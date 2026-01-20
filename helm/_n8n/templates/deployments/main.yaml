@@ -1,0 +1,143 @@
+{{- $imageRepository := coalesce .Values.main.image.repository .Values.image.repository -}}
+{{- $deploymentTag := coalesce .Values.main.image.tag .Values.image.tag .Chart.AppVersion -}}
+{{- $deploymentStrategy := merge (.Values.main.deploymentStrategy | default dict) (.Values.deploymentStrategy | default dict) -}}
+{{- $imagePullPolicy := coalesce .Values.main.image.pullPolicy .Values.image.pullPolicy -}}
+{{- $envSecretName := coalesce .Values.main.envSecretName .Values.envSecretName -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "_.fullname" . }}-main
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+    app.kubernetes.io/component: main
+spec:
+  {{- if not .Values.main.autoscaling.enabled }}
+  replicas: {{ .Values.main.replicaCount }}
+  {{- end }}
+  strategy:
+    type: {{ $deploymentStrategy.type }}
+    {{- if eq $deploymentStrategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ default "25%" $deploymentStrategy.maxSurge  }}
+      maxUnavailable: {{ default "25%" $deploymentStrategy.maxUnavailable }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "_.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: main
+  template:
+    metadata:
+      {{- $podAnnotations := merge (.Values.podAnnotations | default dict) (.Values.main.podAnnotations | default dict) -}}
+      {{- with $podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "_.labels" . | nindent 8 }}
+        {{- $podLabels := merge (.Values.podLabels | default dict) (.Values.main.podLabels | default dict) -}}
+        {{- with $podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app.kubernetes.io/component: main
+    spec:
+      {{- $imagePullSecrets := concat (.Values.imagePullSecrets | default list) (.Values.main.imagePullSecrets | default list) -}}
+      {{- with $imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ default .Values.main.serviceAccountName .Values.serviceAccountName }}
+      {{- $podSecurityContext := merge (.Values.podSecurityContext | default dict) (.Values.main.podSecurityContext | default dict) -}}
+      {{- with $podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-main
+          {{- $securityContext := merge (.Values.securityContext | default dict) (.Values.main.securityContext | default dict) -}}
+          {{- with $securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ $imageRepository }}:{{ $deploymentTag }}"
+          imagePullPolicy: {{ $imagePullPolicy }}
+          env:
+            - name: DEPLOYMENT_TAG
+              value: {{ $deploymentTag | quote }}
+            - name: N8N_USER_FOLDER
+              value: /home/node
+            - name: N8N_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "_.fullname" . }}-shared
+                  key: encryption-key
+            - name: N8N_RUNNERS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "_.fullname" . }}-shared
+                  key: runners-auth-token
+          {{- $env := merge (.Values.env | default dict) (.Values.main.env | default dict) -}}
+            {{- range $k, $v := $env }}
+            - name: {{ $k | quote }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- $extraEnv := merge (.Values.extraEnv | default dict) (.Values.main.extraEnv | default dict) -}}
+            {{- range $key, $value := $extraEnv }}
+            - name: {{ $key }}
+              {{- toYaml $value | nindent 14 }}
+            {{- end }}
+          {{- if $envSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ $envSecretName }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.main.service.port }}
+              protocol: TCP
+            - name: broker
+              protocol: TCP
+              containerPort: 5679
+          {{- with .Values.main.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.main.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.main.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /home/node
+          {{- with .Values.main.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "_.fullname" . }}
+      {{- with .Values.main.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $nodeSelector := merge (.Values.nodeSelector | default dict) (.Values.main.nodeSelector | default dict) -}}
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $affinity := merge (.Values.affinity | default dict) (.Values.main.affinity | default dict) -}}
+      {{- with $affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $tolerations := concat (.Values.tolerations | default list) (.Values.main.tolerations | default list) -}}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

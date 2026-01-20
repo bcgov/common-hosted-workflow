@@ -1,0 +1,10 @@
+{
+  "name": "common-hosted-workflow",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "scripts": {},
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "prettier": "4.0.0-alpha.13"
+  }
+}

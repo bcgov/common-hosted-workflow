@@ -1,0 +1,24 @@
+n8n:
+  enabled: true
+  env:
+    WEBHOOK_URL: "https://dev-chwf.apps.gold.devops.gov.bc.ca"
+    N8N_SMTP_HOST: "apps.smtp.gov.bc.ca"
+    N8N_SMTP_PORT: "25"
+    N8N_SMTP_SSL: "false"
+    N8N_SMTP_AUTHTYPE: "NONE"
+    N8N_SMTP_USER: ""
+    N8N_SMTP_PASS: ""
+    N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+
+  route:
+    enabled: true
+    host: dev-chwf.apps.gold.devops.gov.bc.ca
+
+  worker:
+    enabled: true
+
+  webhook:
+    enabled: true
+
+  runner:
+    enabled: true

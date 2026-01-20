@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "_.fullname" . }}-main
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+    app.kubernetes.io/component: main
+spec:
+  type: {{ .Values.main.service.type }}
+  ports:
+    - port: {{ .Values.main.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 5679
+      targetPort: broker
+      protocol: TCP
+      name: broker
+  selector:
+    {{- include "_.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: main

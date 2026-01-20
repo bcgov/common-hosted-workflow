@@ -1,0 +1,145 @@
+{{- $imageRepository := coalesce .Values.webhook.image.repository .Values.image.repository -}}
+{{- $deploymentTag := coalesce .Values.webhook.image.tag .Values.image.tag .Chart.AppVersion -}}
+{{- $deploymentStrategy := merge (.Values.webhook.deploymentStrategy | default dict) (.Values.deploymentStrategy | default dict) -}}
+{{- $imagePullPolicy := coalesce .Values.webhook.image.pullPolicy .Values.image.pullPolicy -}}
+{{- $envSecretName := coalesce .Values.webhook.envSecretName .Values.envSecretName -}}
+
+{{- if .Values.webhook.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "_.fullname" . }}-webhook
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+spec:
+  {{- if not .Values.webhook.autoscaling.enabled }}
+  replicas: {{ .Values.webhook.replicaCount }}
+  {{- end }}
+  strategy:
+    type: {{ $deploymentStrategy.type }}
+    {{- if eq $deploymentStrategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ default "25%" $deploymentStrategy.maxSurge  }}
+      maxUnavailable: {{ default "25%" $deploymentStrategy.maxUnavailable }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "_.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: webhook
+  template:
+    metadata:
+      {{- $podAnnotations := merge (.Values.podAnnotations | default dict) (.Values.webhook.podAnnotations | default dict) -}}
+      {{- with $podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "_.labels" . | nindent 8 }}
+        {{- $podLabels := merge (.Values.podLabels | default dict) (.Values.webhook.podLabels | default dict) -}}
+        {{- with $podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app.kubernetes.io/component: webhook
+    spec:
+      {{- $imagePullSecrets := concat (.Values.imagePullSecrets | default list) (.Values.webhook.imagePullSecrets | default list) -}}
+      {{- with $imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ default .Values.webhook.serviceAccountName .Values.serviceAccountName }}
+      {{- $podSecurityContext := merge (.Values.podSecurityContext | default dict) (.Values.webhook.podSecurityContext | default dict) -}}
+      {{- with $podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-webhook
+          {{- $securityContext := merge (.Values.securityContext | default dict) (.Values.webhook.securityContext | default dict) -}}
+          {{- with $securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ $imageRepository }}:{{ $deploymentTag }}"
+          imagePullPolicy: {{ $imagePullPolicy }}
+          command: ["n8n"]
+          args:
+            - "webhook"
+          env:
+            - name: DEPLOYMENT_TAG
+              value: {{ $deploymentTag | quote }}
+            - name: N8N_USER_FOLDER
+              value: /home/node
+            - name: N8N_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "_.fullname" . }}-shared
+                  key: encryption-key
+            - name: N8N_RUNNERS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "_.fullname" . }}-shared
+                  key: runners-auth-token
+          {{- $env := merge (.Values.env | default dict) (.Values.webhook.env | default dict) -}}
+            {{- range $k, $v := $env }}
+            - name: {{ $k | quote }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- $extraEnv := merge (.Values.extraEnv | default dict) (.Values.webhook.extraEnv | default dict) -}}
+            {{- range $key, $value := $extraEnv }}
+            - name: {{ $key }}
+              {{- toYaml $value | nindent 14 }}
+            {{- end }}
+          {{- if $envSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ $envSecretName }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.webhook.service.port }}
+              protocol: TCP
+          {{- with .Values.webhook.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.webhook.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.webhook.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /home/node
+          {{- with .Values.webhook.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "_.fullname" . }}
+      {{- with .Values.webhook.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $nodeSelector := merge (.Values.nodeSelector | default dict) (.Values.webhook.nodeSelector | default dict) -}}
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $affinity := merge (.Values.affinity | default dict) (.Values.webhook.affinity | default dict) -}}
+      {{- with $affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $tolerations := concat (.Values.tolerations | default list) (.Values.webhook.tolerations | default list) -}}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,33 @@
+{{- if .Values.runner.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "_.fullname" . }}-runner
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "_.fullname" . }}
+  minReplicas: {{ .Values.runner.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.runner.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.runner.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.runner.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.runner.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.runner.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}

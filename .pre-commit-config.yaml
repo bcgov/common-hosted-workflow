@@ -1,0 +1,47 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: check-case-conflict
+  - id: check-executables-have-shebangs
+    files: \.sh
+  - id: check-json
+  - id: check-vcs-permalinks
+  - id: check-yaml
+    exclude: ^(helm)
+  - id: check-ast
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+- repo: https://github.com/Yelp/detect-secrets
+  rev: v1.5.0
+  hooks:
+  - id: detect-secrets
+    args: [--baseline, .secrets.baseline]
+    exclude: |
+        (?x)^(
+            docker-compose/n8n/demo-data/ |
+            pnpm-lock\.yaml$ |
+            .*/pnpm-lock\.yaml$
+        )
+- repo: local
+  hooks:
+  - id: prettier
+    name: prettier
+    entry: .bin/prettier.sh
+    language: script
+    pass_filenames: true
+    files: \.(ts|tsx|js|jsx|json|css|scss|md|html|yaml|yml)$
+    exclude: .git/COMMIT_EDITMSG
+  - id: python-format
+    name: lint Python
+    entry: black
+    language: system
+    types: [python]
+
+exclude: |
+  (?x)^(
+    CHANGELOG\.md |
+    (.*/)?package-lock\.json |
+    (.*/)?yarn\.lock |
+    (.*/)?pnpm-lock\.yaml
+  )$

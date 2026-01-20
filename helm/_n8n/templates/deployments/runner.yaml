@@ -1,0 +1,144 @@
+{{- $imageRepository := coalesce .Values.runner.image.repository .Values.image.repository -}}
+{{- $deploymentTag := coalesce .Values.runner.image.tag .Values.image.tag .Chart.AppVersion -}}
+{{- $deploymentStrategy := merge (.Values.runner.deploymentStrategy | default dict) (.Values.deploymentStrategy | default dict) -}}
+{{- $imagePullPolicy := coalesce .Values.runner.image.pullPolicy .Values.image.pullPolicy -}}
+{{- $envSecretName := .Values.runner.envSecretName -}}
+
+{{- if .Values.runner.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "_.fullname" . }}-runner
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+spec:
+  {{- if not .Values.runner.autoscaling.enabled }}
+  replicas: {{ .Values.runner.replicaCount }}
+  {{- end }}
+  strategy:
+    type: {{ $deploymentStrategy.type }}
+    {{- if eq $deploymentStrategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ default "25%" $deploymentStrategy.maxSurge  }}
+      maxUnavailable: {{ default "25%" $deploymentStrategy.maxUnavailable }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "_.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: runner
+  template:
+    metadata:
+      {{- $podAnnotations := merge (.Values.podAnnotations | default dict) (.Values.runner.podAnnotations | default dict) -}}
+      {{- with $podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "_.labels" . | nindent 8 }}
+        {{- $podLabels := merge (.Values.podLabels | default dict) (.Values.runner.podLabels | default dict) -}}
+        {{- with $podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app.kubernetes.io/component: runner
+    spec:
+      {{- $imagePullSecrets := concat (.Values.imagePullSecrets | default list) (.Values.runner.imagePullSecrets | default list) -}}
+      {{- with $imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ default .Values.runner.serviceAccountName .Values.serviceAccountName }}
+      {{- $podSecurityContext := merge (.Values.podSecurityContext | default dict) (.Values.runner.podSecurityContext | default dict) -}}
+      {{- with $podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-runner
+          {{- $securityContext := merge (.Values.securityContext | default dict) (.Values.runner.securityContext | default dict) -}}
+          {{- with $securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ $imageRepository }}:{{ $deploymentTag }}"
+          imagePullPolicy: {{ $imagePullPolicy }}
+          env:
+            - name: DEPLOYMENT_TAG
+              value: {{ $deploymentTag | quote }}
+            # - name: N8N_USER_FOLDER
+            #   value: /home/node
+            # - name: N8N_ENCRYPTION_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: {{ include "_.fullname" . }}-shared
+            #       key: encryption-key
+            - name: N8N_RUNNERS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "_.fullname" . }}-shared
+                  key: runners-auth-token
+            - name: N8N_RUNNERS_TASK_BROKER_URI
+              value: "http://{{ include "_.fullname" . }}-worker:5679"
+          {{- $env := .Values.runner.env | default dict -}}
+            {{- range $k, $v := $env }}
+            - name: {{ $k | quote }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- $extraEnv := .Values.runner.extraEnv | default dict -}}
+            {{- range $key, $value := $extraEnv }}
+            - name: {{ $key }}
+              {{- toYaml $value | nindent 14 }}
+            {{- end }}
+          {{- if $envSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ $envSecretName }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.runner.service.port }}
+              protocol: TCP
+          {{- with .Values.runner.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.runner.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.runner.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # volumeMounts:
+          #   - name: data
+          #     mountPath: /home/node
+          # {{- with .Values.runner.volumeMounts }}
+          #   {{- toYaml . | nindent 12 }}
+          # {{- end }}
+      # volumes:
+      #   - name: data
+      #     persistentVolumeClaim:
+      #       claimName: {{ include "_.fullname" . }}
+      # {{- with .Values.runner.volumes }}
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}
+
+      {{- $nodeSelector := merge (.Values.nodeSelector | default dict) (.Values.runner.nodeSelector | default dict) -}}
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $affinity := merge (.Values.affinity | default dict) (.Values.runner.affinity | default dict) -}}
+      {{- with $affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- $tolerations := concat (.Values.tolerations | default list) (.Values.runner.tolerations | default list) -}}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
