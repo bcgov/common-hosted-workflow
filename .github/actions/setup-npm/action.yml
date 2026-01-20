@@ -1,0 +1,18 @@
+name: Setup NPM Packages
+description: Setup required NPM packages with caching for pnpm
+runs:
+  using: composite
+  steps:
+    # Cache pnpm store
+    - name: Cache pnpm store
+      uses: actions/cache@v3
+      with:
+        path: ~/.local/share/pnpm/store/v3
+        key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-${{ runner.os }}-
+
+    - name: Install NPM packages
+      run: |
+        pnpm install
+      shell: bash

@@ -1,0 +1,32 @@
+name: Run pre-commit
+
+on: push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+    - uses: hmarr/debug-action@f7318c783045ac39ed9bb497e22ce835fdafbfe6
+    - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Setup NPM Packages
+      uses: ./.github/actions/setup-npm
+
+    - name: Set executable permissions for local format scripts
+      run: |
+        chmod +x ./.bin/prettier.sh
+
+    - name: Run pre-commit
+      uses: egose/actions/precommit@9057902ffe4d8d8e420e31ef1cda3931710ece60
+      with:
+        config: .pre-commit-config.yaml
+        commit-on-push: false
+        commit-on-pr: false
