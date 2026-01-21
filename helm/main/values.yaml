@@ -33,13 +33,15 @@ n8n:
     # See https://docs.n8n.io/hosting/configuration/environment-variables/binary-data/#binary-data-environment-variables
     N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/security/#security-environment-variables
-    N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+    N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
     N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
     N8N_GIT_NODE_DISABLE_BARE_REPOS: "false"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/task-runners/#n8n-instance-environment-variables
     N8N_RUNNERS_ENABLED: "true" # runner.enabled = true
     N8N_RUNNERS_MODE: "external"
     N8N_RUNNERS_BROKER_LISTEN_ADDRESS: "0.0.0.0"
+    # See https://docs.n8n.io/hosting/scaling/concurrency-control/#self-hosted-concurrency-control
+    N8N_CONCURRENCY_PRODUCTION_LIMIT: "-1"
     # See https://docs.n8n.io/hosting/configuration/task-runners/#setting-up-external-mode
     N8N_NATIVE_PYTHON_RUNNER: "true"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/queue-mode/#queue-mode-environment-variables
@@ -55,6 +57,7 @@ n8n:
     # Extra
     N8N_WORKER_SERVER_ADDRESS: "0.0.0.0"
     N8N_TRUST_PROXY: "true"
+    N8N_BLOCK_FS_WRITE_ACCESS: "true"
 
   extraEnv:
     DB_POSTGRESDB_PASSWORD:
@@ -103,6 +106,7 @@ n8n:
 
     env:
       N8N_RUNNERS_MAX_CONCURRENCY: "20"
+      N8N_BLOCK_FS_WRITE_ACCESS: "true"
 
     resources:
       requests:

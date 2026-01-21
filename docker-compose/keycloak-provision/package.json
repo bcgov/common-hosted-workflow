@@ -1,0 +1,21 @@
+{
+  "name": "keycloak-provision",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "rimraf ./build && tsc",
+    "start": "tsx main.ts"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@egose/keycloak-fluent": "^0.3.0",
+    "wait-on": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/wait-on": "^5.3.4",
+    "rimraf": "^6.0.0",
+    "tsx": "^4.11.2",
+    "typescript": "^5.4.5"
+  }
+}
