@@ -16,7 +16,7 @@ n8n:
 
   image:
     repository: ghcr.io/bcgov/chwf
-    tag: 742812c0226ebad114b977ca3cdc12e4fb15bc9e # pragma: allowlist secret
+    tag: main
     pullPolicy: IfNotPresent
 
   env:

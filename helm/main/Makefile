@@ -12,7 +12,8 @@ define arguments
     "${NAME}" . \
     -n "${NAMESPACE}" \
     -f values.yaml \
-    -f "values-${NAMESPACE}.yaml"
+    -f "values-${NAMESPACE}.yaml" \
+	--set n8n.image.tag="${IMAGE_TAG}"
 endef
 
 .PHONY: helm-dep install upgrade lint uninstall template force-install help
