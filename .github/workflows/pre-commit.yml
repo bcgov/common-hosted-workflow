@@ -28,7 +28,7 @@ jobs:
         chmod +x ./.bin/prettier.sh
 
     - name: Run pre-commit
-      uses: egose/actions/precommit@9057902ffe4d8d8e420e31ef1cda3931710ece60
+      uses: egose/actions/precommit@fb7c0ce76762ce2b5bc5d081efe23aed7dd854bb
       with:
         config: .pre-commit-config.yaml
         commit-on-push: false
