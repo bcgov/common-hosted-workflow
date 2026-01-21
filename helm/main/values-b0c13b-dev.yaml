@@ -14,6 +14,11 @@ n8n:
     enabled: true
     host: dev-chwf.apps.gold.devops.gov.bc.ca
 
+  main:
+    env:
+      OIDC_ISSUER_URL: https://dev.loginproxy.gov.bc.ca/auth
+      OIDC_REDIRECT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/auth/oidc/callback
+
   worker:
     enabled: true
 
