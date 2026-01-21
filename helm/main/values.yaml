@@ -15,8 +15,7 @@ n8n:
   fullnameOverride: chwf-n8n
 
   image:
-    registry: ghcr.io
-    repository: bcgov/chwf
+    repository: ghcr.io/bcgov/chwf
     tag: 742812c0226ebad114b977ca3cdc12e4fb15bc9e # pragma: allowlist secret
     pullPolicy: IfNotPresent
 
