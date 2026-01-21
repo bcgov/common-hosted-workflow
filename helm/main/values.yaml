@@ -15,9 +15,10 @@ n8n:
   fullnameOverride: chwf-n8n
 
   image:
-    repository: n8nio/n8n
+    registry: ghcr.io
+    repository: bcgov/chwf
+    tag: 742812c0226ebad114b977ca3cdc12e4fb15bc9e # pragma: allowlist secret
     pullPolicy: IfNotPresent
-    tag: 2.4.2
 
   env:
     # See https://docs.n8n.io/hosting/configuration/supported-databases-settings/#postgresdb
@@ -71,10 +72,15 @@ n8n:
           name: chwf-redis
           key: redis-password
   main:
+    env:
+      OIDC_ROLES_CLAIM: client_roles
+
+    envSecretName: chwf # pragma: allowlist secret
+
     resources:
       requests:
-        cpu: 200m
-        memory: 384Mi
+        cpu: 300m
+        memory: 576Mi
       limits:
         cpu: 500m
         memory: 1Gi
@@ -84,8 +90,8 @@ n8n:
 
     resources:
       requests:
-        cpu: 200m
-        memory: 384Mi
+        cpu: 300m
+        memory: 576Mi
       limits:
         cpu: 500m
         memory: 1Gi
@@ -95,8 +101,8 @@ n8n:
 
     resources:
       requests:
-        cpu: 200m
-        memory: 384Mi
+        cpu: 300m
+        memory: 576Mi
       limits:
         cpu: 500m
         memory: 1Gi
@@ -110,8 +116,8 @@ n8n:
 
     resources:
       requests:
-        cpu: 200m
-        memory: 384Mi
+        cpu: 400m
+        memory: 768Mi
       limits:
         cpu: 500m
         memory: 1Gi
