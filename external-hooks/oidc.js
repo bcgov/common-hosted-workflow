@@ -13,7 +13,7 @@
  * - OIDC_ISSUER_URL: The OIDC provider's issuer URL (e.g., https://auth.example.com)
  * - OIDC_CLIENT_ID: OAuth2 client ID
  * - OIDC_CLIENT_SECRET: OAuth2 client secret
- * - OIDC_REDIRECT_URI: The callback URL (e.g., https://n8n.example.com/webhook/auth/oidc/callback)
+ * - OIDC_REDIRECT_URI: The callback URL (e.g., https://n8n.example.com/auth/oidc/callback)
  *
  * Optional:
  * - OIDC_SCOPES: Space-separated list of scopes (default: "openid email profile")
@@ -376,7 +376,7 @@ module.exports = {
         /**
          * OIDC Login endpoint - redirects to the OIDC provider
          */
-        app.get('/webhook/auth/oidc/login', async (req, res) => {
+        app.get('/external/auth/oidc/login', async (req, res) => {
           try {
             const discovery = await fetchDiscoveryDocument();
 
@@ -409,7 +409,7 @@ module.exports = {
         /**
          * OIDC Callback endpoint - handles the authorization code
          */
-        app.get('/webhook/auth/oidc/callback', async (req, res) => {
+        app.get('/external/auth/oidc/callback', async (req, res) => {
           try {
             const { code, state, error, error_description } = req.query;
 
@@ -544,8 +544,8 @@ module.exports = {
         });
 
         console.log('[OIDC Hook] OIDC routes registered:');
-        console.log('  - GET /webhook/auth/oidc/login');
-        console.log('  - GET /webhook/auth/oidc/callback');
+        console.log('  - GET /external/auth/oidc/login');
+        console.log('  - GET /external/auth/oidc/callback');
         console.log('  - GET /assets/oidc-frontend-hook.js');
       },
     ],
@@ -567,7 +567,7 @@ module.exports = {
         frontendSettings.sso = frontendSettings.sso || {};
         frontendSettings.sso.oidc = {
           loginEnabled: true,
-          loginUrl: '/webhook/auth/oidc/login',
+          loginUrl: '/external/auth/oidc/login',
           callbackUrl: config.redirectUri,
         };
 
@@ -647,7 +647,7 @@ function getFrontendScript() {
 		button.id = 'oidc-sso-button';
 		button.type = 'button';
 		button.textContent = 'Sign in with SSO';
-		button.onclick = function() { window.location.href = '/auth/oidc/login'; };
+		// button.onclick = function() { window.location.href = '/external/auth/oidc/login'; };
 
 		if (buttonClasses) {
 			button.className = buttonClasses;
