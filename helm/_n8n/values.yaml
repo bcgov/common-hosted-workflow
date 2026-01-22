@@ -1,6 +1,6 @@
 image:
   repository: n8nio/n8n
-  tag: 2.4.4
+  tag: 2.5.0
   pullPolicy: IfNotPresent
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -333,7 +333,7 @@ runner:
 
   image:
     repository: n8nio/runners
-    tag: 2.4.4
+    tag: 2.5.0
     pullPolicy: IfNotPresent
 
   imagePullSecrets: []
