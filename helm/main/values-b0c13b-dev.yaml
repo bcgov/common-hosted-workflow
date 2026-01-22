@@ -16,7 +16,7 @@ n8n:
 
   main:
     env:
-      OIDC_ISSUER_URL: https://dev.loginproxy.gov.bc.ca/auth
+      OIDC_ISSUER_URL: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
       OIDC_REDIRECT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/auth/oidc/callback
 
   worker:

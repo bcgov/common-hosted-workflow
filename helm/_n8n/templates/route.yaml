@@ -11,6 +11,8 @@ spec:
   {{- if .Values.route.host }}
   host: {{ .Values.route.host }}
   {{- end }}
+  port:
+    targetPort: http
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: edge
