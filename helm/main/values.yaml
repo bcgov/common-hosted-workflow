@@ -60,11 +60,17 @@ n8n:
     N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/timezone-localization/
     GENERIC_TIMEZONE: "America/Vancouver"
+    # See https://docs.n8n.io/hosting/configuration/environment-variables/deployment
+    N8N_TEMPLATES_ENABLED: "false"
+    N8N_PERSONALIZATION_ENABLED: "false"
+    N8N_DIAGNOSTICS_ENABLED: "false"
+    N8N_HIRING_BANNER_ENABLED: "false"
     # Extra
     N8N_WORKER_SERVER_ADDRESS: "0.0.0.0"
     N8N_BLOCK_FS_WRITE_ACCESS: "true"
     N8N_HIDE_ACTIVATION_ALERT: "true"
     N8N_HIDE_HIDE_GITHUB_STAR_BUTTON: "true"
+    N8N_AI_ENABLED: "false"
 
   extraEnv:
     DB_POSTGRESDB_PASSWORD:
