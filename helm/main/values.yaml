@@ -53,16 +53,19 @@ n8n:
     EXECUTIONS_DATA_MAX_AGE: "336"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/user-management-smtp-2fa/
     N8N_EMAIL_MODE: "smtp"
+    # See https://docs.n8n.io/hosting/configuration/environment-variables/licenses
+    N8N_HIDE_USAGE_PAGE: "true"
+    N8N_LICENSE_AUTO_RENEW_ENABLED: "false"
+    # See https://docs.n8n.io/hosting/configuration/environment-variables/insights/#insights-environment-variables
+    N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
+    # See https://docs.n8n.io/hosting/configuration/environment-variables/timezone-localization/
+    GENERIC_TIMEZONE: "America/Vancouver"
     # Extra
     N8N_WORKER_SERVER_ADDRESS: "0.0.0.0"
     N8N_TRUST_PROXY: "true"
     N8N_BLOCK_FS_WRITE_ACCESS: "true"
-    # See https://docs.n8n.io/hosting/configuration/environment-variables/licenses
-    N8N_HIDE_USAGE_PAGE: "true"
-    N8N_LICENSE_AUTO_RENEW_ENABLED: "false"
     N8N_HIDE_ACTIVATION_ALERT: "true"
     N8N_HIDE_HIDE_GITHUB_STAR_BUTTON: "true"
-    N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
 
   extraEnv:
     DB_POSTGRESDB_PASSWORD:
@@ -113,6 +116,11 @@ n8n:
 
   runner:
     enabled: false
+
+    image:
+      repository: n8nio/runners
+      tag: 2.5.0
+      pullPolicy: IfNotPresent
 
     env:
       N8N_RUNNERS_MAX_CONCURRENCY: "20"
