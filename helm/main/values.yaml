@@ -62,8 +62,7 @@ n8n:
     GENERIC_TIMEZONE: "America/Vancouver"
     # Extra
     N8N_WORKER_SERVER_ADDRESS: "0.0.0.0"
-    # N8N_TRUST_PROXY: "true"
-    # N8N_BLOCK_FS_WRITE_ACCESS: "true"
+    N8N_BLOCK_FS_WRITE_ACCESS: "true"
     N8N_HIDE_ACTIVATION_ALERT: "true"
     N8N_HIDE_HIDE_GITHUB_STAR_BUTTON: "true"
 
@@ -105,6 +104,11 @@ n8n:
 
   webhook:
     enabled: false
+
+    env:
+      OIDC_ROLES_CLAIM: client_roles
+
+    envSecretName: chwf # pragma: allowlist secret
 
     resources:
       requests:
