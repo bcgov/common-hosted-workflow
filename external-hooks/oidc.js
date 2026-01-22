@@ -376,7 +376,7 @@ module.exports = {
         /**
          * OIDC Login endpoint - redirects to the OIDC provider
          */
-        app.get('/external/auth/oidc/login', async (req, res) => {
+        app.get('/rest/auth/oidc/login', async (req, res) => {
           try {
             const discovery = await fetchDiscoveryDocument();
 
@@ -409,7 +409,7 @@ module.exports = {
         /**
          * OIDC Callback endpoint - handles the authorization code
          */
-        app.get('/external/auth/oidc/callback', async (req, res) => {
+        app.get('/rest/auth/oidc/callback', async (req, res) => {
           try {
             const { code, state, error, error_description } = req.query;
 
@@ -544,8 +544,8 @@ module.exports = {
         });
 
         console.log('[OIDC Hook] OIDC routes registered:');
-        console.log('  - GET /external/auth/oidc/login');
-        console.log('  - GET /external/auth/oidc/callback');
+        console.log('  - GET /rest/auth/oidc/login');
+        console.log('  - GET /rest/auth/oidc/callback');
         console.log('  - GET /assets/oidc-frontend-hook.js');
       },
     ],
@@ -567,7 +567,7 @@ module.exports = {
         frontendSettings.sso = frontendSettings.sso || {};
         frontendSettings.sso.oidc = {
           loginEnabled: true,
-          loginUrl: '/external/auth/oidc/login',
+          loginUrl: '/rest/auth/oidc/login',
           callbackUrl: config.redirectUri,
         };
 
@@ -647,7 +647,7 @@ function getFrontendScript() {
 		button.id = 'oidc-sso-button';
 		button.type = 'button';
 		button.textContent = 'Sign in with SSO';
-		// button.onclick = function() { window.location.href = '/external/auth/oidc/login'; };
+		button.onclick = function() { window.location.href = '/rest/auth/oidc/login'; };
 
 		if (buttonClasses) {
 			button.className = buttonClasses;
