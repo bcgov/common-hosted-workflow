@@ -37,7 +37,6 @@ n8n:
     N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
     N8N_GIT_NODE_DISABLE_BARE_REPOS: "false"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/task-runners/#n8n-instance-environment-variables
-    N8N_RUNNERS_ENABLED: "true" # runner.enabled = true
     N8N_RUNNERS_MODE: "external"
     N8N_RUNNERS_BROKER_LISTEN_ADDRESS: "0.0.0.0"
     # See https://docs.n8n.io/hosting/scaling/concurrency-control/#self-hosted-concurrency-control
@@ -58,6 +57,12 @@ n8n:
     N8N_WORKER_SERVER_ADDRESS: "0.0.0.0"
     N8N_TRUST_PROXY: "true"
     N8N_BLOCK_FS_WRITE_ACCESS: "true"
+    # See https://docs.n8n.io/hosting/configuration/environment-variables/licenses
+    N8N_HIDE_USAGE_PAGE: "true"
+    N8N_LICENSE_AUTO_RENEW_ENABLED: "false"
+    N8N_HIDE_ACTIVATION_ALERT: "true"
+    N8N_HIDE_HIDE_GITHUB_STAR_BUTTON: "true"
+    N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
 
   extraEnv:
     DB_POSTGRESDB_PASSWORD:
