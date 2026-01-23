@@ -31,7 +31,7 @@ x-n8n: &service-n8n
     OLLAMA_HOST: ${OLLAMA_HOST:-ollama:11434}
     N8N_PORT: "5678"
     NODE_ENV: production
-    EXTERNAL_HOOK_FILES: /home/node/.n8n/external-hooks/oidc.js
+    EXTERNAL_HOOK_FILES: /home/node/.n8n/external-hooks/oidc.js:/home/node/.n8n/external-hooks/test.js
     # Trust proxy for rate limiting
     N8N_TRUST_PROXY: "true"
     # OIDC Configuration
@@ -184,7 +184,7 @@ services:
       - n8n_storage:/home/node/.n8n
       - ./n8n/demo-data:/demo-data
       - ../community-nodes:/community-nodes
-      - ../external-hooks/oidc.js:/home/node/.n8n/external-hooks/oidc.js
+      - ../external-hooks:/home/node/.n8n/external-hooks
     restart: unless-stopped
     depends_on:
       postgres:

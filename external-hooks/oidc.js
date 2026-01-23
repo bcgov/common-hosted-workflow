@@ -332,6 +332,7 @@ function isValidEmail(email) {
 // n8n module paths (specific to the Docker image)
 const N8N_DI_PATH = '/usr/local/lib/node_modules/n8n/node_modules/@n8n/di';
 const N8N_JWT_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/services/jwt.service.js';
+const N8N_USER_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/services/user.service.js';
 
 // Export the hooks
 module.exports = {
@@ -353,7 +354,9 @@ module.exports = {
         // Get n8n's JwtService from the DI container
         const { Container } = require(N8N_DI_PATH);
         const { JwtService } = require(N8N_JWT_SERVICE_PATH);
+        const { UserService } = require(N8N_USER_SERVICE_PATH);
         const jwtService = Container.get(JwtService);
+        const userService = Container.get(UserService);
 
         const { app } = server;
         const cookieSecret = getCookieSecret();
@@ -472,6 +475,18 @@ module.exports = {
               return res.redirect('/signin?error=' + encodeURIComponent('No valid email in OIDC response'));
             }
 
+            const rawRole = userInfo[config.rolesClaim];
+            const roleStr = (rawRole ?? '').toString();
+
+            let jwtRole = '';
+            const roles = roleStr
+              .split(',')
+              .map((r) => r.trim())
+              .filter(Boolean);
+            if (roles.length > 0 && ['global:owner', 'global:admin', 'global:member'].includes(roles[0])) {
+              jwtRole = roles[0];
+            }
+
             // Find or create user in n8n database
             const { User, Settings, Credentials, Workflow } = this.dbCollections;
 
@@ -485,18 +500,7 @@ module.exports = {
               // Check if this is the first user (should be owner)
               const userCount = await User.count();
               let role = userCount === 0 ? 'global:owner' : 'global:member';
-
-              const rawRole = userInfo[config.rolesClaim];
-              const roleStr = (rawRole ?? '').toString();
-              console.log(`[OIDC Hook] Role "${roleStr}" found in new user: ${userInfo.email}`);
-
-              const roles = roleStr
-                .split(',')
-                .map((r) => r.trim())
-                .filter(Boolean);
-              if (roles.length > 0 && ['global:owner', 'global:admin', 'global:member'].includes(roles[0])) {
-                role = roles[0];
-              }
+              if (jwtRole) role = jwtRole;
 
               const userData = {
                 email: userInfo.email,
@@ -510,13 +514,16 @@ module.exports = {
               const result = await User.createUserWithProject(userData);
               user = result.user;
 
-              console.log(
-                `[OIDC Hook] Created ${userCount === 0 ? 'owner' : 'member'} user with personal project: ${userInfo.email}`,
-              );
+              console.log(`[OIDC Hook] Created ${role} user with personal project: ${userInfo.email}`);
             }
 
             if (!user) {
               return res.redirect('/signin?error=' + encodeURIComponent('Failed to create or find user'));
+            }
+
+            if (jwtRole && user.role.slug !== jwtRole) {
+              await userService.changeUserRole(user, { newRoleName: jwtRole });
+              console.log(`[OIDC Hook] User role updated from ${user.role.slug} to ${jwtRole}: ${userInfo.email}`);
             }
 
             // Create auth token using n8n's JwtService
