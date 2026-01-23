@@ -474,6 +474,7 @@ module.exports = {
 
             // Find or create user in n8n database
             const { User, Settings, Credentials, Workflow } = this.dbCollections;
+            console.log(Object.keys(this.dbCollections));
 
             // Try to find existing user by email
             let user = await User.findOne({
@@ -487,6 +488,7 @@ module.exports = {
               let role = userCount === 0 ? 'global:owner' : 'global:member';
 
               const roleStr = userInfo[config.rolesClaim] ?? '';
+              console.log(`[OIDC Hook] Role "${roleStr}" found in new user: ${userInfo.email}`);
               const roles = roleStr.split(',');
 
               if (roles.length > 0 && ['global:owner', 'global:admin', 'global:member'].includes(roles[0])) {
