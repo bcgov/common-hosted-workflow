@@ -163,7 +163,6 @@ services:
       ls -al /community-nodes
 
       cd /home/node/.n8n/nodes
-      rm -rf node_modules package-lock.json
       npm install /community-nodes
 
       ls -al /home/node/.n8n/nodes

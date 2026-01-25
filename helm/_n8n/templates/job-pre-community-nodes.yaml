@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "_.fullname" . }}-pre-community-nodes
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade,pre-rollback"
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+    "helm.sh/hook-weight": "-6"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      name: {{ include "_.fullname" . }}-pre-community-nodes
+    spec:
+      activeDeadlineSeconds: 1800
+      restartPolicy: Never
+      serviceAccountName: {{ default .Values.global.serviceAccountName .Values.serviceAccountName }}
+      containers:
+        - name: {{ include "_.fullname" . }}-pre-community-nodes
+          image: node:22.22.0-alpine3.23
+          imagePullPolicy: IfNotPresent
+          command: [/bin/sh, -c]
+          args:
+          - |
+            set -euo pipefail
+            cd /home/node/.n8n/nodes
+            npm install /community-nodes
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /home/node
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "_.fullname" . }}

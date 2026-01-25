@@ -26,6 +26,14 @@ export class Example implements INodeType {
         placeholder: 'Placeholder value',
         description: 'The description text',
       },
+      {
+        displayName: 'My String3',
+        name: 'myString3',
+        type: 'string',
+        default: '',
+        placeholder: 'Placeholder value3',
+        description: 'The description text3',
+      },
     ],
   };
 
