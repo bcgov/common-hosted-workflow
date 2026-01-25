@@ -1,9 +1,12 @@
+{{- $imageRepository := coalesce .Values.main.image.repository .Values.image.repository -}}
+{{- $deploymentTag := coalesce .Values.main.image.tag .Values.image.tag .Chart.AppVersion -}}
+{{- $imagePullPolicy := coalesce .Values.main.image.pullPolicy .Values.image.pullPolicy -}}
+
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "_.fullname" . }}-pre-community-nodes
-  labels:
-    {{- include "app.labels" . | nindent 4 }}
+  labels: {{ include "_.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade,pre-rollback"
     "helm.sh/hook-delete-policy": "before-hook-creation"
@@ -20,8 +23,8 @@ spec:
       serviceAccountName: {{ default .Values.global.serviceAccountName .Values.serviceAccountName }}
       containers:
         - name: {{ include "_.fullname" . }}-pre-community-nodes
-          image: node:22.22.0-alpine3.23
-          imagePullPolicy: IfNotPresent
+          image: "{{ $imageRepository }}:{{ $deploymentTag }}"
+          imagePullPolicy: {{ $imagePullPolicy }}
           command: [/bin/sh, -c]
           args:
           - |
