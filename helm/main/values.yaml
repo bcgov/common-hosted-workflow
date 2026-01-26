@@ -22,10 +22,10 @@ n8n:
   env:
     # See https://docs.n8n.io/hosting/configuration/supported-databases-settings/#postgresdb
     DB_TYPE: "postgresdb"
-    DB_POSTGRESDB_DATABASE: "n8n"
-    DB_POSTGRESDB_HOST: "chwf-postgresql"
-    DB_POSTGRESDB_PORT: "5432"
-    DB_POSTGRESDB_USER: "nonroot"
+    # DB_POSTGRESDB_DATABASE: "n8n"
+    # DB_POSTGRESDB_HOST: "chwf-postgresql"
+    # DB_POSTGRESDB_PORT: "5432"
+    # DB_POSTGRESDB_USER: "nonroot"
     DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED: "true"
     # DB_POSTGRESDB_PASSWORD (default: empty)
     # See https://docs.n8n.io/hosting/configuration/configuration-examples/user-folder/#specify-user-folder-path
@@ -73,11 +73,36 @@ n8n:
     N8N_AI_ENABLED: "false"
 
   extraEnv:
+    DB_POSTGRESDB_DATABASE:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n
+          key: dbname
+    DB_POSTGRESDB_HOST:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n
+          key: pgbouncer-host
+    DB_POSTGRESDB_PORT:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n
+          key: pgbouncer-port
+    DB_POSTGRESDB_USER:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n
+          key: user
     DB_POSTGRESDB_PASSWORD:
       valueFrom:
         secretKeyRef:
-          name: chwf-postgresql
-          key: user-password
+          name: chwf-pgo-pguser-n8n
+          key: password
+    # DB_POSTGRESDB_PASSWORD:
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: chwf-postgresql
+    #       key: user-password
     QUEUE_BULL_REDIS_PASSWORD:
       valueFrom:
         secretKeyRef:
@@ -152,7 +177,7 @@ n8n:
 
 # See https://github.com/bitnami/charts/tree/main/bitnami/postgresql
 postgresql:
-  enabled: true
+  enabled: false
 
   image:
     registry: ghcr.io
@@ -201,3 +226,12 @@ redis:
   auth:
     existingSecret: "chwf-redis" # pragma: allowlist secret
     existingSecretPasswordKey: "redis-password" # pragma: allowlist secret
+
+pgo:
+  enabled: true
+
+  nameOverride: chwf-pgo
+  fullnameOverride: chwf-pgo
+
+  databases:
+  - name: n8n

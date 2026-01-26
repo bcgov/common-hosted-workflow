@@ -2,6 +2,10 @@
 {{- $deploymentTag := coalesce .Values.main.image.tag .Values.image.tag .Chart.AppVersion -}}
 {{- $imagePullPolicy := coalesce .Values.main.image.pullPolicy .Values.image.pullPolicy -}}
 
+{{- $pvcName := include "_.fullname" . -}}
+{{- $pvc := (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $pvcName) -}}
+
+{{- if and (gt .Release.Revision 1) $pvc }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,7 +13,7 @@ metadata:
   labels: {{ include "_.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade,pre-rollback"
-    "helm.sh/hook-delete-policy": "before-hook-creation"
+    "helm.sh/hook-delete-policy": "hook-succeeded,before-hook-creation"
     "helm.sh/hook-weight": "-6"
 spec:
   backoffLimit: 0
@@ -29,6 +33,7 @@ spec:
           args:
           - |
             set -euo pipefail
+            mkdir -p /home/node/.n8n/nodes
             cd /home/node/.n8n/nodes
             npm install /community-nodes
           resources:
@@ -42,3 +47,4 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "_.fullname" . }}
+{{- end }}

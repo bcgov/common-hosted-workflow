@@ -9,6 +9,10 @@ dependencies:
     version: '0.1.0'
     repository: 'file://../_n8n'
     condition: n8n.enabled
+  - name: pgo
+    version: '0.1.0'
+    repository: 'file://../_pgo'
+    condition: pgo.enabled
   - name: postgresql
     version: 18.2.0
     repository: https://charts.bitnami.com/bitnami

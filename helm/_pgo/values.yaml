@@ -1,0 +1,130 @@
+nameOverride: pgo
+fullnameOverride: pgo
+
+# --- General Cluster Settings ---
+postgresVersion: 17
+
+databases: []
+  # - name: inventory
+  #   options: CREATEROLE
+  # - name: analytics
+  #   options: NOSUPERUSER
+  # - name: billing
+
+# --- Instance Configuration ---
+instances:
+  name: ha
+  replicas: 2
+  resources:
+    requests:
+      cpu: 1m
+      memory: 256Mi
+  replicaCertCopy:
+    resources:
+      requests:
+        cpu: 1m
+        memory: 32Mi
+  dataVolumeClaimSpec:
+    storage: 480Mi
+    storageClassName: netapp-block-standard
+
+# --- Backup Configuration (pgBackRest) ---
+pgBackRest:
+  image:
+  repos:
+    - name: repo1
+      enabled: true
+      type: volume
+      retention: "2"
+      retentionType: count
+      volume:
+        size: 64Mi
+        accessModes: ReadWriteOnce
+        storageClassName: netapp-file-standard
+      schedules:
+        full: 0 8 * * *
+        incremental: 0 0,4,12,16,20 * * *
+    - name: repo2
+      enabled: false
+      type: s3
+      # The secret 's3-creds-secret' must contain a key named 's3.conf' with:
+      # [global]
+      # repo2-s3-key=<access-key>
+      # repo2-s3-key-secret=<secret-key>
+      # repo2-cipher-pass=<passphrase>
+      secretName: s3-creds-secret # pragma: allowlist secret
+      retention: "30"
+      retentionType: full
+      s3:
+        bucket: my-bucket
+        endpoint: s3.ca-central-1.amazonaws.com
+        region: ca-central-1
+        path: /backups/cluster
+        uriStyle: host
+      schedules:
+        full: 0 8 * * *
+        incremental: 0 0,4,12,16,20 * * *
+
+  repoHost:
+    resources:
+      requests:
+        cpu: 1m
+        memory: 64Mi
+
+  sidecars:
+    resources:
+      requests:
+        cpu: 1m
+        memory: 64Mi
+
+# --- Restore / Bootstrap Configuration ---
+dataSource:
+  enabled: false
+  type: pgbackrest # Options: pgbackrest, postgresCluster
+  secretName: restore-creds # pragma: allowlist secret
+  stanza: db
+  repo:
+    name: repo2
+    provider: s3 # Options: s3, azure, gcs, volume
+    path: /backups/cluster
+    s3:
+      bucket: my-bucket
+      endpoint: s3.ca-central-1.amazonaws.com
+      region: ca-central-1
+
+# --- High Availability & Performance (Patroni) ---
+patroni:
+  postgresql:
+    pg_hba:
+      - host all all 0.0.0.0/0 scram-sha-256
+    parameters:
+      shared_buffers: 16MB # default is 128MB; a good tuned default for shared_buffers is 25% of the memory allocated to the pod
+      wal_buffers: 64KB # this can be set to -1 to automatically set as 1/32 of shared_buffers or 64kB, whichever is larger
+      min_wal_size: 32MB
+      max_wal_size: 64MB # default is 1GB
+      max_slot_wal_keep_size: 128MB # default is -1, allowing unlimited wal growth when replicas fall behind
+
+# --- Connection Pooling (PgBouncer) ---
+pgBouncer:
+  enabled: true
+  image:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 1m
+      memory: 64Mi
+
+# --- Standby / Disaster Recovery ---
+standby:
+  enabled: false
+  repoName: repo1
+
+# --- Monitoring ---
+pgmonitor:
+  enabled: true
+  exporter:
+    image:
+    resources:
+      requests:
+        cpu: 1m
+        memory: 64Mi
