@@ -2,11 +2,14 @@ dependencies:
 - name: n8n
   repository: file://../_n8n
   version: 0.1.0
+- name: pgo
+  repository: file://../_pgo
+  version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 18.2.0
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 24.1.0
-digest: sha256:a826ff5b907c7cff9dd635c8f8d13714e08d582a787859ab41d0acd47698f134
-generated: "2026-01-19T11:46:18.151466381-08:00"
+digest: sha256:1f2e1ede5180e6c742fc3f464a6308bcb7e4bbdf35fcb554f1b2a5a84cffbff3
+generated: "2026-01-25T21:30:36.838244466-08:00"

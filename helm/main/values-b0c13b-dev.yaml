@@ -24,3 +24,12 @@ n8n:
 
   runner:
     enabled: true
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: true
+
+pgo:
+  enabled: true

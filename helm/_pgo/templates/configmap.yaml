@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-init-sql
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  init.sql: |
+    {{- range $db := .Values.databases }}
+    -- Initialize database: {{ $db.name }}
+    \c {{ $db.name }}
+    ALTER SCHEMA public OWNER TO {{ $db.name }};
+    ALTER USER {{ $db.name }} NOSUPERUSER;
+    GRANT ALL ON SCHEMA public TO {{ $db.name }};
+    {{- end }}
