@@ -26,5 +26,6 @@ ENV N8N_PORT=5678 \
     N8N_PROXY_HOPS=1 \
     N8N_PROTOCOL="https" \
     N8N_COMMUNITY_PACKAGES_ENABLED=true \
+    N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/nodes" \
     EXTERNAL_HOOK_FILES=/external-hooks/oidc.js:/external-hooks/test.js \
     EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js

@@ -27,12 +27,12 @@ export class Example implements INodeType {
         description: 'The description text',
       },
       {
-        displayName: 'My String3',
-        name: 'myString3',
+        displayName: 'My String2',
+        name: 'myString2',
         type: 'string',
         default: '',
-        placeholder: 'Placeholder value3',
-        description: 'The description text3',
+        placeholder: 'Placeholder value2',
+        description: 'The description text2',
       },
     ],
   };
