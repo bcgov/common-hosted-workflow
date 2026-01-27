@@ -5,7 +5,7 @@
 {{- $pvcName := include "_.fullname" . -}}
 {{- $pvc := (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $pvcName) -}}
 
-{{- if and (gt .Release.Revision 1) $pvc }}
+{{- if and (gt .Release.Revision 1) $pvc (index $pvc "metadata") }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -33,8 +33,8 @@ spec:
           args:
           - |
             set -euo pipefail
-            mkdir -p /home/node/.n8n/nodes
-            cd /home/node/.n8n/nodes
+            mkdir -p "$N8N_CUSTOM_EXTENSIONS"
+            cd "$N8N_CUSTOM_EXTENSIONS"
             npm install /community-nodes
           resources:
             requests:

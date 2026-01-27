@@ -31,6 +31,7 @@ x-n8n-env: &n8n-env
   N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
   N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
   N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_USER_MANAGEMENT_JWT_SECRET}
+  N8N_CUSTOM_EXTENSIONS: /home/node/.n8n/nodes
   OLLAMA_HOST: ${OLLAMA_HOST:-ollama:11434}
   N8N_PORT: '5678'
   NODE_ENV: production
@@ -137,6 +138,8 @@ services:
             n8n import:credentials --separate --input=/demo-data/credentials &&
             n8n import:workflow --separate --input=/demo-data/workflows;
           fi;
+
+          cd "$N8N_CUSTOM_EXTENSIONS" &&
           npm install /community-nodes"
     depends_on:
       postgres:
@@ -153,6 +156,8 @@ services:
       - '5678:5678'
     volumes:
       - n8n_storage:/home/node/.n8n
+      - ./n8n/demo-data:/demo-data
+      - ../community-nodes:/community-nodes
       - ../external-hooks:/home/node/.n8n/external-hooks
     depends_on:
       postgres:
