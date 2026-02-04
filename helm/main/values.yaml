@@ -54,7 +54,7 @@ n8n:
     # See https://docs.n8n.io/hosting/configuration/environment-variables/user-management-smtp-2fa/
     N8N_EMAIL_MODE: "smtp"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/licenses
-    N8N_HIDE_USAGE_PAGE: "true"
+    N8N_HIDE_USAGE_PAGE: "false"
     N8N_LICENSE_AUTO_RENEW_ENABLED: "false"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/insights/#insights-environment-variables
     N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"

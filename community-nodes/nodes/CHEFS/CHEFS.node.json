@@ -1,17 +1,17 @@
 {
-  "node": "n8n-nodes-github-issues",
+  "node": "n8n-nodes-chefs",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Development", "Developer Tools"],
   "resources": {
     "credentialDocumentation": [
       {
-        "url": "https://github.com/org/repo?tab=readme-ov-file#credentials"
+        "url": "https://submit.digital.gov.bc.ca/app/api/v1/docs"
       }
     ],
     "primaryDocumentation": [
       {
-        "url": "https://github.com/org/repo?tab=readme-ov-file"
+        "url": "https://submit.digital.gov.bc.ca/app/api/v1/docs"
       }
     ]
   }
