@@ -20,6 +20,7 @@ x-n8n-env: &n8n-env
   DB_POSTGRESDB_USER: ${POSTGRES_USER}
   DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
   DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-n8n}
+  CUSTOM_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/n8n_custom # pragma: allowlist secret
   N8N_DIAGNOSTICS_ENABLED: 'false'
   N8N_PERSONALIZATION_ENABLED: 'false'
   N8N_TEMPLATES_ENABLED: 'false'
@@ -59,6 +60,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - '5432:5432'
     volumes:
       - postgres_storage:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
@@ -160,6 +163,7 @@ services:
       - ../community-nodes:/community-nodes
       - ../external-hooks/dist/oidc.cjs:/home/node/.n8n/external-hooks/oidc.cjs
       - ../external-hooks/dist/test.cjs:/home/node/.n8n/external-hooks/test.cjs
+      - ../external-hooks/drizzle:/home/node/.n8n/external-hooks/drizzle
     depends_on:
       postgres:
         condition: service_healthy

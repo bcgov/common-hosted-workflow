@@ -1,6 +1,7 @@
 {{- $imageRepository := coalesce .Values.main.image.repository .Values.image.repository -}}
 {{- $deploymentTag := coalesce .Values.main.image.tag .Values.image.tag .Chart.AppVersion -}}
 {{- $imagePullPolicy := coalesce .Values.main.image.pullPolicy .Values.image.pullPolicy -}}
+{{- $envSecretName := coalesce .Values.main.envSecretName .Values.envSecretName -}}
 
 {{- $pvcName := include "_.fullname" . -}}
 {{- $pvc := (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $pvcName) -}}
@@ -9,7 +10,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "_.fullname" . }}-pre-community-nodes
+  name: {{ include "_.fullname" . }}-pre
   labels: {{ include "_.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade,pre-rollback"
@@ -20,13 +21,13 @@ spec:
   activeDeadlineSeconds: 1800
   template:
     metadata:
-      name: {{ include "_.fullname" . }}-pre-community-nodes
+      name: {{ include "_.fullname" . }}-pre
     spec:
       activeDeadlineSeconds: 1800
       restartPolicy: Never
       serviceAccountName: {{ default .Values.global.serviceAccountName .Values.serviceAccountName }}
       containers:
-        - name: {{ include "_.fullname" . }}-pre-community-nodes
+        - name: {{ include "_.fullname" . }}-pre
           image: "{{ $imageRepository }}:{{ $deploymentTag }}"
           imagePullPolicy: {{ $imagePullPolicy }}
           command: [/bin/sh, -c]
@@ -36,6 +37,14 @@ spec:
             mkdir -p "$N8N_CUSTOM_EXTENSIONS"
             cd "$N8N_CUSTOM_EXTENSIONS"
             npm install /community-nodes
+
+            cd /external-hooks
+            node migrate.cjs
+          {{- if $envSecretName }}
+          envFrom:
+            - secretRef:
+                name: {{ $envSecretName }}
+          {{- end }}
           resources:
             requests:
               cpu: 50m

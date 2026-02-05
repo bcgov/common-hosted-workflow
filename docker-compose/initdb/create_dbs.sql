@@ -1,2 +1,2 @@
 CREATE DATABASE keycloak;
-CREATE DATABASE n8n-custom;
+CREATE DATABASE n8n_custom;
