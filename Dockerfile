@@ -32,7 +32,6 @@ FROM n8nio/n8n:2.5.2
 
 WORKDIR /home/node
 
-COPY external-hooks /external-hooks/
 COPY --from=build-nodes /app/dist /community-nodes/dist
 COPY --from=build-nodes /app/package.json /community-nodes/package.json
 COPY --from=build-hooks /app/dist /external-hooks
