@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { userWorkflow } from './db/schema';
 
 const hookConfig = {
   n8n: {
@@ -17,12 +18,14 @@ const hookConfig = {
         //   take: 5,
         //   order: { id: 'DESC' },
         // });
-
         // console.log(latestExecutions);
 
         const db = drizzle(process.env.CUSTOM_DATABASE_URL);
         const result = await db.execute('select 1');
         console.log(result);
+
+        const allWorkflows = await db.select().from(userWorkflow);
+        console.log(allWorkflows);
       },
     ],
   },

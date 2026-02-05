@@ -35,6 +35,7 @@ WORKDIR /home/node
 COPY --from=build-nodes /app/dist /community-nodes/dist
 COPY --from=build-nodes /app/package.json /community-nodes/package.json
 COPY --from=build-hooks /app/dist /external-hooks
+COPY external-hooks/drizzle /external-hooks/drizzle
 
 ENV N8N_PORT=5678 \
     N8N_TRUST_PROXY=true \
