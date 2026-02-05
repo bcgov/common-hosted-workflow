@@ -235,3 +235,4 @@ pgo:
 
   databases:
   - name: n8n
+  - name: n8n-custom

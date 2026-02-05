@@ -46,7 +46,7 @@ x-n8n-env: &n8n-env
   OIDC_USERINFO_ENDPOINT: http://keycloak:8080/realms/starter/protocol/openid-connect/userinfo
   OIDC_REDIRECT_URI: http://localhost:5678/rest/auth/oidc/callback
   OIDC_ROLES_CLAIM: client_roles
-  EXTERNAL_HOOK_FILES: /home/node/.n8n/external-hooks/oidc.js:/home/node/.n8n/external-hooks/test.js
+  EXTERNAL_HOOK_FILES: /home/node/.n8n/external-hooks/oidc.cjs:/home/node/.n8n/external-hooks/test.cjs
   EXTERNAL_FRONTEND_HOOKS_URLS: /assets/oidc-frontend-hook.js
   N8N_ADDITIONAL_NON_UI_ROUTES: auth
 
@@ -158,7 +158,8 @@ services:
       - n8n_storage:/home/node/.n8n
       - ./n8n/demo-data:/demo-data
       - ../community-nodes:/community-nodes
-      - ../external-hooks:/home/node/.n8n/external-hooks
+      - ../external-hooks/dist/oidc.cjs:/home/node/.n8n/external-hooks/oidc.cjs
+      - ../external-hooks/dist/test.cjs:/home/node/.n8n/external-hooks/test.cjs
     depends_on:
       postgres:
         condition: service_healthy
