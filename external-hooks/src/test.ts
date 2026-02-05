@@ -1,7 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { userWorkflow } from './db/schema';
-import path from 'path';
 
 const hookConfig = {
   n8n: {
@@ -23,9 +21,6 @@ const hookConfig = {
         // console.log(latestExecutions);
 
         const db = drizzle(process.env.CUSTOM_DATABASE_URL);
-        await migrate(db, { migrationsFolder: path.join(__dirname, 'drizzle') });
-        console.log('Migrations completed!');
-
         const result = await db.execute('select 1');
         console.log(result);
 
