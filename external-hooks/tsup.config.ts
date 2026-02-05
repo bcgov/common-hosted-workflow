@@ -8,7 +8,7 @@ export default defineConfig({
   cjsInterop: false,
   minify: false,
   external: [/^(\/usr\/local\/lib\/node_modules\/n8n)/],
-  noExternal: ['drizzle-orm'],
+  noExternal: ['drizzle-orm', 'pg'],
   footer: {
     js: '',
   },
