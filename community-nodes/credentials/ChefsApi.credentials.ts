@@ -14,6 +14,13 @@ export class ChefsApi implements ICredentialType {
     //   default: '',
     // },
     {
+      displayName: 'Authorization Token',
+      name: 'authorizationToken',
+      type: 'string',
+      typeOptions: { password: true },
+      default: '',
+    },
+    {
       displayName: 'API Key',
       name: 'apiKey',
       type: 'string',

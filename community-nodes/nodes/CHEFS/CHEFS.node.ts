@@ -145,6 +145,18 @@ export class CHEFS implements INodeType {
         },
       },
       {
+        displayName: 'Authorization Token',
+        name: 'authorizationToken',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            resource: ['submission', 'status'],
+          },
+        },
+      },
+      {
         displayName: 'Submission ID',
         name: 'submissionID',
         type: 'string',
