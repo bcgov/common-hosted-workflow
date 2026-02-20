@@ -182,23 +182,23 @@ services:
       - qdrant_storage:/qdrant/storage
 
   # OLLAMA CONFIGURATIONS (Profiles)
-  ollama:
-    <<: *common-props
-    container_name: ollama
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_storage:/root/.ollama
-    ports:
-      - '11434:11434'
+  # ollama:
+  #   <<: *common-props
+  #   container_name: ollama
+  #   image: ollama/ollama:latest
+  #   volumes:
+  #     - ollama_storage:/root/.ollama
+  #   ports:
+  #     - '11434:11434'
 
-  ollama-pull-llama:
-    <<: *common-props
-    container_name: ollama-pull-llama
-    restart: 'no'
-    image: ollama/ollama:latest
-    environment:
-      OLLAMA_HOST: ollama:11434
-    entrypoint: /bin/sh
-    command: -c "sleep 5; ollama pull llama3.2"
-    depends_on:
-      - ollama
+  # ollama-pull-llama:
+  #   <<: *common-props
+  #   container_name: ollama-pull-llama
+  #   restart: 'no'
+  #   image: ollama/ollama:latest
+  #   environment:
+  #     OLLAMA_HOST: ollama:11434
+  #   entrypoint: /bin/sh
+  #   command: -c "sleep 5; ollama pull llama3.2"
+  #   depends_on:
+  #     - ollama
