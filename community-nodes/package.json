@@ -28,7 +28,8 @@
       "dist/credentials/ChefsApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/CHEFS/CHEFS.node.js"
+      "dist/nodes/CHEFS/CHEFS.node.js",
+      "dist/nodes/TeamsMessage/TeamsMessage.node.ts"
     ]
   },
   "devDependencies": {

@@ -9,13 +9,13 @@ import { includeAuthorizationHeader } from './shared/requestOptions';
 
 export class CHEFS implements INodeType {
   description: INodeTypeDescription = {
-    displayName: 'CHEFS',
-    name: 'Common Hosted Form Service',
+    displayName: 'Common Hosted Form Service (CHEFS)',
+    name: 'chefs',
+    description: 'API connector for the Common Hosted Form Service',
     icon: { light: 'file:../../icons/chefs.svg', dark: 'file:../../icons/chefs.dark.svg' },
     group: ['input'],
     version: 1,
     subtitle: '',
-    description: 'CHEFS Node',
     defaults: {
       name: 'CHEFS',
     },
