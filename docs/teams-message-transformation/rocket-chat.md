@@ -16,6 +16,54 @@ The transformer takes a standard Rocket.Chat JSON payload and converts it into a
 
 ---
 
+### Examples
+
+#### 1. Standard Notification with Fields
+
+**Input Payload:**
+
+```json
+{
+  "text": "New Deployment Alert",
+  "attachments": [
+    {
+      "title": "Service: Auth-API",
+      "text": "Deployment successful to production cluster.",
+      "color": "#28a745",
+      "fields": [
+        { "title": "Version", "value": "v2.4.1", "short": true },
+        { "title": "Cluster", "value": "us-east-1", "short": true }
+      ]
+    }
+  ]
+}
+```
+
+**Visual Output:** A message with a **Green** sidebar and a list of key-value pairs below the description.
+
+#### 2. Visual Alert with Image
+
+**Input Payload:**
+
+```json
+{
+  "text": "Monitoring Dashboard Snippet",
+  "attachments": [
+    {
+      "title": "CPU Usage Spike",
+      "title_link": "https://grafana.internal/d/cpu-metrics",
+      "text": "Core-01 exceeded 90% threshold.",
+      "color": "#dc3545",
+      "image_url": "https://grafana.internal/render/dashboard-screenshot.png"
+    }
+  ]
+}
+```
+
+**Visual Output:** A **Red** sidebar alert where the title is a clickable link, followed by the rendered image.
+
+---
+
 ### Input Schema (Rocket.Chat)
 
 The expected input is a JSON object with the following structure:
@@ -34,7 +82,7 @@ The expected input is a JSON object with the following structure:
         {
           "title": "Label",
           "value": "Value",
-          "short": true
+          "short": boolean
         }
       ]
     }
