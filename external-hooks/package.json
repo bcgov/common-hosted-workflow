@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "tsc -w",
-    "build": "rimraf ./build && tsc",
+    "notused_build": "rimraf ./build && tsc",
     "bundle": "tsup",
     "lint-fix": "eslint --fix ."
   },
