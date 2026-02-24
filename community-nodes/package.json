@@ -29,7 +29,7 @@
     ],
     "nodes": [
       "dist/nodes/CHEFS/CHEFS.node.js",
-      "dist/nodes/TeamsMessage/TeamsMessage.node.ts"
+      "dist/nodes/TeamsMessageTransformer/TeamsMessageTransformer.node.ts"
     ]
   },
   "devDependencies": {
