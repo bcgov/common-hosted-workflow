@@ -94,7 +94,7 @@ const hookConfig = {
           }
         };
 
-        app.get('/rest/custom/users/:email/project', adminAuthMiddleware, async (req, res) => {
+        app.get('/rest/custom/admin/users/:email/project', adminAuthMiddleware, async (req, res) => {
           const { email } = req.params;
           const startTime = Date.now();
 
@@ -120,7 +120,7 @@ const hookConfig = {
           }
         });
 
-        app.post('/rest/custom/associate-workflow', adminAuthMiddleware, async (req, res) => {
+        app.post('/rest/custom/admin/associate-workflow', adminAuthMiddleware, async (req, res) => {
           const startTime = Date.now();
           const { workflowId, projectId } = req.body;
 
