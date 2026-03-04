@@ -105,8 +105,6 @@ The node outputs a format compatible with the [Microsoft Graph API for Chat Mess
 }
 ```
 
----
-
 ### Technical Constraints & Notes
 
 - **HTML Support:** Teams uses a sanitized HTML renderer. This transformer uses inline styles exclusively, as Teams ignores `<style>` blocks and external CSS.

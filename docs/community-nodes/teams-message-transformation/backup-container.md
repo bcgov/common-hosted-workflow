@@ -92,8 +92,6 @@ The transformer converts a specific backup payload into a sanitized HTML block o
 }
 ```
 
----
-
 ### Technical Constraints & Notes
 
 - **Case Resilience:** The `statusCode` is normalized to uppercase.
