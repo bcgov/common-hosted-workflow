@@ -35,8 +35,6 @@ Retrieves the user profile and the unique ID of their personal project based on 
 
 ```
 
----
-
 ### 2. Associate Workflow to Project
 
 Manually creates a shared relationship between a specific workflow and a project. This effectively "moves" or "shares" a workflow into a project's scope with `owner` permissions.
@@ -66,8 +64,6 @@ Manually creates a shared relationship between a specific workflow and a project
   "message": "Workflow 'ID' successfully associated with project 'ID'"
 }
 ```
-
----
 
 ## 🛠 Internal Dependencies
 
