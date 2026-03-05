@@ -28,60 +28,47 @@ If you are using the Docker CLI without the Desktop GUI, ensure your environment
 <br> `ln -s $HOMEBREW_PREFIX/lib/docker/cli-plugins/docker-compose ~/.docker/cli-plugins/docker-compose` |
 | **Windows** | Follow the [WSL2 + Native Docker Guide](https://gist.github.com/martinsam16/4492957e3bbea34046f2c8b49c3e5ac0) |
 
----
-
 ## Getting Started
 
-### 1. Environment Configuration
+### Spin Up the Sandbox
 
-Ensure you have a `.env` file in the root directory with the following variables defined (referencing the Compose file):
+Launch the environment. The setup includes automated provisioning for Keycloak and n8n custom nodes and external endpoints.
 
-- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
-- `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`
-- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`
-- `N8N_ENCRYPTION_KEY`, `N8N_USER_MANAGEMENT_JWT_SECRET`
-
-### 2. Spin Up the Sandbox
-
-Launch the environment. The setup includes automated provisioning for Keycloak and n8n demo data.
+In `docker-compose` directory, run:
 
 ```bash
-docker-compose up --build -d
+docker compose --env-file .env.example up --build
 
 ```
 
-## ⚙️ Service Catalog
+## Service Catalog
 
 Once the containers are healthy, the following services are available:
 
-| Service      | Description                                   | Local Access                                                                   |
-| ------------ | --------------------------------------------- | ------------------------------------------------------------------------------ |
-| **Keycloak** | Identity & Access Management (Custom Build)   | [http://localhost:8080](https://www.google.com/search?q=http://localhost:8080) |
-| **n8n**      | Workflow Automation (with OIDC & AI enabled)  | [http://localhost:5678](https://www.google.com/search?q=http://localhost:5678) |
-| **Postgres** | Primary DB (v18.0) - Shared by n8n & Keycloak | `localhost:5432`                                                               |
-| **Qdrant**   | Vector Database for AI/RAG                    | [http://localhost:6333](https://www.google.com/search?q=http://localhost:6333) |
-| **Ollama**   | Local LLM Runner (Optional/Commented Out)     | `localhost:11434`                                                              |
+| Service      | Description                  | Local Access                                                                   |
+| ------------ | ---------------------------- | ------------------------------------------------------------------------------ |
+| **Keycloak** | Identity & Access Management | [http://localhost:8080](https://www.google.com/search?q=http://localhost:8080) |
+| **n8n**      | Workflow Automation          | [http://localhost:5678](https://www.google.com/search?q=http://localhost:5678) |
+| **Postgres** | Primary DB (v18.0)           | `localhost:5432`                                                               |
+| **Ollama**   | Local LLM Runner (Optional)  | `localhost:11434`                                                              |
+| **Qdrant**   | Vector Database (Optional)   | `localhost:6333`                                                               |
 
----
+## Automated Provisioning Details
 
-## 🛠️ Automated Provisioning
+The sandbox uses a "Dependency Chain" to ensure services configure themselves in the correct order:
 
-The sandbox includes "Run-Once" containers that handle the heavy lifting of environment setup:
+1. **Postgres (`initdb`)**: Creates the initial schemas. **Note:** Ensure your `./initdb` folder contains a script to create the `keycloak` database, as Postgres only creates the one defined in `POSTGRES_DB` by default.
+2. **Keycloak Provisioning**: The `keycloak-provision` service uses the Keycloak Admin CLI or API to create the `starter` realm and the OIDC client.
+3. **n8n Provisioning**:
 
-- **`keycloak-provision`**: Automatically configures the `starter` realm and OIDC clients after Keycloak starts.
-- **`n8n-import`**:
-- Checks if workflows exist; if not, imports credentials and workflows from `./n8n/demo-data`.
-- Installs community nodes from `../community-nodes`.
-
-- **`initdb`**: The Postgres service automatically executes scripts located in `./initdb` on first boot.
+- **Idempotency**: Checks if workflows exist before importing to avoid duplicates.
+- **Custom Nodes**: Injects community nodes into the `/home/node/.n8n/nodes` directory.
+- **Hooks**: Runs `migrate.cjs` to set up external hooks (e.g., custom logging or auditing).
 
 ## 💾 Persistence & Volumes
 
-Data is persisted across restarts using named Docker volumes:
+Data is persisted across restarts using named Docker volumes. If you need to **wipe the environment**, run `docker-compose down -v`.
 
-- `n8n_storage`: Config, nodes, and local binary data.
-- `postgres_storage`: All relational data (n8n & Keycloak tables).
-- `qdrant_storage`: Vector collections and indexes.
-- `ollama_storage`: Downloaded LLM models (e.g., Llama 3.2).
-
-> **Note on AI Features:** Ollama is currently commented out in the `docker-compose.yaml`. To use local AI nodes in n8n, uncomment the `ollama` and `ollama-pull-llama` services.
+- `n8n_storage`: Stores the `.n8n` folder, including SQLite (if used), binary data, and installed nodes.
+- `postgres_storage`: Stores the physical database files for both n8n and Keycloak.
+- `ollama_storage` / `qdrant_storage`: (Reserved) Stores downloaded AI models and vector embeddings.

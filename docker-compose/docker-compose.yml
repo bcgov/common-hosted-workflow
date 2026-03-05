@@ -32,10 +32,10 @@ x-n8n-env: &n8n-env
   N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
   N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
   N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_USER_MANAGEMENT_JWT_SECRET}
-  N8N_CUSTOM_EXTENSIONS: /home/node/.n8n/nodes
   OLLAMA_HOST: ${OLLAMA_HOST:-ollama:11434}
   N8N_PORT: '5678'
   NODE_ENV: production
+  N8N_PROTOCOL: 'http'
   N8N_TRUST_PROXY: 'true'
   N8N_PROXY_HOPS: "1"
   # OIDC
@@ -47,8 +47,6 @@ x-n8n-env: &n8n-env
   OIDC_USERINFO_ENDPOINT: http://keycloak:8080/realms/starter/protocol/openid-connect/userinfo
   OIDC_REDIRECT_URI: http://localhost:5678/rest/auth/oidc/callback
   OIDC_ROLES_CLAIM: client_roles
-  EXTERNAL_HOOK_FILES: /home/node/.n8n/external-hooks/oidc.cjs:/home/node/.n8n/external-hooks/test.cjs:/home/node/.n8n/external-hooks/custom-api.cjs
-  EXTERNAL_FRONTEND_HOOKS_URLS: /assets/oidc-frontend-hook.js
   N8N_ADDITIONAL_NON_UI_ROUTES: auth
 
 services:
@@ -123,18 +121,17 @@ services:
       keycloak:
         condition: service_started
 
-  n8n-import:
+  n8n-provision:
     <<: *common-props
-    container_name: n8n-import
+    container_name: n8n-provision
     restart: 'no'
     build:
-      context: .
-      dockerfile: dockerfiles/n8n.Dockerfile
+      context: ..
+      dockerfile: Dockerfile
     environment: *n8n-env
     volumes:
       - n8n_storage:/home/node/.n8n
       - ./n8n/demo-data:/demo-data
-      - ../community-nodes:/community-nodes
     entrypoint: /bin/sh
     command: >
       -c "if [ -z \"$$(n8n list:workflow --onlyId)\" ]; then
@@ -142,8 +139,15 @@ services:
             n8n import:workflow --separate --input=/demo-data/workflows;
           fi;
 
-          cd "$N8N_CUSTOM_EXTENSIONS" &&
-          npm install /community-nodes"
+          echo 'Installing community nodes';
+          mkdir -p /home/node/.n8n/nodes;
+          cd /home/node/.n8n/nodes && npm install /community-nodes;
+
+          echo 'Installing external hooks';
+          cd /external-hooks && node migrate.cjs;
+
+          echo 'n8n provision completed!';
+          "
     depends_on:
       postgres:
         condition: service_healthy
@@ -152,54 +156,17 @@ services:
     <<: *common-props
     container_name: n8n
     build:
-      context: .
-      dockerfile: dockerfiles/n8n.Dockerfile
+      context: ..
+      dockerfile: Dockerfile
     environment: *n8n-env
     ports:
       - '5678:5678'
     volumes:
       - n8n_storage:/home/node/.n8n
-      - ./n8n/demo-data:/demo-data
-      - ../community-nodes:/community-nodes
-      - ../external-hooks/dist/oidc.cjs:/home/node/.n8n/external-hooks/oidc.cjs
-      - ../external-hooks/dist/test.cjs:/home/node/.n8n/external-hooks/test.cjs
-      - ../external-hooks/dist/custom-api.cjs:/home/node/.n8n/external-hooks/custom-api.cjs
-      - ../external-hooks/drizzle:/home/node/.n8n/external-hooks/drizzle
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
         condition: service_started
-      n8n-import:
+      n8n-provision:
         condition: service_completed_successfully
-
-  qdrant:
-    <<: *common-props
-    container_name: qdrant
-    image: qdrant/qdrant:latest
-    ports:
-      - '6333:6333'
-    volumes:
-      - qdrant_storage:/qdrant/storage
-
-  # OLLAMA CONFIGURATIONS (Profiles)
-  # ollama:
-  #   <<: *common-props
-  #   container_name: ollama
-  #   image: ollama/ollama:latest
-  #   volumes:
-  #     - ollama_storage:/root/.ollama
-  #   ports:
-  #     - '11434:11434'
-
-  # ollama-pull-llama:
-  #   <<: *common-props
-  #   container_name: ollama-pull-llama
-  #   restart: 'no'
-  #   image: ollama/ollama:latest
-  #   environment:
-  #     OLLAMA_HOST: ollama:11434
-  #   entrypoint: /bin/sh
-  #   command: -c "sleep 5; ollama pull llama3.2"
-  #   depends_on:
-  #     - ollama
