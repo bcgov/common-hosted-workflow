@@ -50,8 +50,6 @@ Once the containers are healthy, the following services are available:
 | **Keycloak** | Identity & Access Management | [http://localhost:8080](https://www.google.com/search?q=http://localhost:8080) |
 | **n8n**      | Workflow Automation          | [http://localhost:5678](https://www.google.com/search?q=http://localhost:5678) |
 | **Postgres** | Primary DB (v18.0)           | `localhost:5432`                                                               |
-| **Ollama**   | Local LLM Runner (Optional)  | `localhost:11434`                                                              |
-| **Qdrant**   | Vector Database (Optional)   | `localhost:6333`                                                               |
 
 ## Automated Provisioning Details
 
@@ -71,4 +69,3 @@ Data is persisted across restarts using named Docker volumes. If you need to **w
 
 - `n8n_storage`: Stores the `.n8n` folder, including SQLite (if used), binary data, and installed nodes.
 - `postgres_storage`: Stores the physical database files for both n8n and Keycloak.
-- `ollama_storage` / `qdrant_storage`: (Reserved) Stores downloaded AI models and vector embeddings.
