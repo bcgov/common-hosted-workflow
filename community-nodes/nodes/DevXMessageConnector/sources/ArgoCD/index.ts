@@ -1,9 +1,6 @@
 import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 
-// See https://github.com/octokit/webhooks/blob/main/payload-schemas
-// See https://github.com/octokit/webhooks/tree/main/payload-examples
-
-export async function githubTransform(this: IExecuteFunctions, index: number): Promise<INodeExecutionData> {
+export async function argoCdTransform(this: IExecuteFunctions, index: number): Promise<INodeExecutionData> {
   const rawPayload = this.getNodeParameter('payload', index);
 
   console.log('github', JSON.stringify(rawPayload));
