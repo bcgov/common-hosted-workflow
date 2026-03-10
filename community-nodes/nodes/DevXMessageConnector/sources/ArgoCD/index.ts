@@ -1,13 +1,16 @@
 import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { ArgoCdPayload } from './types';
 
 export async function argoCdTransform(this: IExecuteFunctions, index: number): Promise<INodeExecutionData> {
   const rawPayload = this.getNodeParameter('payload', index);
+  const payload =
+    typeof rawPayload === 'string' ? (JSON.parse(rawPayload) as ArgoCdPayload) : (rawPayload as ArgoCdPayload);
 
-  console.log('github', JSON.stringify(rawPayload));
+  console.log('argocd', payload);
 
-  // Specific GitHub transformation logic here
+  // Specific Argo CD transformation logic here
   const transformedJson = {
-    text: `GitHub Alert: ${rawPayload}`,
+    text: `Argo CD Alert: ${rawPayload}`,
   };
 
   return { json: transformedJson };
