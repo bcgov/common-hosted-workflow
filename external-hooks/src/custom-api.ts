@@ -122,7 +122,7 @@ const hookConfig = {
 
         app.post('/rest/custom/admin/associate-workflow', adminAuthMiddleware, async (req, res) => {
           const startTime = Date.now();
-          const { workflowId, projectId } = req.body;
+          const { workflowId, projectId, singleOwner = false } = req.body;
 
           try {
             if (!workflowId || !projectId) {
@@ -147,13 +147,15 @@ const hookConfig = {
             }
 
             await withTransaction(sharedWorkflowRepository.manager, null, async (em) => {
-              await em.save(
-                await sharedWorkflowRepository.create({
-                  project,
-                  workflow,
-                  role: 'workflow:owner',
-                }),
-              );
+              if (singleOwner) await em.delete('SharedWorkflow', { workflow });
+
+              const newShare = em.create('SharedWorkflow', {
+                project,
+                workflow,
+                role: 'workflow:owner',
+              });
+
+              await em.save(newShare);
             });
 
             const duration = Date.now() - startTime;
