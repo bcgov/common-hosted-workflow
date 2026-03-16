@@ -5,6 +5,8 @@
   "scripts": {},
   "devDependencies": {
     "@types/node": "^25.0.9",
+    "axios": "^1.13.6",
+    "fast-csv": "^5.0.5",
     "prettier": "4.0.0-alpha.13"
   }
 }
