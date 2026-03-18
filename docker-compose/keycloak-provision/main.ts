@@ -42,13 +42,29 @@ async function main() {
     lastName: 'User',
   });
 
-  await authRealmHandle.user('user1@testapp.com').ensure({
-    email: 'user1@testapp.com',
-    password: 'user1@testapp.com', // pragma: allowlist secret
-    firstName: 'User',
-    lastName: 'One',
-  });
+  const users = [
+    { firstName: 'John', lastName: 'Doe' },
+    { firstName: 'Jane', lastName: 'Smith' },
+    { firstName: 'Michael', lastName: 'Brown' },
+    { firstName: 'Emily', lastName: 'Johnson' },
+    { firstName: 'Daniel', lastName: 'Wilson' },
+    { firstName: 'Olivia', lastName: 'Martinez' },
+    { firstName: 'David', lastName: 'Anderson' },
+    { firstName: 'Sophia', lastName: 'Taylor' },
+    { firstName: 'James', lastName: 'Thomas' },
+    { firstName: 'Isabella', lastName: 'Moore' },
+  ];
 
+  for (const user of users) {
+    const email = `${user.firstName.toLowerCase()}.${user.lastName.toLowerCase()}@testapp.com`;
+
+    await authRealmHandle.user(email).ensure({
+      email,
+      password: email, // pragma: allowlist secret
+      firstName: user.firstName,
+      lastName: user.lastName,
+    });
+  }
   console.log('Provision complete!');
 }
 
