@@ -6,7 +6,7 @@ RUN npm install -g pnpm@latest
 
 WORKDIR /app
 
-COPY community-nodes/package.json community-nodes/pnpm-lock.yaml* ./
+COPY community-nodes/package.json community-nodes/pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
@@ -21,7 +21,7 @@ RUN npm install -g pnpm@latest
 
 WORKDIR /app
 
-COPY external-hooks/package.json external-hooks/pnpm-lock.yaml* ./
+COPY external-hooks/package.json external-hooks/pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile
 
