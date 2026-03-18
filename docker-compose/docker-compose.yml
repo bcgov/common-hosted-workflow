@@ -1,8 +1,6 @@
 volumes:
   n8n_storage:
   postgres_storage:
-  ollama_storage:
-  qdrant_storage:
 
 networks:
   chwf:
