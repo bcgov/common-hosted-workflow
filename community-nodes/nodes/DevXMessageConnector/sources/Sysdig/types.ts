@@ -1,5 +1,7 @@
 // See https://docs.sysdig.com/en/administration/configure-a-webhook-channel/#description-of-post-data
 
+import type { SysdigMessageContentData } from './schema';
+
 export interface SysdigAlertPayload {
   /** Time when the alert triggered in microseconds */
   timestamp: number;
@@ -44,4 +46,10 @@ export interface MetricValue {
   aggregation: string;
   groupAggregation: string;
   value: number;
+}
+
+export interface SysdigMessageContent {
+  kind: 'template';
+  template: 'sysdig';
+  data: SysdigMessageContentData;
 }

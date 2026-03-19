@@ -1,18 +1,33 @@
 import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
-import type { PullRequestOpenedEvent, PullRequestClosedEvent } from './types';
+import type { PullRequestOpenedEvent, PullRequestClosedEvent, GitHubPullRequestMessageContent } from './types';
+import type { GitHubPullRequestMessageContentData } from './schema';
 
 type AllTypes = PullRequestOpenedEvent | PullRequestClosedEvent;
 
-export async function githubTransform(this: IExecuteFunctions, index: number): Promise<INodeExecutionData> {
+export function githubTransform(this: IExecuteFunctions, index: number): GitHubPullRequestMessageContent {
   const rawPayload = this.getNodeParameter('payload', index);
 
-  const payload = typeof rawPayload === 'string' ? (JSON.parse(rawPayload) as AllTypes) : (rawPayload as AllTypes);
-  console.log('github', payload);
+  const payload: AllTypes =
+    typeof rawPayload === 'string' ? (JSON.parse(rawPayload) as AllTypes) : (rawPayload as AllTypes);
 
-  // Specific GitHub transformation logic here
-  const transformedJson = {
-    text: `GitHub Alert: ${rawPayload}`,
+  const data = {
+    event: payload.action,
+    title: payload.pull_request.title,
+    repo: payload.repository.full_name,
+    author: payload.pull_request.user.login,
+    url: payload.pull_request.html_url,
+    body: payload.pull_request.body ?? undefined,
   };
 
-  return { json: transformedJson };
+  return createGitHubPullRequestTemplateContent(data);
+}
+
+export function createGitHubPullRequestTemplateContent(
+  data: GitHubPullRequestMessageContentData,
+): GitHubPullRequestMessageContent {
+  return {
+    kind: 'template',
+    template: 'github_pr',
+    data,
+  };
 }

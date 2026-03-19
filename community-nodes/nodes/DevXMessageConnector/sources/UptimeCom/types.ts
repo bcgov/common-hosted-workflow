@@ -1,7 +1,9 @@
 // See https://support.uptime.com/hc/en-us/articles/115002560845-Configuring-Custom-Postback-URL-Webhooks#h_01H9KPK2P2RF20ZKF4Y0B4G91P
 // See https://support.atlassian.com/opsgenie/docs/integrate-opsgenie-with-uptime/#Sample-Webhook-Message-from-Opsgenie-Uptime.com
 
-export interface MonitoringPayload {
+import { UptimeComMessageContentData } from './schema';
+
+export interface UptimeComAlertPayload {
   data: MonitoringData;
   event: string;
 }
@@ -98,4 +100,10 @@ export interface Device {
 export interface Links {
   alert_details: string;
   real_time_analysis: string;
+}
+
+export interface UptimeComMessageContent {
+  kind: 'template';
+  template: 'uptime';
+  data: UptimeComMessageContentData;
 }
