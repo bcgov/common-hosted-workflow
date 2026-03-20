@@ -1,14 +1,13 @@
 import { IExecuteFunctions } from 'n8n-workflow';
 import type { BackupContainerPayload, BackupContainerMessageContent } from './types';
 import type { BackupContainerMessageContentData } from './schema';
+import { safeParsePayload } from '../shared/payload';
 
-export function backupContainerTransform(this: IExecuteFunctions, index: number): BackupContainerMessageContent {
+export function backupContainerTransform(this: IExecuteFunctions, index: number): BackupContainerMessageContent | null {
   const rawPayload = this.getNodeParameter('payload', index);
 
-  const payload: BackupContainerPayload =
-    typeof rawPayload === 'string'
-      ? (JSON.parse(rawPayload) as BackupContainerPayload)
-      : (rawPayload as BackupContainerPayload);
+  const payload = safeParsePayload<BackupContainerPayload>(rawPayload);
+  if (!payload) return null;
 
   const data = {
     status: payload.statusCode.toLowerCase() as 'info' | 'warn' | 'error',

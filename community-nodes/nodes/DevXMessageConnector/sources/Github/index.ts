@@ -8,17 +8,18 @@ import type {
 import type { GitHubPullRequestMessageContentData, GitHubWorkflowRunMessageContentData } from './schema';
 import { createTextMessageContent } from '../Text';
 import { TextMessageContent } from '../Text/types';
+import { safeParsePayload } from '../shared/payload';
 
 type allTypes = PullRequestEvent | WorkflowRunEvent;
 
 export function githubTransform(
   this: IExecuteFunctions,
   index: number,
-): GitHubPullRequestMessageContent | GitHubWorkflowRunMessageContent | TextMessageContent {
+): GitHubPullRequestMessageContent | GitHubWorkflowRunMessageContent | TextMessageContent | null {
   const rawPayload = this.getNodeParameter('payload', index);
 
-  const payload: allTypes =
-    typeof rawPayload === 'string' ? (JSON.parse(rawPayload) as allTypes) : (rawPayload as allTypes);
+  const payload = safeParsePayload<allTypes>(rawPayload);
+  if (!payload) return null;
 
   if ('pull_request' in payload) {
     const data = {

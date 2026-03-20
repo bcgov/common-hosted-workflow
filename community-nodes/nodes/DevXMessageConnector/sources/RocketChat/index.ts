@@ -2,11 +2,13 @@ import { IExecuteFunctions } from 'n8n-workflow';
 import { RocketChatPayload } from './types';
 import { createHtmlMessageContent } from '../Html';
 import type { HtmlMessageContent } from '../Html/types';
+import { safeParsePayload } from '../shared/payload';
 
-export function rocketChatTransform(this: IExecuteFunctions, index: number): HtmlMessageContent {
+export function rocketChatTransform(this: IExecuteFunctions, index: number): HtmlMessageContent | null {
   const rawPayload = this.getNodeParameter('payload', index);
-  const payload: RocketChatPayload =
-    typeof rawPayload === 'string' ? (JSON.parse(rawPayload) as RocketChatPayload) : (rawPayload as RocketChatPayload);
+
+  const payload = safeParsePayload<RocketChatPayload>(rawPayload);
+  if (!payload) return null;
 
   let htmlContent = `<div><p>${payload.text}</p>`;
 

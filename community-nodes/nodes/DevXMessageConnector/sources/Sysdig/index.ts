@@ -2,14 +2,13 @@ import { IExecuteFunctions } from 'n8n-workflow';
 import type { SysdigAlertPayload, SysdigMessageContent } from './types';
 import type { SysdigMessageContentData } from './schema';
 import { formatToIsoTimestamp } from '../shared/datetime';
+import { safeParsePayload } from '../shared/payload';
 
-export function sysdigTransform(this: IExecuteFunctions, index: number): SysdigMessageContent {
+export function sysdigTransform(this: IExecuteFunctions, index: number): SysdigMessageContent | null {
   const rawPayload = this.getNodeParameter('payload', index);
 
-  const payload: SysdigAlertPayload =
-    typeof rawPayload === 'string'
-      ? (JSON.parse(rawPayload) as SysdigAlertPayload)
-      : (rawPayload as SysdigAlertPayload);
+  const payload = safeParsePayload<SysdigAlertPayload>(rawPayload);
+  if (!payload) return null;
 
   const data = {
     severity: payload.alert.severity,

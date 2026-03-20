@@ -59,7 +59,7 @@ export class DevXMessageConnector implements INodeType {
         options: [
           { name: 'Template', value: 'template' },
           { name: 'Text', value: 'text' },
-          { name: 'html', value: 'html' },
+          { name: 'HTML', value: 'html' },
         ],
         default: 'template',
       },
@@ -129,30 +129,34 @@ export class DevXMessageConnector implements INodeType {
     for (let i = 0; i < items.length; i++) {
       const type = this.getNodeParameter('type', i) as string;
       const source = this.getNodeParameter('source', i) as string;
-      let messageContent: MessageContent;
+      let messageContent: MessageContent | null = null;
 
       if (type === 'text') {
-        messageContent = await textTransform.call(this, i);
+        messageContent = textTransform.call(this, i);
       } else if (type === 'html') {
-        messageContent = await htmlTransform.call(this, i);
+        messageContent = htmlTransform.call(this, i);
       } else if (type === 'template') {
         if (source === 'generic') {
-          messageContent = await genericTransform.call(this, i);
+          messageContent = genericTransform.call(this, i);
         } else if (source === 'rocket-chat') {
-          messageContent = await rocketChatTransform.call(this, i);
+          messageContent = rocketChatTransform.call(this, i);
         } else if (source === 'github') {
-          messageContent = await githubTransform.call(this, i);
+          messageContent = githubTransform.call(this, i);
         } else if (source === 'backup-container') {
-          messageContent = await backupContainerTransform.call(this, i);
+          messageContent = backupContainerTransform.call(this, i);
         } else if (source === 'sysdig') {
-          messageContent = await sysdigTransform.call(this, i);
+          messageContent = sysdigTransform.call(this, i);
         } else if (source === 'uptime-com') {
-          messageContent = await uptimeComTransform.call(this, i);
+          messageContent = uptimeComTransform.call(this, i);
         } else {
           throw new Error(`The source "${source}" is not known!`);
         }
       } else {
         throw new Error(`The type "${type}" is not known!`);
+      }
+
+      if (!messageContent) {
+        throw new Error('Failed to generate message content');
       }
 
       const response = await sendMessageToDevXConnector.call(this, messageContent);
