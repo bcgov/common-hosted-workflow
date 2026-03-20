@@ -1,4 +1,4 @@
-import type { GitHubPullRequestMessageContentData } from './schema';
+import type { GitHubPullRequestMessageContentData, GitHubWorkflowRunMessageContentData } from './schema';
 
 /* eslint-disable */
 /**
@@ -8481,6 +8481,12 @@ export type WebhookEventName = keyof EventPayloadMap;
 
 export interface GitHubPullRequestMessageContent {
   kind: 'template';
-  template: 'github_pr';
+  template: 'github_pull_request';
   data: GitHubPullRequestMessageContentData;
+}
+
+export interface GitHubWorkflowRunMessageContent {
+  kind: 'template';
+  template: 'github_workflow_run';
+  data: GitHubWorkflowRunMessageContentData;
 }

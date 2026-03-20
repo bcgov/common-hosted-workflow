@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import type { UptimeComAlertPayload, UptimeComMessageContent } from './types';
 import type { UptimeComMessageContentData } from './schema';
 import { formatToIsoTimestamp } from '../shared/datetime';

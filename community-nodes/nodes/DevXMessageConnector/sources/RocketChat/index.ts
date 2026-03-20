@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import { RocketChatPayload } from './types';
 import { createHtmlMessageContent } from '../Html';
 import type { HtmlMessageContent } from '../Html/types';

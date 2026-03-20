@@ -7,6 +7,9 @@ import {
   type INodeTypeDescription,
 } from 'n8n-workflow';
 import {
+  textTransform,
+  htmlTransform,
+  genericTransform,
   backupContainerTransform,
   githubTransform,
   rocketChatTransform,
@@ -17,7 +20,7 @@ import type { TextMessageContent } from './sources/Text/types';
 import type { HtmlMessageContent } from './sources/Html/types';
 import type { GenericMessageContent } from './sources/Generic/types';
 import type { BackupContainerMessageContent } from './sources/BackupContainer/types';
-import type { GitHubPullRequestMessageContent } from './sources/Github/types';
+import type { GitHubPullRequestMessageContent, GitHubWorkflowRunMessageContent } from './sources/Github/types';
 import type { SysdigMessageContent } from './sources/Sysdig/types';
 import type { UptimeComMessageContent } from './sources/UptimeCom/types';
 
@@ -27,6 +30,7 @@ type MessageContent =
   | GenericMessageContent
   | BackupContainerMessageContent
   | GitHubPullRequestMessageContent
+  | GitHubWorkflowRunMessageContent
   | SysdigMessageContent
   | UptimeComMessageContent;
 
@@ -48,6 +52,18 @@ export class DevXMessageConnector implements INodeType {
     credentials: [],
     properties: [
       {
+        displayName: 'Type',
+        name: 'type',
+        type: 'options',
+        noDataExpression: true,
+        options: [
+          { name: 'Template', value: 'template' },
+          { name: 'Text', value: 'text' },
+          { name: 'html', value: 'html' },
+        ],
+        default: 'template',
+      },
+      {
         displayName: 'Source',
         name: 'source',
         type: 'options',
@@ -58,18 +74,48 @@ export class DevXMessageConnector implements INodeType {
           { name: 'Backup Container', value: 'backup-container' },
           { name: 'Sysdig', value: 'sysdig' },
           { name: 'Uptime.com', value: 'uptime-com' },
+          { name: 'Generic', value: 'generic' },
         ],
         default: 'rocket-chat',
+        displayOptions: {
+          show: {
+            type: ['template'],
+          },
+        },
       },
       {
-        displayName: 'Message Payload',
+        displayName: 'Payload',
         name: 'payload',
         type: 'string',
         default: '',
         required: true,
         displayOptions: {
           show: {
-            source: ['rocket-chat', 'github', 'backup-container', 'sysdig', 'uptime-com', 'argo-cd'],
+            type: ['template'],
+          },
+        },
+      },
+      {
+        displayName: 'Text',
+        name: 'payload',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            type: ['text'],
+          },
+        },
+      },
+      {
+        displayName: 'Html',
+        name: 'payload',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            type: ['html'],
           },
         },
       },
@@ -81,21 +127,32 @@ export class DevXMessageConnector implements INodeType {
     const returnData: INodeExecutionData[] = [];
 
     for (let i = 0; i < items.length; i++) {
+      const type = this.getNodeParameter('type', i) as string;
       const source = this.getNodeParameter('source', i) as string;
       let messageContent: MessageContent;
 
-      if (source === 'rocket-chat') {
-        messageContent = await rocketChatTransform.call(this, i);
-      } else if (source === 'github') {
-        messageContent = await githubTransform.call(this, i);
-      } else if (source === 'backup-container') {
-        messageContent = await backupContainerTransform.call(this, i);
-      } else if (source === 'sysdig') {
-        messageContent = await sysdigTransform.call(this, i);
-      } else if (source === 'uptime-com') {
-        messageContent = await uptimeComTransform.call(this, i);
+      if (type === 'text') {
+        messageContent = await textTransform.call(this, i);
+      } else if (type === 'html') {
+        messageContent = await htmlTransform.call(this, i);
+      } else if (type === 'template') {
+        if (source === 'generic') {
+          messageContent = await genericTransform.call(this, i);
+        } else if (source === 'rocket-chat') {
+          messageContent = await rocketChatTransform.call(this, i);
+        } else if (source === 'github') {
+          messageContent = await githubTransform.call(this, i);
+        } else if (source === 'backup-container') {
+          messageContent = await backupContainerTransform.call(this, i);
+        } else if (source === 'sysdig') {
+          messageContent = await sysdigTransform.call(this, i);
+        } else if (source === 'uptime-com') {
+          messageContent = await uptimeComTransform.call(this, i);
+        } else {
+          throw new Error(`The source "${source}" is not known!`);
+        }
       } else {
-        throw new Error(`The source "${source}" is not known!`);
+        throw new Error(`The type "${type}" is not known!`);
       }
 
       const response = await sendMessageToDevXConnector.call(this, messageContent);

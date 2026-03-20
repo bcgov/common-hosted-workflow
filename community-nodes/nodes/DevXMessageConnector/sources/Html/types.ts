@@ -1,4 +1,4 @@
 export interface HtmlMessageContent {
   kind: 'html';
-  html: string;
+  text: string;
 }

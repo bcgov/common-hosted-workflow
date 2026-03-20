@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import type { BackupContainerPayload, BackupContainerMessageContent } from './types';
 import type { BackupContainerMessageContentData } from './schema';
 

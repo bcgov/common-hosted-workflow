@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import type { HtmlMessageContent } from './types';
 
 export function htmlTransform(this: IExecuteFunctions, index: number): HtmlMessageContent {
@@ -10,6 +10,6 @@ export function htmlTransform(this: IExecuteFunctions, index: number): HtmlMessa
 export function createHtmlMessageContent(html: string): HtmlMessageContent {
   return {
     kind: 'html',
-    html,
+    text: html,
   };
 }

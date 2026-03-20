@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import type { GenericMessageContent } from './types';
 import type { GenericMessageContentData } from './schema';
 

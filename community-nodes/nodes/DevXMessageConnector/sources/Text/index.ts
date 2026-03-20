@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import type { TextMessageContent } from './types';
 
 export function textTransform(this: IExecuteFunctions, index: number): TextMessageContent {

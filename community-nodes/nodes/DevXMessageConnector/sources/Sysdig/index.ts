@@ -1,4 +1,4 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { IExecuteFunctions } from 'n8n-workflow';
 import type { SysdigAlertPayload, SysdigMessageContent } from './types';
 import type { SysdigMessageContentData } from './schema';
 import { formatToIsoTimestamp } from '../shared/datetime';
