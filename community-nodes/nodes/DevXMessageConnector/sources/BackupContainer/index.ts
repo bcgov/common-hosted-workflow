@@ -1,19 +1,30 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
-import { BackupContainerPayload } from './types';
+import { IExecuteFunctions } from 'n8n-workflow';
+import type { BackupContainerPayload, BackupContainerMessageContent } from './types';
+import type { BackupContainerMessageContentData } from './schema';
+import { safeParsePayload } from '../shared/payload';
 
-export async function backupContainerTransform(this: IExecuteFunctions, index: number): Promise<INodeExecutionData> {
+export function backupContainerTransform(this: IExecuteFunctions, index: number): BackupContainerMessageContent | null {
   const rawPayload = this.getNodeParameter('payload', index);
 
-  const payload =
-    typeof rawPayload === 'string'
-      ? (JSON.parse(rawPayload) as BackupContainerPayload)
-      : (rawPayload as BackupContainerPayload);
-  console.log('backup-container', payload);
+  const payload = safeParsePayload<BackupContainerPayload>(rawPayload);
+  if (!payload) return null;
 
-  // Specific Backup Container transformation logic here
-  const transformedJson = {
-    text: `Backup Container Alert: ${rawPayload}`,
+  const data = {
+    status: payload.statusCode.toLowerCase() as 'info' | 'warn' | 'error',
+    projectName: payload.projectName,
+    projectFriendlyName: payload.projectFriendlyName,
+    message: payload.message,
   };
 
-  return { json: transformedJson };
+  return createBackupContainerMessageContent(data);
+}
+
+export function createBackupContainerMessageContent(
+  data: BackupContainerMessageContentData,
+): BackupContainerMessageContent {
+  return {
+    kind: 'template',
+    template: 'db_backup',
+    data,
+  };
 }

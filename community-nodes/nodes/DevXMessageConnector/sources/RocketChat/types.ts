@@ -1,5 +1,4 @@
 // See https://developer.rocket.chat/apidocs/post-message
-
 export interface RocketChatField {
   title: string;
   value: string;

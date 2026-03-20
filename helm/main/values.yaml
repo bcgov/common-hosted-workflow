@@ -45,6 +45,7 @@ n8n:
     N8N_NATIVE_PYTHON_RUNNER: "true"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/queue-mode/#queue-mode-environment-variables
     OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS: "true"
+    QUEUE_BULL_PREFIX: ""
     QUEUE_BULL_REDIS_HOST: "chwf-redis-master"
     QUEUE_BULL_REDIS_PORT: "6379"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/executions/#executions-environment-variables

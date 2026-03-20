@@ -29,6 +29,7 @@
     ],
     "nodes": [
       "dist/nodes/CHEFS/CHEFS.node.js",
+      "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.ts",
       "dist/nodes/TeamsMessageTransformer/TeamsMessageTransformer.node.ts"
     ]
   },

@@ -1,18 +1,29 @@
-import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
-import type { MonitoringPayload } from './types';
+import { IExecuteFunctions } from 'n8n-workflow';
+import type { UptimeComAlertPayload, UptimeComMessageContent } from './types';
+import type { UptimeComMessageContentData } from './schema';
+import { formatToIsoTimestamp } from '../shared/datetime';
+import { safeParsePayload } from '../shared/payload';
 
-export async function uptimeComTransform(this: IExecuteFunctions, index: number): Promise<INodeExecutionData> {
+export function uptimeComTransform(this: IExecuteFunctions, index: number): UptimeComMessageContent | null {
   const rawPayload = this.getNodeParameter('payload', index);
 
-  const payload =
-    typeof rawPayload === 'string' ? (JSON.parse(rawPayload) as MonitoringPayload) : (rawPayload as MonitoringPayload);
+  const payload = safeParsePayload<UptimeComAlertPayload>(rawPayload);
+  if (!payload) return null;
 
-  console.log('uptimeCom', payload);
-
-  // Specific Uptime.Com transformation logic here
-  const transformedJson = {
-    text: `Uptime.Com Alert: ${rawPayload}`,
+  const data = {
+    status: payload.data.alert.is_up ? ('up' as const) : ('down' as const),
+    service: payload.data.service.display_name,
+    downSince: formatToIsoTimestamp(payload.data.alert.created_at),
+    url: payload.data.links.alert_details,
   };
 
-  return { json: transformedJson };
+  return createUptimeComMessageContent(data);
+}
+
+export function createUptimeComMessageContent(data: UptimeComMessageContentData): UptimeComMessageContent {
+  return {
+    kind: 'template',
+    template: 'uptime',
+    data,
+  };
 }
