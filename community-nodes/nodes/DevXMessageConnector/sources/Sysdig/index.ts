@@ -1,6 +1,7 @@
 import { IExecuteFunctions } from 'n8n-workflow';
 import type { SysdigAlertPayload, SysdigMessageContent } from './types';
-import type { SysdigMessageContentData } from './schema';
+import { sysdigMessageContentDataSchema, type SysdigMessageContentData } from './schema';
+
 import { formatToIsoTimestamp } from '../shared/datetime';
 import { safeParsePayload } from '../shared/payload';
 
@@ -24,9 +25,10 @@ export function sysdigTransform(this: IExecuteFunctions, index: number): SysdigM
 }
 
 export function createSysdigMessageContent(data: SysdigMessageContentData): SysdigMessageContent {
+  const validatedData = sysdigMessageContentDataSchema.parse(data);
   return {
     kind: 'template',
     template: 'sysdig',
-    data,
+    data: validatedData,
   };
 }

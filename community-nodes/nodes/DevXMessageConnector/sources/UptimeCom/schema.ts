@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import { IsoTimestampSchema } from '../shared/schema';
+import { isoTimestampSchema } from '../shared/schema';
 
 export const uptimeComMessageContentDataSchema = z
   .object({
     status: z.enum(['up', 'down']),
     service: z.string().min(1),
-    downSince: IsoTimestampSchema.optional(),
+    downSince: isoTimestampSchema.optional(),
     url: z.string().url().optional(),
   })
   .strict();

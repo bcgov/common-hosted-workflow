@@ -1,6 +1,6 @@
 import { IExecuteFunctions } from 'n8n-workflow';
 import type { GenericMessageContent } from './types';
-import type { GenericMessageContentData } from './schema';
+import { genericMessageContentDataSchema, type GenericMessageContentData } from './schema';
 import { safeParsePayload } from '../shared/payload';
 
 export function genericTransform(this: IExecuteFunctions, index: number): GenericMessageContent | null {
@@ -13,9 +13,10 @@ export function genericTransform(this: IExecuteFunctions, index: number): Generi
 }
 
 export function createGenericMessageContent(data: GenericMessageContentData): GenericMessageContent {
+  const validatedData = genericMessageContentDataSchema.parse(data);
   return {
     kind: 'template',
     template: 'generic',
-    data: data,
+    data: validatedData,
   };
 }

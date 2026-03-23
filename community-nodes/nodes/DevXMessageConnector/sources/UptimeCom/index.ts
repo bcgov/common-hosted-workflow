@@ -1,6 +1,6 @@
 import { IExecuteFunctions } from 'n8n-workflow';
 import type { UptimeComAlertPayload, UptimeComMessageContent } from './types';
-import type { UptimeComMessageContentData } from './schema';
+import { uptimeComMessageContentDataSchema, type UptimeComMessageContentData } from './schema';
 import { formatToIsoTimestamp } from '../shared/datetime';
 import { safeParsePayload } from '../shared/payload';
 
@@ -21,9 +21,10 @@ export function uptimeComTransform(this: IExecuteFunctions, index: number): Upti
 }
 
 export function createUptimeComMessageContent(data: UptimeComMessageContentData): UptimeComMessageContent {
+  const validatedData = uptimeComMessageContentDataSchema.parse(data);
   return {
     kind: 'template',
     template: 'uptime',
-    data,
+    data: validatedData,
   };
 }
