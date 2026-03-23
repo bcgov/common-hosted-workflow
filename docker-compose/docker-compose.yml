@@ -46,6 +46,9 @@ x-n8n-env: &n8n-env
   OIDC_REDIRECT_URI: http://localhost:5678/rest/auth/oidc/callback
   OIDC_ROLES_CLAIM: client_roles
   N8N_ADDITIONAL_NON_UI_ROUTES: auth
+  # For custom nodes
+  DEVX_CONNECTOR_API_URL: ${DEVX_CONNECTOR_API_URL}
+  DEVX_CONNECTOR_API_KEY: ${DEVX_CONNECTOR_API_KEY}
 
 services:
   postgres:
