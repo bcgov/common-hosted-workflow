@@ -1,0 +1,46 @@
+n8n:
+  enabled: true
+  env:
+    WEBHOOK_URL: "https://test-chwf.apps.gold.devops.gov.bc.ca"
+    N8N_SMTP_HOST: "apps.smtp.gov.bc.ca"
+    N8N_SMTP_PORT: "25"
+    N8N_SMTP_SSL: "false"
+    N8N_SMTP_AUTHTYPE: "NONE"
+    N8N_SMTP_USER: ""
+    N8N_SMTP_PASS: ""
+    N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+    OIDC_ISSUER_URL: https://loginproxy.gov.bc.ca/auth/realms/standard
+    OIDC_REDIRECT_URI: https://chwf.apps.gold.devops.gov.bc.ca/rest/auth/oidc/callback
+
+  route:
+    enabled: true
+    host: prod-chwf.apps.gold.devops.gov.bc.ca
+
+  worker:
+    enabled: true
+
+  webhook:
+    enabled: true
+
+  runner:
+    enabled: true
+
+redis:
+  enabled: true
+
+pgo:
+  enabled: true
+  pgBackRest:
+    repos:
+      - name: repo1
+        enabled: true
+        type: volume
+        retention: "2"
+        retentionType: count
+        volume:
+          size: 256Mi
+          accessModes: ReadWriteOnce
+          storageClassName: netapp-file-standard
+        schedules:
+          full: 0 8 * * *
+          incremental: 0 0,4,12,16,20 * * *
