@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { userWorkflow } from './db/schema';
+import { userWorkflow } from './db/schema/schema';
 
 const hookConfig = {
   n8n: {
