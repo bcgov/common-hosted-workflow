@@ -136,7 +136,7 @@ jobs:
         kubectl rollout status deployment/chwf-n8n-webhook
         kubectl rollout status deployment/chwf-n8n-runner
       working-directory: ./helm/main
-  
+
   deploy-prod:
     needs: [build-push-n8n]
     runs-on: ubuntu-22.04
