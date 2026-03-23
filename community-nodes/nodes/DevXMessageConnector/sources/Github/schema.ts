@@ -6,7 +6,7 @@ export const gitHubPullRequestMessageContentDataSchema = z
     title: z.string().min(1),
     repo: z.string().min(1),
     author: z.string().min(1),
-    url: z.url(),
+    url: z.string().url(),
     body: z.string().optional(),
   })
   .strict();

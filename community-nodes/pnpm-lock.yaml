@@ -14,6 +14,9 @@ importers:
       sanitize-html:
         specifier: ^2.17.2
         version: 2.17.2
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@n8n/node-cli':
         specifier: '*'
@@ -30,9 +33,6 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
 packages:
 

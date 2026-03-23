@@ -1,6 +1,6 @@
 import { IExecuteFunctions } from 'n8n-workflow';
 import type { BackupContainerPayload, BackupContainerMessageContent } from './types';
-import type { BackupContainerMessageContentData } from './schema';
+import { backupContainerMessageContentDataSchema, type BackupContainerMessageContentData } from './schema';
 import { safeParsePayload } from '../shared/payload';
 
 export function backupContainerTransform(this: IExecuteFunctions, index: number): BackupContainerMessageContent | null {
@@ -22,9 +22,10 @@ export function backupContainerTransform(this: IExecuteFunctions, index: number)
 export function createBackupContainerMessageContent(
   data: BackupContainerMessageContentData,
 ): BackupContainerMessageContent {
+  const validatedData = backupContainerMessageContentDataSchema.parse(data);
   return {
     kind: 'template',
     template: 'db_backup',
-    data,
+    data: validatedData,
   };
 }

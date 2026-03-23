@@ -5,7 +5,12 @@ import type {
   GitHubPullRequestMessageContent,
   GitHubWorkflowRunMessageContent,
 } from './types';
-import type { GitHubPullRequestMessageContentData, GitHubWorkflowRunMessageContentData } from './schema';
+import {
+  gitHubPullRequestMessageContentDataSchema,
+  gitHubWorkflowRunMessageContentDataSchema,
+  type GitHubPullRequestMessageContentData,
+  type GitHubWorkflowRunMessageContentData,
+} from './schema';
 import { createTextMessageContent } from '../Text';
 import { TextMessageContent } from '../Text/types';
 import { safeParsePayload } from '../shared/payload';
@@ -57,19 +62,21 @@ export function githubTransform(
 export function createGitHubPullRequestTemplateContent(
   data: GitHubPullRequestMessageContentData,
 ): GitHubPullRequestMessageContent {
+  const validatedData = gitHubPullRequestMessageContentDataSchema.parse(data);
   return {
     kind: 'template',
     template: 'github_pull_request',
-    data,
+    data: validatedData,
   };
 }
 
 export function createGitHubWorkflowRunTemplateContent(
   data: GitHubWorkflowRunMessageContentData,
 ): GitHubWorkflowRunMessageContent {
+  const validatedData = gitHubWorkflowRunMessageContentDataSchema.parse(data);
   return {
     kind: 'template',
     template: 'github_workflow_run',
-    data,
+    data: validatedData,
   };
 }

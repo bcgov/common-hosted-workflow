@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { IsoTimestampSchema } from '../shared/schema';
+import { isoTimestampSchema } from '../shared/schema';
 
 export const sysdigMessageContentDataSchema = z
   .object({
@@ -9,8 +9,8 @@ export const sysdigMessageContentDataSchema = z
     alertName: z.string().min(1),
     scope: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
-    timestamp: IsoTimestampSchema.optional(),
-    url: z.url().optional(),
+    timestamp: isoTimestampSchema.optional(),
+    url: z.string().url().optional(),
   })
   .strict();
 
