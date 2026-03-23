@@ -24,7 +24,7 @@ importers:
         specifier: ^13.1.3
         version: 13.1.3
       prettier:
-        specifier: 4.0.0-alpha.13
+        specifier: ^4.0.0-alpha.13
         version: 4.0.0-alpha.13
 
 packages:
