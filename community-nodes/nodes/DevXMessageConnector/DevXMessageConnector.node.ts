@@ -16,6 +16,7 @@ import {
   sysdigTransform,
   uptimeComTransform,
 } from './sources';
+import { parseTeamsLink } from './helpers';
 import type { TextMessageContent } from './sources/Text/types';
 import type { HtmlMessageContent } from './sources/Html/types';
 import type { GenericMessageContent } from './sources/Generic/types';
@@ -49,7 +50,12 @@ export class DevXMessageConnector implements INodeType {
     usableAsTool: true,
     inputs: [NodeConnectionTypes.Main],
     outputs: [NodeConnectionTypes.Main],
-    credentials: [],
+    credentials: [
+      {
+        name: 'devXConnector',
+        required: true,
+      },
+    ],
     properties: [
       {
         displayName: 'Type',
@@ -124,11 +130,17 @@ export class DevXMessageConnector implements INodeType {
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const items = this.getInputData();
+    const credentials = await this.getCredentials('devXConnector');
+    const { channelId, groupId } = parseTeamsLink(credentials.channelLink as string);
+
+    if (!channelId || !groupId) {
+      throw new Error('Invalid Microsoft Teams channel link provided');
+    }
+
     const returnData: INodeExecutionData[] = [];
 
     for (let i = 0; i < items.length; i++) {
       const type = this.getNodeParameter('type', i) as string;
-      const source = this.getNodeParameter('source', i) as string;
       let messageContent: MessageContent | null = null;
 
       if (type === 'text') {
@@ -136,6 +148,7 @@ export class DevXMessageConnector implements INodeType {
       } else if (type === 'html') {
         messageContent = htmlTransform.call(this, i);
       } else if (type === 'template') {
+        const source = this.getNodeParameter('source', i) as string;
         if (source === 'generic') {
           messageContent = genericTransform.call(this, i);
         } else if (source === 'rocket-chat') {
@@ -159,7 +172,7 @@ export class DevXMessageConnector implements INodeType {
         throw new Error('Failed to generate message content');
       }
 
-      const response = await sendMessageToDevXConnector.call(this, messageContent);
+      const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId);
       returnData.push({ json: response as unknown as IDataObject });
     }
 
@@ -167,23 +180,33 @@ export class DevXMessageConnector implements INodeType {
   }
 }
 
-async function sendMessageToDevXConnector(this: IExecuteFunctions, content: MessageContent) {
-  const API_KEY = process.env.CONNECTOR_API_KEY;
-  const BASE_URL = process.env.CONNECTOR_API_URL;
+async function sendMessageToDevXConnector(
+  this: IExecuteFunctions,
+  content: MessageContent,
+  teamId: string,
+  channelId: string,
+) {
+  const apiKey = process.env.DEVX_CONNECTOR_API_KEY;
+  const baseUrl = process.env.DEVX_CONNECTOR_API_URL;
+
+  if (!apiKey || !baseUrl) {
+    throw new Error('Missing DevX Connector configuration (API_KEY or BASE_URL)');
+  }
+
+  const normalizedUrl = baseUrl.replace(/\/$/, '');
 
   const options = {
     method: 'POST' as const,
-    url: `${BASE_URL}/api/v1/messages`,
+    url: `${normalizedUrl}/api/v1/messages`,
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'X-User-Entra-Id': '',
       'Content-Type': 'application/json',
     },
     body: {
       target: {
-        // TODO: add inputs for teamId and channelId
-        teamId: '00000000-0000-0000-0000-000000000000',
-        channelId: '19:abc123@thread.tacv2',
+        teamId,
+        channelId,
       },
       content,
     },
