@@ -1,0 +1,9 @@
+{
+  "node": "community-nodes.workflowInteractionLayer",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Communication"],
+  "resources": {
+    "primaryDocumentation": [{ "url": "" }]
+  }
+}
