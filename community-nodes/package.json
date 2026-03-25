@@ -16,7 +16,8 @@
     "build:watch": "tsc --watch",
     "dev": "n8n-node dev",
     "lint": "n8n-node lint",
-    "lint:fix": "n8n-node lint --fix"
+    "lint:fix": "n8n-node lint --fix",
+    "test": "vitest run"
   },
   "files": [
     "dist"
@@ -39,7 +40,8 @@
     "@types/node": "^25.2.0",
     "@types/sanitize-html": "^2.16.1",
     "eslint": "9.32.0",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.1.1"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
