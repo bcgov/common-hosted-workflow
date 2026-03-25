@@ -16,3 +16,9 @@ runs:
       run: |
         pnpm install
       shell: bash
+
+    - name: Install Custom node NPM packages
+      run: |
+        pnpm install
+      working-directory: ./community-nodes
+      shell: bash
