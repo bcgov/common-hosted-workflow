@@ -51,6 +51,11 @@ spec:
     key: init.sql
 
   users:
+    - name: postgres
+      databases:
+        - postgres
+      options: "SUPERUSER"
+
     {{- range $db := .Values.databases }}
     - name: {{ $db.name }}
       databases:

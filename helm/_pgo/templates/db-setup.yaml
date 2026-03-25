@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "_.fullname" . }}-db-setup-rev{{ .Release.Revision }}
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      activeDeadlineSeconds: 1800
+      restartPolicy: Never
+      containers:
+        - name: psql-setup
+          image: postgres:{{ .Values.postgresVersion | default "17" }}
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "_.fullname" . }}-pguser-postgres
+                  key: password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              {{- range $db := .Values.databases }}
+              echo "Setting up database: {{ $db.name }}"
+
+              # Construct the connection string to the primary service
+              export DB_HOST={{ include "_.fullname" $ }}-primary
+
+              # Run your specific requirements
+              psql -h "$DB_HOST" -U postgres -d "{{ $db.name }}" <<EOF
+                ALTER SCHEMA public OWNER TO "{{ $db.name }}";
+                ALTER USER "{{ $db.name }}" NOSUPERUSER;
+                GRANT ALL ON SCHEMA public TO "{{ $db.name }}";
+              EOF
+              {{- end }}
