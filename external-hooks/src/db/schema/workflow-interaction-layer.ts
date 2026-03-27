@@ -1,5 +1,35 @@
 import { sql } from 'drizzle-orm';
-import { check, index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  check,
+  index,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+
+/**
+ * tenant_project_relation
+ */
+export const tenantProjectRelation = pgTable(
+  'tenant_project_relation',
+  {
+    tenantId: uuid('tenant_id').notNull(),
+    projectId: varchar('project_id', { length: 50 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tenantId, table.projectId] }),
+    index('idx_tpr_tenant_id').on(table.tenantId),
+    uniqueIndex('uq_tpr_project_id').on(table.projectId),
+  ],
+);
+
+export type TenantProjectRelation = typeof tenantProjectRelation.$inferSelect;
+export type NewTenantProjectRelation = typeof tenantProjectRelation.$inferInsert;
 
 /**
  * messages
@@ -18,7 +48,9 @@ export const messages = pgTable(
     workflowId: varchar('workflow_id', { length: 50 }),
     projectId: varchar('project_id', {
       length: 50,
-    }).notNull(),
+    })
+      .notNull()
+      .references(() => tenantProjectRelation.projectId),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     status: varchar('status', { length: 50 }).notNull().default('active'),
@@ -61,7 +93,9 @@ export const actionRequests = pgTable(
     workflowId: varchar('workflow_id', { length: 50 }),
     projectId: varchar('project_id', {
       length: 50,
-    }).notNull(),
+    })
+      .notNull()
+      .references(() => tenantProjectRelation.projectId),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     status: varchar('status', { length: 50 }).notNull().default('pending'),
@@ -114,7 +148,9 @@ export const auditLog = pgTable(
     action: varchar('action', { length: 50 }).notNull(),
     projectId: varchar('project_id', {
       length: 50,
-    }).notNull(),
+    })
+      .notNull()
+      .references(() => tenantProjectRelation.projectId),
     performedBy: varchar('performed_by', { length: 100 }).notNull(),
     performedAt: timestamp('performed_at', { withTimezone: true }).defaultNow().notNull(),
     beforeState: jsonb('before_state'),
