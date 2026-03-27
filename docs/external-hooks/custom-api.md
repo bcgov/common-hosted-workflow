@@ -2,14 +2,21 @@
 
 A set of **custom administrative API endpoints** for n8n by leveraging internal hooks. These endpoints extend n8n's native capabilities, specifically allowing for cross-user project lookups and manual workflow-to-project associations.
 
+### Source layout (`external-hooks/src/api/`)
+
+| File                | Role                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`hooks.ts`**      | n8n external-hooks **entry** (`export = createHookConfig()`). Build output: `dist/api/hooks.cjs` (see `EXTERNAL_HOOK_FILES` in the main `Dockerfile`). |
+| **`middleware.ts`** | Shared code: constants, `createAuthMiddleware`, and `adminAuthMiddleware` wiring.                                                                      |
+| **`admin.ts`**      | `/rest/custom/admin/*` routes only.                                                                                                                    |
+| **Message APIs**    | Documented separately in [`workflow-interaction-layer.md`](./workflow-interaction-layer.md).                                                           |
+
 ---
 
 ## 🔐 Authentication & Security
 
-All custom endpoints are protected by the `adminAuthMiddleware`.
-
-- **Header Required:** `X-N8N-API-KEY`
-- **Permission Level:** Requires a user with the `global-owner` or `global-admin` role.
+- **Admin routes** (`/rest/custom/admin/*`) use `adminAuthMiddleware`: validates `X-N8N-API-KEY` via n8n’s `PublicApiKeyService` and requires `global-owner` or `global-admin`.
+- **Headers:** `X-N8N-API-KEY` required for admin routes.
 - **Mechanism:** The middleware validates the key against n8n's internal `PublicApiKeyService`. If the user is not an administrator, the request returns a `403 Forbidden` status.
 
 ---
@@ -64,6 +71,35 @@ Manually creates a shared relationship between a specific workflow and a project
   "message": "Workflow 'ID' successfully associated with project 'ID'"
 }
 ```
+
+### 3. Insert Tenant Project Relation
+
+Inserts a mapping into the custom table `tenant_project_relation` so message APIs can validate `X-TENANT-ID` against the allowed projects for that tenant. At most **one project per tenant**: if the tenant already has a mapping to a different `projectId`, the API returns `409` with `conflictProjectId` (the existing project id).
+
+- **URL:** `/rest/custom/admin/tenant-project-relation`
+- **Method:** `POST`
+- **Request Body:**
+
+```json
+{
+  "tenantId": "uuid",
+  "projectId": "string"
+}
+```
+
+- **Success (201 Created):**
+
+```json
+{ "success": true, "message": "Inserted tenant/project relation ..." }
+```
+
+- **Conflict (409):**
+  - If the tenant already has a project mapping and the request uses a different `projectId`: `409` with `conflictProjectId`.
+  - If the `projectId` is already mapped to a different tenant: `409` with `conflictTenantId`.
+
+### Workflow interaction layer (message APIs)
+
+See [`workflow-interaction-layer.md`](./workflow-interaction-layer.md).
 
 ## 🛠 Internal Dependencies
 

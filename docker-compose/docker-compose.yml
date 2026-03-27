@@ -49,6 +49,8 @@ x-n8n-env: &n8n-env
   # For custom nodes
   DEVX_CONNECTOR_API_URL: ${DEVX_CONNECTOR_API_URL}
   DEVX_CONNECTOR_API_KEY: ${DEVX_CONNECTOR_API_KEY}
+  # internal auth token for secure communication between n8n and external hooks
+  INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
 
 services:
   postgres:
