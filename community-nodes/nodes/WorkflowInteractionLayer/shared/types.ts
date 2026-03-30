@@ -4,12 +4,12 @@ export interface MessageCreatePayload {
   actorType: 'user' | 'group' | 'role' | 'system' | 'other';
   title: string;
   body: string;
-  workflowId?: string;
+  workflowId: string;
   metadata?: Record<string, unknown>;
 }
 
 export interface MessageResponse {
-  messageId: string;
+  id: string;
   title: string;
   body: string;
   actorId: string;
@@ -31,7 +31,7 @@ export interface ActionCreatePayload {
   callbackUrl: string;
   callbackMethod?: 'POST' | 'PUT' | 'PATCH';
   callbackPayloadSpec?: Record<string, unknown>;
-  workflowId?: string;
+  workflowId: string;
   dueDate?: string;
   priority?: 'critical' | 'normal';
   checkIn?: string;
@@ -39,7 +39,7 @@ export interface ActionCreatePayload {
 }
 
 export interface ActionResponse {
-  actionId: string;
+  id: string;
   actionType: string;
   payload: Record<string, unknown>;
   callbackUrl: string;

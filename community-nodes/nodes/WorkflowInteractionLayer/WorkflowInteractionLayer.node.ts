@@ -29,8 +29,7 @@ export class WorkflowInteractionLayer implements INodeType {
     outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
-        // eslint-disable-next-line @n8n/community-nodes/no-credential-reuse
-        name: 'n8nApi',
+        name: 'workflowInteractionLayerApi',
         required: true,
       },
     ],
@@ -57,7 +56,7 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['message'] } },
         options: [
           { name: 'Create', value: 'create', action: 'Create a message' },
-          { name: 'Read', value: 'read', action: 'Read a message' },
+          { name: 'Get Messages by Actor ID', value: 'getByActor', action: 'Get messages by actor ID' },
           { name: 'Get Many', value: 'list', action: 'Get many messages' },
         ],
         default: 'create',
@@ -72,8 +71,8 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['action'] } },
         options: [
           { name: 'Create', value: 'create', action: 'Create an action' },
-          { name: 'Delete', value: 'delete', action: 'Delete an action' },
           { name: 'Get', value: 'get', action: 'Get an action' },
+          { name: 'Get Actions by Actor ID', value: 'getByActor', action: 'Get actions by actor ID' },
           { name: 'Get Many', value: 'list', action: 'Get many actions' },
           { name: 'Update', value: 'update', action: 'Update an action' },
         ],
@@ -144,16 +143,41 @@ export class WorkflowInteractionLayer implements INodeType {
       },
 
       // ═══════════════════════════════════════
-      // Read Message fields
+      // Get Messages by Actor ID fields
       // ═══════════════════════════════════════
       {
-        displayName: 'Message ID',
-        name: 'messageId',
+        displayName: 'Actor ID',
+        name: 'actorId',
         type: 'string',
         default: '',
         required: true,
-        description: 'ID of the message to retrieve',
-        displayOptions: { show: { resource: ['message'], operation: ['read'] } },
+        description: 'ID of the actor to retrieve messages for',
+        displayOptions: { show: { resource: ['message'], operation: ['getByActor'] } },
+      },
+      {
+        displayName: 'Since',
+        name: 'since',
+        type: 'string',
+        default: '',
+        description: 'Filter messages created after this RFC 3339 timestamp',
+        displayOptions: { show: { resource: ['message'], operation: ['getByActor'] } },
+      },
+      {
+        displayName: 'Limit',
+        name: 'limit',
+        type: 'number',
+        typeOptions: { minValue: 1, maxValue: 200 },
+        default: 50,
+        description: 'Max number of results to return',
+        displayOptions: { show: { resource: ['message'], operation: ['getByActor'] } },
+      },
+      {
+        displayName: 'Workflow Instance ID',
+        name: 'workflowInstanceId',
+        type: 'string',
+        default: '',
+        description: 'Filter by workflow instance ID',
+        displayOptions: { show: { resource: ['message'], operation: ['getByActor'] } },
       },
 
       // ═══════════════════════════════════════
@@ -185,21 +209,6 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['message'], operation: ['list'] } },
       },
       {
-        displayName: 'Actor Type',
-        name: 'actorType',
-        type: 'options',
-        default: 'user',
-        options: [
-          { name: 'Group', value: 'group' },
-          { name: 'Other', value: 'other' },
-          { name: 'Role', value: 'role' },
-          { name: 'System', value: 'system' },
-          { name: 'User', value: 'user' },
-        ],
-        description: 'Filter by actor type',
-        displayOptions: { show: { resource: ['message'], operation: ['list'] } },
-      },
-      {
         displayName: 'Workflow Instance ID',
         name: 'workflowInstanceId',
         type: 'string',
@@ -208,12 +217,11 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['message'], operation: ['list'] } },
       },
       {
-        displayName: 'Offset',
-        name: 'offset',
-        type: 'number',
-        typeOptions: { minValue: 0 },
-        default: 0,
-        description: 'Number of results to skip for pagination',
+        displayName: 'Since',
+        name: 'since',
+        type: 'string',
+        default: '',
+        description: 'Filter messages created after this RFC 3339 timestamp (cursor for pagination)',
         displayOptions: { show: { resource: ['message'], operation: ['list'] } },
       },
 
@@ -355,6 +363,44 @@ export class WorkflowInteractionLayer implements INodeType {
       },
 
       // ═══════════════════════════════════════
+      // Get Actions by Actor ID fields
+      // ═══════════════════════════════════════
+      {
+        displayName: 'Actor ID',
+        name: 'actorId',
+        type: 'string',
+        default: '',
+        required: true,
+        description: 'ID of the actor to retrieve actions for',
+        displayOptions: { show: { resource: ['action'], operation: ['getByActor'] } },
+      },
+      {
+        displayName: 'Since',
+        name: 'since',
+        type: 'string',
+        default: '',
+        description: 'Filter actions created after this RFC 3339 timestamp',
+        displayOptions: { show: { resource: ['action'], operation: ['getByActor'] } },
+      },
+      {
+        displayName: 'Limit',
+        name: 'limit',
+        type: 'number',
+        typeOptions: { minValue: 1, maxValue: 200 },
+        default: 50,
+        description: 'Max number of results to return',
+        displayOptions: { show: { resource: ['action'], operation: ['getByActor'] } },
+      },
+      {
+        displayName: 'Workflow Instance ID',
+        name: 'workflowInstanceId',
+        type: 'string',
+        default: '',
+        description: 'Filter by workflow instance ID',
+        displayOptions: { show: { resource: ['action'], operation: ['getByActor'] } },
+      },
+
+      // ═══════════════════════════════════════
       // List Actions fields
       // ═══════════════════════════════════════
       {
@@ -383,21 +429,6 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['action'], operation: ['list'] } },
       },
       {
-        displayName: 'Actor Type',
-        name: 'actorType',
-        type: 'options',
-        default: 'user',
-        options: [
-          { name: 'Group', value: 'group' },
-          { name: 'Other', value: 'other' },
-          { name: 'Role', value: 'role' },
-          { name: 'System', value: 'system' },
-          { name: 'User', value: 'user' },
-        ],
-        description: 'Filter by actor type',
-        displayOptions: { show: { resource: ['action'], operation: ['list'] } },
-      },
-      {
         displayName: 'Workflow Instance ID',
         name: 'workflowInstanceId',
         type: 'string',
@@ -411,15 +442,6 @@ export class WorkflowInteractionLayer implements INodeType {
         type: 'string',
         default: '',
         description: 'Filter actions created after this RFC 3339 timestamp',
-        displayOptions: { show: { resource: ['action'], operation: ['list'] } },
-      },
-      {
-        displayName: 'Offset',
-        name: 'offset',
-        type: 'number',
-        typeOptions: { minValue: 0 },
-        default: 0,
-        description: 'Number of results to skip for pagination',
         displayOptions: { show: { resource: ['action'], operation: ['list'] } },
       },
 
@@ -450,68 +472,6 @@ export class WorkflowInteractionLayer implements INodeType {
         ],
         description: 'New status for the action',
         displayOptions: { show: { resource: ['action'], operation: ['update'] } },
-      },
-      {
-        displayName: 'Additional Fields',
-        name: 'additionalFields',
-        type: 'collection',
-        placeholder: 'Add Field',
-        default: {},
-        displayOptions: { show: { resource: ['action'], operation: ['update'] } },
-        options: [
-          {
-            displayName: 'Check In',
-            name: 'checkIn',
-            type: 'string',
-            default: '',
-            description: 'Updated reminder timestamp in RFC 3339 format',
-          },
-          {
-            displayName: 'Due Date',
-            name: 'dueDate',
-            type: 'string',
-            default: '',
-            description: 'Updated due date in RFC 3339 format',
-          },
-          {
-            displayName: 'Metadata',
-            name: 'metadata',
-            type: 'json',
-            default: '',
-            description: 'Updated metadata JSON object',
-          },
-          {
-            displayName: 'Payload',
-            name: 'payload',
-            type: 'json',
-            default: '',
-            description: 'Updated payload JSON',
-          },
-          {
-            displayName: 'Priority',
-            name: 'priority',
-            type: 'options',
-            default: 'normal',
-            options: [
-              { name: 'Critical', value: 'critical' },
-              { name: 'Normal', value: 'normal' },
-            ],
-            description: 'Updated priority',
-          },
-        ],
-      },
-
-      // ═══════════════════════════════════════
-      // Delete Action fields
-      // ═══════════════════════════════════════
-      {
-        displayName: 'Action ID',
-        name: 'actionId',
-        type: 'string',
-        default: '',
-        required: true,
-        description: 'ID of the action to delete',
-        displayOptions: { show: { resource: ['action'], operation: ['delete'] } },
       },
     ],
   };
@@ -549,9 +509,6 @@ export class WorkflowInteractionLayer implements INodeType {
             if (metadata) body.metadata = metadata;
 
             responseData = await wilApiRequest(this, 'POST', '/messages', body);
-          } else if (operation === 'read') {
-            const messageId = this.getNodeParameter('messageId', i) as string;
-            responseData = await wilApiRequest(this, 'GET', `/messages/${messageId}`);
           } else if (operation === 'list') {
             const query: IDataObject = {};
             const returnAll = this.getNodeParameter('returnAll', i) as boolean;
@@ -563,16 +520,27 @@ export class WorkflowInteractionLayer implements INodeType {
             const actorId = this.getNodeParameter('actorId', i, '') as string;
             if (actorId) query.actorId = actorId;
 
-            const actorType = this.getNodeParameter('actorType', i, '') as string;
-            if (actorType) query.actorType = actorType;
+            const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
+            if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
+
+            const since = this.getNodeParameter('since', i, '') as string;
+            if (since) query.since = since;
+
+            responseData = await wilApiRequest(this, 'GET', '/messages', undefined, query);
+          } else if (operation === 'getByActor') {
+            const actorId = this.getNodeParameter('actorId', i) as string;
+            const query: IDataObject = {};
+
+            const since = this.getNodeParameter('since', i, '') as string;
+            if (since) query.since = since;
+
+            const limit = this.getNodeParameter('limit', i, 50) as number;
+            if (limit) query.limit = limit;
 
             const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
             if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
 
-            const offset = this.getNodeParameter('offset', i, 0) as number;
-            if (offset > 0) query.offset = offset;
-
-            responseData = await wilApiRequest(this, 'GET', '/messages', undefined, query);
+            responseData = await wilApiRequest(this, 'GET', `/actors/${actorId}/messages`, undefined, query);
 
             // ═══════════════════════════════════════
             // ACTION
@@ -612,6 +580,20 @@ export class WorkflowInteractionLayer implements INodeType {
           } else if (operation === 'get') {
             const actionId = this.getNodeParameter('actionId', i) as string;
             responseData = await wilApiRequest(this, 'GET', `/actions/${actionId}`);
+          } else if (operation === 'getByActor') {
+            const actorId = this.getNodeParameter('actorId', i) as string;
+            const query: IDataObject = {};
+
+            const since = this.getNodeParameter('since', i, '') as string;
+            if (since) query.since = since;
+
+            const limit = this.getNodeParameter('limit', i, 50) as number;
+            if (limit) query.limit = limit;
+
+            const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
+            if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
+
+            responseData = await wilApiRequest(this, 'GET', `/actors/${actorId}/actions`, undefined, query);
           } else if (operation === 'list') {
             const query: IDataObject = {};
             const returnAll = this.getNodeParameter('returnAll', i) as boolean;
@@ -623,17 +605,11 @@ export class WorkflowInteractionLayer implements INodeType {
             const actorId = this.getNodeParameter('actorId', i, '') as string;
             if (actorId) query.actorId = actorId;
 
-            const actorType = this.getNodeParameter('actorType', i, '') as string;
-            if (actorType) query.actorType = actorType;
-
             const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
             if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
 
             const since = this.getNodeParameter('since', i, '') as string;
             if (since) query.since = since;
-
-            const offset = this.getNodeParameter('offset', i, 0) as number;
-            if (offset > 0) query.offset = offset;
 
             responseData = await wilApiRequest(this, 'GET', '/actions', undefined, query);
           } else if (operation === 'update') {
@@ -642,23 +618,7 @@ export class WorkflowInteractionLayer implements INodeType {
               status: this.getNodeParameter('status', i) as string,
             };
 
-            const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-
-            if (additionalFields.checkIn) body.checkIn = additionalFields.checkIn;
-            if (additionalFields.dueDate) body.dueDate = additionalFields.dueDate;
-            if (additionalFields.priority) body.priority = additionalFields.priority;
-
-            const payload = safeParse(additionalFields.payload);
-            if (payload) body.payload = payload;
-
-            const metadata = safeParse(additionalFields.metadata);
-            if (metadata) body.metadata = metadata;
-
             responseData = await wilApiRequest(this, 'PATCH', `/actions/${actionId}`, body);
-          } else if (operation === 'delete') {
-            const actionId = this.getNodeParameter('actionId', i) as string;
-            await wilApiRequest(this, 'DELETE', `/actions/${actionId}`);
-            responseData = { deleted: true };
           }
         }
 
