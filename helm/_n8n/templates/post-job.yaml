@@ -6,28 +6,28 @@
 {{- $pvcName := include "_.fullname" . -}}
 {{- $pvc := (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $pvcName) -}}
 
-{{- if and (gt .Release.Revision 1) $pvc (index $pvc "metadata") }}
+{{- if and (eq .Release.Revision 1) $pvc (index $pvc "metadata") }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "_.fullname" . }}-pre-rev{{ .Release.Revision }}
+  name: {{ include "_.fullname" . }}-post-rev{{ .Release.Revision }}
   labels: {{ include "_.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": "pre-install,pre-upgrade,pre-rollback"
-    "helm.sh/hook-delete-policy": "hook-succeeded,before-hook-creation"
-    "helm.sh/hook-weight": "-6"
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "11"
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 1800
   template:
     metadata:
-      name: {{ include "_.fullname" . }}-pre
+      name: {{ include "_.fullname" . }}-post
     spec:
       activeDeadlineSeconds: 1800
       restartPolicy: Never
       serviceAccountName: {{ default .Values.global.serviceAccountName .Values.serviceAccountName }}
       containers:
-        - name: {{ include "_.fullname" . }}-pre
+        - name: {{ include "_.fullname" . }}-post
           image: "{{ $imageRepository }}:{{ $deploymentTag }}"
           imagePullPolicy: {{ $imagePullPolicy }}
           command: [/bin/sh, -c]
