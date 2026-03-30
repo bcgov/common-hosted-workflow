@@ -73,8 +73,10 @@ export class MessageRepository {
   }): Promise<Array<typeof messages.$inferSelect>> {
     const clauses: any[] = [inArray(messages.projectId, params.allowedProjectIds)];
     if (params.actorId) clauses.push(eq(messages.actorId, params.actorId));
-    // "since" means created at or after the provided timestamp.
-    if (params.since) clauses.push(gte(messages.createdAt, params.since));
+    // "since" means createdAt >= provided instant (exclusive of invalid Date).
+    if (params.since instanceof Date && !Number.isNaN(params.since.getTime())) {
+      clauses.push(gte(messages.createdAt, params.since));
+    }
 
     return await this.db
       .select()

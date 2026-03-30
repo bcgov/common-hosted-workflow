@@ -1,148 +1,138 @@
-import { toTrimmedString } from './middleware';
-import { TenantProjectRelationRepository } from '../db/repository/workflow-interaction-layer/message';
+import { Request, Response, Router } from 'express';
+import { LOG_PREFIX } from './constants/logging';
+import { tenantUuidRegex } from './constants/regex';
+import {
+  associateWorkflowResponseSchema,
+  associateWorkflowSchema,
+  getUserProjectResponseSchema,
+  getUserProjectSchema,
+  tenantProjectCreatedResponseSchema,
+  tenantProjectExistsResponseSchema,
+  tenantProjectRelationSchema,
+} from './schemas/admin';
+import type { CustomRepositories, N8nRepositories } from './types/repositories';
+import { AppError, wrapAsyncRoute } from './utils/errors';
+import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from './utils/validation';
 
-const TENANT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-type Request = {
-  params: Record<string, string | undefined>;
-  body: Record<string, unknown>;
-  caller?: { email: string; role: { slug: string } };
-};
-
-type Response = {
-  status: (code: number) => { json: (payload: unknown) => unknown };
-  json: (payload: unknown) => unknown;
-};
-
-export function registerAdminRoutes({
-  app,
+export function createAdminRouter({
   adminAuthMiddleware,
-  logPrefix,
-  userRepository,
-  projectRepository,
-  workflowRepository,
-  sharedWorkflowRepository,
-  withTransaction,
-  tenantProjectRelationRepository,
+  n8nRepositories,
+  customRepositories,
 }: {
-  app: any;
-  adminAuthMiddleware: any;
-  logPrefix: string;
-  userRepository: any;
-  projectRepository: any;
-  workflowRepository: any;
-  sharedWorkflowRepository: any;
-  withTransaction: any;
-  tenantProjectRelationRepository: TenantProjectRelationRepository;
+  adminAuthMiddleware: unknown;
+  n8nRepositories: N8nRepositories;
+  customRepositories: CustomRepositories;
 }) {
-  app.get('/rest/custom/admin/users/:email/project', adminAuthMiddleware, async (req: Request, res: Response) => {
-    const { email } = req.params;
-    try {
-      const user = await userRepository.findOneBy({ email });
-      if (!user) {
-        console.warn(`${logPrefix} [404] Target user not found: ${email}`);
-        return res.status(404).json({ error: 'Target user does not exist.' });
+  const { user, project, workflow, sharedWorkflow, withTransaction } = n8nRepositories;
+  const { tenantProjectRelation } = customRepositories;
+  const router = Router();
+
+  router.get(
+    '/users/:email/project',
+    adminAuthMiddleware,
+    createRequestSchemaValidator(getUserProjectSchema),
+    wrapAsyncRoute(async (req: Request, res: Response) => {
+      const parsed = parseValidatedRequest(getUserProjectSchema, req);
+      const { email } = parsed.params;
+
+      const foundUser = await user.findOneBy({ email });
+      if (!foundUser) {
+        console.warn(`${LOG_PREFIX} [404] Target user not found: ${email}`);
+        throw new AppError(404, 'Target user does not exist.');
       }
 
-      const personalProject = await projectRepository.getPersonalProjectForUserOrFail(user.id);
+      const personalProject = await project.getPersonalProjectForUserOrFail(foundUser.id);
+      const payload = parseValidatedResponse(getUserProjectResponseSchema, {
+        user: foundUser,
+        project: personalProject,
+      });
+      res.json(payload);
+    }),
+  );
 
-      return res.json({ user, project: personalProject });
-    } catch (error) {
-      console.error(`${logPrefix} [500] Internal Error for ${email}:`, (error as Error).message);
-      console.debug((error as Error).stack);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
+  router.post(
+    '/associate-workflow',
+    adminAuthMiddleware,
+    createRequestSchemaValidator(associateWorkflowSchema),
+    wrapAsyncRoute(async (req: Request, res: Response) => {
+      const parsed = parseValidatedRequest(associateWorkflowSchema, req);
+      const { workflowId, projectId, singleOwner } = parsed.body;
 
-  app.post('/rest/custom/admin/associate-workflow', adminAuthMiddleware, async (req: Request, res: Response) => {
-    const workflowId = toTrimmedString(req.body.workflowId);
-    const projectId = toTrimmedString(req.body.projectId);
-    const singleOwner = req.body.singleOwner === true;
-    try {
-      if (!workflowId || !projectId) {
-        return res.status(400).json({ error: 'Missing workflowId or projectId in request body.' });
-      }
-
-      const [workflow, project] = await Promise.all([
-        workflowRepository.findOneBy({ id: workflowId }),
-        projectRepository.findOneBy({ id: projectId }),
+      const [wf, proj] = await Promise.all([
+        workflow.findOneBy({ id: workflowId }),
+        project.findOneBy({ id: projectId }),
       ]);
 
-      if (!workflow) {
-        console.warn(`${logPrefix} [404] Workflow move failed: Workflow ${workflowId} not found.`);
-        return res.status(404).json({ error: 'Workflow not found.' });
+      if (!wf) {
+        console.warn(`${LOG_PREFIX} [404] Workflow move failed: Workflow ${workflowId} not found.`);
+        throw new AppError(404, 'Workflow not found.');
       }
 
-      if (!project) {
-        console.warn(`${logPrefix} [404] Workflow move failed: Project ${projectId} not found.`);
-        return res.status(404).json({ error: 'Project not found.' });
+      if (!proj) {
+        console.warn(`${LOG_PREFIX} [404] Workflow move failed: Project ${projectId} not found.`);
+        throw new AppError(404, 'Project not found.');
       }
 
-      await withTransaction(sharedWorkflowRepository.manager, null, async (em: any) => {
-        if (singleOwner) await em.delete('SharedWorkflow', { workflow });
-        const newShare = em.create('SharedWorkflow', { project, workflow, role: 'workflow:owner' });
+      await withTransaction(sharedWorkflow.manager, null, async (em: any) => {
+        if (singleOwner) await em.delete('SharedWorkflow', { workflow: wf });
+        const newShare = em.create('SharedWorkflow', { project: proj, workflow: wf, role: 'workflow:owner' });
         await em.save(newShare);
       });
 
-      return res.json({
-        success: true,
+      const payload = parseValidatedResponse(associateWorkflowResponseSchema, {
+        success: true as const,
         message: `Workflow '${workflowId}' successfully associated with project '${projectId}'`,
       });
-    } catch (error) {
-      console.error(`${logPrefix} [500] Association Error:`, (error as Error).message);
-      console.debug((error as Error).stack);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
+      res.json(payload);
+    }),
+  );
 
-  app.post('/rest/custom/admin/tenant-project-relation', adminAuthMiddleware, async (req: Request, res: Response) => {
-    const tenantId = toTrimmedString(req.body.tenantId ?? req.body.tenant_id);
-    const projectId = toTrimmedString(req.body.projectId ?? req.body.project_id);
+  router.post(
+    '/tenant-project-relation',
+    adminAuthMiddleware,
+    createRequestSchemaValidator(tenantProjectRelationSchema),
+    wrapAsyncRoute(async (req: Request, res: Response) => {
+      const parsed = parseValidatedRequest(tenantProjectRelationSchema, req);
+      const { tenantId, projectId } = parsed.body;
 
-    try {
-      if (!tenantId || !projectId) {
-        return res.status(400).json({ error: 'Missing tenantId or projectId in request body.' });
-      }
-      if (!TENANT_UUID_RE.test(tenantId)) {
-        return res.status(400).json({ error: 'Invalid tenantId (expected UUID).' });
+      if (!tenantUuidRegex.test(tenantId)) {
+        throw new AppError(400, 'Invalid tenantId (expected UUID).');
       }
 
-      const project = await projectRepository.findOneBy({ id: projectId });
-      if (!project) {
-        console.warn(`${logPrefix} [404] tenant_project_relation insert failed: Project ${projectId} not found.`);
-        return res.status(404).json({ error: 'Project not found.' });
+      const proj = await project.findOneBy({ id: projectId });
+      if (!proj) {
+        console.warn(`${LOG_PREFIX} [404] tenant_project_relation insert failed: Project ${projectId} not found.`);
+        throw new AppError(404, 'Project not found.');
       }
 
-      const result = await tenantProjectRelationRepository.insertTenantProjectRelation({ tenantId, projectId });
+      const result = await tenantProjectRelation.insertTenantProjectRelation({ tenantId, projectId });
       if (result.created) {
-        return res.status(201).json({
-          success: true,
+        const payload = parseValidatedResponse(tenantProjectCreatedResponseSchema, {
+          success: true as const,
           message: `Inserted tenant/project relation tenantId=${tenantId} projectId=${projectId}`,
         });
+        return res.status(201).json(payload);
       }
 
       if (result.conflictProjectId) {
-        return res.status(409).json({
-          error: 'tenant already has a project mapping',
+        throw new AppError(409, 'tenant already has a project mapping', {
           conflictProjectId: result.conflictProjectId,
         });
       }
 
       if (result.conflictTenantId) {
-        return res.status(409).json({
-          error: 'projectId is already mapped to a different tenant',
+        throw new AppError(409, 'projectId is already mapped to a different tenant', {
           conflictTenantId: result.conflictTenantId,
         });
       }
 
-      return res.status(200).json({
-        success: true,
+      const payload = parseValidatedResponse(tenantProjectExistsResponseSchema, {
+        success: true as const,
         message: 'Relation already exists.',
       });
-    } catch (error) {
-      console.error(`${logPrefix} [500] tenant_project_relation insert error:`, (error as Error).message);
-      console.debug((error as Error).stack);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
+      res.status(200).json(payload);
+    }),
+  );
+
+  return router;
 }
