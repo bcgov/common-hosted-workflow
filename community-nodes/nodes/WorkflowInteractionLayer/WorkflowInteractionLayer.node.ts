@@ -9,13 +9,8 @@ import {
   type IDataObject,
   type JsonObject,
 } from 'n8n-workflow';
-import { wilApiRequest, wilApiRequestAllItems, safeParse } from './shared/GenericFunctions';
-import type {
-  MessageCreatePayload,
-  MessageResponse,
-  ActionCreatePayload,
-  ActionResponse,
-} from './shared/GenericFunctions';
+import { createMessage, listMessages, getMessagesByActor } from './operations/message.operations';
+import { createAction, getAction, getActionsByActor, listActions, updateAction } from './operations/action.operations';
 
 export class WorkflowInteractionLayer implements INodeType {
   description: INodeTypeDescription = {
@@ -113,10 +108,10 @@ export class WorkflowInteractionLayer implements INodeType {
         required: true,
         options: [
           { name: 'Group', value: 'group' },
-          { name: 'Other', value: 'other' },
           { name: 'Role', value: 'role' },
           { name: 'System', value: 'system' },
           { name: 'User', value: 'user' },
+          { name: 'Other', value: 'other' },
         ],
         displayOptions: { show: { resource: ['message'], operation: ['create'] } },
       },
@@ -259,10 +254,10 @@ export class WorkflowInteractionLayer implements INodeType {
         required: true,
         options: [
           { name: 'Group', value: 'group' },
-          { name: 'Other', value: 'other' },
           { name: 'Role', value: 'role' },
           { name: 'System', value: 'system' },
           { name: 'User', value: 'user' },
+          { name: 'Other', value: 'other' },
         ],
         displayOptions: { show: { resource: ['action'], operation: ['create'] } },
       },
@@ -489,187 +484,22 @@ export class WorkflowInteractionLayer implements INodeType {
     const resource = this.getNodeParameter('resource', 0) as string;
     const operation = this.getNodeParameter('operation', 0) as string;
 
-    // Auto-resolved context — available to all operations
-    const workflow = this.getWorkflow();
-    const executionId = this.getExecutionId();
-
     for (let i = 0; i < items.length; i++) {
       try {
         let responseData: unknown;
 
-        // ═══════════════════════════════════════
-        // MESSAGE
-        // ═══════════════════════════════════════
         if (resource === 'message') {
-          if (operation === 'create') {
-            const body: MessageCreatePayload = {
-              workflowInstanceId: executionId as string,
-              workflowId: workflow.id as string,
-              actorId: this.getNodeParameter('actorId', i) as string,
-              actorType: this.getNodeParameter('actorType', i) as MessageCreatePayload['actorType'],
-              title: this.getNodeParameter('title', i) as string,
-              body: this.getNodeParameter('body', i) as string,
-            };
-
-            const metadata = safeParse(this.getNodeParameter('metadata', i, '{}'));
-            if (metadata) body.metadata = metadata as Record<string, unknown>;
-
-            responseData = await wilApiRequest<MessageResponse>(
-              this,
-              'POST',
-              '/messages',
-              body as unknown as IDataObject,
-            );
-          } else if (operation === 'list') {
-            const query: IDataObject = {};
-            const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-
-            const actorId = this.getNodeParameter('actorId', i, '') as string;
-            if (actorId) query.actorId = actorId;
-
-            const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
-            if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
-
-            const since = this.getNodeParameter('since', i, '') as string;
-            if (since) query.since = since;
-
-            if (returnAll) {
-              responseData = await wilApiRequestAllItems<MessageResponse>(this, '/messages', query);
-            } else {
-              query.limit = this.getNodeParameter('limit', i) as number;
-              const page = await wilApiRequest<{ items: MessageResponse[]; nextCursor: string | null }>(
-                this,
-                'GET',
-                '/messages',
-                undefined,
-                query,
-              );
-              responseData = page.items;
-            }
-          } else if (operation === 'getByActor') {
-            const actorId = this.getNodeParameter('actorId', i) as string;
-            const query: IDataObject = {};
-
-            const since = this.getNodeParameter('since', i, '') as string;
-            if (since) query.since = since;
-
-            const limit = this.getNodeParameter('limit', i, 50) as number;
-            if (limit) query.limit = limit;
-
-            const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
-            if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
-
-            responseData = await wilApiRequest<MessageResponse[]>(
-              this,
-              'GET',
-              `/actors/${actorId}/messages`,
-              undefined,
-              query,
-            );
-
-            // ═══════════════════════════════════════
-            // ACTION
-            // ═══════════════════════════════════════
-          }
+          if (operation === 'create') responseData = await createMessage(this, i);
+          else if (operation === 'list') responseData = await listMessages(this, i);
+          else if (operation === 'getByActor') responseData = await getMessagesByActor(this, i);
         } else if (resource === 'action') {
-          if (operation === 'create') {
-            const body: ActionCreatePayload = {
-              workflowInstanceId: executionId as string,
-              workflowId: workflow.id as string,
-              actorId: this.getNodeParameter('actorId', i) as string,
-              actorType: this.getNodeParameter('actorType', i) as ActionCreatePayload['actorType'],
-              actionType: this.getNodeParameter('actionType', i) as string,
-              callbackUrl: this.getNodeParameter('callbackUrl', i) as string,
-              payload: {},
-            };
-
-            const parsedPayload = safeParse(this.getNodeParameter('payload', i, '{}'));
-            if (parsedPayload) body.payload = parsedPayload as Record<string, unknown>;
-
-            const callbackMethod = this.getNodeParameter('callbackMethod', i) as ActionCreatePayload['callbackMethod'];
-            if (callbackMethod) body.callbackMethod = callbackMethod;
-
-            const callbackPayloadSpec = safeParse(this.getNodeParameter('callbackPayloadSpec', i, '{}'));
-            if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec as Record<string, unknown>;
-
-            const dueDate = this.getNodeParameter('dueDate', i, '') as string;
-            if (dueDate) body.dueDate = dueDate;
-
-            const priority = this.getNodeParameter('priority', i, 'normal') as ActionCreatePayload['priority'];
-            if (priority) body.priority = priority;
-
-            const checkIn = this.getNodeParameter('checkIn', i, '') as string;
-            if (checkIn) body.checkIn = checkIn;
-
-            const metadata = safeParse(this.getNodeParameter('metadata', i, '{}'));
-            if (metadata) body.metadata = metadata as Record<string, unknown>;
-
-            responseData = await wilApiRequest<ActionResponse>(
-              this,
-              'POST',
-              '/actions',
-              body as unknown as IDataObject,
-            );
-          } else if (operation === 'get') {
-            const actionId = this.getNodeParameter('actionId', i) as string;
-            responseData = await wilApiRequest<ActionResponse>(this, 'GET', `/actions/${actionId}`);
-          } else if (operation === 'getByActor') {
-            const actorId = this.getNodeParameter('actorId', i) as string;
-            const query: IDataObject = {};
-
-            const since = this.getNodeParameter('since', i, '') as string;
-            if (since) query.since = since;
-
-            const limit = this.getNodeParameter('limit', i, 50) as number;
-            if (limit) query.limit = limit;
-
-            const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
-            if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
-
-            responseData = await wilApiRequest<ActionResponse[]>(
-              this,
-              'GET',
-              `/actors/${actorId}/actions`,
-              undefined,
-              query,
-            );
-          } else if (operation === 'list') {
-            const query: IDataObject = {};
-            const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-
-            const actorId = this.getNodeParameter('actorId', i, '') as string;
-            if (actorId) query.actorId = actorId;
-
-            const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
-            if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
-
-            const since = this.getNodeParameter('since', i, '') as string;
-            if (since) query.since = since;
-
-            if (returnAll) {
-              responseData = await wilApiRequestAllItems<ActionResponse>(this, '/actions', query);
-            } else {
-              query.limit = this.getNodeParameter('limit', i) as number;
-              const page = await wilApiRequest<{ items: ActionResponse[]; nextCursor: string | null }>(
-                this,
-                'GET',
-                '/actions',
-                undefined,
-                query,
-              );
-              responseData = page.items;
-            }
-          } else if (operation === 'update') {
-            const actionId = this.getNodeParameter('actionId', i) as string;
-            const body: IDataObject = {
-              status: this.getNodeParameter('status', i) as string,
-            };
-
-            responseData = await wilApiRequest<ActionResponse>(this, 'PATCH', `/actions/${actionId}`, body);
-          }
+          if (operation === 'create') responseData = await createAction(this, i);
+          else if (operation === 'get') responseData = await getAction(this, i);
+          else if (operation === 'getByActor') responseData = await getActionsByActor(this, i);
+          else if (operation === 'list') responseData = await listActions(this, i);
+          else if (operation === 'update') responseData = await updateAction(this, i);
         }
 
-        // Build output with item linking
         const executionData = this.helpers.constructExecutionMetaData(
           this.helpers.returnJsonArray(responseData as IDataObject | IDataObject[]),
           { itemData: { item: i } },
