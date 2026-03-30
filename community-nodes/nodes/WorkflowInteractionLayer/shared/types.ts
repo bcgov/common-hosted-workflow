@@ -57,3 +57,11 @@ export interface ActionResponse {
   updatedAt: string;
   metadata: Record<string, unknown> | null;
 }
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export type MessageListResponse = PaginatedResponse<MessageResponse>;
+export type ActionListResponse = PaginatedResponse<ActionResponse>;

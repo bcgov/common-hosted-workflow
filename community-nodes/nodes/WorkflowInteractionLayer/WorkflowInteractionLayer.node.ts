@@ -9,7 +9,13 @@ import {
   type IDataObject,
   type JsonObject,
 } from 'n8n-workflow';
-import { wilApiRequest, safeParse } from './shared/GenericFunctions';
+import { wilApiRequest, wilApiRequestAllItems, safeParse } from './shared/GenericFunctions';
+import type {
+  MessageCreatePayload,
+  MessageResponse,
+  ActionCreatePayload,
+  ActionResponse,
+} from './shared/GenericFunctions';
 
 export class WorkflowInteractionLayer implements INodeType {
   description: INodeTypeDescription = {
@@ -157,7 +163,7 @@ export class WorkflowInteractionLayer implements INodeType {
       {
         displayName: 'Since',
         name: 'since',
-        type: 'string',
+        type: 'dateTime',
         default: '',
         description: 'Filter messages created after this RFC 3339 timestamp',
         displayOptions: { show: { resource: ['message'], operation: ['getByActor'] } },
@@ -219,7 +225,7 @@ export class WorkflowInteractionLayer implements INodeType {
       {
         displayName: 'Since',
         name: 'since',
-        type: 'string',
+        type: 'dateTime',
         default: '',
         description: 'Filter messages created after this RFC 3339 timestamp (cursor for pagination)',
         displayOptions: { show: { resource: ['message'], operation: ['list'] } },
@@ -316,7 +322,7 @@ export class WorkflowInteractionLayer implements INodeType {
       {
         displayName: 'Due Date',
         name: 'dueDate',
-        type: 'string',
+        type: 'dateTime',
         default: '',
         description: 'Optional due date in RFC 3339 format',
         displayOptions: { show: { resource: ['action'], operation: ['create'] } },
@@ -335,7 +341,7 @@ export class WorkflowInteractionLayer implements INodeType {
       {
         displayName: 'Check In',
         name: 'checkIn',
-        type: 'string',
+        type: 'dateTime',
         default: '',
         description: 'Optional reminder timestamp in RFC 3339 format',
         displayOptions: { show: { resource: ['action'], operation: ['create'] } },
@@ -377,7 +383,7 @@ export class WorkflowInteractionLayer implements INodeType {
       {
         displayName: 'Since',
         name: 'since',
-        type: 'string',
+        type: 'dateTime',
         default: '',
         description: 'Filter actions created after this RFC 3339 timestamp',
         displayOptions: { show: { resource: ['action'], operation: ['getByActor'] } },
@@ -439,7 +445,7 @@ export class WorkflowInteractionLayer implements INodeType {
       {
         displayName: 'Since',
         name: 'since',
-        type: 'string',
+        type: 'dateTime',
         default: '',
         description: 'Filter actions created after this RFC 3339 timestamp',
         displayOptions: { show: { resource: ['action'], operation: ['list'] } },
@@ -496,26 +502,27 @@ export class WorkflowInteractionLayer implements INodeType {
         // ═══════════════════════════════════════
         if (resource === 'message') {
           if (operation === 'create') {
-            const body: IDataObject = {
-              workflowInstanceId: executionId,
-              workflowId: workflow.id,
+            const body: MessageCreatePayload = {
+              workflowInstanceId: executionId as string,
+              workflowId: workflow.id as string,
               actorId: this.getNodeParameter('actorId', i) as string,
-              actorType: this.getNodeParameter('actorType', i) as string,
+              actorType: this.getNodeParameter('actorType', i) as MessageCreatePayload['actorType'],
               title: this.getNodeParameter('title', i) as string,
               body: this.getNodeParameter('body', i) as string,
             };
 
             const metadata = safeParse(this.getNodeParameter('metadata', i, '{}'));
-            if (metadata) body.metadata = metadata;
+            if (metadata) body.metadata = metadata as Record<string, unknown>;
 
-            responseData = await wilApiRequest(this, 'POST', '/messages', body);
+            responseData = await wilApiRequest<MessageResponse>(
+              this,
+              'POST',
+              '/messages',
+              body as unknown as IDataObject,
+            );
           } else if (operation === 'list') {
             const query: IDataObject = {};
             const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-
-            if (!returnAll) {
-              query.limit = this.getNodeParameter('limit', i) as number;
-            }
 
             const actorId = this.getNodeParameter('actorId', i, '') as string;
             if (actorId) query.actorId = actorId;
@@ -526,7 +533,19 @@ export class WorkflowInteractionLayer implements INodeType {
             const since = this.getNodeParameter('since', i, '') as string;
             if (since) query.since = since;
 
-            responseData = await wilApiRequest(this, 'GET', '/messages', undefined, query);
+            if (returnAll) {
+              responseData = await wilApiRequestAllItems<MessageResponse>(this, '/messages', query);
+            } else {
+              query.limit = this.getNodeParameter('limit', i) as number;
+              const page = await wilApiRequest<{ items: MessageResponse[]; nextCursor: string | null }>(
+                this,
+                'GET',
+                '/messages',
+                undefined,
+                query,
+              );
+              responseData = page.items;
+            }
           } else if (operation === 'getByActor') {
             const actorId = this.getNodeParameter('actorId', i) as string;
             const query: IDataObject = {};
@@ -540,7 +559,13 @@ export class WorkflowInteractionLayer implements INodeType {
             const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
             if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
 
-            responseData = await wilApiRequest(this, 'GET', `/actors/${actorId}/messages`, undefined, query);
+            responseData = await wilApiRequest<MessageResponse[]>(
+              this,
+              'GET',
+              `/actors/${actorId}/messages`,
+              undefined,
+              query,
+            );
 
             // ═══════════════════════════════════════
             // ACTION
@@ -548,38 +573,46 @@ export class WorkflowInteractionLayer implements INodeType {
           }
         } else if (resource === 'action') {
           if (operation === 'create') {
-            const body: IDataObject = {
-              workflowInstanceId: executionId,
-              workflowId: workflow.id,
+            const body: ActionCreatePayload = {
+              workflowInstanceId: executionId as string,
+              workflowId: workflow.id as string,
               actorId: this.getNodeParameter('actorId', i) as string,
-              actorType: this.getNodeParameter('actorType', i) as string,
+              actorType: this.getNodeParameter('actorType', i) as ActionCreatePayload['actorType'],
               actionType: this.getNodeParameter('actionType', i) as string,
               callbackUrl: this.getNodeParameter('callbackUrl', i) as string,
-              callbackMethod: this.getNodeParameter('callbackMethod', i) as string,
+              payload: {},
             };
 
-            const payload = safeParse(this.getNodeParameter('payload', i, '{}'));
-            if (payload) body.payload = payload;
+            const parsedPayload = safeParse(this.getNodeParameter('payload', i, '{}'));
+            if (parsedPayload) body.payload = parsedPayload as Record<string, unknown>;
+
+            const callbackMethod = this.getNodeParameter('callbackMethod', i) as ActionCreatePayload['callbackMethod'];
+            if (callbackMethod) body.callbackMethod = callbackMethod;
 
             const callbackPayloadSpec = safeParse(this.getNodeParameter('callbackPayloadSpec', i, '{}'));
-            if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec;
+            if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec as Record<string, unknown>;
 
             const dueDate = this.getNodeParameter('dueDate', i, '') as string;
             if (dueDate) body.dueDate = dueDate;
 
-            const priority = this.getNodeParameter('priority', i, 'normal') as string;
+            const priority = this.getNodeParameter('priority', i, 'normal') as ActionCreatePayload['priority'];
             if (priority) body.priority = priority;
 
             const checkIn = this.getNodeParameter('checkIn', i, '') as string;
             if (checkIn) body.checkIn = checkIn;
 
             const metadata = safeParse(this.getNodeParameter('metadata', i, '{}'));
-            if (metadata) body.metadata = metadata;
+            if (metadata) body.metadata = metadata as Record<string, unknown>;
 
-            responseData = await wilApiRequest(this, 'POST', '/actions', body);
+            responseData = await wilApiRequest<ActionResponse>(
+              this,
+              'POST',
+              '/actions',
+              body as unknown as IDataObject,
+            );
           } else if (operation === 'get') {
             const actionId = this.getNodeParameter('actionId', i) as string;
-            responseData = await wilApiRequest(this, 'GET', `/actions/${actionId}`);
+            responseData = await wilApiRequest<ActionResponse>(this, 'GET', `/actions/${actionId}`);
           } else if (operation === 'getByActor') {
             const actorId = this.getNodeParameter('actorId', i) as string;
             const query: IDataObject = {};
@@ -593,14 +626,16 @@ export class WorkflowInteractionLayer implements INodeType {
             const workflowInstanceId = this.getNodeParameter('workflowInstanceId', i, '') as string;
             if (workflowInstanceId) query.workflowInstanceId = workflowInstanceId;
 
-            responseData = await wilApiRequest(this, 'GET', `/actors/${actorId}/actions`, undefined, query);
+            responseData = await wilApiRequest<ActionResponse[]>(
+              this,
+              'GET',
+              `/actors/${actorId}/actions`,
+              undefined,
+              query,
+            );
           } else if (operation === 'list') {
             const query: IDataObject = {};
             const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-
-            if (!returnAll) {
-              query.limit = this.getNodeParameter('limit', i) as number;
-            }
 
             const actorId = this.getNodeParameter('actorId', i, '') as string;
             if (actorId) query.actorId = actorId;
@@ -611,14 +646,26 @@ export class WorkflowInteractionLayer implements INodeType {
             const since = this.getNodeParameter('since', i, '') as string;
             if (since) query.since = since;
 
-            responseData = await wilApiRequest(this, 'GET', '/actions', undefined, query);
+            if (returnAll) {
+              responseData = await wilApiRequestAllItems<ActionResponse>(this, '/actions', query);
+            } else {
+              query.limit = this.getNodeParameter('limit', i) as number;
+              const page = await wilApiRequest<{ items: ActionResponse[]; nextCursor: string | null }>(
+                this,
+                'GET',
+                '/actions',
+                undefined,
+                query,
+              );
+              responseData = page.items;
+            }
           } else if (operation === 'update') {
             const actionId = this.getNodeParameter('actionId', i) as string;
             const body: IDataObject = {
               status: this.getNodeParameter('status', i) as string,
             };
 
-            responseData = await wilApiRequest(this, 'PATCH', `/actions/${actionId}`, body);
+            responseData = await wilApiRequest<ActionResponse>(this, 'PATCH', `/actions/${actionId}`, body);
           }
         }
 

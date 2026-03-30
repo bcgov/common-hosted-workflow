@@ -1,4 +1,13 @@
 import type { IExecuteFunctions, IHttpRequestMethods, IHttpRequestOptions, IDataObject } from 'n8n-workflow';
+import type {
+  MessageCreatePayload,
+  MessageResponse,
+  ActionCreatePayload,
+  ActionResponse,
+  PaginatedResponse,
+} from './types';
+
+export type { MessageCreatePayload, MessageResponse, ActionCreatePayload, ActionResponse, PaginatedResponse };
 
 /**
  * Build common headers for all WIL API requests:
@@ -32,13 +41,13 @@ export async function getBaseUrl(ctx: IExecuteFunctions): Promise<string> {
 /**
  * Make an authenticated HTTP request to the WIL API.
  */
-export async function wilApiRequest(
+export async function wilApiRequest<T = unknown>(
   ctx: IExecuteFunctions,
   method: IHttpRequestMethods,
   path: string,
   body?: IDataObject,
   query?: IDataObject,
-): Promise<unknown> {
+): Promise<T> {
   const baseUrl = await getBaseUrl(ctx);
   const headers = await getAuthHeaders(ctx);
 
@@ -57,7 +66,7 @@ export async function wilApiRequest(
     options.qs = query;
   }
 
-  return ctx.helpers.httpRequest(options);
+  return ctx.helpers.httpRequest(options) as Promise<T>;
 }
 
 /**
@@ -73,4 +82,32 @@ export function safeParse(val: unknown): IDataObject | undefined {
     // ignore parse errors
   }
   return undefined;
+}
+
+/**
+ * Fetch all pages from a cursor-paginated WIL list endpoint.
+ * The API returns { items: T[], nextCursor: string | null }.
+ * Each subsequent request passes nextCursor as the `since` query param.
+ */
+export async function wilApiRequestAllItems<T>(
+  ctx: IExecuteFunctions,
+  path: string,
+  query: IDataObject = {},
+): Promise<T[]> {
+  const allItems: T[] = [];
+  let nextCursor: string | null = null;
+
+  do {
+    if (nextCursor) {
+      query.since = nextCursor;
+    }
+    // Always request max page size to minimise round-trips
+    query.limit = 200;
+
+    const page = await wilApiRequest<PaginatedResponse<T>>(ctx, 'GET', path, undefined, query);
+    allItems.push(...page.items);
+    nextCursor = page.nextCursor;
+  } while (nextCursor);
+
+  return allItems;
 }
