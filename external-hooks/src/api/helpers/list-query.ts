@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 /**
- * CHWF messages API: Zod pieces for list query params (`since`, `limit`).
+ * Shared schemas for list-style HTTP query params (`since`, `limit`) across CHWF APIs
+ * (e.g. messages, actions).
  */
 
 /** Optional `since` query: ISO / Date-parseable string → `Date` for `createdAt >= since`. */
@@ -20,7 +21,7 @@ type LimitQueryOptions = {
 
 /**
  * Numeric page-size style query string (digits only), bounded.
- * Defaults: min 1, max 200 (messages list API).
+ * Defaults: min 1, max 200 (typical list default).
  */
 export function createLimitQueryString(options: LimitQueryOptions = {}) {
   const min = options.min ?? 1;
@@ -34,5 +35,5 @@ export function createLimitQueryString(options: LimitQueryOptions = {}) {
     });
 }
 
-/** Default messages list `limit` query schema (1–200). */
+/** Default list `limit` query schema (1–200). */
 export const limitQueryString = createLimitQueryString();

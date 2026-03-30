@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { messages } from '../../db/schema/workflow-interaction-layer';
-import { limitQueryString, optionalSinceQueryParam } from '../helpers/message-query-zod';
+import { limitQueryString, optionalSinceQueryParam } from '../helpers/list-query';
 import { asParamRecord, emptyQueryValueToUndefined, flattenQueryParams } from '../utils/query-params-preprocess';
 
 export const messageItemSchema = z.object({
