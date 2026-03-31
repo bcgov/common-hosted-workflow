@@ -1,9 +1,9 @@
 import { AUTHORIZATION_HEADER, N8N_API_KEY_HEADER, X_TENANT_ID_HEADER } from './constants/headers';
 import { LOG_PREFIX } from './constants/logging';
-import { messageCreatePathPattern } from './constants/route-patterns';
+import { workflowInteractionInternalPostPathPattern } from './constants/route-patterns';
 import { tenantUuidRegex } from './constants/regex';
 import { extractBearerToken } from './helpers/bearer';
-import { getAccessibleProjectIdsForUser } from './helpers/n8n-project-access';
+import { listN8nProjectIdsAccessibleToUser } from './helpers/n8n-validation';
 import { shortenIdForLog } from './utils/string';
 import type { AuthMiddlewareConfig, AuthRequest, AuthResponse, ExpressNext } from './types/auth';
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
@@ -24,7 +24,7 @@ function runMiddleware(
   });
 }
 
-/** n8n external-hooks: auth middleware, message tenant scope, and hook factory. */
+/** n8n external-hooks: auth middleware, workflow-interaction tenant scope, and hook factory. */
 
 export function createAuthMiddleware(config: AuthMiddlewareConfig) {
   const { apiKeyService, globalOwnerRoleSlug, globalAdminRoleSlug } = config;
@@ -83,14 +83,14 @@ export function createAuthMiddleware(config: AuthMiddlewareConfig) {
 }
 
 /**
- * After `apiKeyAuthMiddleware`: require `X-TENANT-ID`, load all `project_id`s for that tenant from
- * `tenant_project_relation`, intersect with the caller's n8n-accessible projects, attach
- * `chwfAllowedProjectIds` for handlers.
+ * Workflow interaction (messages + actions): after API key auth, resolves tenant → projects from
+ * `tenant_project_relation`, intersects with the caller’s n8n-accessible projects, and sets
+ * `res.locals.chwfAllowedProjectIds` for handlers.
  *
- * POST is internal-only and must include `Authorization: Bearer <INTERNAL_AUTH_TOKEN>`.
- * GET and POST both use the same tenant + caller project scope from this middleware.
+ * For POST `/v1/messages/` and POST `/v1/actions`, also requires `Authorization: Bearer <INTERNAL_AUTH_TOKEN>`
+ * when `INTERNAL_AUTH_TOKEN` is set (`workflowInteractionInternalPostPathPattern`).
  */
-export function createMessageTenantProjectMiddleware(config: {
+export function createWorkflowInteractionTenantMiddleware(config: {
   n8nRepositories: Pick<N8nRepositories, 'project' | 'projectRelation'>;
   customRepositories: Pick<CustomRepositories, 'tenantProjectRelation'>;
 }) {
@@ -105,11 +105,15 @@ export function createMessageTenantProjectMiddleware(config: {
     const tenantProjectIds = await tenantProjectRelationRepository.getProjectIdsByTenantId(tenantId);
 
     if (tenantProjectIds.length === 0) {
-      console.warn(LOG_PREFIX, `[messageTenant] 403 no projects for tenant`);
+      console.warn(LOG_PREFIX, `[workflowInteractionTenant] 403 no projects for tenant`);
       return next(new AppError(403, 'No projects linked to this tenant'));
     }
 
-    const userProjectIds = await getAccessibleProjectIdsForUser(projectRepository, projectRelationRepository, callerId);
+    const userProjectIds = await listN8nProjectIdsAccessibleToUser(
+      projectRepository,
+      projectRelationRepository,
+      callerId,
+    );
 
     const userSet = new Set(userProjectIds);
     const allowed = tenantProjectIds.filter((id) => userSet.has(id));
@@ -117,7 +121,7 @@ export function createMessageTenantProjectMiddleware(config: {
     if (allowed.length === 0) {
       console.warn(
         LOG_PREFIX,
-        `[messageTenant] 403 intersection empty (tenant has projects but caller cannot access any)`,
+        `[workflowInteractionTenant] 403 intersection empty (tenant has projects but caller cannot access any)`,
       );
       return next(new AppError(403, 'User has no access to any project for this tenant'));
     }
@@ -128,16 +132,15 @@ export function createMessageTenantProjectMiddleware(config: {
   };
 
   /**
-   * Message auth+scope middleware:
-   * - ALL message calls must provide X-TENANT-ID (internal and external).
-   * - POST additionally requires valid INTERNAL_AUTH_TOKEN bearer.
-   * - Effective scope is tenant projects intersected with caller-accessible n8n projects.
+   * Workflow interaction layer (messages + action requests): tenant + caller project scope.
+   * - All such routes must provide X-TENANT-ID (internal and external).
+   * - POST create on messages/actions requires valid INTERNAL_AUTH_TOKEN bearer.
    */
   return async (req: AuthRequest, res: AuthResponse, next: ExpressNext) => {
     const method = (req as { method?: string }).method?.toUpperCase?.() ?? '';
     const urlPath =
       ((req as { originalUrl?: string }).originalUrl ?? (req as { path?: string }).path ?? '').split('?')[0] ?? '';
-    const isPostCreateMessage = method === 'POST' && messageCreatePathPattern.test(urlPath);
+    const isPostCreateInternalOnly = method === 'POST' && workflowInteractionInternalPostPathPattern.test(urlPath);
 
     // Authorization bearer is validated for internal-only POST.
     const bearerToken = extractBearerToken(req.header(AUTHORIZATION_HEADER));
@@ -145,9 +148,9 @@ export function createMessageTenantProjectMiddleware(config: {
     const isInternalCall = Boolean(internalAuthToken && bearerToken && bearerToken === internalAuthToken);
     res.locals.chwfInternal = isInternalCall;
 
-    if (isPostCreateMessage) {
+    if (isPostCreateInternalOnly) {
       if (!internalAuthToken) {
-        console.warn(LOG_PREFIX, `[messageTenant] 500 INTERNAL_AUTH_TOKEN missing`);
+        console.warn(LOG_PREFIX, `[workflowInteractionTenant] 500 INTERNAL_AUTH_TOKEN missing`);
         return next(new AppError(500, 'INTERNAL_AUTH_TOKEN not configured'));
       }
       if (!isInternalCall) {
@@ -160,7 +163,7 @@ export function createMessageTenantProjectMiddleware(config: {
     if (!tenantId) {
       console.warn(
         LOG_PREFIX,
-        `[messageTenant] 400 missing ${X_TENANT_ID_HEADER}; expectedHeader=${X_TENANT_ID_HEADER}`,
+        `[workflowInteractionTenant] 400 missing ${X_TENANT_ID_HEADER}; expectedHeader=${X_TENANT_ID_HEADER}`,
       );
       return next(new AppError(400, `Missing ${X_TENANT_ID_HEADER} header`));
     }
@@ -176,7 +179,7 @@ export function createMessageTenantProjectMiddleware(config: {
     try {
       await handleTenantScopedAccess(res, next, tenantId, res.locals.caller.id);
     } catch (error) {
-      console.error(LOG_PREFIX, `[messageTenant] 500 ${(error as Error).message}`, (error as Error).stack);
+      console.error(LOG_PREFIX, `[workflowInteractionTenant] 500 ${(error as Error).message}`, (error as Error).stack);
       return next(error instanceof AppError ? error : new AppError(500, 'Internal Server Error'));
     }
   };

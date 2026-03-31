@@ -1,7 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { LOG_PREFIX } from '../constants/logging';
+import {
+  requireChwfAllowedProjectIds,
+  resolveWorkflowProjectScope,
+  validateN8nExecutionInTenantScope,
+  validateN8nExecutionMatchesWorkflow,
+} from '../helpers/n8n-validation';
 import { AppError, wrapAsyncRoute } from '../utils/errors';
-import { formatDbErrorForLog } from '../helpers/db-error';
+import { formatDbErrorForLog } from '../helpers/db-helper';
 import { shortenIdForLog } from '../utils/string';
 import {
   createMessageSchema,
@@ -15,54 +21,47 @@ import {
 import type { CustomRepositories, N8nRepositories } from '../types/repositories';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
 
-/** Returns project scope from middleware or throws 403 if missing. */
-function projectScopeWhere(res: Response, routeLabel: string) {
-  const allowed = res.locals.chwfAllowedProjectIds;
-  if (!allowed?.length) {
-    console.warn(LOG_PREFIX, `[messages] ${routeLabel} 403 missing tenant/user scoped projects`);
-    throw new AppError(403, 'Missing tenant project scope');
-  }
-  return allowed;
-}
-
-/** Intersects workflow-shared project IDs with tenant/user-allowed project IDs. */
-async function resolveWorkflowProjectScope(
-  workflowId: string,
-  allowedProjectIds: string[],
-  sharedWorkflow: N8nRepositories['sharedWorkflow'],
-): Promise<string[]> {
-  const workflowProjectIds: string[] = await sharedWorkflow.findProjectIds(workflowId);
-  const allowedSet = new Set(allowedProjectIds);
-  return workflowProjectIds.filter((id) => allowedSet.has(id));
-}
-
+/** Factory for the messages `Router` (caller supplies middleware and repos from `route.ts`). */
 export function createMessageRouter({
   apiKeyAuthMiddleware,
-  messageTenantProjectMiddleware,
+  workflowInteractionTenantMiddleware,
   n8nRepositories,
   customRepositories,
 }: {
   apiKeyAuthMiddleware: unknown;
-  messageTenantProjectMiddleware: unknown;
+  workflowInteractionTenantMiddleware: unknown;
   n8nRepositories: N8nRepositories;
   customRepositories: CustomRepositories;
 }) {
-  const { sharedWorkflow } = n8nRepositories;
+  const { sharedWorkflow, execution } = n8nRepositories;
   const { message: messageRepository } = customRepositories;
   const router = Router();
 
   router.get(
     '/actors/:actorId/messages',
     apiKeyAuthMiddleware,
-    messageTenantProjectMiddleware,
+    workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(listActorMessagesSchema),
     wrapAsyncRoute(async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(listActorMessagesSchema, req);
-      const allowedProjectIds = projectScopeWhere(res, 'GET /v1/actors/:actorId/messages');
+      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
+      const { workflowInstanceId } = parsed.query;
+      if (workflowInstanceId) {
+        const scopeCheck = await validateN8nExecutionInTenantScope({
+          executionRepository: execution,
+          workflowInstanceId,
+          allowedProjectIds,
+          sharedWorkflowRepository: sharedWorkflow,
+        });
+        if (scopeCheck.ok === false) {
+          throw new AppError(scopeCheck.status, scopeCheck.error);
+        }
+      }
       const rows = await messageRepository.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
         since: parsed.query.since,
+        workflowInstanceId,
         limit: parsed.query.limit ?? 50,
       });
       const payload = parseValidatedResponse(listActorMessagesResponseSchema, rows.map(mapMessageRowToResponse));
@@ -73,15 +72,28 @@ export function createMessageRouter({
   router.get(
     '/messages/',
     apiKeyAuthMiddleware,
-    messageTenantProjectMiddleware,
+    workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(listMessagesSchema),
     wrapAsyncRoute(async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(listMessagesSchema, req);
-      const allowedProjectIds = projectScopeWhere(res, 'GET /v1/messages/');
+      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/messages/', 'messages');
+      const { workflowInstanceId } = parsed.query;
+      if (workflowInstanceId) {
+        const scopeCheck = await validateN8nExecutionInTenantScope({
+          executionRepository: execution,
+          workflowInstanceId,
+          allowedProjectIds,
+          sharedWorkflowRepository: sharedWorkflow,
+        });
+        if (scopeCheck.ok === false) {
+          throw new AppError(scopeCheck.status, scopeCheck.error);
+        }
+      }
       const rows = await messageRepository.list({
         allowedProjectIds,
         actorId: parsed.query.actorId,
         since: parsed.query.since,
+        workflowInstanceId,
         limit: parsed.query.limit ?? 50,
       });
       const items = rows.map(mapMessageRowToResponse);
@@ -95,15 +107,25 @@ export function createMessageRouter({
   router.post(
     '/messages/',
     apiKeyAuthMiddleware,
-    messageTenantProjectMiddleware,
+    workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(createMessageSchema),
     wrapAsyncRoute(async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(createMessageSchema, req);
       const { title, body, actorId, actorType, workflowInstanceId, workflowId, metadata, status } = parsed.body;
-      const allowedProjectIds = projectScopeWhere(res, 'POST /v1/messages/');
+      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'POST /v1/messages/', 'messages');
 
       let projectId = '';
       try {
+        // Align n8n execution with body workflowId, then pick a projectId shared by workflow + tenant scope.
+        const execCheck = await validateN8nExecutionMatchesWorkflow({
+          executionRepository: execution,
+          workflowInstanceId,
+          workflowId,
+        });
+        if (execCheck.ok === false) {
+          throw new AppError(execCheck.status, execCheck.error);
+        }
+
         const scopedWorkflowProjects = await resolveWorkflowProjectScope(workflowId, allowedProjectIds, sharedWorkflow);
         if (!scopedWorkflowProjects.length) {
           throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');

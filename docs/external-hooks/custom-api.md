@@ -1,124 +1,99 @@
-# n8n custom API endpoints
+# n8n custom admin API
 
-A set of **custom administrative API endpoints** for n8n by leveraging internal hooks. These endpoints extend n8n's native capabilities, specifically allowing for cross-user project lookups and manual workflow-to-project associations.
+Administrative endpoints exposed under **`/rest/custom/admin/*`**. They use n8n hooks (`external-hooks`) and require a **global owner** or **global admin** API key.
 
-### Source layout (`external-hooks/src/api/`)
-
-| File                | Role                                                                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`hooks.ts`**      | n8n external-hooks **entry** (`export = createHookConfig()`). Build output: `dist/api/hooks.cjs` (see `EXTERNAL_HOOK_FILES` in the main `Dockerfile`). |
-| **`middleware.ts`** | Shared code: constants, `createAuthMiddleware`, and `adminAuthMiddleware` wiring.                                                                      |
-| **`admin.ts`**      | `/rest/custom/admin/*` routes only.                                                                                                                    |
-| **Message APIs**    | Documented separately in [`workflow-interaction-layer.md`](./workflow-interaction-layer.md).                                                           |
+For **messages** and **action requests** (workflow interaction layer), see [`workflow-interaction-layer.md`](./workflow-interaction-layer.md) and [`workflow-interaction-api-validations.md`](./workflow-interaction-api-validations.md).
 
 ---
 
-## 🔐 Authentication & Security
+## Tenant–project relation (1:1)
 
-- **Admin routes** (`/rest/custom/admin/*`) use `adminAuthMiddleware`: validates `X-N8N-API-KEY` via n8n’s `PublicApiKeyService` and requires `global-owner` or `global-admin`.
-- **Headers:** `X-N8N-API-KEY` required for admin routes.
-- **Mechanism:** The middleware validates the key against n8n's internal `PublicApiKeyService`. If the user is not an administrator, the request returns a `403 Forbidden` status.
+The custom table **`tenant_project_relation`** is modeled as **one-to-one in both directions** for workflow interaction:
 
----
+- **At most one `project_id` per `tenant_id`** — a tenant maps to a single n8n project for CHWF scoping.
+- **At most one `tenant_id` per `project_id`** — a project cannot be linked to two different tenants (enforced by API and DB uniqueness on `project_id`).
 
-## 🚀 API Endpoints
-
-### 1. Get User Project Details
-
-Retrieves the user profile and the unique ID of their personal project based on their email address.
-
-- **URL:** `/rest/custom/admin/users/:email/project`
-- **Method:** `GET`
-- **Path Parameters:**
-- `email` (string): The email address of the target user.
-
-- **Success Response (200 OK):**
-
-```json
-{
-  "user": { "id": "uuid", "email": "user@example.com", ... },
-  "project": { "id": "uuid", "name": "User's Project", "type": "personal" }
-}
-
-```
-
-### 2. Associate Workflow to Project
-
-Manually creates a shared relationship between a specific workflow and a project. This effectively "moves" or "shares" a workflow into a project's scope with `owner` permissions.
-
-- **URL:** `/rest/custom/admin/associate-workflow`
-- **Method:** `POST`
-- **Request Body:**
-
-```json
-{
-  "workflowId": "string",
-  "projectId": "string"
-}
-```
-
-- **Logic:**
-
-1. Validates that both the `workflowId` and `projectId` exist in the database.
-2. Uses a database transaction via `withTransaction` to ensure data integrity.
-3. Creates a new entry in the `SharedWorkflowRepository` with the role `workflow:owner`.
-
-- **Success Response (200 OK):**
-
-```json
-{
-  "success": true,
-  "message": "Workflow 'ID' successfully associated with project 'ID'"
-}
-```
-
-### 3. Insert Tenant Project Relation
-
-Inserts a mapping into the custom table `tenant_project_relation` so message APIs can validate `X-TENANT-ID` against the allowed projects for that tenant. At most **one project per tenant**: if the tenant already has a mapping to a different `projectId`, the API returns `409` with `conflictProjectId` (the existing project id).
-
-- **URL:** `/rest/custom/admin/tenant-project-relation`
-- **Method:** `POST`
-- **Request Body:**
-
-```json
-{
-  "tenantId": "uuid",
-  "projectId": "string"
-}
-```
-
-- **Success (201 Created):**
-
-```json
-{ "success": true, "message": "Inserted tenant/project relation ..." }
-```
-
-- **Conflict (409):**
-  - If the tenant already has a project mapping and the request uses a different `projectId`: `409` with `conflictProjectId`.
-  - If the `projectId` is already mapped to a different tenant: `409` with `conflictTenantId`.
-
-### Workflow interaction layer (message APIs)
-
-See [`workflow-interaction-layer.md`](./workflow-interaction-layer.md).
-
-## 🛠 Internal Dependencies
-
-The script relies on access to n8n's internal Node.js modules. If you are moving this to a different environment, ensure these paths remain valid:
-
-| Module / Service | Path Location                                       |
-| ---------------- | --------------------------------------------------- |
-| **DI Container** | `@n8n/di`                                           |
-| **Repositories** | `@n8n/db` (User, Project, Workflow, SharedWorkflow) |
-| **Auth Service** | `dist/services/public-api-key.service.js`           |
+Use **`POST /rest/custom/admin/tenant-project-relation`** to create that mapping before calling workflow interaction APIs. See endpoint **3** below for conflict responses when these rules are violated.
 
 ---
 
-## ⚠️ Error Handling
+## Source layout (admin-related)
 
-The implementation uses standard HTTP status codes for error reporting:
+| Path                                      | Role                                                                    |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| `external-hooks/src/api/hooks.ts`         | n8n entry: `export = createHookConfig()`.                               |
+| `external-hooks/src/api/route.ts`         | DI wiring, mounts `admin` router and workflow routers.                  |
+| `external-hooks/src/api/middleware.ts`    | `createAuthMiddleware` (`apiKeyAuthMiddleware`, `adminAuthMiddleware`). |
+| `external-hooks/src/api/admin.ts`         | Admin routes only.                                                      |
+| `external-hooks/src/api/schemas/admin.ts` | Zod schemas for admin requests/responses.                               |
 
-- `400 Bad Request`: Missing required fields in the POST body.
-- `401 Unauthorized`: No API key provided or key is invalid.
-- `403 Forbidden`: User is authenticated but lacks Admin/Owner privileges.
-- `404 Not Found`: The requested User, Workflow, or Project does not exist.
-- `500 Internal Server Error`: Generic database or runtime failures (logged with stack trace in debug mode).
+---
+
+## Authentication
+
+- **Header:** `X-N8N-API-KEY` (validated via n8n `PublicApiKeyService`).
+- **Role:** Caller must have `global-owner` or `global-admin`; otherwise **403** `Global admin access required.`
+
+---
+
+## Endpoints
+
+### 1. Get user project by email
+
+- **URL:** `GET /rest/custom/admin/users/:email/project`
+- **Path:** `email` — target user’s email.
+- **200:** `{ "user": { … }, "project": { … } }` (personal project).
+- **404:** User not found.
+
+### 2. Associate workflow to project
+
+- **URL:** `POST /rest/custom/admin/associate-workflow`
+- **Body:** `{ "workflowId": "string", "projectId": "string", "singleOwner"?: boolean }`
+- **Behavior:** Transaction; ensures workflow and project exist; creates/updates `SharedWorkflow` with owner role.
+- **200:** `{ "success": true, "message": "…" }`
+- **404:** Workflow or project not found.
+
+### 3. Tenant–project relation
+
+- **URL:** `POST /rest/custom/admin/tenant-project-relation`
+- **Body:** `{ "tenantId": "uuid", "projectId": "string" }`
+- **Purpose:** Inserts into `tenant_project_relation` so workflow interaction APIs can scope **`X-TENANT-ID`** to n8n projects. Enforces the **1:1** rules above; conflicts return **409** with `conflictProjectId` or `conflictTenantId`.
+- **201:** New row inserted.
+- **200:** Relation already existed.
+
+---
+
+## Internal dependencies (n8n)
+
+| Piece           | Package / path                                           |
+| --------------- | -------------------------------------------------------- |
+| DI              | `@n8n/di`                                                |
+| Repositories    | `@n8n/db` (e.g. User, Project, Workflow, SharedWorkflow) |
+| API key service | n8n public API key service                               |
+
+---
+
+## ⚠️ Error handling
+
+All admin routes use **`AppError`** and the global **`handleErrorResponse`** (`external-hooks/src/api/utils/errors.ts`). JSON shape:
+
+```json
+{
+  "status": "error",
+  "statusCode": 400,
+  "message": "…",
+  "conflictProjectId": "…",
+  "stack": "…"
+}
+```
+
+`stack` is included only in development when configured.
+
+| HTTP    | Typical cause                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------------- |
+| **400** | Invalid or failed Zod validation on params/body (e.g. bad `tenantId` format in handler checks).     |
+| **401** | Missing/invalid `X-N8N-API-KEY` (via chained `apiKeyAuthMiddleware` inside `adminAuthMiddleware`).  |
+| **403** | Authenticated user is not global owner/admin.                                                       |
+| **404** | Target user, workflow, or project does not exist.                                                   |
+| **409** | Tenant–project insert violates **1:1** mapping (`conflictProjectId` or `conflictTenantId` in body). |
+| **500** | Unexpected errors (DB, misconfiguration); message is generic; details may be logged server-side.    |
