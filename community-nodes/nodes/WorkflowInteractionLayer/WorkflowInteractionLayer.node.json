@@ -1,0 +1,13 @@
+{
+  "node": "community-nodes.workflowInteractionLayer",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Development"],
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/workflow-interaction-layer"
+      }
+    ]
+  }
+}
