@@ -37,7 +37,7 @@ describe('DevXMessageConnector sysdig', () => {
       template: 'sysdig',
       data: {
         severity: 4,
-        state: 'ACTIVE',
+        state: 'active',
         alertName: 'Container CPU High',
         scope: undefined,
         description: undefined,
