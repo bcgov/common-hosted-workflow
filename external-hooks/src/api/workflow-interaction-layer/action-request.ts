@@ -72,7 +72,7 @@ export function createActionRequestRouter({
           allowedProjectIds,
           sharedWorkflow,
         );
-        if (!scopedWorkflowProjects.length) {
+        if (!scopedWorkflowProjects.length || scopedWorkflowProjects.length === 0) {
           throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');
         }
         projectId = scopedWorkflowProjects[0];

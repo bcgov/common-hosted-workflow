@@ -1,7 +1,5 @@
-import type {
-  MessageRepository,
-  TenantProjectRelationRepository,
-} from '../../db/repository/workflow-interaction-layer/message';
+import type { MessageRepository } from '../../db/repository/workflow-interaction-layer/message';
+import type { TenantProjectRelationRepository } from '../../db/repository/workflow-interaction-layer/tenant-project-relation';
 import type { ActionRequestRepository } from '../../db/repository/workflow-interaction-layer/action-request';
 import type { N8nExecutionLookup } from '../helpers/n8n-validation';
 

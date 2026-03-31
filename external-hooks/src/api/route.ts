@@ -1,9 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../db/repository/workflow-interaction-layer/action-request';
-import {
-  MessageRepository,
-  TenantProjectRelationRepository,
-} from '../db/repository/workflow-interaction-layer/message';
+import { MessageRepository } from '../db/repository/workflow-interaction-layer/message';
+import { TenantProjectRelationRepository } from '../db/repository/workflow-interaction-layer/tenant-project-relation';
 import { createAdminRouter } from './admin';
 import { LOG_PREFIX } from './constants/logging';
 import { N8N_API_KEY_SERVICE_PATH, N8N_DB_PATH, N8N_DI_PATH } from './constants/n8n-paths';
