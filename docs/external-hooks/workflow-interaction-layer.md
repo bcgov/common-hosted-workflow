@@ -1,83 +1,77 @@
-# Workflow Interaction Layer (Message APIs)
+# Workflow interaction layer — API reference (messages & actions)
 
-These endpoints manage `messages` in the custom DB (`CUSTOM_DATABASE_URL`), associated to n8n projects via `tenant_project_relation` and `workflowId -> projectId` mapping.
+HTTP API for **`messages`** and **`action_requests`** in the custom database (`CUSTOM_DATABASE_URL`), scoped by tenant and n8n project access.
 
-## Prerequisite
+**Headers, middleware, and n8n execution checks:** [`workflow-interaction-api-validations.md`](./workflow-interaction-api-validations.md).
 
-Before testing or using these APIs, add tenant/project mapping data manually in `tenant_project_relation` so each target `project_id` is linked to the correct `tenant_id`.
+**Admin APIs** (including tenant–project setup): [`custom-api.md`](./custom-api.md).
 
-## Endpoints
+---
 
-All endpoints require:
+## Prerequisite (required before testing)
 
-- Header `X-N8N-API-KEY`
-- Header `X-TENANT-ID` (UUID)
+1. **Create a tenant–project mapping** using the admin API
+   **`POST /rest/custom/admin/tenant-project-relation`** with body `{ "tenantId": "<uuid>", "projectId": "<n8n project id>" }`.
+   Workflow interaction routes resolve **`X-TENANT-ID`** against **`tenant_project_relation`**; without a row, requests fail with **403** (no projects for tenant).
 
-### Common tenant and project checks (internal + external)
+2. The **API key user** must have n8n access to that **`project_id`** (personal or shared project). Otherwise the tenant/caller intersection is empty (**403**).
 
-For both GET and POST, API processing continues only when all checks pass:
+3. For **POST** create on messages or actions, configure **`INTERNAL_AUTH_TOKEN`** and send **`Authorization: Bearer <token>`** in addition to the headers below.
 
-- resolve `project_id`s for `X-TENANT-ID` from `tenant_project_relation`
-- intersect with caller's n8n-accessible projects
-- resolve `workflowId` project mapping and verify overlap with the scoped projects
+Until (1) and (2) are satisfied, **GET** and **POST** workflow interaction calls will not reach business logic successfully.
 
-| Method | Path                                       |
-| ------ | ------------------------------------------ |
-| `GET`  | `/rest/custom/v1/messages/`                |
-| `GET`  | `/rest/custom/v1/actors/:actorId/messages` |
+---
 
-### Internal access (from an n8n workflow)
+## Common headers
 
-Internal calls must include:
+| Header                    | Required         | Notes                                          |
+| ------------------------- | ---------------- | ---------------------------------------------- |
+| `X-N8N-API-KEY`           | Yes              | Identifies the caller in n8n.                  |
+| `X-TENANT-ID`             | Yes              | UUID; must exist in `tenant_project_relation`. |
+| `Authorization: Bearer …` | POST create only | Must equal `INTERNAL_AUTH_TOKEN`.              |
 
-- Header `Authorization: Bearer <INTERNAL_AUTH_TOKEN>`
+Base path for all routes below: **`/rest/custom/v1`**.
 
-Rules:
+---
 
-- Internal `POST` is allowed only when bearer token equals `INTERNAL_AUTH_TOKEN`.
-- Internal calls must also include `X-TENANT-ID` and pass the same tenant/user/workflow checks as external calls.
+## Messages
 
-| Method | Path                        |
-| ------ | --------------------------- |
-| `POST` | `/rest/custom/v1/messages/` |
+| Method | Path                        | Description                                                                                                                                         |
+| ------ | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/messages/`                | Paginated list: optional `actorId`, `since`, `limit`, `workflowInstanceId`. Response `{ items, nextCursor }`.                                       |
+| `GET`  | `/actors/:actorId/messages` | List for one actor; optional `since`, `limit`, `workflowInstanceId`. Response JSON array.                                                           |
+| `POST` | `/messages/`                | Create message (internal bearer). Body: `title`, `body`, `actorId`, `actorType`, `workflowInstanceId`, `workflowId`, optional `metadata`, `status`. |
 
-## GET query params
+**Actor types:** `user`, `role`, `group`, `system`, `other`.
+**Message status (optional):** `active`, `read`.
+**`workflowInstanceId` on GET:** When provided, the server validates the n8n execution is in scope before querying (see validations doc).
 
-For `GET /rest/custom/v1/messages/`:
+---
 
-- `actorId` (optional string)
-- `since` (optional ISO 8601 datetime string; rows with `createdAt >= since`)
-- `limit` (optional integer `1..200`, default `50`)
+## Action requests
 
-Example:
-`GET /rest/custom/v1/messages/?actorId={{actorId}}&since=2026-03-26T10:30:00Z&limit=25`
+| Method  | Path                                 | Description                                                                                               |
+| ------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `GET`   | `/actions`                           | List; optional query `actorId`, `since`, `limit`, `workflowInstanceId`. Response `{ items, nextCursor }`. |
+| `GET`   | `/actors/:actorId/actions`           | List for one actor; optional `since`, `limit`, `workflowInstanceId`.                                      |
+| `GET`   | `/actions/:actionId`                 | Get by id (scoped by project).                                                                            |
+| `GET`   | `/actors/:actorId/actions/:actionId` | Get by id and actor.                                                                                      |
+| `POST`  | `/actions`                           | Create (internal bearer). See validations doc for full body fields.                                       |
+| `PATCH` | `/actions/:actionId`                 | Body `{ "status": "…" }`.                                                                                 |
+| `PATCH` | `/actors/:actorId/actions/:actionId` | Same, scoped by actor.                                                                                    |
 
-## POST body (`POST /rest/custom/v1/messages/`)
+**Action status values:** `pending`, `in_progress`, `completed`, `cancelled`, `expired`, `deleted`.
+**Priority:** `critical`, `normal`.
 
-Required fields:
+---
 
-- `title` (string)
-- `body` (string)
-- `actorId` (string)
-- `actorType` one of: `user`, `role`, `group`, `system`, `other`
-- `workflowInstanceId` (string)
-- `workflowId` (string)
+## Examples
 
-Optional fields:
+**GET messages with execution filter**
 
-- `projectId` (string). If provided, it must be within workflow + tenant + user scoped projects.
-- `metadata` (object)
-- `status` (`active` | `read`)
-- If `projectId` is omitted and exactly one scoped project is available, that project is used.
-- If multiple scoped projects are available, `projectId` must be provided.
+`GET /rest/custom/v1/messages/?workflowInstanceId={{execution_id}}&limit=25`
 
-Headers for internal call:
-
-- `X-N8N-API-KEY: {{api_key}}`
-- `X-TENANT-ID: {{tenant_id}}`
-- `Authorization: Bearer {{internal_token}}`
-
-Example body:
+**POST message (internal)**
 
 ```json
 {
@@ -85,20 +79,31 @@ Example body:
   "body": "Please review step 3 before continuing.",
   "actorId": "665601d6-0fdd-4dd7-9396-2480b183196a",
   "actorType": "user",
-  "workflowInstanceId": "550e8400-e29b-41d4-a716-446655440000",
+  "workflowInstanceId": "1",
   "workflowId": "WKDGMqR0J2YJZirfB0mzr",
   "status": "active",
-  "metadata": { "priority": "high", "source": "postman" }
+  "metadata": { "priority": "high", "source": "n8n" }
 }
 ```
 
-## Postman variables
+---
 
-Set:
+## Postman-style variables
 
-- `base_url`
-- `api_key`
-- `internal_token` = `INTERNAL_AUTH_TOKEN` (secret)
-- `tenant_id` (UUID)
-- `workflow_id`
-- `actorId`
+`base_url`, `api_key`, `internal_token`, `tenant_id` (UUID), `workflow_id`, `actorId`, execution id for `workflowInstanceId`.
+
+---
+
+## ⚠️ Error handling
+
+Responses use the shared JSON error shape from **`handleErrorResponse`** (`status`, `statusCode`, `message`, optional `stack` in development). For a **status-by-cause** table (400–500) and middleware details, see [`workflow-interaction-api-validations.md`](./workflow-interaction-api-validations.md) § **Error handling**.
+
+Summary:
+
+| HTTP    | Typical cause                                                                                             |
+| ------- | --------------------------------------------------------------------------------------------------------- |
+| **400** | Bad headers (e.g. tenant UUID), Zod validation, bad execution id or workflow mismatch.                    |
+| **401** | Invalid/missing API key; internal POST without valid bearer.                                              |
+| **403** | Tenant has no mapped project, caller cannot access tenant’s project, or workflow/execution outside scope. |
+| **404** | Action request not found (GET/PATCH by id).                                                               |
+| **500** | Misconfigured internal token on POST create, DB/n8n failures, or response validation errors.              |

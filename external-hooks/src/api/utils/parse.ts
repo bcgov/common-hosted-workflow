@@ -14,3 +14,15 @@ export const parseDate = (value: string | undefined) => {
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
 };
+
+/**
+ * JSON body timestamp fields: `undefined` / `null` preserved; strings must parse to a valid Date.
+ * Returns `undefined` for invalid non-null values (caller validates).
+ */
+export function parseOptionalBodyTimestamp(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
