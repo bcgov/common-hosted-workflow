@@ -4,9 +4,9 @@ import { isoTimestampSchema } from '../shared/schema';
 
 export const sysdigMessageContentDataSchema = z
   .object({
-    severity: z.number(),
-    state: z.enum(['ACTIVE', 'OK']),
-    alertName: z.string().min(1),
+    severity: z.number().int().min(0).max(7),
+    alertName: z.string().min(1).max(200),
+    state: z.enum(['active', 'ok']).optional(),
     scope: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
     timestamp: isoTimestampSchema.optional(),

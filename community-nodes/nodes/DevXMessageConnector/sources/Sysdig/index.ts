@@ -13,7 +13,7 @@ export function sysdigTransform(this: IExecuteFunctions, index: number): SysdigM
 
   const data = {
     severity: payload.alert.severity,
-    state: payload.state,
+    state: (payload.state ?? '').toLowerCase() as 'active' | 'ok',
     alertName: payload.alert.name,
     scope: payload.alert.scope ?? undefined,
     description: payload.alert.description ?? undefined,

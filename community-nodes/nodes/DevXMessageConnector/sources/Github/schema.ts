@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const gitHubPullRequestMessageContentDataSchema = z
   .object({
     event: z.string().min(1),
-    title: z.string().min(1),
+    title: z.string().min(1).max(200),
     repo: z.string().min(1),
     author: z.string().min(1),
     url: z.string().url(),
