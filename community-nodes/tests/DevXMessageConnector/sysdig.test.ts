@@ -19,7 +19,7 @@ describe('DevXMessageConnector sysdig', () => {
         source: 'sysdig',
         payload: {
           timestamp: '2024-01-02T03:04:05.678Z',
-          state: 'ACTIVE',
+          state: 'active',
           alert: {
             severity: 4,
             editUrl: 'https://app.sysdig.com/alerts/1',
