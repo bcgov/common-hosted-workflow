@@ -15,6 +15,13 @@
       "when": 1774047057791,
       "tag": "0001_workflow_messages_action_requests_and_audit_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774385886145,
+      "tag": "0002_workflow_tenant_project_relation",
+      "breakpoints": true
     }
   ]
 }
