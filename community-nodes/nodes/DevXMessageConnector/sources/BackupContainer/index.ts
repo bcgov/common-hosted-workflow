@@ -10,7 +10,7 @@ export function backupContainerTransform(this: IExecuteFunctions, index: number)
   if (!payload) return null;
 
   const data = {
-    status: payload.statusCode.toLowerCase() as 'info' | 'warn' | 'error',
+    status: (payload.statusCode ?? '').toLowerCase() as 'info' | 'warn' | 'error',
     projectName: payload.projectName,
     projectFriendlyName: payload.projectFriendlyName,
     message: payload.message,

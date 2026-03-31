@@ -194,22 +194,27 @@ async function sendMessageToDevXConnector(
   }
 
   const normalizedUrl = baseUrl.replace(/\/$/, '');
+  const url = `${normalizedUrl}/api/v1/messages`;
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'X-User-Entra-Id': '',
+    'Content-Type': 'application/json',
+  };
+
+  const body = {
+    target: {
+      teamId,
+      channelId,
+    },
+    content,
+  };
 
   const options = {
     method: 'POST' as const,
-    url: `${normalizedUrl}/api/v1/messages`,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'X-User-Entra-Id': '',
-      'Content-Type': 'application/json',
-    },
-    body: {
-      target: {
-        teamId,
-        channelId,
-      },
-      content,
-    },
+    url,
+    headers,
+    body,
     json: true,
   };
 
