@@ -126,6 +126,8 @@ n8n:
   worker:
     enabled: true
 
+    envSecretName: chwf # pragma: allowlist secret
+
     resources:
       requests:
         cpu: 300m
