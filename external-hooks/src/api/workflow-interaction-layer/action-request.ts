@@ -140,16 +140,16 @@ export function createActionRequestRouter({
           throw new AppError(scopeCheck.status, scopeCheck.error);
         }
       }
-
+      const pageLimit = limit ?? 50;
       const rows = await actionRequestRepository.list({
         allowedProjectIds,
         actorId,
         paginationSince: since,
         workflowInstanceId,
-        limit: limit ?? 50,
+        limit: pageLimit,
       });
       const items = rows.map(mapActionRequestRowToResponse);
-      const pageLimit = limit ?? 50;
+
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
       const payload = parseValidatedResponse(listActionsResponseSchema, { items, nextCursor });
       res.status(200).json(payload);
@@ -218,16 +218,15 @@ export function createActionRequestRouter({
           throw new AppError(scopeCheck.status, scopeCheck.error);
         }
       }
-
+      const pageLimit = limit ?? 50;
       const rows = await actionRequestRepository.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
         paginationSince: since,
         workflowInstanceId,
-        limit: limit ?? 50,
+        limit: pageLimit,
       });
       const items = rows.map(mapActionRequestRowToResponse);
-      const pageLimit = limit ?? 50;
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
       const payload = parseValidatedResponse(listActionsResponseSchema, { items, nextCursor });
       res.status(200).json(payload);

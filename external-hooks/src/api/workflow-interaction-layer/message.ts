@@ -90,15 +90,16 @@ export function createMessageRouter({
           throw new AppError(scopeCheck.status, scopeCheck.error);
         }
       }
+      const pageLimit = parsed.query.limit ?? 50;
       const rows = await messageRepository.list({
         allowedProjectIds,
         actorId: parsed.query.actorId,
         paginationSince: parsed.query.since,
         workflowInstanceId,
-        limit: parsed.query.limit ?? 50,
+        limit: pageLimit,
       });
       const items = rows.map(mapMessageRowToResponse);
-      const pageLimit = parsed.query.limit ?? 50;
+
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
       const payload = parseValidatedResponse(listMessagesResponseSchema, { items, nextCursor });
       res.status(200).json(payload);
