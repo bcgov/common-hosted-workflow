@@ -30,3 +30,8 @@ export const actionRequestStatusZodEnum = z.enum(ACTION_REQUEST_STATUS_VALUES);
 export const ACTION_REQUEST_PRIORITY_VALUES = ['critical', 'normal'] as const;
 export type ActionRequestPriority = (typeof ACTION_REQUEST_PRIORITY_VALUES)[number];
 export const actionRequestPriorityZodEnum = z.enum(ACTION_REQUEST_PRIORITY_VALUES);
+
+/** Allowed HTTP verbs for action callback delivery. */
+export const CALLBACK_HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+export type CallbackHttpMethod = (typeof CALLBACK_HTTP_METHODS)[number];
+export const callbackHttpMethodZodEnum = z.enum(CALLBACK_HTTP_METHODS);
