@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { messages } from '../../db/schema/workflow-interaction-layer';
 import { messageStatusZodEnum, workflowInteractionActorTypeZodEnum } from '../constants/enum';
-import { limitQueryString, optionalSinceQueryParam } from '../helpers/list-query';
+import { limitQueryString, optionalSinceOrCursorQueryParam } from '../helpers/list-query';
 import { asParamRecord, emptyQueryValueToUndefined, flattenQueryParams } from '../utils/query-params-preprocess';
 import { applyLowercaseToOptionalZodEnum, applyLowercaseToZodEnum } from '../utils/string';
 
@@ -20,14 +20,14 @@ export const messageItemSchema = z.object({
   updatedAt: z.date(),
 });
 
-/** GET /v1/actors/:actorId/messages — query: `since`, `limit`, optional `workflowInstanceId`. */
+/** GET /v1/actors/:actorId/messages — query: optional `since` (ISO or keyset), `limit`, optional `workflowInstanceId`. */
 export const listActorMessagesSchema = z.object({
   params: z.preprocess(asParamRecord, z.object({ actorId: z.string().trim().min(1) }).strict()),
   query: z.preprocess(
     flattenQueryParams,
     z
       .object({
-        since: z.preprocess(emptyQueryValueToUndefined, optionalSinceQueryParam.optional()),
+        since: z.preprocess(emptyQueryValueToUndefined, optionalSinceOrCursorQueryParam.optional()),
         limit: z.preprocess(emptyQueryValueToUndefined, limitQueryString.optional()),
         workflowInstanceId: z.preprocess(emptyQueryValueToUndefined, z.string().trim().min(1).optional()),
       })
@@ -36,7 +36,7 @@ export const listActorMessagesSchema = z.object({
   body: z.record(z.string(), z.unknown()).optional(),
 });
 
-/** GET /v1/messages/ — query: `actorId`, `since`, `limit`, optional `workflowInstanceId`. */
+/** GET /v1/messages/ — query: `actorId`, optional `since` (ISO or keyset), `limit`, optional `workflowInstanceId`. */
 export const listMessagesSchema = z.object({
   params: z.preprocess(asParamRecord, z.object({}).strict()),
   query: z.preprocess(
@@ -44,7 +44,7 @@ export const listMessagesSchema = z.object({
     z
       .object({
         actorId: z.preprocess(emptyQueryValueToUndefined, z.string().trim().min(1).optional()),
-        since: z.preprocess(emptyQueryValueToUndefined, optionalSinceQueryParam.optional()),
+        since: z.preprocess(emptyQueryValueToUndefined, optionalSinceOrCursorQueryParam.optional()),
         limit: z.preprocess(emptyQueryValueToUndefined, limitQueryString.optional()),
         workflowInstanceId: z.preprocess(emptyQueryValueToUndefined, z.string().trim().min(1).optional()),
       })

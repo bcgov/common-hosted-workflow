@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { LOG_PREFIX } from '../constants/logging';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
+import { nextCursorFromPagedItems } from '../helpers/list-query';
 import {
   requireChwfAllowedProjectIds,
   resolveWorkflowProjectScope,
@@ -53,7 +54,7 @@ export function createActionRequestRouter({
       const allowedProjectIds = requireChwfAllowedProjectIds(res, 'POST /v1/actions', 'actions');
 
       const { dueDate, checkIn } = normalizeCreateActionTimestamps(body);
-      const callbackMethod = (body.callbackMethod ?? 'POST').trim().toUpperCase();
+      const callbackMethod = body.callbackMethod ?? 'POST';
 
       let projectId = '';
       try {
@@ -72,7 +73,7 @@ export function createActionRequestRouter({
           allowedProjectIds,
           sharedWorkflow,
         );
-        if (!scopedWorkflowProjects.length || scopedWorkflowProjects.length === 0) {
+        if (!scopedWorkflowProjects.length) {
           throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');
         }
         projectId = scopedWorkflowProjects[0];
@@ -139,17 +140,17 @@ export function createActionRequestRouter({
           throw new AppError(scopeCheck.status, scopeCheck.error);
         }
       }
-
+      const pageLimit = limit ?? 50;
       const rows = await actionRequestRepository.list({
         allowedProjectIds,
         actorId,
-        since,
+        paginationSince: since,
         workflowInstanceId,
-        limit: limit ?? 50,
+        limit: pageLimit,
       });
       const items = rows.map(mapActionRequestRowToResponse);
-      const pageLimit = limit ?? 50;
-      const nextCursor = items.length === pageLimit ? (items.at(-1)?.createdAt?.toISOString?.() ?? null) : null;
+
+      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
       const payload = parseValidatedResponse(listActionsResponseSchema, { items, nextCursor });
       res.status(200).json(payload);
     }),
@@ -217,17 +218,16 @@ export function createActionRequestRouter({
           throw new AppError(scopeCheck.status, scopeCheck.error);
         }
       }
-
+      const pageLimit = limit ?? 50;
       const rows = await actionRequestRepository.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
-        since,
+        paginationSince: since,
         workflowInstanceId,
-        limit: limit ?? 50,
+        limit: pageLimit,
       });
       const items = rows.map(mapActionRequestRowToResponse);
-      const pageLimit = limit ?? 50;
-      const nextCursor = items.length === pageLimit ? (items.at(-1)?.createdAt?.toISOString?.() ?? null) : null;
+      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
       const payload = parseValidatedResponse(listActionsResponseSchema, { items, nextCursor });
       res.status(200).json(payload);
     }),

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { LOG_PREFIX } from '../constants/logging';
+import { nextCursorFromPagedItems } from '../helpers/list-query';
 import {
   requireChwfAllowedProjectIds,
   resolveWorkflowProjectScope,
@@ -60,7 +61,7 @@ export function createMessageRouter({
       const rows = await messageRepository.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
-        since: parsed.query.since,
+        paginationSince: parsed.query.since,
         workflowInstanceId,
         limit: parsed.query.limit ?? 50,
       });
@@ -89,16 +90,17 @@ export function createMessageRouter({
           throw new AppError(scopeCheck.status, scopeCheck.error);
         }
       }
+      const pageLimit = parsed.query.limit ?? 50;
       const rows = await messageRepository.list({
         allowedProjectIds,
         actorId: parsed.query.actorId,
-        since: parsed.query.since,
+        paginationSince: parsed.query.since,
         workflowInstanceId,
-        limit: parsed.query.limit ?? 50,
+        limit: pageLimit,
       });
       const items = rows.map(mapMessageRowToResponse);
-      const pageLimit = parsed.query.limit ?? 50;
-      const nextCursor = items.length === pageLimit ? (items.at(-1)?.createdAt?.toISOString?.() ?? null) : null;
+
+      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
       const payload = parseValidatedResponse(listMessagesResponseSchema, { items, nextCursor });
       res.status(200).json(payload);
     }),
@@ -127,7 +129,7 @@ export function createMessageRouter({
         }
 
         const scopedWorkflowProjects = await resolveWorkflowProjectScope(workflowId, allowedProjectIds, sharedWorkflow);
-        if (!scopedWorkflowProjects.length || scopedWorkflowProjects.length === 0) {
+        if (!scopedWorkflowProjects.length) {
           throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');
         }
         projectId = scopedWorkflowProjects[0];

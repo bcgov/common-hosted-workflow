@@ -1,4 +1,5 @@
-import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, or } from 'drizzle-orm';
+import type { ListPaginationSince } from '../../../types/list-pagination';
 import { actionRequests } from '../../schema/workflow-interaction-layer';
 
 export class ActionRequestRepository {
@@ -8,22 +9,33 @@ export class ActionRequestRepository {
   async list(params: {
     allowedProjectIds: string[];
     actorId?: string;
-    since?: Date;
+    paginationSince?: ListPaginationSince;
     workflowInstanceId?: string;
     limit: number;
   }): Promise<Array<typeof actionRequests.$inferSelect>> {
     const clauses: any[] = [inArray(actionRequests.projectId, params.allowedProjectIds)];
     if (params.actorId) clauses.push(eq(actionRequests.actorId, params.actorId));
-    if (params.since instanceof Date && !Number.isNaN(params.since.getTime())) {
-      clauses.push(gte(actionRequests.createdAt, params.since));
+    const ps = params.paginationSince;
+    if (ps?.mode === 'time') {
+      if (!Number.isNaN(ps.since.getTime())) {
+        clauses.push(gte(actionRequests.createdAt, ps.since));
+      }
+    } else if (ps?.mode === 'cursor') {
+      clauses.push(
+        or(
+          lt(actionRequests.createdAt, ps.createdAt),
+          and(eq(actionRequests.createdAt, ps.createdAt), lt(actionRequests.id, ps.id)),
+        ),
+      );
     }
     if (params.workflowInstanceId) clauses.push(eq(actionRequests.workflowInstanceId, params.workflowInstanceId));
 
+    // `id` tie-breaker: stable total order for keyset cursor (WHERE above must match this sort).
     return await this.db
       .select()
       .from(actionRequests)
       .where(and(...clauses))
-      .orderBy(desc(actionRequests.createdAt))
+      .orderBy(desc(actionRequests.createdAt), desc(actionRequests.id))
       .limit(params.limit);
   }
 
