@@ -53,6 +53,20 @@ x-n8n-env: &n8n-env
   INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
 
 services:
+  adaptivecard:
+    <<: *common-props
+    container_name: adaptivecard
+    build:
+      context: ./adaptivecard
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     <<: *common-props
     container_name: postgres
