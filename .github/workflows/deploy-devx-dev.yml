@@ -15,7 +15,7 @@ on:
         description: "Image tag to deploy"
         required: false
         type: string
-        default: "latest"
+        default: "main"
 jobs:
   deploy-devx-dev:
     runs-on: ubuntu-22.04
