@@ -125,6 +125,22 @@ export class DevXMessageConnector implements INodeType {
           },
         },
       },
+      {
+        displayName: 'Mode',
+        name: 'mode',
+        type: 'options',
+        noDataExpression: true,
+        options: [
+          { name: 'Send', value: 'send' },
+          { name: 'Preview', value: 'preview' },
+        ],
+        default: 'send',
+        displayOptions: {
+          show: {
+            type: ['template', 'text', 'html'],
+          },
+        },
+      },
     ],
   };
 
@@ -141,6 +157,7 @@ export class DevXMessageConnector implements INodeType {
 
     for (let i = 0; i < items.length; i++) {
       const type = this.getNodeParameter('type', i) as string;
+      const mode = this.getNodeParameter('mode', i) as string;
       let messageContent: MessageContent | null = null;
 
       if (type === 'text') {
@@ -172,7 +189,7 @@ export class DevXMessageConnector implements INodeType {
         throw new Error('Failed to generate message content');
       }
 
-      const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId);
+      const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId, mode);
       returnData.push({ json: response as unknown as IDataObject });
     }
 
@@ -185,6 +202,7 @@ async function sendMessageToDevXConnector(
   content: MessageContent,
   teamId: string,
   channelId: string,
+  mode: string,
 ) {
   const apiKey = process.env.DEVX_CONNECTOR_API_KEY;
   const baseUrl = process.env.DEVX_CONNECTOR_API_URL;
@@ -194,7 +212,7 @@ async function sendMessageToDevXConnector(
   }
 
   const normalizedUrl = baseUrl.replace(/\/$/, '');
-  const url = `${normalizedUrl}/api/v1/messages`;
+  const url = `${normalizedUrl}/api/v1/messages${mode === 'preview' ? '/preview' : ''}`;
 
   const headers = {
     Authorization: `Bearer ${apiKey}`,
