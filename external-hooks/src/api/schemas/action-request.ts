@@ -3,9 +3,10 @@ import { actionRequests } from '../../db/schema/workflow-interaction-layer';
 import {
   actionRequestPriorityZodEnum,
   actionRequestStatusZodEnum,
+  callbackHttpMethodZodEnum,
   workflowInteractionActorTypeZodEnum,
 } from '../constants/enum';
-import { limitQueryString, optionalSinceQueryParam } from '../helpers/list-query';
+import { limitQueryString, optionalSinceOrCursorQueryParam } from '../helpers/list-query';
 import { parseOptionalBodyTimestamp } from '../utils/parse';
 import { asParamRecord, emptyQueryValueToUndefined, flattenQueryParams } from '../utils/query-params-preprocess';
 import { applyLowercaseToOptionalZodEnum, applyLowercaseToZodEnum } from '../utils/string';
@@ -15,7 +16,7 @@ export const actionRequestItemSchema = z.object({
   actionType: z.string(),
   payload: z.record(z.string(), z.unknown()),
   callbackUrl: z.string(),
-  callbackMethod: z.string(),
+  callbackMethod: callbackHttpMethodZodEnum,
   callbackPayloadSpec: z.record(z.string(), z.unknown()).nullable(),
   actorId: z.string(),
   actorType: z.string(),
@@ -34,7 +35,7 @@ export const actionRequestItemSchema = z.object({
 const listActionsQueryShape = z
   .object({
     actorId: z.preprocess(emptyQueryValueToUndefined, z.string().trim().min(1).optional()),
-    since: z.preprocess(emptyQueryValueToUndefined, optionalSinceQueryParam.optional()),
+    since: z.preprocess(emptyQueryValueToUndefined, optionalSinceOrCursorQueryParam.optional()),
     limit: z.preprocess(emptyQueryValueToUndefined, limitQueryString.optional()),
     workflowInstanceId: z.preprocess(emptyQueryValueToUndefined, z.string().trim().min(1).optional()),
   })
@@ -42,7 +43,7 @@ const listActionsQueryShape = z
 
 const listActorActionsQueryShape = z
   .object({
-    since: z.preprocess(emptyQueryValueToUndefined, optionalSinceQueryParam.optional()),
+    since: z.preprocess(emptyQueryValueToUndefined, optionalSinceOrCursorQueryParam.optional()),
     limit: z.preprocess(emptyQueryValueToUndefined, limitQueryString.optional()),
     workflowInstanceId: z.preprocess(emptyQueryValueToUndefined, z.string().trim().min(1).optional()),
   })
@@ -120,7 +121,12 @@ export const createActionRequestSchema = z
         actionType: z.string().trim().min(1),
         payload: z.record(z.string(), z.unknown()),
         callbackUrl: z.string().trim().min(1),
-        callbackMethod: z.string().trim().min(1).optional(),
+        callbackMethod: z
+          .string()
+          .trim()
+          .transform((s) => s.toUpperCase())
+          .pipe(callbackHttpMethodZodEnum)
+          .optional(),
         callbackPayloadSpec: z.record(z.string(), z.unknown()).nullable().optional(),
         actorId: z.string().trim().min(1),
         actorType: applyLowercaseToZodEnum(workflowInteractionActorTypeZodEnum),
