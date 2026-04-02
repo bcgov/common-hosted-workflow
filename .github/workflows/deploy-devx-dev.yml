@@ -2,9 +2,6 @@
 name: Deploy DevX (Dev)
 
 on:
-  push:
-    branches:
-    - feat/CCP-3912
   workflow_dispatch:
     inputs:
       tag:
