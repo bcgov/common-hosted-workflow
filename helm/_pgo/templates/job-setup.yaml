@@ -1,19 +1,16 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "_.fullname" . }}-db-setup-rev{{ .Release.Revision }}
+  name: {{ include "_.fullname" . }}-setup-rev{{ .Release.Revision }}
   labels:
     {{- include "_.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "10"
     "helm.sh/hook-delete-policy": hook-succeeded
 spec:
-  backoffLimit: 0
+  backoffLimit: 3
   activeDeadlineSeconds: 1800
   template:
     spec:
-      activeDeadlineSeconds: 1800
       restartPolicy: Never
       containers:
         - name: psql-setup
@@ -29,6 +26,14 @@ spec:
             - -c
             - |
               set -e
+              export DB_HOST={{ include "_.fullname" . }}-primary
+
+              echo "Checking for database availability at $DB_HOST..."
+              until pg_isready -h "$DB_HOST" -U postgres; do
+                echo "Database not ready yet. Sleeping 5s..."
+                sleep 5
+              done
+
               {{- range $db := .Values.databases }}
               echo "Setting up database: {{ $db.name }}"
 
