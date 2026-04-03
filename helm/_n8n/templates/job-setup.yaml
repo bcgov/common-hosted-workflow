@@ -1,0 +1,87 @@
+{{- $imageRepository := coalesce .Values.main.image.repository .Values.image.repository -}}
+{{- $deploymentTag := coalesce .Values.main.image.tag .Values.image.tag .Chart.AppVersion -}}
+{{- $imagePullPolicy := coalesce .Values.main.image.pullPolicy .Values.image.pullPolicy -}}
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "_.fullname" . }}-setup-rev{{ .Release.Revision }}
+  labels: {{ include "_.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      name: {{ include "_.fullname" . }}-setup
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ default .Values.global.serviceAccountName .Values.serviceAccountName }}
+      containers:
+        - name: {{ include "_.fullname" . }}-setup
+          image: "{{ $imageRepository }}:{{ $deploymentTag }}"
+          imagePullPolicy: {{ $imagePullPolicy }}
+          command: [/bin/sh, -c]
+          env:
+            - name: CUSTOM_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: user
+            - name: CUSTOM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: password
+            - name: CUSTOM_DB_HOST
+              value: {{ .Values.customDatabase.host }}
+            - name: CUSTOM_DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: port
+            - name: CUSTOM_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: dbname
+            - name: CUSTOM_DATABASE_URL
+              value: "postgresql://$(CUSTOM_DB_USER):$(CUSTOM_DB_PASSWORD)@$(CUSTOM_DB_HOST):$(CUSTOM_DB_PORT)/$(CUSTOM_DB_NAME)"
+          args:
+          - |
+            set -euo pipefail
+
+            echo "Waiting for database at $CUSTOM_DB_HOST:$CUSTOM_DB_PORT..."
+            sleep 5
+
+            node -e "
+            const net = require('net');
+            const check = () => {
+              const socket = net.createConnection($CUSTOM_DB_PORT, '$CUSTOM_DB_HOST');
+              socket.on('connect', () => { console.log('Database is up!'); process.exit(0); });
+              socket.on('error', () => {
+                console.log('Database not reachable yet... retrying in 5s');
+                setTimeout(check, 5000);
+              });
+            };
+            check();
+            "
+
+            mkdir -p "$N8N_CUSTOM_EXTENSIONS"
+            cd "$N8N_CUSTOM_EXTENSIONS"
+            npm install /community-nodes
+
+            cd /external-hooks
+            node migrate.cjs
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /home/node
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "_.fullname" . }}

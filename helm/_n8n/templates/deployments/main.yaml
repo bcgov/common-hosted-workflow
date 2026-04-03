@@ -76,6 +76,30 @@ spec:
                 secretKeyRef:
                   name: {{ include "_.fullname" . }}-shared
                   key: runners-auth-token
+            - name: CUSTOM_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: user
+            - name: CUSTOM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: password
+            - name: CUSTOM_DB_HOST
+              value: {{ .Values.customDatabase.host }}
+            - name: CUSTOM_DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: port
+            - name: CUSTOM_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.customDatabase.secretName }}
+                  key: dbname
+            - name: CUSTOM_DATABASE_URL
+              value: "postgresql://$(CUSTOM_DB_USER):$(CUSTOM_DB_PASSWORD)@$(CUSTOM_DB_HOST):$(CUSTOM_DB_PORT)/$(CUSTOM_DB_NAME)"
           {{- $env := merge (.Values.env | default dict) (.Values.main.env | default dict) -}}
             {{- range $k, $v := $env }}
             - name: {{ $k | quote }}
