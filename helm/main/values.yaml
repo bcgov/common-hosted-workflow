@@ -19,6 +19,10 @@ n8n:
     tag: main
     pullPolicy: IfNotPresent
 
+  customDatabase:
+    secretName: chwf-pgo-pguser-n8n-custom # pragma: allowlist secret
+    host: chwf-pgo-pgbouncer
+
   env:
     # See https://docs.n8n.io/hosting/configuration/supported-databases-settings/#postgresdb
     DB_TYPE: "postgresdb"
