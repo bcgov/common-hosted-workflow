@@ -14,7 +14,6 @@ serviceAccountName:
 
 customDatabase:
   secretName: pgo-pguser-n8n-custom # pragma: allowlist secret
-  host: pgo-pgbouncer
 
 envSecretName:
 env: {}
