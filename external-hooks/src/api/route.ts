@@ -8,6 +8,7 @@ import { N8N_API_KEY_SERVICE_PATH, N8N_DB_PATH, N8N_DI_PATH } from './constants/
 import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from './middleware';
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
 import { handleErrorResponse } from './utils/errors';
+import { mountSwaggerUi } from './swagger-ui';
 import { createActionRequestRouter } from './workflow-interaction-layer/action-request';
 import { createMessageRouter } from './workflow-interaction-layer/message';
 
@@ -96,6 +97,8 @@ export function createHookConfig() {
             n8nRepositories,
             customRepositories,
           });
+
+          mountSwaggerUi(app);
 
           app.use('/rest/custom/admin', adminRouter);
           app.use('/rest/custom/v1', messageRouter);
