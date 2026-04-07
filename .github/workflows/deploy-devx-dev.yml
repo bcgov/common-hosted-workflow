@@ -34,12 +34,12 @@ jobs:
       with:
         openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
         openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
-        namespace: ${{ vars.environment }}
+        namespace: ${{ environment.name }}
         insecure_skip_tls_verify: true
 
     - name: Deploy apps with Helm chart
       run: |
-        make upgrade NAMESPACE=${{ vars.environment }} IMAGE_TAG=${{ inputs.tag }}
+        make upgrade NAMESPACE=${{ environment.name }} IMAGE_TAG=${{ inputs.tag }}
         kubectl rollout status deployment/chwf-n8n-main
         kubectl rollout status deployment/chwf-n8n-worker
         kubectl rollout status deployment/chwf-n8n-webhook
@@ -63,12 +63,12 @@ jobs:
       with:
         openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
         openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
-        namespace: ${{ vars.environment }}
+        namespace: ${{ environment.name }}
         insecure_skip_tls_verify: true
 
     - name: Deploy apps with Helm chart
       run: |
-        make upgrade NAMESPACE=${{ vars.environment }} IMAGE_TAG=${{ inputs.tag }}
+        make upgrade NAMESPACE=${{ environment.name }} IMAGE_TAG=${{ inputs.tag }}
         kubectl rollout status deployment/chwf-n8n-main
         kubectl rollout status deployment/chwf-n8n-worker
         kubectl rollout status deployment/chwf-n8n-webhook
