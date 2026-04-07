@@ -39,7 +39,10 @@ jobs:
 
     - name: Deploy apps with Helm chart
       run: |
-        make upgrade NAMESPACE=${{ vars.OPENSHIFT_NAMESPACE }} IMAGE_TAG=${{ inputs.tag }}
+        make upgrade NAMESPACE=${{ vars.OPENSHIFT_NAMESPACE }} \
+        IMAGE_TAG=${{ inputs.tag }} \
+        VALUES_FILE=values-${{ vars.OPENSHIFT_NAMESPACE }}.yaml
+
         kubectl rollout status deployment/chwf-n8n-main
         kubectl rollout status deployment/chwf-n8n-worker
         kubectl rollout status deployment/chwf-n8n-webhook
@@ -68,7 +71,9 @@ jobs:
 
     - name: Deploy apps with Helm chart
       run: |
-        make upgrade NAMESPACE=${{ vars.OPENSHIFT_NAMESPACE }} IMAGE_TAG=${{ inputs.tag }}
+        make upgrade NAMESPACE=${{ vars.OPENSHIFT_NAMESPACE }} \
+        IMAGE_TAG=${{ inputs.tag }} \
+        VALUES_FILE=values-${{ vars.OPENSHIFT_NAMESPACE }}dr.yaml
         kubectl rollout status deployment/chwf-n8n-main
         kubectl rollout status deployment/chwf-n8n-worker
         kubectl rollout status deployment/chwf-n8n-webhook
