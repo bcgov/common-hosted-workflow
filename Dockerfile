@@ -37,7 +37,9 @@ COPY --from=build-nodes /app/package.json /community-nodes/package.json
 COPY --from=build-hooks /app/dist /external-hooks
 COPY external-hooks/drizzle /external-hooks/drizzle
 
+# Keep Swagger UI disabled by default. Enable per environment.
 ENV N8N_PORT=5678 \
+    ENABLE_SWAGGER_UI=false \
     N8N_TRUST_PROXY=true \
     N8N_PROXY_HOPS=1 \
     N8N_PROTOCOL="https" \
