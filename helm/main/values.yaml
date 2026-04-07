@@ -116,6 +116,7 @@ n8n:
   main:
     env:
       OIDC_ROLES_CLAIM: client_roles
+      ENABLE_SWAGGER_UI: 'false'
 
     envSecretName: chwf # pragma: allowlist secret
 
