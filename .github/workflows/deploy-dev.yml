@@ -50,14 +50,7 @@ jobs:
   deploy-devx-dev:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx-dev.yml
-    secrets: inherit
-    with:
-      tag: ${{ github.sha }}
-  
-  deploy-devx-test:
-    name: Deploys DevX (Dev)
-    uses: ./.github/workflows/deploy-devx-dev.yml
-    secrets: inherit
+    secrets: inherit # pragma: allowlist secret
     with:
       tag: ${{ github.sha }}
 
