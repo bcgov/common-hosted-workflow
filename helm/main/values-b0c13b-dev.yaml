@@ -16,6 +16,10 @@ n8n:
     enabled: true
     host: dev-chwf.apps.gold.devops.gov.bc.ca
 
+  main:
+    env:
+      ENABLE_SWAGGER_UI: 'true'
+
   worker:
     enabled: true
 
