@@ -89,8 +89,8 @@ jobs:
       run: |
         make upgrade \
         NAMESPACE=${{ vars.OPENSHIFT_NAMESPACE }} \
-        CLUSTER=${{ contains(secrets.OPENSHIFT_SERVER,'golddr') && 'golddr' || 'gold' }} \ 
-        IMAGE_TAG=${{ inputs.tag }}
+        IMAGE_TAG=${{ inputs.tag }} \
+        CLUSTER=${{ contains(secrets.OPENSHIFT_SERVER,'golddr') && 'golddr' || 'gold' }}
 
         kubectl rollout status deployment/chwf-n8n-main
         kubectl rollout status deployment/chwf-n8n-worker
