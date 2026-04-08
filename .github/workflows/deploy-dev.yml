@@ -52,6 +52,7 @@ jobs:
     uses: ./.github/workflows/deploy-devx-dev.yml
     secrets: inherit # pragma: allowlist secret
     with:
+      environment: dev
       tag: ${{ github.sha }}
 
   deploy-test:

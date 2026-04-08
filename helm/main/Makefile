@@ -3,21 +3,20 @@ SHELL := /usr/bin/env bash
 NAME := chwf
 NAMESPACE =
 IMAGE_TAG =
-VALUES_FILE =
 
 ifndef NAMESPACE
     $(error NAMESPACE is not set)
 endif
 
-ifndef VALUES_FILE
-    $(error VALUES_FILE is not set)
+ifndef CLUSTER
+    $(error CLUSTER is not set, should be one of silver,gold,golddr)
 endif
 
 define arguments
     "${NAME}" . \
     -n "${NAMESPACE}" \
     -f values.yaml \
-    -f "${VALUES_FILE}" \
+    -f "values-${NAMESPACE}-${CLUSTER}.yaml" \
 	--set n8n.image.tag="${IMAGE_TAG}"
 endef
 
