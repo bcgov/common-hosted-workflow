@@ -33,6 +33,7 @@ x-n8n-env: &n8n-env
   OLLAMA_HOST: ${OLLAMA_HOST:-ollama:11434}
   N8N_PORT: '5678'
   NODE_ENV: production
+  ENABLE_SWAGGER_UI: 'true'
   N8N_PROTOCOL: 'http'
   N8N_TRUST_PROXY: 'true'
   N8N_PROXY_HOPS: "1"
