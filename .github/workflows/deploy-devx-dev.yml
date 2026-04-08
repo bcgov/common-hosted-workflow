@@ -1,4 +1,3 @@
----
 name: Deploy DevX (Dev)
 
 on:
@@ -9,6 +8,15 @@ on:
         required: false
         type: string
         default: "latest"
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: choice # Defines the input as a dropdown menu
+        default: "dev"
+        options: # List of allowed values
+          - dev
+          - test
+          - prod
   workflow_call:
     inputs:
       tag:
@@ -16,14 +24,20 @@ on:
         required: false
         type: string
         default: "main"
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: string
+        default: "dev"
 jobs:
-  deploy-devx-dev:
+  deploy-devX:
+    name: "Deploy devX-${{ inputs.environment }}"
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
       contents: read
     environment:
-      name: devx-dev
+      name: devx-${{ inputs.environment }}
 
     steps:
     - uses: hmarr/debug-action@f7318c783045ac39ed9bb497e22ce835fdafbfe6
@@ -49,13 +63,14 @@ jobs:
         kubectl rollout status deployment/chwf-n8n-runner
       working-directory: ./helm/main
 
-  deploy-devX-devdr:
+  deploy-devX-dr:
+    name: "Deploy devX-${{ inputs.environment }}dr"
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
       contents: read
     environment:
-      name: devx-devdr
+      name: devx-${{ inputs.environment }}dr
 
     steps:
     - uses: hmarr/debug-action@f7318c783045ac39ed9bb497e22ce835fdafbfe6
