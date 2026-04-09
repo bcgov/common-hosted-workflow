@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@egose/keycloak-fluent':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.6.0
+        version: 0.6.3
       wait-on:
         specifier: ^9.0.0
         version: 9.0.1
@@ -33,8 +33,8 @@ importers:
 
 packages:
 
-  '@egose/keycloak-fluent@0.3.0':
-    resolution: {integrity: sha512-05EFURLPQS+hvvMCmX96z197KYlR8+H5/zOYC4lMQfi3PJz3i3vM298JelnD0fS62/31S9BWmkq2Nv2o5P2sqg==}
+  '@egose/keycloak-fluent@0.6.3':
+    resolution: {integrity: sha512-xvynBYVKBPKwHfG4cuyZSULTDrbIi8DRMyvOkmsxV7A49jCqZS98LCvQARtKCm8pzEvhRdxeqpefcgoPT3yg+w==}
     engines: {node: '>=20'}
 
   '@esbuild/aix-ppc64@0.25.11':
@@ -217,12 +217,37 @@ packages:
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
     engines: {node: '>=12'}
 
-  '@keycloak/keycloak-admin-client@26.4.7':
-    resolution: {integrity: sha512-6AqwZjWuWBzM0nPVggWDV4Oep+CO8ATfNEvVhXgC1dH7PkBCl/4hCRj9ZFHnX1OtQJ+zozD6LQ1giwArcAU6qQ==}
+  '@keycloak/keycloak-admin-client@26.6.0':
+    resolution: {integrity: sha512-L3dQDkvVWT2fJWsDUa0qDlQAf0Q41qrsMILHD0Uoy8PsHvoD24hTxmyHhxSLlUPwsURmpChkKo2lMS7BDFJ9IA==}
     engines: {node: '>=18'}
+
+  '@microsoft/kiota-abstractions@1.0.0-preview.100':
+    resolution: {integrity: sha512-3s2WYKQ6WLB/0pyDmmv9bigH/3LZ0Mm4ldHskNLBj0U8DYjFzfG729snnEij+hZN0l2XHr37pGBr1MZK8vM7zQ==}
+
+  '@microsoft/kiota-http-fetchlibrary@1.0.0-preview.100':
+    resolution: {integrity: sha512-uS2rhKKjbYiT8JWG8GGVOALB+s4HdDc9hg5tTZMVf3qY5b/us1OKLQ6WgW6USq/kZAuKKWkIq/BQgPCWbHtFTQ==}
+
+  '@microsoft/kiota-serialization-form@1.0.0-preview.100':
+    resolution: {integrity: sha512-SR/yWBtvKYhN2ARR4wVMFb91XgN32DBmLLQmtemdKgL1YWBxVCNAUP/qHbZhrTX7q4kh7jl/S9yrr1S8ySS7AA==}
+
+  '@microsoft/kiota-serialization-json@1.0.0-preview.100':
+    resolution: {integrity: sha512-4qatf5j0Aeaakdw24jMuIX7W6mf/W2rU9UyAjkIrSjaB7W5n8gsUvhoTcRpPTAFN7pvzQkCbO7Z0paRfdYzhIw==}
+
+  '@microsoft/kiota-serialization-multipart@1.0.0-preview.100':
+    resolution: {integrity: sha512-zwWoLZH6+KsAl05Ijd8HpbU+mct5wb0//ZCGdCkQ/UqsAaoe2xYSoKicxQbVGv9VvSTq0as7iVLwqDeqEI9rDw==}
+
+  '@microsoft/kiota-serialization-text@1.0.0-preview.100':
+    resolution: {integrity: sha512-x2Epz0StHLBkVJKeEmwrXSh6SJuxZ72VVBNO53uHUNZ/Y7X8tZuSQR7X74EO69mEi4zAF21X2jbkF9/dhlARog==}
+
+  '@opentelemetry/api@1.9.1':
+    resolution: {integrity: sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==}
+    engines: {node: '>=8.0.0'}
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
+
+  '@std-uritemplate/std-uritemplate@2.0.8':
+    resolution: {integrity: sha512-8oj7jKksoTRxjdPkWKX9FyOKDS8ORBm+ZfTSHm0f3eYha8cI0O1d57gyduOIAX7Y2uUukNDNlxlvGb+FFkE7yQ==}
 
   '@types/node@24.10.4':
     resolution: {integrity: sha512-vnDVpYPMzs4wunl27jHrfmwojOGKya0xyM3sH+UE5iv5uPS6vX7UIoh6m+vQc5LGBq52HBKPIn/zcSZVzeDEZg==}
@@ -358,6 +383,7 @@ packages:
   glob@11.0.0:
     resolution: {integrity: sha512-9UiX/Bl6J2yaBbxKoEBRm4Cipxgok8kQYcOPEhScPwebu2I0HoQOuYdIO6S3hLuWoZgpDpwQZMzTFxgpkyT76g==}
     engines: {node: 20 || >=22}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   gopd@1.2.0:
@@ -391,8 +417,8 @@ packages:
     resolution: {integrity: sha512-IiQpRyypSnLisQf3PwuN2eIHAsAIGZIrLZkd4zdvIar2bDyhM91ubRjy8a3eYablXsh9BeI/c7dmPYHca5qtoA==}
     engines: {node: '>= 20'}
 
-  lodash-es@4.17.21:
-    resolution: {integrity: sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==}
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
@@ -477,6 +503,9 @@ packages:
     resolution: {integrity: sha512-iq6eVVI64nQQTRYq2KtEg2d2uU7LElhTJwsH4YzIHZshxlgZms/wIc4VoDQTlG/IvVIrBKG06CrZnp0qv7hkcQ==}
     engines: {node: '>=12'}
 
+  tinyduration@3.4.1:
+    resolution: {integrity: sha512-NemFoamVYn7TmtwZKZ3OiliM9fZkr6EWiTM+wKknco6POSy2gS689xx/pXip0JYp40HXpUw6k65CUYHWYUXdaA==}
+
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
@@ -517,10 +546,10 @@ packages:
 
 snapshots:
 
-  '@egose/keycloak-fluent@0.3.0':
+  '@egose/keycloak-fluent@0.6.3':
     dependencies:
-      '@keycloak/keycloak-admin-client': 26.4.7
-      lodash-es: 4.17.21
+      '@keycloak/keycloak-admin-client': 26.6.0
+      lodash-es: 4.18.1
 
   '@esbuild/aix-ppc64@0.25.11':
     optional: true
@@ -625,12 +654,55 @@ snapshots:
       wrap-ansi: 8.1.0
       wrap-ansi-cjs: wrap-ansi@7.0.0
 
-  '@keycloak/keycloak-admin-client@26.4.7':
+  '@keycloak/keycloak-admin-client@26.6.0':
     dependencies:
+      '@microsoft/kiota-abstractions': 1.0.0-preview.100
+      '@microsoft/kiota-http-fetchlibrary': 1.0.0-preview.100
+      '@microsoft/kiota-serialization-form': 1.0.0-preview.100
+      '@microsoft/kiota-serialization-json': 1.0.0-preview.100
+      '@microsoft/kiota-serialization-multipart': 1.0.0-preview.100
+      '@microsoft/kiota-serialization-text': 1.0.0-preview.100
       camelize-ts: 3.0.0
       url-template: 3.1.1
 
+  '@microsoft/kiota-abstractions@1.0.0-preview.100':
+    dependencies:
+      '@opentelemetry/api': 1.9.1
+      '@std-uritemplate/std-uritemplate': 2.0.8
+      tinyduration: 3.4.1
+      tslib: 2.8.1
+
+  '@microsoft/kiota-http-fetchlibrary@1.0.0-preview.100':
+    dependencies:
+      '@microsoft/kiota-abstractions': 1.0.0-preview.100
+      '@opentelemetry/api': 1.9.1
+      tslib: 2.8.1
+
+  '@microsoft/kiota-serialization-form@1.0.0-preview.100':
+    dependencies:
+      '@microsoft/kiota-abstractions': 1.0.0-preview.100
+      tslib: 2.8.1
+
+  '@microsoft/kiota-serialization-json@1.0.0-preview.100':
+    dependencies:
+      '@microsoft/kiota-abstractions': 1.0.0-preview.100
+      tslib: 2.8.1
+
+  '@microsoft/kiota-serialization-multipart@1.0.0-preview.100':
+    dependencies:
+      '@microsoft/kiota-abstractions': 1.0.0-preview.100
+      tslib: 2.8.1
+
+  '@microsoft/kiota-serialization-text@1.0.0-preview.100':
+    dependencies:
+      '@microsoft/kiota-abstractions': 1.0.0-preview.100
+      tslib: 2.8.1
+
+  '@opentelemetry/api@1.9.1': {}
+
   '@standard-schema/spec@1.0.0': {}
+
+  '@std-uritemplate/std-uritemplate@2.0.8': {}
 
   '@types/node@24.10.4':
     dependencies:
@@ -828,7 +900,7 @@ snapshots:
       '@hapi/topo': 6.0.2
       '@standard-schema/spec': 1.0.0
 
-  lodash-es@4.17.21: {}
+  lodash-es@4.18.1: {}
 
   lodash@4.17.21: {}
 
@@ -899,6 +971,8 @@ snapshots:
   strip-ansi@7.1.0:
     dependencies:
       ansi-regex: 6.1.0
+
+  tinyduration@3.4.1: {}
 
   tslib@2.8.1: {}
 
