@@ -1,4 +1,4 @@
-name: Deploy DevX (Dev)
+name: Deploy SDG
 
 on:
   workflow_dispatch:

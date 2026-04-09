@@ -1,5 +1,4 @@
-name: Deploy DevX (Dev)
-
+name: Deploy DevX
 on:
   workflow_dispatch:
     inputs:
