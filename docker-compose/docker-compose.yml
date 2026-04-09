@@ -58,7 +58,7 @@ services:
     <<: *common-props
     container_name: sdg-mock-app
     build:
-      context: ./sdg-mock-app/nextjs-app
+      context: ./sdg-mock-app
       dockerfile: Dockerfile
       args:
         N8N_TARGET: http://n8n:5678
