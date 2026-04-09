@@ -28,7 +28,7 @@ RUN pnpm install --frozen-lockfile
 COPY external-hooks .
 RUN pnpm bundle
 
-FROM n8nio/n8n:2.5.2
+FROM n8nio/n8n:2.16.0
 
 WORKDIR /home/node
 
