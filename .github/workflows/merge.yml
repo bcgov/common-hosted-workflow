@@ -54,7 +54,7 @@ jobs:
     with:
       environment: dev
       tag: ${{ github.sha }}
-  
+
   deploy-sdg-dev:
     name: Deploys SDG (Dev)
     uses: ./.github/workflows/deploy-sdg-dev.yml
