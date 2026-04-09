@@ -2,3 +2,4 @@ node_modules
 .wip
 /.claude
 /.kiro
+.next/

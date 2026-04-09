@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 const N8N_TARGET = process.env.N8N_TARGET || 'http://localhost:5678';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   async rewrites() {
     return [
       { source: '/rest/:path*', destination: `${N8N_TARGET}/rest/:path*` },

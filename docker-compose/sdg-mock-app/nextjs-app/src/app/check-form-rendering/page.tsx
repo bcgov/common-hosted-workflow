@@ -1,85 +1,50 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
+import { ChefsFormViewer } from '@/components/chefs';
 
 function ChefsFormPage() {
   const searchParams = useSearchParams();
   const formId = searchParams.get('form-id') || '';
   const authToken = searchParams.get('auth-token') || '';
 
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [draftUrl, setDraftUrl] = useState('');
-  const [formLoaded, setFormLoaded] = useState(false);
-
-  // Preload webhook URL from localStorage chef_config
-  useEffect(() => {
+  const [webhookUrl, setWebhookUrl] = useState(() => {
+    if (typeof window === 'undefined') return '';
     try {
       const raw = localStorage.getItem('chef_config');
       if (raw) {
         const cfg = JSON.parse(raw);
-        if (cfg.webhookUrl) setWebhookUrl(cfg.webhookUrl);
+        return cfg.webhookUrl ?? '';
       }
     } catch {
       /* ignore */
     }
-  }, []);
+    return '';
+  });
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draftUrl, setDraftUrl] = useState('');
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [submitted, setSubmitted] = useState(false);
   const [formKey, setFormKey] = useState(0);
-  const viewerRef = useRef<HTMLElement | null>(null);
 
-  // Load the CHEFS form viewer script
-  useEffect(() => {
-    if (document.querySelector('script[src*="chefs-form-viewer"]')) return;
-    const script = document.createElement('script');
-    script.src = 'https://submit.digital.gov.bc.ca/app/embed/chefs-form-viewer.min.js';
-    script.async = true;
-    document.head.appendChild(script);
-  }, []);
-
-  // Load and attach the form when formId/authToken are present
-  useEffect(() => {
-    if (!formId) return;
-    setFormLoaded(false);
-
-    // Wait for custom element to be defined
-    const interval = setInterval(() => {
-      const viewer = viewerRef.current;
-      if (viewer && typeof (viewer as any).load === 'function') {
-        clearInterval(interval);
-        viewer.setAttribute('form-id', formId);
-        if (authToken) viewer.setAttribute('api-key', authToken);
-        viewer.setAttribute('base-url', 'https://submit.digital.gov.bc.ca/app');
-        viewer.setAttribute('language', 'en');
-        viewer.setAttribute('isolate-styles', '');
-        (viewer as any).load();
-        setFormLoaded(true);
-      }
-    }, 200);
-
-    return () => clearInterval(interval);
-  }, [formId, authToken, formKey]);
-
-  // Listen for submitDone and forward to webhook
-  const handleSubmitDone = useCallback(
-    async (e: Event) => {
-      const detail = (e as CustomEvent).detail;
+  const handleSubmissionComplete = useCallback(
+    async (detail: unknown) => {
       if (!webhookUrl) {
         console.warn('No webhook URL configured — submission not forwarded.');
         return;
       }
       setSubmitStatus('sending');
       try {
+        const submission = (detail as { submission?: unknown })?.submission ?? detail;
         const response = await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(detail.submission),
+          body: JSON.stringify(submission),
         });
         if (!response.ok) throw new Error('Webhook failed: ' + response.status);
         setSubmitStatus('success');
-        console.log('Submission sent to webhook successfully');
       } catch (err) {
         console.error('Failed to send submission to webhook:', err);
         setSubmitStatus('error');
@@ -96,13 +61,6 @@ function ChefsFormPage() {
     setSubmitStatus('idle');
   };
 
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer || !formLoaded) return;
-    viewer.addEventListener('formio:submitDone', handleSubmitDone);
-    return () => viewer.removeEventListener('formio:submitDone', handleSubmitDone);
-  }, [formLoaded, handleSubmitDone]);
-
   const openSettings = () => {
     setDraftUrl(webhookUrl);
     setSettingsOpen(true);
@@ -112,7 +70,6 @@ function ChefsFormPage() {
     const url = draftUrl.trim();
     setWebhookUrl(url);
     setSettingsOpen(false);
-    // Persist to localStorage chef_config
     try {
       const raw = localStorage.getItem('chef_config');
       const cfg = raw ? JSON.parse(raw) : {};
@@ -148,50 +105,33 @@ function ChefsFormPage() {
           {submitStatus === 'sending' && <span style={styles.statusSending}>Sending…</span>}
           {submitStatus === 'success' && <span style={styles.statusSuccess}>✓ Sent</span>}
           {submitStatus === 'error' && <span style={styles.statusError}>✗ Failed</span>}
-
           {submitted && (
-            <button onClick={resetForm} style={styles.resetBtn} title="Reset form" aria-label="Reset form">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
+            <button onClick={resetForm} style={styles.resetBtn} aria-label="Reset form">
               Reset
             </button>
           )}
-
           <button
             onClick={openSettings}
             style={styles.settingsBtn}
             title={hasWebhook ? `Webhook: ${webhookUrl}` : 'No webhook URL configured'}
             aria-label="Webhook settings"
           >
-            {/* Warning icon when no webhook */}
-            {!hasWebhook && (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ marginRight: 4 }}>
-                <path
-                  d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                  stroke="#e67e22"
-                  strokeWidth="2"
-                  fill="none"
-                />
-                <line x1="12" y1="9" x2="12" y2="13" stroke="#e67e22" strokeWidth="2" />
-                <line x1="12" y1="17" x2="12.01" y2="17" stroke="#e67e22" strokeWidth="2" />
-              </svg>
-            )}
-            {/* Gear icon */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
+            ⚙
           </button>
         </div>
       </div>
 
-      {/* Form container */}
+      {/* Form — rendered by the reusable ChefsFormViewer */}
       <main style={styles.main}>
         <div style={styles.formContainer}>
-          {/* @ts-expect-error - custom web component */}
-          <chefs-form-viewer key={formKey} ref={viewerRef} />
+          <ChefsFormViewer
+            key={formKey}
+            formId={formId}
+            apiKey={authToken}
+            onSubmissionComplete={handleSubmissionComplete}
+            onSubmissionError={(err) => console.error('Form submission error:', err)}
+            onFormReady={() => console.log('Form ready')}
+          />
         </div>
       </main>
 
@@ -271,6 +211,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 10px',
     cursor: 'pointer',
     color: '#555',
+    fontSize: 18,
   },
   resetBtn: {
     display: 'flex',
