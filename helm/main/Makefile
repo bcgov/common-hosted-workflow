@@ -8,11 +8,15 @@ ifndef NAMESPACE
     $(error NAMESPACE is not set)
 endif
 
+ifndef CLUSTER
+    $(error CLUSTER is not set, should be one of silver,gold,golddr)
+endif
+
 define arguments
     "${NAME}" . \
     -n "${NAMESPACE}" \
     -f values.yaml \
-    -f "values-${NAMESPACE}.yaml" \
+    -f "values-${NAMESPACE}-${CLUSTER}.yaml" \
 	--set n8n.image.tag="${IMAGE_TAG}"
 endef
 
