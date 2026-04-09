@@ -54,6 +54,22 @@ x-n8n-env: &n8n-env
   INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
 
 services:
+  sdg-mock-app:
+    <<: *common-props
+    container_name: sdg-mock-app
+    build:
+      context: ./sdg-mock-app
+      dockerfile: Dockerfile
+      args:
+        N8N_TARGET: http://n8n:5678
+    ports:
+      - '8081:8081'
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      n8n:
+        condition: service_started
+
   adaptivecard:
     <<: *common-props
     container_name: adaptivecard
