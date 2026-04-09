@@ -1,0 +1,64 @@
+name: Merge
+
+on:
+  push:
+    branches:
+    - main
+    paths-ignore:
+    - docs/**
+    - terraform/**
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+  security-events: write
+
+jobs:
+  build-push-n8n:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+    - uses: hmarr/debug-action@f7318c783045ac39ed9bb497e22ce835fdafbfe6
+    - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Build and Push
+      uses: egose/actions/docker-build-push@fb7c0ce76762ce2b5bc5d081efe23aed7dd854bb
+      with:
+        registry-url: ${{ env.GITHUB_REGISTRY }}
+        registry-username: ${{ github.actor }}
+        registry-password: ${{ secrets.GITHUB_TOKEN }}
+        image-name: bcgov/chwf
+        docker-context: .
+        docker-file: Dockerfile
+        docker-outputs: type=image,push=true,compression=gzip,force-compression=true
+        metadata-tags: |
+          type=ref,event=branch
+          type=sha,format=long,prefix=,suffix=
+        trivy: false # available only for GitHub Advanced Security
+
+  deploy-devx-dev:
+    name: Deploys DevX (Dev)
+    uses: ./.github/workflows/deploy-devx-dev.yml
+    secrets: inherit # pragma: allowlist secret
+    with:
+      environment: dev
+      tag: ${{ github.sha }}
+  
+  deploy-sdg-dev:
+    name: Deploys SDG (Dev)
+    uses: ./.github/workflows/deploy-sdg-dev.yml
+    secrets: inherit # pragma: allowlist secret
+    with:
+      environment: dev
+      tag: ${{ github.sha }}
