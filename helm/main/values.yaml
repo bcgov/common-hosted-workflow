@@ -30,6 +30,8 @@ n8n:
     # DB_POSTGRESDB_PORT: "5432"
     # DB_POSTGRESDB_USER: "nonroot"
     DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED: "true"
+    # WATCH: https://github.com/n8n-io/n8n/issues/25705
+    DB_POSTGRESDB_STATEMENT_TIMEOUT: "0"
     # DB_POSTGRESDB_PASSWORD (default: empty)
     # See https://docs.n8n.io/hosting/configuration/configuration-examples/user-folder/#specify-user-folder-path
     N8N_BLOCKLIST_FUNCTIONS_ALLOW_BUILTIN: "*"
