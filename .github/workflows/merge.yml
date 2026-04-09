@@ -50,6 +50,7 @@ jobs:
   deploy-devx-dev:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx.yml
+    needs: [build-push-n8n]
     secrets: inherit # pragma: allowlist secret
     with:
       environment: dev
@@ -58,6 +59,7 @@ jobs:
   deploy-sdg-dev:
     name: Deploys SDG (Dev)
     uses: ./.github/workflows/deploy-sdg.yml
+    needs: [build-push-n8n]
     secrets: inherit # pragma: allowlist secret
     with:
       environment: dev
