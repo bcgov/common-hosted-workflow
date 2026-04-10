@@ -50,32 +50,46 @@ function Dashboard() {
   return (
     <>
       {/* ── Header ── */}
-      <div className="header">
-        <div className="header-left">
-          <div className="logo">C</div>
+      <div className="flex items-center justify-between px-7 py-4 border-b border-border bg-surface sticky top-0 z-50">
+        <div className="flex items-center gap-3.5">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center font-bold text-[15px] text-white">
+            C
+          </div>
           <div>
-            <div className="header-title">SDG Demo</div>
-            <div className="header-sub">An application using Workflow as a service</div>
+            <div className="text-base font-semibold tracking-tight">SDG Demo</div>
+            <div className="text-xs text-text-muted mt-px">An application using Workflow as a service</div>
           </div>
         </div>
-        <div className="header-right">
-          <div className={`status-pill ${hasError ? 'error' : isConnected ? 'connected' : ''}`}>
-            <span className="status-dot" />
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+              hasError
+                ? 'bg-red-soft text-red-400'
+                : isConnected
+                  ? 'bg-green-soft text-emerald-400'
+                  : 'bg-surface-3 text-text-muted'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
             <span>{hasError ? 'Error' : isConnected ? `Connected (${connMode})` : 'Not configured'}</span>
           </div>
-          <button className="btn" onClick={() => setSettingsOpen(true)}>
+          <button
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-border bg-surface-2 text-text text-[13px] font-medium cursor-pointer whitespace-nowrap hover:border-border-hover hover:bg-surface-3 transition-all duration-150"
+            onClick={() => setSettingsOpen(true)}
+          >
             <GearIcon />
             Settings
           </button>
-          <button className={`btn btn-primary ${loading ? 'loading' : ''}`} onClick={refresh}>
+          <button
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-accent bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap hover:bg-[#3d7ae8] transition-all duration-150 ${loading ? 'opacity-60 pointer-events-none' : ''}`}
+            onClick={refresh}
+          >
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              style={
-                loading ? { width: 15, height: 15, animation: 'spin 0.8s linear infinite' } : { width: 15, height: 15 }
-              }
+              className={`size-[15px] ${loading ? 'animate-spin' : ''}`}
             >
               <polyline points="23 4 23 10 17 10" />
               <polyline points="1 20 1 14 7 14" />
@@ -87,50 +101,45 @@ function Dashboard() {
       </div>
 
       {/* ── Controls ── */}
-      <div className="controls">
-        <div className="control-group">
-          <span className="control-label">Actor ID</span>
+      <div className="flex items-center gap-3 flex-wrap px-7 py-3.5 border-b border-border bg-surface">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-text-muted font-medium">Actor ID</span>
           <input
             type="text"
-            className="control-input"
+            className="w-[140px] px-2.5 py-1.5 rounded-md border border-border bg-surface-2 text-text text-[13px] font-mono focus:outline-none focus:border-accent"
             value={actorId}
             onChange={(e) => setActorId(e.target.value)}
-            style={{ width: 140 }}
             placeholder="e.g. amina"
           />
         </div>
-        <div className="control-group">
-          <span className="control-label">Since</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-text-muted font-medium">Since</span>
           <input
             type="datetime-local"
-            className="control-input"
+            className="w-[220px] px-2.5 py-1.5 rounded-md border border-border bg-surface-2 text-text text-[13px] font-mono focus:outline-none focus:border-accent"
             value={since}
             onChange={(e) => setSince(e.target.value)}
-            style={{ width: 220 }}
           />
         </div>
-        <div className="control-group">
-          <span className="control-label">Limit</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-text-muted font-medium">Limit</span>
           <input
             type="number"
-            className="control-input"
+            className="w-[70px] px-2.5 py-1.5 rounded-md border border-border bg-surface-2 text-text text-[13px] font-mono focus:outline-none focus:border-accent"
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
             min={1}
             max={200}
-            style={{ width: 70 }}
           />
         </div>
-        <div className="spacer" />
+        <div className="flex-1" />
         {lastRefresh && (
-          <span className="control-label" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
-            Last refresh: {lastRefresh}
-          </span>
+          <span className="text-[11px] text-text-muted font-mono font-medium">Last refresh: {lastRefresh}</span>
         )}
       </div>
 
       {/* ── Main Grid ── */}
-      <div className="main">
+      <div className="grid grid-cols-[300px_1fr_1fr] max-lg:grid-cols-2 max-sm:grid-cols-1 min-h-[calc(100vh-110px)]">
         <FormsPanel
           appConfig={config}
           formConfig={formCfg}

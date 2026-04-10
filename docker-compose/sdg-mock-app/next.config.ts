@@ -1,9 +1,11 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 const N8N_TARGET = process.env.N8N_TARGET || 'http://localhost:5678';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname),
   async rewrites() {
     return [
       { source: '/rest/:path*', destination: `${N8N_TARGET}/rest/:path*` },

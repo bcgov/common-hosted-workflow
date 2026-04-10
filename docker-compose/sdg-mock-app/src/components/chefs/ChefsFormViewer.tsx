@@ -22,10 +22,8 @@ export function ChefsFormViewer({
   const scriptStatus = useChefsScript();
   const [isFormMounted, setIsFormMounted] = useState(false);
 
-  // Encode headers as URL-encoded JSON (as per PR-1802)
   const headersAttr = headers ? `headers="${encodeURIComponent(JSON.stringify(headers))}"` : '';
 
-  // Build attributes string
   const attrs = [
     `form-id="${formId}"`,
     `base-url="${baseUrl}"`,
@@ -40,7 +38,6 @@ export function ChefsFormViewer({
     .filter(Boolean)
     .join(' ');
 
-  // Set innerHTML when formId changes, inject styles to prevent layout shift
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = `<chefs-form-viewer ${attrs}></chefs-form-viewer>`;
@@ -85,7 +82,6 @@ export function ChefsFormViewer({
     return () => observer.disconnect();
   }, [attrs, formId, scriptStatus]);
 
-  // Attach event listeners once script is ready
   useEffect(() => {
     if (scriptStatus !== 'ready' || !containerRef.current) return;
 
@@ -111,23 +107,18 @@ export function ChefsFormViewer({
     formViewer.addEventListener('formio:submit', handleSubmit);
     formViewer.addEventListener('formio:submitError', handleSubmitError);
 
-    // Check if already rendered (in case we missed the ready event)
     const shadowRoot = (formViewer as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot;
     if (shadowRoot && shadowRoot.children.length > 0) {
       queueMicrotask(() => setIsFormMounted(true));
     }
 
-    // Set headers as property directly (required for evalContext)
     if (headers) {
       (formViewer as unknown as Record<string, unknown>).headers = headers;
     }
 
-    // Call load() method explicitly
     const viewer = formViewer as HTMLElement & { load?: () => Promise<void> };
     if (typeof viewer.load === 'function') {
-      viewer.load().catch(() => {
-        // Error handling is done via formio:submitError event
-      });
+      viewer.load().catch(() => {});
     }
 
     return () => {
@@ -139,7 +130,7 @@ export function ChefsFormViewer({
 
   if (scriptStatus === 'error') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#ea4335' }}>
+      <div className="flex items-center justify-center p-8 text-red-500">
         <p>Failed to load form. Please try refreshing the page.</p>
       </div>
     );
@@ -149,32 +140,14 @@ export function ChefsFormViewer({
   const showSpinner = isScriptLoading || !isFormMounted;
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       {showSpinner && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <div style={spinnerStyle} />
-          <span style={{ marginLeft: 8, color: '#888' }}>Loading form…</span>
+        <div className="flex items-center justify-center p-8">
+          <div className="size-6 border-3 border-gray-200 border-t-blue-600 rounded-full animate-spin" />
+          <span className="ml-2 text-gray-400">Loading form…</span>
         </div>
       )}
-      <div ref={containerRef} style={{ display: showSpinner ? 'none' : 'block' }} />
+      <div ref={containerRef} className={showSpinner ? 'hidden' : 'block'} />
     </div>
   );
-}
-
-/** Simple CSS spinner via inline keyframes injected once */
-const spinnerStyle: React.CSSProperties = {
-  width: 24,
-  height: 24,
-  border: '3px solid #e0e0e0',
-  borderTopColor: '#1a73e8',
-  borderRadius: '50%',
-  animation: 'chefs-spin 0.8s linear infinite',
-};
-
-// Inject keyframes once
-if (typeof document !== 'undefined' && !document.getElementById('chefs-spinner-keyframes')) {
-  const style = document.createElement('style');
-  style.id = 'chefs-spinner-keyframes';
-  style.textContent = `@keyframes chefs-spin { to { transform: rotate(360deg); } }`;
-  document.head.appendChild(style);
 }
