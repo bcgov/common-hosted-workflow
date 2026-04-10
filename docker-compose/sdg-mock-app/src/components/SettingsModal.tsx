@@ -34,50 +34,86 @@ export default function SettingsModal({ open, config, onSave, onClose }: Props) 
     });
   };
 
+  if (!open) return null;
+
   return (
-    <div className={`modal-overlay ${open ? 'open' : ''}`}>
-      <div className="modal">
-        <div className="modal-header">
-          <h3>⚙ API Configuration</h3>
-          <button className="modal-close" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
+      <div className="bg-surface border border-border rounded-[14px] w-[440px] max-w-[90vw] shadow-2xl">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h3 className="text-[15px] font-semibold">⚙ API Configuration</h3>
+          <button className="bg-transparent border-none text-text-muted text-xl cursor-pointer p-1" onClick={onClose}>
             &times;
           </button>
         </div>
-        <div className="modal-body">
-          <div className="field">
-            <label>n8n Base URL</label>
-            <input ref={baseUrlRef} type="text" placeholder="(empty = same-origin proxy)" />
-            <div className="hint">
-              Leave empty when using <code style={{ fontSize: 11, color: 'var(--accent)' }}>next dev</code> proxy. Set
-              to <code style={{ fontSize: 11, color: 'var(--accent)' }}>http://localhost:5678</code> for direct access.
-            </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-1.5">
+              n8n Base URL
+            </label>
+            <input
+              ref={baseUrlRef}
+              type="text"
+              placeholder="(empty = same-origin proxy)"
+              className="w-full px-3 py-2.5 rounded-md border border-border bg-surface-2 text-text text-sm font-mono focus:outline-none focus:border-accent"
+            />
+            <p className="text-[11px] text-text-dim mt-1">
+              Leave empty when using <code className="text-accent text-[11px]">next dev</code> proxy. Set to{' '}
+              <code className="text-accent text-[11px]">http://localhost:5678</code> for direct access.
+            </p>
           </div>
-          <div className="field">
-            <label>X-N8N-API-KEY</label>
-            <input ref={apiKeyRef} type="password" placeholder="n8n API key" />
+          <div>
+            <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-1.5">
+              X-N8N-API-KEY
+            </label>
+            <input
+              ref={apiKeyRef}
+              type="password"
+              placeholder="n8n API key"
+              className="w-full px-3 py-2.5 rounded-md border border-border bg-surface-2 text-text text-sm font-mono focus:outline-none focus:border-accent"
+            />
           </div>
-          <div className="field">
-            <label>X-TENANT-ID</label>
-            <input ref={tenantIdRef} type="text" placeholder="UUID" />
-            <div className="hint">Tenant UUID for scoping</div>
+          <div>
+            <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-1.5">
+              X-TENANT-ID
+            </label>
+            <input
+              ref={tenantIdRef}
+              type="text"
+              placeholder="UUID"
+              className="w-full px-3 py-2.5 rounded-md border border-border bg-surface-2 text-text text-sm font-mono focus:outline-none focus:border-accent"
+            />
+            <p className="text-[11px] text-text-dim mt-1">Tenant UUID for scoping</p>
           </div>
-          <div className="field">
-            <label>CORS Proxy URL (optional)</label>
-            <input ref={corsProxyRef} type="text" placeholder="http://localhost:8080" />
-            <div className="hint">
+          <div>
+            <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-1.5">
+              CORS Proxy URL (optional)
+            </label>
+            <input
+              ref={corsProxyRef}
+              type="text"
+              placeholder="http://localhost:8080"
+              className="w-full px-3 py-2.5 rounded-md border border-border bg-surface-2 text-text text-sm font-mono focus:outline-none focus:border-accent"
+            />
+            <p className="text-[11px] text-text-dim mt-1">
               If you get CORS errors, run a local proxy:
               <br />
-              <code style={{ fontSize: 11, color: 'var(--accent)' }}>
+              <code className="text-accent text-[11px]">
                 npx local-cors-proxy --proxyUrl http://localhost:5678 --port 8080
               </code>
-            </div>
+            </p>
           </div>
         </div>
-        <div className="modal-footer">
-          <button className="btn" onClick={onClose}>
+        <div className="px-5 py-3.5 border-t border-border flex justify-end gap-2">
+          <button
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-border bg-surface-2 text-text text-sm font-medium cursor-pointer hover:border-border-hover hover:bg-surface-3 transition-all duration-150"
+            onClick={onClose}
+          >
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={handleSave}>
+          <button
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-accent bg-accent text-white text-sm font-medium cursor-pointer hover:bg-[#3d7ae8] transition-all duration-150"
+            onClick={handleSave}
+          >
             Save &amp; Connect
           </button>
         </div>

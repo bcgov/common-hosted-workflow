@@ -1,10 +1,13 @@
 FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@10.18.3 --activate
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
@@ -16,9 +19,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG N8N_TARGET=http://n8n:5678
 ENV N8N_TARGET=${N8N_TARGET}
 
-RUN npm run build
+RUN pnpm run build
 
-FROM base AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -27,9 +30,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy standalone output (includes server.js and required node_modules)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-# Copy static assets and public folder
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 

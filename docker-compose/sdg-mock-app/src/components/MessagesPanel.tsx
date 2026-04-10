@@ -11,42 +11,43 @@ interface Props {
 
 export default function MessagesPanel({ messages, error }: Props) {
   return (
-    <div className="panel">
-      <div className="panel-header">
-        <div className="panel-title">
-          <span className="icon">✉</span> Messages
-          <span className="count-badge">{error ? '!' : messages.length}</span>
+    <div className="border-r border-border flex flex-col">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-[95px] z-10">
+        <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-text-muted">
+          <span className="text-base">✉</span> Messages
+          <span className="bg-accent-soft text-accent px-2 py-0.5 rounded-full text-[11px] font-bold font-mono">
+            {error ? '!' : messages.length}
+          </span>
         </div>
       </div>
-      <div className="panel-body">
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
         {error ? (
-          <div className="empty-state">
-            <div className="es-icon" style={{ color: 'var(--red)' }}>
-              ✕
-            </div>
-            <div className="es-title" style={{ color: 'var(--red)' }}>
-              Error loading messages
-            </div>
-            <div className="es-desc">{error}</div>
+          <div className="flex flex-col items-center justify-center py-12 px-5 text-text-dim text-center flex-1">
+            <div className="text-3xl mb-2.5 opacity-50 text-red-400">✕</div>
+            <div className="text-sm font-semibold text-red-400">Error loading messages</div>
+            <div className="text-xs">{error}</div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="empty-state">
-            <div className="es-icon">✉</div>
-            <div className="es-title">No messages yet</div>
-            <div className="es-desc">Configure settings and hit Refresh</div>
+          <div className="flex flex-col items-center justify-center py-12 px-5 text-text-dim text-center flex-1">
+            <div className="text-3xl mb-2.5 opacity-50">✉</div>
+            <div className="text-sm font-semibold">No messages yet</div>
+            <div className="text-xs">Configure settings and hit Refresh</div>
           </div>
         ) : (
           messages.map((m) => (
-            <div className="card" key={m.id}>
-              <div className="card-top">
-                <div className="card-title">{m.title || '(no title)'}</div>
+            <div
+              key={m.id}
+              className="bg-surface border border-border rounded-lg px-4 py-3.5 transition-all duration-150 hover:border-border-hover hover:shadow-lg"
+            >
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="text-sm font-semibold leading-snug">{m.title || '(no title)'}</div>
               </div>
-              <div className="card-body">{m.body || ''}</div>
-              <div className="card-meta">
-                <span>🕐 {fmtDate(m.createdAt)}</span>
-                <span>🔗 wf: {shortId(m.workflowId)}</span>
-                <span>▶ exec: {shortId(m.workflowInstanceId)}</span>
-                {m.projectId && <span>📁 {shortId(m.projectId)}</span>}
+              <div className="text-[13px] text-text-muted leading-relaxed mt-1.5">{m.body || ''}</div>
+              <div className="flex items-center gap-2.5 flex-wrap mt-2.5 text-[11px] text-text-dim font-mono">
+                <span className="inline-flex items-center gap-1">🕐 {fmtDate(m.createdAt)}</span>
+                <span className="inline-flex items-center gap-1">🔗 wf: {shortId(m.workflowId)}</span>
+                <span className="inline-flex items-center gap-1">▶ exec: {shortId(m.workflowInstanceId)}</span>
+                {m.projectId && <span className="inline-flex items-center gap-1">📁 {shortId(m.projectId)}</span>}
               </div>
               {m.metadata && <PayloadBlock label="Show metadata" data={m.metadata} />}
             </div>
