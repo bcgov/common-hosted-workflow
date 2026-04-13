@@ -16,8 +16,8 @@ concurrency:
 permissions:
   contents: read
   actions: read
-  packages: read
-  security-events: read
+  packages: write
+  security-events: write
 
 jobs:
   build-push-n8n:
