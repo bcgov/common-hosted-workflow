@@ -3,34 +3,34 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag to deploy"
+        description: Image tag to deploy
         required: false
         type: string
-        default: "latest"
+        default: latest
       environment:
-        description: "Deployment environment"
+        description: Deployment environment
         required: true
         type: choice # Defines the input as a dropdown menu
-        default: "dev"
+        default: dev
         options: # List of allowed values
-          - dev
-          - test
-          - prod
+        - dev
+        - test
+        - prod
   workflow_call:
     inputs:
       tag:
-        description: "Image tag to deploy"
+        description: Image tag to deploy
         required: false
         type: string
-        default: "main"
+        default: main
       environment:
-        description: "Deployment environment"
+        description: Deployment environment
         required: true
         type: string
-        default: "dev"
+        default: dev
 jobs:
   deploy-devX:
-    name: "Deploy devX-${{ inputs.environment }}"
+    name: Deploy devX-${{ inputs.environment }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
@@ -64,7 +64,7 @@ jobs:
       working-directory: ./helm/main
 
   deploy-devX-dr:
-    name: "Deploy devX-${{ inputs.environment }}dr"
+    name: Deploy devX-${{ inputs.environment }}dr
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
