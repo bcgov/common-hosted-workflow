@@ -46,8 +46,8 @@ http://localhost:8081/check-form-rendering?form-id=FORM_ID&auth-token=AUTH_TOKEN
 ## Development
 
 ```bash
-npm install
-npm run dev
+npx pnpm install
+npx pnpm run dev
 ```
 
 The app proxies `/rest/*`, `/webhook/*`, and `/webhook-waiting/*` requests to the n8n instance (default `http://localhost:5678`, override with `N8N_TARGET` env var).
