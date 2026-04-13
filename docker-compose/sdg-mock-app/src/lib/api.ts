@@ -36,25 +36,11 @@ export interface ActionRequest {
   updatedAt: string;
 }
 
-export interface AppConfig {
-  baseUrl: string;
-  apiKey: string;
-  tenantId: string;
-  corsProxy: string;
-}
-
 export interface FormConfig {
   webhookUrl: string;
 }
 
 // ── Defaults ──
-
-export const DEFAULT_CONFIG: AppConfig = {
-  baseUrl: '',
-  apiKey: '',
-  tenantId: '',
-  corsProxy: '',
-};
 
 export const DEFAULT_FORM_CONFIG: FormConfig = {
   webhookUrl: '',
@@ -62,22 +48,7 @@ export const DEFAULT_FORM_CONFIG: FormConfig = {
 
 // ── Persistence ──
 
-const CONFIG_KEY = 'sdg_config';
 const FORM_CONFIG_KEY = 'sdg_form_config';
-
-export function loadConfig(): AppConfig {
-  try {
-    const saved = localStorage.getItem(CONFIG_KEY);
-    if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
-  } catch {
-    /* ignore */
-  }
-  return { ...DEFAULT_CONFIG };
-}
-
-export function saveConfig(cfg: AppConfig) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
-}
 
 export function loadFormConfig(): FormConfig {
   try {
@@ -93,19 +64,7 @@ export function saveFormConfig(cfg: FormConfig) {
   localStorage.setItem(FORM_CONFIG_KEY, JSON.stringify(cfg));
 }
 
-// ── API Helpers ──
-
-function apiHeaders(cfg: AppConfig): Record<string, string> {
-  return {
-    'X-N8N-API-KEY': cfg.apiKey,
-    'X-TENANT-ID': cfg.tenantId,
-    'Content-Type': 'application/json',
-  };
-}
-
-function effectiveBase(cfg: AppConfig): string {
-  return cfg.corsProxy || cfg.baseUrl;
-}
+// ── API Helpers (all calls go through /api/wil backend proxy) ──
 
 function buildQueryString(filters: { since?: string; limit?: number }): string {
   const params = new URLSearchParams();
@@ -115,13 +74,9 @@ function buildQueryString(filters: { since?: string; limit?: number }): string {
   return qs ? '?' + qs : '';
 }
 
-export async function apiFetch<T>(
-  cfg: AppConfig,
-  path: string,
-  filters: { since?: string; limit?: number } = {},
-): Promise<T> {
-  const url = effectiveBase(cfg) + path + buildQueryString(filters);
-  const resp = await fetch(url, { headers: apiHeaders(cfg) });
+export async function apiFetch<T>(path: string, filters: { since?: string; limit?: number } = {}): Promise<T> {
+  const url = `/api/wil${path}${buildQueryString(filters)}`;
+  const resp = await fetch(url);
   if (!resp.ok) {
     const body = await resp.text();
     throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
@@ -129,11 +84,11 @@ export async function apiFetch<T>(
   return resp.json();
 }
 
-export async function apiPatch<T>(cfg: AppConfig, path: string, body: unknown): Promise<T> {
-  const url = effectiveBase(cfg) + path;
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const url = `/api/wil${path}`;
   const resp = await fetch(url, {
     method: 'PATCH',
-    headers: apiHeaders(cfg),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
@@ -143,20 +98,16 @@ export async function apiPatch<T>(cfg: AppConfig, path: string, body: unknown): 
   return resp.json();
 }
 
-/** Rewrite a callback URL to go through the proxy / same-origin. */
-export function rewriteUrl(rawUrl: string, cfg: AppConfig): string {
-  try {
-    const parsed = new URL(rawUrl);
-    const base = effectiveBase(cfg);
-    if (base) {
-      const baseParsed = new URL(base);
-      parsed.protocol = baseParsed.protocol;
-      parsed.host = baseParsed.host;
-      return parsed.toString();
-    }
-    return parsed.pathname + parsed.search;
-  } catch {
-    return rawUrl;
+/** Submit an approval/callback through the backend proxy. */
+export async function apiCallback(callbackUrl: string, method: string, body: unknown): Promise<void> {
+  const resp = await fetch('/api/wil/callback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callbackUrl, method, body }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
   }
 }
 

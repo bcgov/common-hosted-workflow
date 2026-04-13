@@ -1,20 +1,18 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import type { AppConfig, FormConfig } from '@/lib/api';
-import { rewriteUrl } from '@/lib/api';
+import type { FormConfig } from '@/lib/api';
 import { useToast } from './Toast';
 import GearIcon from './icons/GearIcon';
 
 interface Props {
-  appConfig: AppConfig;
   formConfig: FormConfig;
   actorId: string;
   onOpenFormSettings: () => void;
   onRefresh: () => void;
 }
 
-export default function FormsPanel({ appConfig, formConfig, actorId, onOpenFormSettings, onRefresh }: Props) {
+export default function FormsPanel({ formConfig, actorId, onOpenFormSettings, onRefresh }: Props) {
   const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState('');
@@ -33,7 +31,17 @@ export default function FormsPanel({ appConfig, formConfig, actorId, onOpenFormS
     }
 
     setSubmitting(true);
-    const url = rewriteUrl(formConfig.webhookUrl, appConfig);
+
+    // The webhook URL is either absolute or relative.
+    // Next.js rewrites /webhook/* to n8n automatically.
+    let url = formConfig.webhookUrl;
+    try {
+      const parsed = new URL(url);
+      // Convert absolute n8n URLs to same-origin paths so the Next.js rewrite handles them
+      url = parsed.pathname + parsed.search;
+    } catch {
+      // already relative — use as-is
+    }
 
     try {
       const resp = await fetch(url, {

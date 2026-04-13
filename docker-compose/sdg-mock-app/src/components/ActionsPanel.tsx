@@ -1,15 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import type { ActionRequest, AppConfig } from '@/lib/api';
-import { shortId, fmtDate, apiPatch, apiFetch } from '@/lib/api';
+import type { ActionRequest } from '@/lib/api';
+import { shortId, fmtDate, apiPatch, apiFetch, apiCallback } from '@/lib/api';
 import { useToast } from './Toast';
 import PayloadBlock from './PayloadBlock';
 
 interface Props {
   actions: ActionRequest[];
   error: string | null;
-  config: AppConfig;
   actorId: string;
   onRefresh: () => void;
 }
@@ -27,7 +26,7 @@ const TAG_CLASSES: Record<string, string> = {
   normal: 'bg-surface-3 text-text-muted',
 };
 
-export default function ActionsPanel({ actions, error, config, actorId, onRefresh }: Props) {
+export default function ActionsPanel({ actions, error, actorId, onRefresh }: Props) {
   const toast = useToast();
 
   return (
@@ -54,9 +53,7 @@ export default function ActionsPanel({ actions, error, config, actorId, onRefres
             <div className="text-xs">Try adjusting the filters or check back later</div>
           </div>
         ) : (
-          actions.map((a) => (
-            <ActionCard key={a.id} action={a} config={config} actorId={actorId} toast={toast} onRefresh={onRefresh} />
-          ))
+          actions.map((a) => <ActionCard key={a.id} action={a} actorId={actorId} toast={toast} onRefresh={onRefresh} />)
         )}
       </div>
     </div>
@@ -67,13 +64,12 @@ export default function ActionsPanel({ actions, error, config, actorId, onRefres
 
 interface ActionCardProps {
   action: ActionRequest;
-  config: AppConfig;
   actorId: string;
   toast: (msg: string, type?: 'success' | 'error') => void;
   onRefresh: () => void;
 }
 
-function ActionCard({ action: a, config, actorId, toast, onRefresh }: ActionCardProps) {
+function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const [patching, setPatching] = useState<string | null>(null);
   const [approvalSent, setApprovalSent] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -89,7 +85,7 @@ function ActionCard({ action: a, config, actorId, toast, onRefresh }: ActionCard
   const handlePatch = async (newStatus: string) => {
     setPatching(newStatus);
     try {
-      await apiPatch(config, `/rest/custom/v1/actors/${encodeURIComponent(actorId)}/actions/${a.id}`, {
+      await apiPatch(`/actors/${encodeURIComponent(actorId)}/actions/${a.id}`, {
         status: newStatus,
       });
       toast(`Action → ${newStatus}`, 'success');
@@ -104,47 +100,18 @@ function ActionCard({ action: a, config, actorId, toast, onRefresh }: ActionCard
   const handleApproval = async (option: string) => {
     setSelectedOption(option);
     try {
-      const basePath = `/rest/custom/v1/actors/${encodeURIComponent(actorId)}`;
-      const actionsData = await apiFetch<ActionRequest[] | { items: ActionRequest[] }>(config, `${basePath}/actions`);
+      // Re-fetch to get the latest callbackUrl
+      const basePath = `/actors/${encodeURIComponent(actorId)}`;
+      const actionsData = await apiFetch<ActionRequest[] | { items: ActionRequest[] }>(`${basePath}/actions`);
       const items = Array.isArray(actionsData) ? actionsData : actionsData.items || [];
       const action = items.find((x) => x.id === a.id);
       if (!action?.callbackUrl) throw new Error('Callback URL not found for this action');
 
       const method = (action.callbackMethod || 'POST').toUpperCase();
 
-      let cbUrl = action.callbackUrl;
-      if (!config.corsProxy && !config.baseUrl) {
-        try {
-          const parsed = new URL(cbUrl);
-          cbUrl = parsed.pathname + parsed.search;
-        } catch {
-          /* keep original */
-        }
-      } else if (config.corsProxy) {
-        try {
-          const parsed = new URL(cbUrl);
-          const proxyParsed = new URL(config.corsProxy);
-          parsed.protocol = proxyParsed.protocol;
-          parsed.host = proxyParsed.host;
-          cbUrl = parsed.toString();
-        } catch {
-          /* keep original */
-        }
-      }
+      // Send through the backend callback proxy
+      await apiCallback(action.callbackUrl, method, { option });
 
-      const resp = await fetch(cbUrl, {
-        method,
-        headers: {
-          'X-N8N-API-KEY': config.apiKey,
-          'X-TENANT-ID': config.tenantId,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ option }),
-      });
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`${resp.status}: ${text}`);
-      }
       setApprovalSent(true);
       toast(`Approval "${option}" submitted`, 'success');
       setTimeout(onRefresh, 1500);
