@@ -77,7 +77,7 @@ services:
       context: ./adaptivecard
       dockerfile: Dockerfile
     ports:
-      - '3000:3000'
+      - '8421:8421'
     environment:
       - NODE_ENV=production
     depends_on:

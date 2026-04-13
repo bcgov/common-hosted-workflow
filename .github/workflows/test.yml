@@ -23,7 +23,23 @@ jobs:
     - name: Setup NPM Packages
       uses: ./.github/actions/setup-npm
 
-    - name: Run unit tests on custom nodes
+    - name: Test community nodes build & test
       run: |
+        pnpm build
         pnpm test
       working-directory: ./community-nodes
+      shell: bash
+
+    - name: Test adaptivecard sample app build & lint
+      run: |
+        pnpm build
+        pnpm lint
+      working-directory: ./docker-compose/adaptivecard
+      shell: bash
+
+    - name: Test sdg-mock-app sample app build & lint
+      run: |
+        pnpm build
+        pnpm lint
+      working-directory: ./docker-compose/sdg-mock-app
+      shell: bash
