@@ -22,3 +22,15 @@ runs:
         pnpm install
       working-directory: ./community-nodes
       shell: bash
+
+    - name: Install adaptivecard sample app NPM packages
+      run: |
+        pnpm install
+      working-directory: ./docker-compose/adaptivecard
+      shell: bash
+
+    - name: Install sdg-mock-app sample app NPM packages
+      run: |
+        pnpm install
+      working-directory: ./docker-compose/sdg-mock-app
+      shell: bash

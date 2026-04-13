@@ -1,22 +1,22 @@
 FROM node:24-alpine AS base
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
+
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm i --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED=1
-
 ARG N8N_TARGET=http://n8n:5678
 ENV N8N_TARGET=${N8N_TARGET}
-
-RUN npm run build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN pnpm run build
 
 FROM base AS runner
 WORKDIR /app

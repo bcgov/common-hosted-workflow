@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as AdaptiveCards from 'adaptivecards';
 import markdownit from 'markdown-it';
 
 export default function Home() {
   const [cards, setCards] = useState([]);
 
-  const fetchCards = async () => {
+  const fetchCards = useCallback(async () => {
     try {
       const res = await fetch('/api/cards');
       const data = await res.json();
@@ -15,7 +15,7 @@ export default function Home() {
     } catch (err) {
       console.error('Failed to fetch cards', err);
     }
-  };
+  }, []);
 
   const clearCards = async () => {
     try {
@@ -30,9 +30,10 @@ export default function Home() {
 
   useEffect(() => {
     fetchCards();
+
     const interval = setInterval(fetchCards, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchCards]);
 
   return (
     <div className="min-h-screen bg-[#1A1A1A] py-10 px-4 sm:px-6 lg:px-8 text-slate-200">
