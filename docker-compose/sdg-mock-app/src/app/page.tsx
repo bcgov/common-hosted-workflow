@@ -1,12 +1,10 @@
 'use client';
 
 import { ToastProvider } from '@/components/Toast';
-import SettingsModal from '@/components/SettingsModal';
 import FormSettingsModal from '@/components/FormSettingsModal';
 import FormsPanel from '@/components/FormsPanel';
 import MessagesPanel from '@/components/MessagesPanel';
 import ActionsPanel from '@/components/ActionsPanel';
-import GearIcon from '@/components/icons/GearIcon';
 import { useDashboard } from '@/hooks/useDashboard';
 
 export default function Page() {
@@ -19,10 +17,7 @@ export default function Page() {
 
 function Dashboard() {
   const {
-    config,
     formCfg,
-    settingsOpen,
-    setSettingsOpen,
     formSettingsOpen,
     setFormSettingsOpen,
     loading,
@@ -37,15 +32,11 @@ function Dashboard() {
     msgError,
     actions,
     actError,
-    connMode,
-    isConnected,
-    hasError,
     refresh,
-    handleSaveSettings,
     handleSaveFormSettings,
   } = useDashboard();
 
-  if (!config || !formCfg) return null;
+  if (!formCfg) return null;
 
   return (
     <>
@@ -63,23 +54,12 @@ function Dashboard() {
         <div className="flex items-center gap-2.5">
           <div
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-              hasError
-                ? 'bg-red-soft text-red-400'
-                : isConnected
-                  ? 'bg-green-soft text-emerald-400'
-                  : 'bg-surface-3 text-text-muted'
+              msgError || actError ? 'bg-red-soft text-red-400' : 'bg-green-soft text-emerald-400'
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current" />
-            <span>{hasError ? 'Error' : isConnected ? `Connected (${connMode})` : 'Not configured'}</span>
+            <span>{msgError || actError ? 'Error' : 'Connected'}</span>
           </div>
-          <button
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-border bg-surface-2 text-text text-[13px] font-medium cursor-pointer whitespace-nowrap hover:border-border-hover hover:bg-surface-3 transition-all duration-150"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <GearIcon />
-            Settings
-          </button>
           <button
             className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-accent bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap hover:bg-[#3d7ae8] transition-all duration-150 ${loading ? 'opacity-60 pointer-events-none' : ''}`}
             onClick={refresh}
@@ -141,23 +121,16 @@ function Dashboard() {
       {/* ── Main Grid ── */}
       <div className="grid grid-cols-[300px_1fr_1fr] max-lg:grid-cols-2 max-sm:grid-cols-1 min-h-[calc(100vh-110px)]">
         <FormsPanel
-          appConfig={config}
           formConfig={formCfg}
           actorId={actorId.trim()}
           onOpenFormSettings={() => setFormSettingsOpen(true)}
           onRefresh={refresh}
         />
         <MessagesPanel messages={messages} error={msgError} />
-        <ActionsPanel actions={actions} error={actError} config={config} actorId={actorId.trim()} onRefresh={refresh} />
+        <ActionsPanel actions={actions} error={actError} actorId={actorId.trim()} onRefresh={refresh} />
       </div>
 
       {/* ── Modals ── */}
-      <SettingsModal
-        open={settingsOpen}
-        config={config}
-        onSave={handleSaveSettings}
-        onClose={() => setSettingsOpen(false)}
-      />
       <FormSettingsModal
         open={formSettingsOpen}
         config={formCfg}

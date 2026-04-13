@@ -65,7 +65,10 @@ services:
     ports:
     - 8081:8081
     environment:
-    - NODE_ENV=production
+      NODE_ENV: production
+      N8N_TARGET: http://n8n:5678
+      X_N8N_API_KEY: ${X_N8N_API_KEY}
+      X_TENANT_ID: ${X_TENANT_ID}
     depends_on:
       n8n:
         condition: service_started
@@ -79,7 +82,7 @@ services:
     ports:
     - 8421:8421
     environment:
-    - NODE_ENV=production
+      NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
