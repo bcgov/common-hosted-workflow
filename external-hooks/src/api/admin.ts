@@ -1,5 +1,4 @@
 import { Request, Response, Router } from 'express';
-import { LOG_PREFIX } from './constants/logging';
 import { tenantUuidRegex } from './constants/regex';
 import {
   associateWorkflowResponseSchema,
@@ -13,6 +12,9 @@ import {
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
 import { AppError, wrapAsyncRoute } from './utils/errors';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from './utils/validation';
+import { createLogger } from './utils/logger';
+
+const log = createLogger('CustomAPIs');
 
 export function createAdminRouter({
   adminAuthMiddleware,
@@ -37,7 +39,7 @@ export function createAdminRouter({
 
       const foundUser = await user.findOneBy({ email });
       if (!foundUser) {
-        console.warn(`${LOG_PREFIX} [404] Target user not found: ${email}`);
+        log.warn('Target user not found', { statusCode: 404, email });
         throw new AppError(404, 'Target user does not exist.');
       }
 
@@ -64,12 +66,12 @@ export function createAdminRouter({
       ]);
 
       if (!wf) {
-        console.warn(`${LOG_PREFIX} [404] Workflow move failed: Workflow ${workflowId} not found.`);
+        log.warn('Workflow move failed: workflow not found', { statusCode: 404, workflowId });
         throw new AppError(404, 'Workflow not found.');
       }
 
       if (!proj) {
-        console.warn(`${LOG_PREFIX} [404] Workflow move failed: Project ${projectId} not found.`);
+        log.warn('Workflow move failed: project not found', { statusCode: 404, projectId });
         throw new AppError(404, 'Project not found.');
       }
 
@@ -101,7 +103,7 @@ export function createAdminRouter({
 
       const proj = await project.findOneBy({ id: projectId });
       if (!proj) {
-        console.warn(`${LOG_PREFIX} [404] tenant_project_relation insert failed: Project ${projectId} not found.`);
+        log.warn('Tenant-project relation insert failed: project not found', { statusCode: 404, projectId });
         throw new AppError(404, 'Project not found.');
       }
 

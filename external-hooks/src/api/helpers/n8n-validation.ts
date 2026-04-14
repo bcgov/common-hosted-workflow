@@ -4,8 +4,10 @@
  */
 
 import type { Response } from 'express';
-import { LOG_PREFIX } from '../constants/logging';
 import { AppError } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('CustomAPIs');
 
 /** Subset of n8n `ExecutionRepository` used to resolve `workflowInstanceId` (execution id). */
 export type N8nExecutionLookup = {
@@ -140,7 +142,11 @@ export function requireChwfAllowedProjectIds(
 ): string[] {
   const allowed = res.locals.chwfAllowedProjectIds;
   if (!allowed?.length) {
-    console.warn(LOG_PREFIX, `[${logDomain}] ${routeLabel} 403 missing tenant/user scoped projects`);
+    log.warn('Missing tenant/user scoped projects', {
+      domain: logDomain,
+      route: routeLabel,
+      statusCode: 403,
+    });
     throw new AppError(403, 'Missing tenant project scope');
   }
   return allowed;

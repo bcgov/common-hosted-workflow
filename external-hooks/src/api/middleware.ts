@@ -1,5 +1,4 @@
 import { AUTHORIZATION_HEADER, N8N_API_KEY_HEADER, X_TENANT_ID_HEADER } from './constants/headers';
-import { LOG_PREFIX } from './constants/logging';
 import { workflowInteractionInternalPostPathPattern } from './constants/route-patterns';
 import { tenantUuidRegex } from './constants/regex';
 import { extractBearerToken } from './helpers/bearer';
@@ -8,6 +7,9 @@ import { shortenIdForLog } from './utils/string';
 import type { AuthMiddlewareConfig, AuthRequest, AuthResponse, ExpressNext } from './types/auth';
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
 import { AppError } from './utils/errors';
+import { createLogger } from './utils/logger';
+
+const log = createLogger('CustomAPIs');
 
 /** Runs a middleware and completes when it calls `next()` or `next(err)`. */
 function runMiddleware(
@@ -35,21 +37,21 @@ export function createAuthMiddleware(config: AuthMiddlewareConfig) {
       const token = req.header(N8N_API_KEY_HEADER);
 
       if (!token) {
-        console.warn(LOG_PREFIX, `[401] Access denied: No API key provided.`);
+        log.warn('Access denied: No API key provided', { statusCode: 401 });
         return next(new AppError(401, 'No API key provided'));
       }
 
       const caller = await apiKeyService.getUserForApiKey(token);
 
       if (!caller || caller.disabled) {
-        console.warn(LOG_PREFIX, `[apiKeyAuth] rejecting: missing caller or disabled`);
+        log.warn('Rejecting: missing caller or disabled', { handler: 'apiKeyAuth' });
         return next(new AppError(401, 'Invalid API key'));
       }
       res.locals.caller = caller;
       next();
     } catch (error) {
-      console.warn(LOG_PREFIX, `[401] Invalid API key: ${(error as Error).message}`);
-      console.debug(`${LOG_PREFIX} [apiKeyAuth] stack`, (error as Error).stack);
+      log.warn('Invalid API key', { statusCode: 401, error: (error as Error).message });
+      log.debug('apiKeyAuth stack trace', { stack: (error as Error).stack });
       return next(new AppError(401, 'Invalid API key'));
     }
   };
@@ -63,7 +65,7 @@ export function createAuthMiddleware(config: AuthMiddlewareConfig) {
     }
 
     if (!res.locals.caller) {
-      console.warn(LOG_PREFIX, `[adminAuth] no caller after apiKeyAuth — stopping (401 path)`);
+      log.warn('No caller after apiKeyAuth — stopping', { handler: 'adminAuth', statusCode: 401 });
       return next(new AppError(401, 'Invalid API key'));
     }
 
@@ -72,7 +74,10 @@ export function createAuthMiddleware(config: AuthMiddlewareConfig) {
     const isGlobalAdmin = slug !== undefined && allowed.includes(slug);
 
     if (!isGlobalAdmin) {
-      console.warn(LOG_PREFIX, `[403] Forbidden: ${res.locals.caller.email} lacks Admin/Owner privileges.`);
+      log.warn('Forbidden: caller lacks Admin/Owner privileges', {
+        statusCode: 403,
+        email: res.locals.caller.email,
+      });
       return next(new AppError(403, 'Global admin access required.'));
     }
 
@@ -105,7 +110,7 @@ export function createWorkflowInteractionTenantMiddleware(config: {
     const tenantProjectIds = await tenantProjectRelationRepository.getProjectIdsByTenantId(tenantId);
 
     if (tenantProjectIds.length === 0) {
-      console.warn(LOG_PREFIX, `[workflowInteractionTenant] 403 no projects for tenant`);
+      log.warn('No projects for tenant', { handler: 'workflowInteractionTenant', statusCode: 403 });
       return next(new AppError(403, 'No projects linked to this tenant'));
     }
 
@@ -119,10 +124,10 @@ export function createWorkflowInteractionTenantMiddleware(config: {
     const allowed = tenantProjectIds.filter((id) => userSet.has(id));
 
     if (allowed.length === 0) {
-      console.warn(
-        LOG_PREFIX,
-        `[workflowInteractionTenant] 403 intersection empty (tenant has projects but caller cannot access any)`,
-      );
+      log.warn('Intersection empty: tenant has projects but caller cannot access any', {
+        handler: 'workflowInteractionTenant',
+        statusCode: 403,
+      });
       return next(new AppError(403, 'User has no access to any project for this tenant'));
     }
 
@@ -150,25 +155,37 @@ export function createWorkflowInteractionTenantMiddleware(config: {
 
     if (isPostCreateInternalOnly) {
       if (!internalAuthToken) {
-        console.warn(LOG_PREFIX, `[workflowInteractionTenant] 500 INTERNAL_AUTH_TOKEN missing`);
+        log.warn('INTERNAL_AUTH_TOKEN not configured', {
+          handler: 'workflowInteractionTenant',
+          statusCode: 500,
+        });
         return next(new AppError(500, 'INTERNAL_AUTH_TOKEN not configured'));
       }
       if (!isInternalCall) {
-        console.warn(LOG_PREFIX, `[messageTenant] 401 POST internal auth failed bearerPresent=${Boolean(bearerToken)}`);
+        log.warn('POST internal auth failed', {
+          handler: 'messageTenant',
+          statusCode: 401,
+          bearerPresent: Boolean(bearerToken),
+        });
         return next(new AppError(401, 'Unauthorized'));
       }
     }
 
     const tenantId = req.header(X_TENANT_ID_HEADER)?.trim();
     if (!tenantId) {
-      console.warn(
-        LOG_PREFIX,
-        `[workflowInteractionTenant] 400 missing ${X_TENANT_ID_HEADER}; expectedHeader=${X_TENANT_ID_HEADER}`,
-      );
+      log.warn('Missing tenant ID header', {
+        handler: 'workflowInteractionTenant',
+        statusCode: 400,
+        expectedHeader: X_TENANT_ID_HEADER,
+      });
       return next(new AppError(400, `Missing ${X_TENANT_ID_HEADER} header`));
     }
     if (!tenantUuidRegex.test(tenantId)) {
-      console.warn(LOG_PREFIX, `[messageTenant] 400 invalid tenant UUID preview=${shortenIdForLog(tenantId)}`);
+      log.warn('Invalid tenant UUID', {
+        handler: 'messageTenant',
+        statusCode: 400,
+        tenantIdPreview: shortenIdForLog(tenantId),
+      });
       return next(new AppError(400, `Invalid ${X_TENANT_ID_HEADER} (expected UUID)`));
     }
 
@@ -179,7 +196,12 @@ export function createWorkflowInteractionTenantMiddleware(config: {
     try {
       await handleTenantScopedAccess(res, next, tenantId, res.locals.caller.id);
     } catch (error) {
-      console.error(LOG_PREFIX, `[workflowInteractionTenant] 500 ${(error as Error).message}`, (error as Error).stack);
+      log.error('Workflow interaction tenant error', {
+        handler: 'workflowInteractionTenant',
+        statusCode: 500,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+      });
       return next(error instanceof AppError ? error : new AppError(500, 'Internal Server Error'));
     }
   };
