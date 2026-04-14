@@ -23,6 +23,9 @@ import https from 'https';
 import http from 'http';
 import crypto from 'crypto';
 import { URL, URLSearchParams } from 'url';
+import { createLogger, logRequest, logResponse, logError } from './api/utils/logger';
+
+const log = createLogger('OIDCHook');
 
 // Configuration from environment
 const config = {
@@ -83,10 +86,17 @@ function makeRequest(
       headers,
     };
 
+    logRequest(log, { method, url, headers });
+    const startTime = Date.now();
+
     const req = protocol.request(reqOptions, (res) => {
       let b = '';
       res.on('data', (chunk) => (b += chunk));
       res.on('end', () => {
+        logResponse(log, {
+          statusCode: res.statusCode,
+          durationMs: Date.now() - startTime,
+        });
         resolve({
           statusCode: res.statusCode,
           headers: res.headers,
@@ -95,7 +105,10 @@ function makeRequest(
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (err) => {
+      logError(log, err, { context: 'makeRequest', url, method });
+      reject(err);
+    });
 
     if (body) {
       req.write(body);
@@ -206,7 +219,7 @@ async function exchangeCodeForTokens(code, discovery) {
   });
 
   if (response.statusCode !== 200) {
-    console.error('Token exchange failed:', response.body);
+    log.error('Token exchange failed', { statusCode: response.statusCode });
     throw new Error(`Token exchange failed: ${response.statusCode}`);
   }
 
@@ -227,7 +240,7 @@ async function fetchUserInfo(accessToken, discovery) {
   });
 
   if (response.statusCode !== 200) {
-    console.error('UserInfo fetch failed:', response.body);
+    log.error('UserInfo fetch failed', { statusCode: response.statusCode });
     throw new Error(`UserInfo fetch failed: ${response.statusCode}`);
   }
 
@@ -352,11 +365,11 @@ const hookConfig = {
       async function (server, n8nConfig) {
         const missing = validateConfig();
         if (missing.length > 0) {
-          console.warn(`[OIDC Hook] Missing configuration: ${missing.join(', ')}. OIDC disabled.`);
+          log.warn('Missing configuration — OIDC disabled', { missing: missing.join(', ') });
           return;
         }
 
-        console.log('[OIDC Hook] Initializing OIDC authentication...');
+        log.info('Initializing OIDC authentication...');
 
         // Get n8n's JwtService from the DI container
         const { Container } = require(N8N_DI_PATH);
@@ -411,7 +424,7 @@ const hookConfig = {
 
             res.redirect(authUrl.toString());
           } catch (error) {
-            console.error('[OIDC Hook] Login error:', error);
+            logError(log, error, { context: 'OIDC login' });
             res.status(500).send('OIDC configuration error. Please check the logs.');
           }
         });
@@ -425,7 +438,7 @@ const hookConfig = {
 
             // Handle OIDC errors
             if (error) {
-              console.error('[OIDC Hook] OIDC error:', error, error_description);
+              log.error('OIDC error from provider', { error, errorDescription: error_description });
               return res.redirect('/signin?error=' + encodeURIComponent(error_description || error));
             }
 
@@ -521,7 +534,7 @@ const hookConfig = {
               const result = await User.createUserWithProject(userData);
               user = result.user;
 
-              console.log(`[OIDC Hook] Created ${role} user with personal project: ${userInfo.email}`);
+              log.info('Created user with personal project', { role, email: userInfo.email });
             }
 
             if (!user) {
@@ -530,7 +543,11 @@ const hookConfig = {
 
             if (jwtRole && user.role.slug !== jwtRole) {
               await userService.changeUserRole(user, { newRoleName: jwtRole });
-              console.log(`[OIDC Hook] User role updated from ${user.role.slug} to ${jwtRole}: ${userInfo.email}`);
+              log.info('User role updated', {
+                previousRole: user.role.slug,
+                newRole: jwtRole,
+                email: userInfo.email,
+              });
             }
 
             // Create auth token using n8n's JwtService
@@ -542,7 +559,7 @@ const hookConfig = {
             // Redirect to home
             res.redirect('/');
           } catch (error) {
-            console.error('[OIDC Hook] Callback error:', error);
+            logError(log, error, { context: 'OIDC callback' });
             res.redirect('/signin?error=' + encodeURIComponent('Authentication failed: ' + error.message));
           }
         });
@@ -562,10 +579,9 @@ const hookConfig = {
           res.send(getFrontendScript());
         });
 
-        console.log('[OIDC Hook] OIDC routes registered:');
-        console.log('  - GET /rest/auth/oidc/login');
-        console.log('  - GET /rest/auth/oidc/callback');
-        console.log('  - GET /assets/oidc-frontend-hook.js');
+        log.info('OIDC routes registered', {
+          routes: ['GET /rest/auth/oidc/login', 'GET /rest/auth/oidc/callback', 'GET /assets/oidc-frontend-hook.js'],
+        });
       },
     ],
   },
@@ -598,7 +614,7 @@ const hookConfig = {
         frontendSettings.enterprise = frontendSettings.enterprise || {};
         frontendSettings.enterprise.oidc = true;
 
-        console.log('[OIDC Hook] Frontend settings configured for OIDC');
+        log.info('Frontend settings configured for OIDC');
       },
     ],
   },

@@ -1,7 +1,9 @@
 import type { Application } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import * as swaggerDocument from './openapi.json';
-import { LOG_PREFIX } from './constants/logging';
+import { createLogger } from './utils/logger';
+
+const log = createLogger('CustomAPIs');
 
 /** Base path for Swagger UI and the downloadable OpenAPI document. */
 export const SWAGGER_UI_MOUNT_PATH = '/rest/custom/docs';
@@ -21,8 +23,8 @@ export function isSwaggerUiEnabled(): boolean {
 
 export function mountSwaggerUi(app: Application): void {
   if (!isSwaggerUiEnabled()) {
-    console.info(
-      `${LOG_PREFIX} Swagger UI not mounted: n8n usually runs with NODE_ENV=production; set ENABLE_SWAGGER_UI=true to enable (or ENABLE_SWAGGER_UI=false to keep off).`,
+    log.info(
+      'Swagger UI not mounted: n8n usually runs with NODE_ENV=production; set ENABLE_SWAGGER_UI=true to enable (or ENABLE_SWAGGER_UI=false to keep off).',
     );
     return;
   }
@@ -48,5 +50,5 @@ export function mountSwaggerUi(app: Application): void {
     }),
   );
 
-  console.info(`${LOG_PREFIX} Swagger UI: ${SWAGGER_UI_MOUNT_PATH} (OpenAPI: ${jsonPath})`);
+  log.info('Swagger UI mounted', { path: SWAGGER_UI_MOUNT_PATH, openapi: jsonPath });
 }

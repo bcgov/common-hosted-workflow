@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { LOG_PREFIX } from '../constants/logging';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import {
   requireChwfAllowedProjectIds,
@@ -21,6 +20,9 @@ import {
 } from '../schemas/message';
 import type { CustomRepositories, N8nRepositories } from '../types/repositories';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('CustomAPIs');
 
 /** Factory for the messages `Router` (caller supplies middleware and repos from `route.ts`). */
 export function createMessageRouter({
@@ -136,7 +138,7 @@ export function createMessageRouter({
       } catch (error) {
         if (error instanceof AppError) throw error;
         const dbDetail = formatDbErrorForLog(error);
-        console.error(`${LOG_PREFIX} [500] Create message resolution error:`, dbDetail, error);
+        log.error('Create message resolution error', { statusCode: 500, dbDetail, error: String(error) });
         throw new AppError(500, 'Internal Server Error');
       }
 
@@ -156,11 +158,13 @@ export function createMessageRouter({
         res.status(201).json(payload);
       } catch (error) {
         const dbDetail = formatDbErrorForLog(error);
-        console.error(
-          `${LOG_PREFIX} [500] Create message error: projectId=${shortenIdForLog(projectId)} workflowId=${shortenIdForLog(workflowId)}`,
+        log.error('Create message error', {
+          statusCode: 500,
+          projectId: shortenIdForLog(projectId),
+          workflowId: shortenIdForLog(workflowId),
           dbDetail,
-          error,
-        );
+          error: String(error),
+        });
         throw new AppError(500, 'Internal Server Error');
       }
     }),

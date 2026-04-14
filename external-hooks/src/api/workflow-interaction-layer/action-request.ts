@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { LOG_PREFIX } from '../constants/logging';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
@@ -26,6 +25,9 @@ import {
 } from '../schemas/action-request';
 import type { CustomRepositories, N8nRepositories } from '../types/repositories';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('CustomAPIs');
 
 /** Factory for the action-requests `Router`. */
 export function createActionRequestRouter({
@@ -80,7 +82,7 @@ export function createActionRequestRouter({
       } catch (error) {
         if (error instanceof AppError) throw error;
         const dbDetail = formatDbErrorForLog(error);
-        console.error(`${LOG_PREFIX} [500] Create action resolution error:`, dbDetail, error);
+        log.error('Create action resolution error', { statusCode: 500, dbDetail, error: String(error) });
         throw new AppError(500, 'Internal Server Error');
       }
 
@@ -109,11 +111,13 @@ export function createActionRequestRouter({
         res.status(201).json(payload);
       } catch (error) {
         const dbDetail = formatDbErrorForLog(error);
-        console.error(
-          `${LOG_PREFIX} [500] Create action error: projectId=${shortenIdForLog(projectId)} workflowId=${shortenIdForLog(body.workflowId)}`,
+        log.error('Create action error', {
+          statusCode: 500,
+          projectId: shortenIdForLog(projectId),
+          workflowId: shortenIdForLog(body.workflowId),
           dbDetail,
-          error,
-        );
+          error: String(error),
+        });
         throw new AppError(500, 'Internal Server Error');
       }
     }),
