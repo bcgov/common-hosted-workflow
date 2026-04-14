@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import chefsConfig from '../../../chefs-config.json';
+import { loadChefsConfig } from '@/lib/chefs-config';
 
 /**
  * GET /api/chefs/actors/{actorId}/forms
@@ -10,6 +10,7 @@ import chefsConfig from '../../../chefs-config.json';
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ actorId: string }> }) {
   const { actorId } = await params;
 
+  const chefsConfig = loadChefsConfig();
   const forms = chefsConfig.forms
     .filter((f) => f.allowedActors.includes('*') || f.allowedActors.includes(actorId))
     .map(({ formId, formName }) => ({ formId, formName }));

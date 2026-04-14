@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import chefsConfig from '../chefs-config.json';
+import { loadChefsConfig } from '@/lib/chefs-config';
 
 /**
  * POST /api/chefs/submissions
  *
- * Receives { formId, submission } from the frontend after a CHEFS form is
- * submitted. If the form has a callbackWebhookUrl configured, forwards the
- * submission data to that webhook (typically an n8n webhook endpoint).
+ * Receives { formId, submission, actorId } from the frontend after a CHEFS
+ * form is submitted. If the form has a callbackWebhookUrl configured,
+ * forwards the submission data to that webhook (typically an n8n endpoint).
  */
 export async function POST(request: NextRequest) {
   const { formId, submission, actorId } = await request.json();
@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'formId is required' }, { status: 400 });
   }
 
+  const chefsConfig = loadChefsConfig();
   const entry = chefsConfig.forms.find((f) => f.formId === formId);
   if (!entry) {
     return NextResponse.json({ error: 'Form not found in configuration' }, { status: 404 });

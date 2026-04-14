@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import chefsConfig from '../chefs-config.json';
+import { loadChefsConfig } from '@/lib/chefs-config';
 import { wilGet } from '@/lib/wil-proxy';
 
 const CHEFS_BASE_URL = process.env.CHEFS_BASE_URL || 'https://submit.digital.gov.bc.ca/app';
@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     }
   } else {
     // ── Mode 1: Get apiKey from chefs-config.json ──
+    const chefsConfig = loadChefsConfig();
     const entry = chefsConfig.forms.find((f) => f.formId === formId);
     if (!entry) {
       return NextResponse.json({ error: 'Form not found in configuration' }, { status: 404 });
