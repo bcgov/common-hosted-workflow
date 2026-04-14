@@ -13,7 +13,7 @@ export function ChefsFormViewer({
   readOnly = false,
   language = 'en',
   isolateStyles = false,
-  baseUrl = 'https://submit.digital.gov.bc.ca/app',
+  baseUrl = process.env.NEXT_PUBLIC_CHEFS_BASE_URL || 'https://submit.digital.gov.bc.ca/app',
   onFormReady,
   onSubmissionComplete,
   onSubmissionError,
@@ -60,6 +60,15 @@ export function ChefsFormViewer({
           width: 100% !important;
           margin: 0 !important;
           padding: 0 !important;
+        }
+        label.col-form-label,
+        label.control-label,
+        label.form-check-label,
+        .formio-component label,
+        .form-group > label {
+          color: #1a1a1a !important;
+          font-weight: 600 !important;
+          font-size: 14px !important;
         }
       `;
       shadowRoot.prepend(styleEl);

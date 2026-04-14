@@ -1,0 +1,11 @@
+{
+  "forms": [
+    {
+      "formId": "YOUR_CHEFS_FORM_ID",
+      "formName": "My Example Form",
+      "apiKey": "",
+      "allowedActors": ["*"],
+      "callbackWebhookUrl": ""
+    }
+  ]
+}

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { ActionRequest } from '@/lib/api';
-import { shortId, fmtDate, apiPatch, apiFetch, apiCallback } from '@/lib/api';
+import { shortId, fmtDate, apiPatch, apiFetch, apiCallback, fetchChefsToken } from '@/lib/api';
 import { useToast } from './Toast';
 import PayloadBlock from './PayloadBlock';
+import ChefsFormModal from './ChefsFormModal';
 
 interface Props {
   actions: ActionRequest[];
@@ -74,6 +75,12 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const [approvalSent, setApprovalSent] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
+  // ── showform state ──
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [formToken, setFormToken] = useState<string | null>(null);
+  const [formName, setFormName] = useState<string | null>(null);
+  const [formTokenLoading, setFormTokenLoading] = useState(false);
+
   const isPatchable = ['pending', 'in_progress'].includes(a.status);
   const isApproval =
     a.actionType === 'getapproval' &&
@@ -81,6 +88,67 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
     a.payload &&
     Array.isArray(a.payload.option) &&
     !!a.callbackUrl;
+
+  // Resolve formId from payload — handle both casings (formId / FormID)
+  const showFormId =
+    a.actionType === 'showform' ? ((a.payload?.formId ?? a.payload?.FormID) as string | undefined) : undefined;
+
+  // Resolve formName from payload
+  const payloadFormName =
+    a.actionType === 'showform' ? ((a.payload?.FormName ?? a.payload?.formName) as string | undefined) : undefined;
+
+  const isShowForm = a.actionType === 'showform' && ['pending', 'in_progress'].includes(a.status) && !!showFormId;
+
+  const handleOpenForm = useCallback(async () => {
+    if (!showFormId) return;
+    setFormTokenLoading(true);
+    try {
+      const { authToken, formName: name } = await fetchChefsToken(showFormId, a.id);
+      setFormToken(authToken);
+      setFormName(name);
+      setFormModalOpen(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setFormTokenLoading(false);
+    }
+  }, [showFormId, a.id, toast]);
+
+  const handleFormSubmitted = useCallback(
+    async (detail: unknown) => {
+      try {
+        // Re-fetch to get the latest callbackUrl
+        const basePath = `/actors/${encodeURIComponent(actorId)}`;
+        const actionsData = await apiFetch<ActionRequest[] | { items: ActionRequest[] }>(`${basePath}/actions`);
+        const items = Array.isArray(actionsData) ? actionsData : actionsData.items || [];
+        const action = items.find((x) => x.id === a.id);
+
+        if (action?.callbackUrl) {
+          const method = (action.callbackMethod || 'POST').toUpperCase();
+          const submission = (detail as { submission?: unknown })?.submission ?? detail;
+          await apiCallback(action.callbackUrl, method, {
+            formId: showFormId,
+            actorId,
+            submission,
+          });
+        }
+
+        // Mark action as completed
+        await apiPatch(`/actors/${encodeURIComponent(actorId)}/actions/${a.id}`, {
+          status: 'completed',
+        });
+
+        toast('Form submitted & action completed', 'success');
+        setTimeout(onRefresh, 1500);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : String(err), 'error');
+      }
+      setFormModalOpen(false);
+      setFormToken(null);
+      setFormName(null);
+    },
+    [a.id, showFormId, actorId, toast, onRefresh],
+  );
 
   const handlePatch = async (newStatus: string) => {
     setPatching(newStatus);
@@ -127,7 +195,15 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
         {a.actionType || 'unknown'}
       </span>
       <div className="flex items-start justify-between gap-2.5">
-        <div className="text-sm font-semibold leading-snug">Action {shortId(a.id)}</div>
+        <div className="text-sm font-semibold leading-snug">
+          {isShowForm && payloadFormName ? (
+            <>
+              Action: Please fill the <span className="text-accent">{payloadFormName}</span>
+            </>
+          ) : (
+            <>Action {shortId(a.id)}</>
+          )}
+        </div>
         <div className="flex gap-1.5 items-center">
           {a.priority === 'critical' && (
             <span
@@ -179,13 +255,31 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
           </div>
           {approvalSent && <div className="mt-2 text-[11px] text-emerald-400 font-semibold">✓ Response submitted</div>}
         </div>
+      ) : isShowForm ? (
+        <div className="mt-2.5 p-3.5 bg-surface-2 border border-border rounded-lg">
+          <div className="text-sm text-text mb-2 leading-snug">
+            Form: <span className="font-mono text-accent">{showFormId}</span>
+            {(a.payload.formVersion ?? a.payload.FormVersion) ? (
+              <span className="text-text-dim ml-2 text-[11px]">
+                v{String(a.payload.formVersion ?? a.payload.FormVersion)}
+              </span>
+            ) : null}
+          </div>
+          <button
+            onClick={handleOpenForm}
+            disabled={formTokenLoading}
+            className="w-full py-2 rounded-md border-none bg-accent text-white text-sm font-semibold cursor-pointer hover:bg-[#3d7ae8] transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {formTokenLoading ? 'Loading…' : '📝 Fill Form'}
+          </button>
+        </div>
       ) : a.payload ? (
         <PayloadBlock label="Show payload" data={a.payload} />
       ) : null}
 
       {a.callbackPayloadSpec && <PayloadBlock label="Show callback spec" data={a.callbackPayloadSpec} />}
 
-      {isPatchable && !isApproval && (
+      {isPatchable && !isApproval && !isShowForm && (
         <div className="flex gap-1.5 mt-2.5 flex-wrap">
           <button
             className="px-2.5 py-1 rounded-md border border-emerald-400 bg-surface-2 text-emerald-400 text-[11px] font-semibold uppercase tracking-wide cursor-pointer hover:border-accent hover:text-accent transition-all duration-150 disabled:opacity-50"
@@ -209,6 +303,21 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
             {patching === 'cancelled' ? '…' : '✕ Cancel'}
           </button>
         </div>
+      )}
+
+      {/* ── CHEFS Form Modal for showform actions ── */}
+      {formModalOpen && formToken && showFormId && (
+        <ChefsFormModal
+          formId={showFormId}
+          formName={formName ?? undefined}
+          token={formToken}
+          onClose={() => {
+            setFormModalOpen(false);
+            setFormToken(null);
+            setFormName(null);
+          }}
+          onSubmitted={handleFormSubmitted}
+        />
       )}
     </div>
   );

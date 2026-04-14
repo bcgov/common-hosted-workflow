@@ -1,7 +1,6 @@
 'use client';
 
 import { ToastProvider } from '@/components/Toast';
-import FormSettingsModal from '@/components/FormSettingsModal';
 import FormsPanel from '@/components/FormsPanel';
 import MessagesPanel from '@/components/MessagesPanel';
 import ActionsPanel from '@/components/ActionsPanel';
@@ -17,9 +16,6 @@ export default function Page() {
 
 function Dashboard() {
   const {
-    formCfg,
-    formSettingsOpen,
-    setFormSettingsOpen,
     loading,
     lastRefresh,
     actorId,
@@ -33,10 +29,7 @@ function Dashboard() {
     actions,
     actError,
     refresh,
-    handleSaveFormSettings,
   } = useDashboard();
-
-  if (!formCfg) return null;
 
   return (
     <>
@@ -120,23 +113,10 @@ function Dashboard() {
 
       {/* ── Main Grid ── */}
       <div className="grid grid-cols-[300px_1fr_1fr] max-lg:grid-cols-2 max-sm:grid-cols-1 min-h-[calc(100vh-110px)]">
-        <FormsPanel
-          formConfig={formCfg}
-          actorId={actorId.trim()}
-          onOpenFormSettings={() => setFormSettingsOpen(true)}
-          onRefresh={refresh}
-        />
+        <FormsPanel actorId={actorId.trim()} onRefresh={refresh} />
         <MessagesPanel messages={messages} error={msgError} />
         <ActionsPanel actions={actions} error={actError} actorId={actorId.trim()} onRefresh={refresh} />
       </div>
-
-      {/* ── Modals ── */}
-      <FormSettingsModal
-        open={formSettingsOpen}
-        config={formCfg}
-        onSave={handleSaveFormSettings}
-        onClose={() => setFormSettingsOpen(false)}
-      />
     </>
   );
 }

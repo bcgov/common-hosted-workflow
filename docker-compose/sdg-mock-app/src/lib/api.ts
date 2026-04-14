@@ -111,6 +111,53 @@ export async function apiCallback(callbackUrl: string, method: string, body: unk
   }
 }
 
+// ── CHEFS API Helpers ──
+
+export interface ChefsFormEntry {
+  formId: string;
+  formName: string;
+}
+
+/** Fetch the list of CHEFS forms available for a given actor. */
+export async function fetchChefsFormsForActor(actorId: string): Promise<ChefsFormEntry[]> {
+  const resp = await fetch(`/api/chefs/actors/${encodeURIComponent(actorId)}/forms`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  const data = await resp.json();
+  return data.forms as ChefsFormEntry[];
+}
+
+/** Get a short-lived JWT auth-token for rendering a CHEFS form. */
+export async function fetchChefsToken(
+  formId: string,
+  actionId?: string,
+): Promise<{ authToken: string; formName: string }> {
+  const params = new URLSearchParams({ formId });
+  if (actionId) params.set('actionId', actionId);
+  const resp = await fetch(`/api/chefs/token?${params}`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  const data = await resp.json();
+  return { authToken: data.authToken as string, formName: (data.formName as string) || '' };
+}
+
+/** Forward a CHEFS form submission to the backend callback. */
+export async function submitChefsForm(formId: string, submission: unknown, actorId?: string): Promise<void> {
+  const resp = await fetch('/api/chefs/submissions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formId, submission, actorId }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
 // ── Formatting helpers ──
 
 export function shortId(id?: string | null): string {
