@@ -7,15 +7,17 @@ import { wilGet } from '@/lib/wil-proxy';
  *   URLs and internal routing details.
  * - Payload keys like FormAPIKey are API secrets.
  */
-const SENSITIVE_PAYLOAD_KEYS = ['FormAPIKey', 'formApiKey'];
+const SENSITIVE_PAYLOAD_KEYS = new Set(['formapikey']);
 
 function sanitizeAction(action: Record<string, unknown>): Record<string, unknown> {
   const { callbackUrl, callbackMethod, callbackPayloadSpec, ...safe } = action;
 
   if (safe.payload && typeof safe.payload === 'object' && !Array.isArray(safe.payload)) {
     const payload = { ...(safe.payload as Record<string, unknown>) };
-    for (const key of SENSITIVE_PAYLOAD_KEYS) {
-      delete payload[key];
+    for (const key of Object.keys(payload)) {
+      if (SENSITIVE_PAYLOAD_KEYS.has(key.toLowerCase())) {
+        delete payload[key];
+      }
     }
     safe.payload = payload;
   }
