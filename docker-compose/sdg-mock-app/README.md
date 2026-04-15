@@ -29,6 +29,32 @@ sequenceDiagram
 
 > The frontend never sees CHEFS API keys. The backend reads them from `chefs-config.json` (Forms panel) or from the action's payload in the WIL database (`showform` actions), exchanges them for short-lived JWTs via the CHEFS gateway, and returns only the JWT to the browser. The `<chefs-form-viewer>` web component handles automatic token refresh.
 
+## Security — Sensitive Data Never Reaches the Browser
+
+The SDG backend proxy is designed so that secrets and internal URLs stay server-side. Two categories of data are protected:
+
+### CHEFS Form API Keys
+
+When a `showform` action is created by an n8n workflow, the action payload stored in the WIL database may contain a `FormAPIKey` used to obtain CHEFS auth tokens. The `GET /api/wil/actors/:actorId/actions` proxy strips `FormAPIKey` (and `formApiKey`) from every action payload before returning the response to the browser. The key is only ever read server-side when the backend exchanges it for a short-lived JWT via the CHEFS gateway.
+
+### Callback URLs
+
+Action callback URLs contain signed n8n webhook-waiting URLs (e.g. `http://host/webhook-waiting/:id?signature=...`). Exposing these to the frontend would allow anyone with browser DevTools to replay or tamper with workflow callbacks.
+
+The proxy strips `callbackUrl`, `callbackMethod`, and `callbackPayloadSpec` from every action returned to the browser. When the frontend needs to trigger a callback (approval, form submission, etc.) it sends only the `actionId` to `POST /api/wil/callback`. The backend fetches the full action from the WIL API server-side, reads the callback details, and forwards the request — the browser never sees or sends the actual URL.
+
+**In summary, the frontend only receives:**
+
+| Field         | Exposed? | Notes                                      |
+| ------------- | -------- | ------------------------------------------ |
+| `id`          | ✅       | Action identifier, used for callbacks      |
+| `actionType`  | ✅       | e.g. `showform`, `getapproval`             |
+| `payload`     | ✅       | Sanitized — `FormAPIKey` removed           |
+| `status`      | ✅       | `pending`, `in_progress`, `completed`, etc |
+| `priority`    | ✅       | `normal` or `critical`                     |
+| `callbackUrl` | ❌       | Stripped by proxy                          |
+| `FormAPIKey`  | ❌       | Stripped from payload by proxy             |
+
 ## Pages
 
 ### 1. SDG Demo Dashboard — `/`
@@ -114,12 +140,12 @@ pnpm dev
 
 ### WIL Proxy (existing)
 
-| Method | Path                                         | Description             |
-| ------ | -------------------------------------------- | ----------------------- |
-| GET    | `/api/wil/actors/:actorId/messages`          | List messages for actor |
-| GET    | `/api/wil/actors/:actorId/actions`           | List actions for actor  |
-| PATCH  | `/api/wil/actors/:actorId/actions/:actionId` | Update action status    |
-| POST   | `/api/wil/callback`                          | Forward callback to n8n |
+| Method | Path                                         | Description                                               |
+| ------ | -------------------------------------------- | --------------------------------------------------------- |
+| GET    | `/api/wil/actors/:actorId/messages`          | List messages for actor                                   |
+| GET    | `/api/wil/actors/:actorId/actions`           | List actions for actor                                    |
+| PATCH  | `/api/wil/actors/:actorId/actions/:actionId` | Update action status                                      |
+| POST   | `/api/wil/callback`                          | Forward callback to n8n (accepts `actionId`, not the URL) |
 
 ### CHEFS Integration (new)
 

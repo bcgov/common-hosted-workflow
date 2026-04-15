@@ -62,6 +62,18 @@ export async function wilPatch(path: string, body: unknown): Promise<Response> {
   return resp;
 }
 
+/** Fetch a single action by ID from the WIL API (server-side only). */
+export async function wilGetAction(actionId: string): Promise<Response> {
+  const url = `${wilBaseUrl()}/actions/${encodeURIComponent(actionId)}`;
+  const resp = await fetch(url, { headers: wilHeaders(), cache: 'no-store' });
+  logRequest('GET', url, resp.status);
+  if (!resp.ok) {
+    const body = await resp.clone().text();
+    console.error(`[wil-proxy] GET ${url} error body:`, body);
+  }
+  return resp;
+}
+
 /** Forward an arbitrary request to a callback URL with WIL credentials. */
 export async function wilCallback(callbackUrl: string, method: string, body: unknown): Promise<Response> {
   // Rewrite public-facing n8n URLs to the internal Docker hostname.
