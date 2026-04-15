@@ -19,9 +19,6 @@ export interface ActionRequest {
   id: string;
   actionType: string;
   payload: Record<string, unknown>;
-  callbackUrl: string;
-  callbackMethod?: string;
-  callbackPayloadSpec?: Record<string, unknown> | null;
   actorId: string;
   actorType: string;
   workflowInstanceId: string;
@@ -98,12 +95,13 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return resp.json();
 }
 
-/** Submit an approval/callback through the backend proxy. */
-export async function apiCallback(callbackUrl: string, method: string, body: unknown): Promise<void> {
+/** Submit a callback through the backend proxy using the action ID.
+ *  The backend fetches the callbackUrl server-side so it never reaches the browser. */
+export async function apiCallback(actionId: string, body: unknown): Promise<void> {
   const resp = await fetch('/api/wil/callback', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callbackUrl, method, body }),
+    body: JSON.stringify({ actionId, body }),
   });
   if (!resp.ok) {
     const text = await resp.text();

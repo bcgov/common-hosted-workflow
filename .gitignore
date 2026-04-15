@@ -3,3 +3,4 @@ node_modules
 /.claude
 /.kiro
 .next/
+.vscode/settings.json

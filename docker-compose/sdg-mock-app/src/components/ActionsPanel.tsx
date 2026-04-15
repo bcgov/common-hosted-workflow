@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import type { ActionRequest } from '@/lib/api';
-import { shortId, fmtDate, apiPatch, apiFetch, apiCallback, fetchChefsToken } from '@/lib/api';
+import { shortId, fmtDate, apiPatch, apiCallback, fetchChefsToken } from '@/lib/api';
 import { useToast } from './Toast';
 import PayloadBlock from './PayloadBlock';
 import ChefsFormModal from './ChefsFormModal';
@@ -83,11 +83,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
 
   const isPatchable = ['pending', 'in_progress'].includes(a.status);
   const isApproval =
-    a.actionType === 'getapproval' &&
-    a.status === 'pending' &&
-    a.payload &&
-    Array.isArray(a.payload.option) &&
-    !!a.callbackUrl;
+    a.actionType === 'getapproval' && a.status === 'pending' && a.payload && Array.isArray(a.payload.option);
 
   // Resolve formId from payload — handle both casings (formId / FormID)
   const showFormId =
@@ -117,21 +113,12 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const handleFormSubmitted = useCallback(
     async (detail: unknown) => {
       try {
-        // Re-fetch to get the latest callbackUrl
-        const basePath = `/actors/${encodeURIComponent(actorId)}`;
-        const actionsData = await apiFetch<ActionRequest[] | { items: ActionRequest[] }>(`${basePath}/actions`);
-        const items = Array.isArray(actionsData) ? actionsData : actionsData.items || [];
-        const action = items.find((x) => x.id === a.id);
-
-        if (action?.callbackUrl) {
-          const method = (action.callbackMethod || 'POST').toUpperCase();
-          const submission = (detail as { submission?: unknown })?.submission ?? detail;
-          await apiCallback(action.callbackUrl, method, {
-            formId: showFormId,
-            actorId,
-            submission,
-          });
-        }
+        const submission = (detail as { submission?: unknown })?.submission ?? detail;
+        await apiCallback(a.id, {
+          formId: showFormId,
+          actorId,
+          submission,
+        });
 
         // Mark action as completed
         await apiPatch(`/actors/${encodeURIComponent(actorId)}/actions/${a.id}`, {
@@ -168,17 +155,8 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const handleApproval = async (option: string) => {
     setSelectedOption(option);
     try {
-      // Re-fetch to get the latest callbackUrl
-      const basePath = `/actors/${encodeURIComponent(actorId)}`;
-      const actionsData = await apiFetch<ActionRequest[] | { items: ActionRequest[] }>(`${basePath}/actions`);
-      const items = Array.isArray(actionsData) ? actionsData : actionsData.items || [];
-      const action = items.find((x) => x.id === a.id);
-      if (!action?.callbackUrl) throw new Error('Callback URL not found for this action');
-
-      const method = (action.callbackMethod || 'POST').toUpperCase();
-
-      // Send through the backend callback proxy
-      await apiCallback(action.callbackUrl, method, { option });
+      // Send through the backend callback proxy using action ID
+      await apiCallback(a.id, { option });
 
       setApprovalSent(true);
       toast(`Approval "${option}" submitted`, 'success');
@@ -221,11 +199,6 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
       </div>
 
       {a.dueDate && <div className="text-[11px] text-amber-400 mt-1">⏰ Due: {fmtDate(a.dueDate)}</div>}
-      {a.callbackUrl && (
-        <div className="text-[11px] text-text-dim mt-0.5 font-mono">
-          ↩ {a.callbackMethod || 'POST'} {a.callbackUrl}
-        </div>
-      )}
 
       <div className="flex items-center gap-2.5 flex-wrap mt-2.5 text-[11px] text-text-dim font-mono">
         <span className="inline-flex items-center gap-1">🕐 {fmtDate(a.createdAt)}</span>
@@ -277,7 +250,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
         <PayloadBlock label="Show payload" data={a.payload} />
       ) : null}
 
-      {a.callbackPayloadSpec && <PayloadBlock label="Show callback spec" data={a.callbackPayloadSpec} />}
+      {a.payload ? <PayloadBlock label="Show payload" data={a.payload} /> : null}
 
       {isPatchable && !isApproval && !isShowForm && (
         <div className="flex gap-1.5 mt-2.5 flex-wrap">
