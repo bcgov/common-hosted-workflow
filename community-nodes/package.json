@@ -32,6 +32,7 @@
     ],
     "nodes": [
       "dist/nodes/CHEFS/CHEFS.node.js",
+      "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
       "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.js",
       "dist/nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node.js"
     ]

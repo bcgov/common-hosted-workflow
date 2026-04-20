@@ -1,0 +1,18 @@
+{
+  "node": "community-nodes.chefsSubmissionExtractor",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Miscellaneous"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://submit.digital.gov.bc.ca/app/api/v1/docs"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://submit.digital.gov.bc.ca/app/api/v1/docs"
+      }
+    ]
+  }
+}

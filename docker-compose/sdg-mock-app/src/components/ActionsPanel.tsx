@@ -113,11 +113,15 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const handleFormSubmitted = useCallback(
     async (detail: unknown) => {
       try {
-        const submission = (detail as { submission?: unknown })?.submission ?? detail;
+        // The CHEFS formio:submitDone event wraps the saved submission
+        // inside a `submission` property: detail.submission.id
+        const submission = (detail as Record<string, unknown>)?.submission as Record<string, unknown> | undefined;
+        const submissionId = submission?.id;
+
         await apiCallback(a.id, {
           formId: showFormId,
           actorId,
-          submission,
+          submission_id: submissionId,
         });
 
         // Mark action as completed
