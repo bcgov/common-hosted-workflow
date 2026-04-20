@@ -10,7 +10,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [-96, 0],
+      "position": [
+        -96,
+        0
+      ],
       "id": "6453f674-c777-4b53-8993-e3c529a20bbe",
       "name": "Create a message",
       "credentials": {
@@ -24,7 +27,10 @@
       "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
-      "position": [1664, -32],
+      "position": [
+        1664,
+        -32
+      ],
       "id": "78d1b93d-b028-42b7-99b5-7aa0bd78c95e",
       "name": "Merge"
     },
@@ -35,7 +41,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [208, 0],
+      "position": [
+        208,
+        0
+      ],
       "id": "06adc198-062c-4619-b42b-11b360f98eb8",
       "name": "Get messages by actor ID",
       "credentials": {
@@ -55,7 +64,10 @@
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [16, 416],
+      "position": [
+        16,
+        416
+      ],
       "id": "47439ae2-fd21-4934-907d-9e109de89944",
       "name": "Wait",
       "webhookId": "5bc47ce3-d49f-4f2f-9369-8671ca35b65a",
@@ -65,7 +77,10 @@
       "parameters": {},
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1776, 192],
+      "position": [
+        1776,
+        192
+      ],
       "id": "93e48e24-1b93-4f01-8b08-d66d2e11a89c",
       "name": "No Operation, do nothing"
     },
@@ -77,7 +92,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [-560, 240],
+      "position": [
+        -560,
+        240
+      ],
       "id": "3a7ea12c-7ae0-4705-96b2-59bf363c158b",
       "name": "Receive Application",
       "webhookId": "27544295-771b-4ea0-90c8-8a7e0f7a7438"
@@ -90,7 +108,10 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-192, -96],
+      "position": [
+        -192,
+        -96
+      ],
       "id": "8fb330dd-0a23-46f6-9feb-43cd99acac4a",
       "name": "Sticky Note"
     },
@@ -103,7 +124,10 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-192, 384],
+      "position": [
+        -192,
+        384
+      ],
       "id": "f4455a3d-b717-41a2-9154-b8a183021193",
       "name": "Sticky Note1"
     },
@@ -118,7 +142,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [528, 496],
+      "position": [
+        528,
+        496
+      ],
       "id": "4a822dba-9b3a-470f-b827-6736bac17594",
       "name": "Ask actor to fill the income details form",
       "credentials": {
@@ -138,7 +165,10 @@
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [704, 432],
+      "position": [
+        704,
+        432
+      ],
       "id": "00abcc6f-765d-4bf5-878e-1d59994833cf",
       "name": "Wait For Income form",
       "webhookId": "71cfbd67-501d-4451-9b3a-5198696ef33e"
@@ -151,7 +181,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [1472, 352],
+      "position": [
+        1472,
+        352
+      ],
       "id": "b3438e56-2566-425a-8654-9356b833c4fb",
       "name": "Create a Thanks message",
       "credentials": {
@@ -169,7 +202,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [1472, 176],
+      "position": [
+        1472,
+        176
+      ],
       "id": "0ed8a7f7-5cbb-4fe8-89b5-4e24e665b807",
       "name": "Sorry",
       "credentials": {
@@ -205,7 +241,10 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1248, 272],
+      "position": [
+        1248,
+        272
+      ],
       "id": "1ffc3718-eccc-4268-9337-94a5b13e32e7",
       "name": "If income > 200000"
     },
@@ -221,7 +260,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [-144, 480],
+      "position": [
+        -144,
+        480
+      ],
       "id": "68429e3d-782a-4513-a95b-d5d246bf9055",
       "name": "Create an Approval Action for Income Details Sharing",
       "credentials": {
@@ -240,7 +282,10 @@
       },
       "type": "CUSTOM.workflowInteractionLayer",
       "typeVersion": 1,
-      "position": [144, 496],
+      "position": [
+        144,
+        496
+      ],
       "id": "83f3d076-8295-42e8-9f4d-feb5c3dc60e9",
       "name": "Update Approval action to Completed",
       "credentials": {
@@ -259,7 +304,10 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [1184, 144],
+      "position": [
+        1184,
+        144
+      ],
       "id": "7cf9daab-56b3-40da-a856-30d9f3702da1",
       "name": "Sticky Note2"
     },
@@ -297,7 +345,10 @@
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-368, 240],
+      "position": [
+        -368,
+        240
+      ],
       "id": "d0671a91-e3bb-4bda-8171-8f0a0b3b87ac",
       "name": "Setting actor"
     },
@@ -310,7 +361,10 @@
       },
       "type": "CUSTOM.chefsSubmissionExtractor",
       "typeVersion": 1,
-      "position": [992, 448],
+      "position": [
+        992,
+        448
+      ],
       "id": "d71f4529-5538-4ae7-a24a-3bd99ab2833b",
       "name": "CHEFS Submission Extractor",
       "credentials": {
@@ -341,7 +395,10 @@
       },
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
-      "position": [336, 480],
+      "position": [
+        336,
+        480
+      ],
       "id": "73bf7eb2-b9c1-4c0d-9f81-e637ff46c802",
       "name": "Get CHEF Income Form Details"
     }

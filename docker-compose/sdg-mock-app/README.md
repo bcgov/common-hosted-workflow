@@ -4,18 +4,20 @@ A Next.js application that serves as a demo frontend for the Workflow Interactio
 
 ## Architecture
 
+### Forms for Triggering Workflow (chefs-config.json)
+
 ```mermaid
 sequenceDiagram
     participant B as Browser (React)
     participant S as SDG Backend (Next.js)
-    participant W as WIL API (n8n)
+    participant W as n8n Webhooks
     participant C as CHEFS Gateway
 
     B->>S: GET /api/chefs/actors/:actorId/forms
     S-->>B: { forms: [{ formId, formName }] }
 
     B->>S: GET /api/chefs/token?formId=X
-    S->>C: POST /gateway/v1/auth/token/forms/X<br/>(Basic formId:apiKey — from config or action payload)
+    S->>C: POST /gateway/v1/auth/token/forms/X<br/>(Basic formId:apiKey — from chefs-config.json)
     C-->>S: { token: "short-lived JWT" }
     S-->>B: { formId, formName, authToken }
 
@@ -23,8 +25,46 @@ sequenceDiagram
 
     B->>S: POST /api/chefs/submissions<br/>{ formId, submission, actorId }
     S->>W: POST callbackWebhookUrl<br/>{ formId, submission, actorId }
+    W-->>S: 200 OK { message: "Workflow Started" }
+    S-->>B: { message: "Workflow Started" }
+```
+
+### ShowForm Action Flow (WIL-driven)
+
+```mermaid
+sequenceDiagram
+    participant B as Browser (React)
+    participant S as SDG Backend (Next.js)
+    participant WIL as WIL API (n8n)
+    participant C as CHEFS Gateway
+    participant W as n8n Webhook-Waiting
+
+    Note over B,S: 1 — Load actions for the actor
+    B->>S: GET /api/wil/actors/:actorId/actions
+    S->>WIL: GET /actors/:actorId/actions
+    WIL-->>S: [ ...actions ]
+    Note over S: Sanitize: strip callbackUrl,<br/>callbackMethod, FormAPIKey
+    S-->>B: [ ...sanitized actions ]
+    Note over B: showform action contains<br/>formId & formName in payload<br/>(FormAPIKey removed)
+
+    Note over B,C: 2 — Obtain CHEFS auth token
+    B->>S: GET /api/chefs/token?formId=X&actionId=Y
+    S->>WIL: GET /actions/Y
+    WIL-->>S: { payload: { FormAPIKey, formId, ... } }
+    Note over S: Extract FormAPIKey from<br/>action payload (server-side only)
+    S->>C: POST /gateway/v1/auth/token/forms/X<br/>(Basic formId:FormAPIKey)
+    C-->>S: { token: "short-lived JWT" }
+    S-->>B: { formId, formName, authToken }
+
+    Note over B,W: 3 — Render form & submit
+    Note over B: Renders <chefs-form-viewer><br/>with authToken
+    B->>S: POST /api/wil/callback<br/>{ actionId: Y, body: { submission } }
+    S->>WIL: GET /actions/Y
+    WIL-->>S: { callbackUrl, callbackMethod, ... }
+    Note over S: Read callbackUrl server-side
+    S->>W: POST callbackUrl<br/>{ submission }
     W-->>S: 200 OK
-    S-->>B: { message: "Submission forwarded" }
+    S-->>B: { success }
 ```
 
 > The frontend never sees CHEFS API keys. The backend reads them from `chefs-config.json` (Forms panel) or from the action's payload in the WIL database (`showform` actions), exchanges them for short-lived JWTs via the CHEFS gateway, and returns only the JWT to the browser. The `<chefs-form-viewer>` web component handles automatic token refresh.
