@@ -20,6 +20,7 @@ When `Type` is set to `Template`, these `Source` values are available:
 | `GitHub`           | GitHub `pull_request` or `workflow_run` webhook payload            |
 | `Backup Container` | Backup Container webhook payload                                   |
 | `Sysdig`           | Sysdig alert webhook payload                                       |
+| `Status Cake`      | StatusCake webhook payload                                         |
 | `Uptime.com`       | Uptime.com alert webhook payload                                   |
 | `Generic`          | A simple custom payload you shape yourself                         |
 
@@ -37,7 +38,7 @@ Prepare these items first:
 1. Access to n8n.
 2. A Microsoft Teams channel where the message should be delivered.
 3. The full Teams channel link from `Copy link to channel`.
-4. A payload source, such as GitHub, Sysdig, Uptime.com, Rocket.Chat, or another webhook sender.
+4. A payload source, such as GitHub, Sysdig, StatusCake, Uptime.com, Rocket.Chat, or another webhook sender.
 
 ## Create The Workflow
 
@@ -275,6 +276,10 @@ This source is intended for Sysdig alert webhook payloads. If you connect it thr
 ### Uptime.com
 
 This source is intended for Uptime.com alert webhook payloads. If you connect it through n8n, use the incoming request body directly, usually with `{{ $json.body }}`.
+
+### Status Cake
+
+This source is intended for StatusCake webhook payloads. If you connect it through n8n, use the incoming request body directly, usually with `{{ $json.body }}`.
 
 ## Common Payload Expressions
 
