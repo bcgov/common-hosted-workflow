@@ -13,6 +13,7 @@ import {
   backupContainerTransform,
   githubTransform,
   rocketChatTransform,
+  statusCakeTransform,
   sysdigTransform,
   uptimeComTransform,
 } from './sources';
@@ -79,6 +80,7 @@ export class DevXMessageConnector implements INodeType {
           { name: 'GitHub', value: 'github' },
           { name: 'Backup Container', value: 'backup-container' },
           { name: 'Sysdig', value: 'sysdig' },
+          { name: 'Status Cake', value: 'status-cake' },
           { name: 'Uptime.com', value: 'uptime-com' },
           { name: 'Generic', value: 'generic' },
         ],
@@ -176,6 +178,8 @@ export class DevXMessageConnector implements INodeType {
           messageContent = backupContainerTransform.call(this, i);
         } else if (source === 'sysdig') {
           messageContent = sysdigTransform.call(this, i);
+        } else if (source === 'status-cake') {
+          messageContent = statusCakeTransform.call(this, i);
         } else if (source === 'uptime-com') {
           messageContent = uptimeComTransform.call(this, i);
         } else {
