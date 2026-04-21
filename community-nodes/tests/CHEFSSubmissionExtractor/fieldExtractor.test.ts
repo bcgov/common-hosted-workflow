@@ -4,41 +4,12 @@ import {
   validateFieldPaths,
   extractFields,
 } from '../../nodes/CHEFSSubmissionExtractor/shared/fieldExtractor';
+import { makeFieldExtractorTestData } from './helpers';
 
 // ── resolveFieldPath ──
 
 describe('resolveFieldPath', () => {
-  const data: Record<string, unknown> = {
-    applicant: {
-      name: 'Jane Doe',
-      email: 'jane@example.com',
-      phone: null,
-    },
-    company: {
-      headquarters: {
-        address: {
-          city: 'Victoria',
-          province: 'BC',
-        },
-      },
-    },
-    items: [
-      { name: 'Widget', quantity: 5 },
-      { name: 'Gadget', quantity: 3 },
-    ],
-    nested: {
-      matrix: [
-        [10, 20],
-        [30, 40],
-      ],
-    },
-    status: 'submitted',
-    count: 42,
-    active: true,
-    emptyField: '',
-    zeroField: 0,
-    falseField: false,
-  };
+  const data = makeFieldExtractorTestData();
 
   // ── Basic object traversal ──
 
@@ -142,10 +113,7 @@ describe('resolveFieldPath', () => {
 // ── validateFieldPaths ──
 
 describe('validateFieldPaths', () => {
-  const data: Record<string, unknown> = {
-    applicant: { name: 'Jane Doe' },
-    company: { headquarters: { address: { city: 'Victoria' } } },
-  };
+  const data = makeFieldExtractorTestData();
 
   it('returns valid: true when all paths exist', () => {
     const result = validateFieldPaths(data, [
@@ -179,11 +147,7 @@ describe('validateFieldPaths', () => {
 // ── extractFields ──
 
 describe('extractFields', () => {
-  const data: Record<string, unknown> = {
-    applicant: { name: 'Jane Doe', phone: null },
-    company: { headquarters: { address: { city: 'Victoria' } } },
-    items: [{ name: 'Widget' }],
-  };
+  const data = makeFieldExtractorTestData();
 
   it('extracts existing fields into the output object', () => {
     const result = extractFields(data, [

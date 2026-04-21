@@ -25,6 +25,49 @@ import type { ChefsSubmissionResponse } from '../../nodes/CHEFSSubmissionExtract
 
 export const MOCK_API_KEY = 'test-chefs-api-key'; // pragma: allowlist secret
 
+/** Single city-field mapping reused across many tests to avoid duplication */
+export const CITY_MAPPING = {
+  mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
+};
+
+/**
+ * Shared test data fixture for fieldExtractor unit tests.
+ * Covers nested objects, arrays, falsy values, and edge cases.
+ */
+export function makeFieldExtractorTestData(): Record<string, unknown> {
+  return {
+    applicant: {
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      phone: null,
+    },
+    company: {
+      headquarters: {
+        address: {
+          city: 'Victoria',
+          province: 'BC',
+        },
+      },
+    },
+    items: [
+      { name: 'Widget', quantity: 5 },
+      { name: 'Gadget', quantity: 3 },
+    ],
+    nested: {
+      matrix: [
+        [10, 20],
+        [30, 40],
+      ],
+    },
+    status: 'submitted',
+    count: 42,
+    active: true,
+    emptyField: '',
+    zeroField: 0,
+    falseField: false,
+  };
+}
+
 export function makeChefsSubmissionResponse(overrides: Record<string, unknown> = {}): ChefsSubmissionResponse {
   const inner = {
     id: 'sub-001',

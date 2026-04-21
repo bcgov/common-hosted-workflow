@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { executeWith, makeChefsSubmissionResponse, MOCK_API_KEY } from './helpers';
+import { executeWith, CITY_MAPPING, MOCK_API_KEY } from './helpers';
+
+// Reusable mapping fragments for tests that need more than the single-city default
+const CITY_AND_NAME_MAPPING = {
+  mapping: [
+    { outputKey: 'city', sourcePath: 'company.headquarters.address.city' },
+    { outputKey: 'name', sourcePath: 'applicant.name' },
+  ],
+};
 
 // ── Basic field extraction ──
 
 describe('CHEFSSubmissionExtractor execute', () => {
   describe('key-value mode', () => {
     it('extracts fields using UI key-value mappings', async () => {
-      const { result } = await executeWith({
-        fieldMappings: {
-          mapping: [
-            { outputKey: 'city', sourcePath: 'company.headquarters.address.city' },
-            { outputKey: 'name', sourcePath: 'applicant.name' },
-          ],
-        },
-      });
+      const { result } = await executeWith({ fieldMappings: CITY_AND_NAME_MAPPING });
 
       expect(result[0]).toHaveLength(1);
       expect(result[0][0].json).toEqual({ city: 'Victoria', name: 'Jane Doe' });
@@ -90,9 +91,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
     it('appends metadata when includeSubmissionMeta is true', async () => {
       const { result } = await executeWith({
         includeSubmissionMeta: true,
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
+        fieldMappings: CITY_MAPPING,
       });
 
       const json = result[0][0].json as Record<string, unknown>;
@@ -106,9 +105,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
     it('does not include metadata when includeSubmissionMeta is false', async () => {
       const { result } = await executeWith({
         includeSubmissionMeta: false,
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
+        fieldMappings: CITY_MAPPING,
       });
 
       const json = result[0][0].json as Record<string, unknown>;
@@ -123,9 +120,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
     it('calls the CHEFS API with the correct submission ID', async () => {
       const { httpRequest } = await executeWith({
         submissionId: 'my-sub-id',
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
+        fieldMappings: CITY_MAPPING,
       });
 
       expect(httpRequest).toHaveBeenCalledTimes(1);
@@ -138,9 +133,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
       const { httpRequest } = await executeWith({
         formId: 'test-form',
         apiKey: 'test-key', // pragma: allowlist secret
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
+        fieldMappings: CITY_MAPPING,
       });
 
       const callArgs = httpRequest.mock.calls[0][0];
@@ -153,11 +146,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
 
   describe('item linking', () => {
     it('includes pairedItem metadata on output', async () => {
-      const { result } = await executeWith({
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
-      });
+      const { result } = await executeWith({ fieldMappings: CITY_MAPPING });
 
       expect(result[0][0]).toHaveProperty('pairedItem', { item: 0 });
     });
@@ -238,25 +227,15 @@ describe('CHEFSSubmissionExtractor execute', () => {
 
   describe('credential validation', () => {
     it('throws when formId is empty', async () => {
-      await expect(
-        executeWith({
-          formId: '',
-          fieldMappings: {
-            mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-          },
-        }),
-      ).rejects.toThrow('CHEFS credentials are incomplete');
+      await expect(executeWith({ formId: '', fieldMappings: CITY_MAPPING })).rejects.toThrow(
+        'CHEFS credentials are incomplete',
+      );
     });
 
     it('throws when apiKey is empty', async () => {
-      await expect(
-        executeWith({
-          apiKey: '',
-          fieldMappings: {
-            mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-          },
-        }),
-      ).rejects.toThrow('CHEFS credentials are incomplete');
+      await expect(executeWith({ apiKey: '', fieldMappings: CITY_MAPPING })).rejects.toThrow(
+        'CHEFS credentials are incomplete',
+      );
     });
   });
 
@@ -264,25 +243,15 @@ describe('CHEFSSubmissionExtractor execute', () => {
 
   describe('submission ID validation', () => {
     it('throws when submission ID is empty', async () => {
-      await expect(
-        executeWith({
-          submissionId: '',
-          fieldMappings: {
-            mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-          },
-        }),
-      ).rejects.toThrow('Submission ID is required and cannot be empty');
+      await expect(executeWith({ submissionId: '', fieldMappings: CITY_MAPPING })).rejects.toThrow(
+        'Submission ID is required and cannot be empty',
+      );
     });
 
     it('throws when submission ID is whitespace only', async () => {
-      await expect(
-        executeWith({
-          submissionId: '   ',
-          fieldMappings: {
-            mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-          },
-        }),
-      ).rejects.toThrow('Submission ID is required and cannot be empty');
+      await expect(executeWith({ submissionId: '   ', fieldMappings: CITY_MAPPING })).rejects.toThrow(
+        'Submission ID is required and cannot be empty',
+      );
     });
   });
 
@@ -290,24 +259,14 @@ describe('CHEFSSubmissionExtractor execute', () => {
 
   describe('API response validation', () => {
     it('throws when response is missing submission wrapper', async () => {
-      await expect(
-        executeWith({
-          httpResponse: {},
-          fieldMappings: {
-            mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-          },
-        }),
-      ).rejects.toThrow('missing submission wrapper');
+      await expect(executeWith({ httpResponse: {}, fieldMappings: CITY_MAPPING })).rejects.toThrow(
+        'missing submission wrapper',
+      );
     });
 
     it('throws when response is missing submission data', async () => {
       await expect(
-        executeWith({
-          httpResponse: { submission: { submission: null } },
-          fieldMappings: {
-            mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-          },
-        }),
+        executeWith({ httpResponse: { submission: { submission: null } }, fieldMappings: CITY_MAPPING }),
       ).rejects.toThrow('missing submission data');
     });
   });
@@ -319,9 +278,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
       const { result } = await executeWith({
         continueOnFail: true,
         submissionId: '',
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
+        fieldMappings: CITY_MAPPING,
       });
 
       expect(result[0]).toHaveLength(1);
@@ -333,9 +290,7 @@ describe('CHEFSSubmissionExtractor execute', () => {
       const { result } = await executeWith({
         continueOnFail: true,
         submissionId: '',
-        fieldMappings: {
-          mapping: [{ outputKey: 'city', sourcePath: 'company.headquarters.address.city' }],
-        },
+        fieldMappings: CITY_MAPPING,
       });
 
       expect(result[0][0]).toHaveProperty('pairedItem', { item: 0 });
