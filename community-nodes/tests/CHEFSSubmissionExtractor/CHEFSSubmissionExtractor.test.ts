@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { executeWith, CITY_MAPPING, MOCK_API_KEY } from './helpers';
+import { executeWith, CITY_MAPPING } from './helpers';
 
 // Reusable mapping fragments for tests that need more than the single-city default
 const CITY_AND_NAME_MAPPING = {
