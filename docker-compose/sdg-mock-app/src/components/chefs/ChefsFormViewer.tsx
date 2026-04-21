@@ -113,7 +113,7 @@ export function ChefsFormViewer({
     };
 
     formViewer.addEventListener('formio:ready', handleFormReady);
-    formViewer.addEventListener('formio:submit', handleSubmit);
+    formViewer.addEventListener('formio:submitDone', handleSubmit);
     formViewer.addEventListener('formio:submitError', handleSubmitError);
 
     const shadowRoot = (formViewer as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot;
@@ -132,7 +132,7 @@ export function ChefsFormViewer({
 
     return () => {
       formViewer.removeEventListener('formio:ready', handleFormReady);
-      formViewer.removeEventListener('formio:submit', handleSubmit);
+      formViewer.removeEventListener('formio:submitDone', handleSubmit);
       formViewer.removeEventListener('formio:submitError', handleSubmitError);
     };
   }, [scriptStatus, headers, onFormReady, onSubmissionComplete, onSubmissionError]);
