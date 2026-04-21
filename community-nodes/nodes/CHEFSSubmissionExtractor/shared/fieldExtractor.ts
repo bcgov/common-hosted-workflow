@@ -17,12 +17,10 @@ export function resolveFieldPath(data: Record<string, unknown>, dotPath: string)
   const segments = dotPath.split('.');
   let current: unknown = data;
 
-  for (let i = 0; i < segments.length; i++) {
+  for (const segment of segments) {
     if (current === null || current === undefined || typeof current !== 'object') {
       return { exists: false, value: undefined };
     }
-
-    const segment = segments[i];
 
     if (Array.isArray(current)) {
       const index = Number(segment);
@@ -31,7 +29,7 @@ export function resolveFieldPath(data: Record<string, unknown>, dotPath: string)
       }
       current = current[index];
     } else {
-      if (!Object.prototype.hasOwnProperty.call(current, segment)) {
+      if (!Object.prototype.hasOwnProperty.call(current as Record<string, unknown>, segment)) {
         return { exists: false, value: undefined };
       }
       current = (current as Record<string, unknown>)[segment];

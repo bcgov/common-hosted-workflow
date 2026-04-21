@@ -9,7 +9,7 @@ import {
   type IDataObject,
   type JsonObject,
 } from 'n8n-workflow';
-import type { ChefsFormCredentials, FieldMapping } from './shared/types';
+import type { ChefsFormCredentials, ChefsSubmissionInner, FieldMapping } from './shared/types';
 import { validateFieldPaths, extractFields } from './shared/fieldExtractor';
 import { chefsApiRequest } from './shared/chefsApiRequest';
 
@@ -70,6 +70,81 @@ function parseFieldMappings(ctx: IExecuteFunctions, itemIndex: number): FieldMap
   }
 
   return mappings;
+}
+
+/**
+ * Validates the CHEFS API response structure and returns the inner submission object.
+ *
+ * @throws NodeOperationError if the response is missing expected keys
+ */
+function validateResponseStructure(
+  ctx: IExecuteFunctions,
+  response: { submission?: ChefsSubmissionInner },
+  itemIndex: number,
+): ChefsSubmissionInner {
+  const inner = response.submission;
+  if (!inner) {
+    throw new NodeOperationError(ctx.getNode(), 'Unexpected CHEFS API response structure: missing submission wrapper', {
+      itemIndex,
+    });
+  }
+
+  if (
+    !inner.submission ||
+    typeof inner.submission !== 'object' ||
+    !('data' in inner.submission) ||
+    inner.submission.data == null
+  ) {
+    throw new NodeOperationError(ctx.getNode(), 'Unexpected CHEFS API response structure: missing submission data', {
+      itemIndex,
+    });
+  }
+
+  return inner;
+}
+
+/**
+ * Processes a single input item: fetches the submission, validates paths, extracts fields.
+ */
+async function processItem(
+  ctx: IExecuteFunctions,
+  itemIndex: number,
+  credentials: ChefsFormCredentials,
+): Promise<INodeExecutionData[]> {
+  const submissionId = (ctx.getNodeParameter('submissionId', itemIndex) as string).trim();
+  if (!submissionId) {
+    throw new NodeOperationError(ctx.getNode(), 'Submission ID is required and cannot be empty', { itemIndex });
+  }
+
+  const missingPathBehavior = ctx.getNodeParameter('missingPathBehavior', itemIndex) as string;
+  const includeSubmissionMeta = ctx.getNodeParameter('includeSubmissionMeta', itemIndex) as boolean;
+  const mappings = parseFieldMappings(ctx, itemIndex);
+
+  const response = await chefsApiRequest(ctx, 'GET', `/submissions/${submissionId}`, credentials);
+  const inner = validateResponseStructure(ctx, response, itemIndex);
+  const submissionData = inner.submission.data;
+
+  // Validate field paths and handle missing ones
+  const validation = validateFieldPaths(submissionData, mappings);
+  if (!validation.valid && missingPathBehavior === 'throwError') {
+    const missingList = validation.missingPaths.map((m) => `"${m.outputKey}" (path: ${m.sourcePath})`).join(', ');
+    throw new NodeOperationError(ctx.getNode(), `The following fields do not exist on the submission: ${missingList}`, {
+      itemIndex,
+    });
+  }
+
+  const extracted = extractFields(submissionData, mappings);
+
+  if (includeSubmissionMeta) {
+    extracted['_createdBy'] = inner.createdBy;
+    extracted['_createdAt'] = inner.createdAt;
+    extracted['_updatedBy'] = inner.updatedBy;
+    extracted['_updatedAt'] = inner.updatedAt;
+  }
+
+  return ctx.helpers.constructExecutionMetaData(ctx.helpers.returnJsonArray(extracted as IDataObject), {
+    itemData: { item: itemIndex },
+  });
 }
 
 export class CHEFSSubmissionExtractor implements INodeType {
@@ -189,84 +264,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
 
     for (let i = 0; i < items.length; i++) {
       try {
-        // Step 1: Read node parameters
-        const submissionId = (this.getNodeParameter('submissionId', i) as string).trim();
-        if (!submissionId) {
-          throw new NodeOperationError(this.getNode(), 'Submission ID is required and cannot be empty', {
-            itemIndex: i,
-          });
-        }
-        const missingPathBehavior = this.getNodeParameter('missingPathBehavior', i) as string;
-        const includeSubmissionMeta = this.getNodeParameter('includeSubmissionMeta', i) as boolean;
-
-        // Step 2: Parse field mappings from either UI or JSON mode
-        const mappings = parseFieldMappings(this, i);
-
-        // Step 3: Fetch submission from CHEFS API
-        const response = await chefsApiRequest(this, 'GET', `/submissions/${submissionId}`, credentials);
-
-        // Step 4: Validate response structure and extract submission data
-        // The CHEFS API wraps everything in a top-level `submission` key.
-        // Form data lives at response.submission.submission.data
-        // Metadata lives at response.submission.createdBy, etc.
-        const inner = response.submission;
-        if (!inner) {
-          throw new NodeOperationError(
-            this.getNode(),
-            'Unexpected CHEFS API response structure: missing submission wrapper',
-            { itemIndex: i },
-          );
-        }
-
-        if (
-          !inner.submission ||
-          typeof inner.submission !== 'object' ||
-          !('data' in inner.submission) ||
-          inner.submission.data == null
-        ) {
-          throw new NodeOperationError(
-            this.getNode(),
-            'Unexpected CHEFS API response structure: missing submission data',
-            { itemIndex: i },
-          );
-        }
-
-        const submissionData = inner.submission.data as Record<string, unknown>;
-
-        // Step 5: Validate all field paths exist in submission
-        const validation = validateFieldPaths(submissionData, mappings);
-
-        // Step 6: Handle missing paths based on configured behavior
-        if (!validation.valid) {
-          if (missingPathBehavior === 'throwError') {
-            const missingList = validation.missingPaths
-              .map((m) => `"${m.outputKey}" (path: ${m.sourcePath})`)
-              .join(', ');
-            throw new NodeOperationError(
-              this.getNode(),
-              `The following fields do not exist on the submission: ${missingList}`,
-              { itemIndex: i },
-            );
-          }
-          // missingPathBehavior === 'returnNull': fall through to extraction
-        }
-
-        // Step 7: Extract fields — returns null for missing paths when in returnNull mode
-        const extracted = extractFields(submissionData, mappings);
-
-        // Step 8: Optionally append submission metadata
-        if (includeSubmissionMeta) {
-          extracted['_createdBy'] = inner.createdBy;
-          extracted['_createdAt'] = inner.createdAt;
-          extracted['_updatedBy'] = inner.updatedBy;
-          extracted['_updatedAt'] = inner.updatedAt;
-        }
-
-        // Step 9: Return filtered result with item linking
-        const executionData = this.helpers.constructExecutionMetaData(
-          this.helpers.returnJsonArray(extracted as IDataObject),
-          { itemData: { item: i } },
-        );
+        const executionData = await processItem(this, i, credentials);
         returnData.push(...executionData);
       } catch (error) {
         if (this.continueOnFail()) {
