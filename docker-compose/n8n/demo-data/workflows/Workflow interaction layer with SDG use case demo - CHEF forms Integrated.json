@@ -1,0 +1,572 @@
+{
+  "name": "Workflow interaction layer with SDG use case demo - CHEF forms Integrated",
+  "nodes": [
+    {
+      "parameters": {
+        "actorId": "={{ $json.actorId }}",
+        "actorType": "={{ $json.actorType }}",
+        "title": "={{ $json.title }}",
+        "body": "={{ $json.body }}"
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [-96, 0],
+      "id": "6453f674-c777-4b53-8993-e3c529a20bbe",
+      "name": "Create a message",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1664, -32],
+      "id": "78d1b93d-b028-42b7-99b5-7aa0bd78c95e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "getByActor",
+        "actorId": "={{ $json.actorId }}"
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [208, 0],
+      "id": "06adc198-062c-4619-b42b-11b360f98eb8",
+      "name": "Get messages by actor ID",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "options": {
+          "responseData": "Success"
+        }
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [16, 416],
+      "id": "47439ae2-fd21-4934-907d-9e109de89944",
+      "name": "Wait",
+      "webhookId": "5bc47ce3-d49f-4f2f-9369-8671ca35b65a",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1776, 192],
+      "id": "93e48e24-1b93-4f01-8b08-d66d2e11a89c",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "disablilty-chef-app",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-560, 240],
+      "id": "3a7ea12c-7ae0-4705-96b2-59bf363c158b",
+      "name": "Receive Application",
+      "webhookId": "27544295-771b-4ea0-90c8-8a7e0f7a7438"
+    },
+    {
+      "parameters": {
+        "content": "Workflow Interaction Layer - Message Node",
+        "height": 304,
+        "width": 692
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-192, -96],
+      "id": "8fb330dd-0a23-46f6-9feb-43cd99acac4a",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Workflow Interaction Layer - Action Node",
+        "height": 368,
+        "width": 1108,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-192, 384],
+      "id": "f4455a3d-b717-41a2-9154-b8a183021193",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "resource": "action",
+        "actorId": "={{ $('Setting actor').item.json.actorId}}",
+        "actionType": "showform",
+        "payload": "={\n\"FormName\": \"{{ $json.form_name }}\",\n\"FormID\": \"{{ $json.form_id }}\",\n\"FormAPIKey\" : \"{{ $json.api_key }}\"\n}\n ",
+        "callbackUrl": "={{ $execution.resumeUrl }}",
+        "callbackPayloadSpec": "{\"submission_id\": \"string\"}"
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [528, 496],
+      "id": "4a822dba-9b3a-470f-b827-6736bac17594",
+      "name": "Ask actor to fill the income details form",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "options": {
+          "responseData": "Success"
+        }
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [704, 432],
+      "id": "00abcc6f-765d-4bf5-878e-1d59994833cf",
+      "name": "Wait For Income form",
+      "webhookId": "71cfbd67-501d-4451-9b3a-5198696ef33e"
+    },
+    {
+      "parameters": {
+        "actorId": "={{ $('Setting actor').item.json.actorId}}",
+        "title": "Thanks!!",
+        "body": "We received your Income details and will procced further with your disability credit application"
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [1472, 352],
+      "id": "b3438e56-2566-425a-8654-9356b833c4fb",
+      "name": "Create a Thanks message",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "actorId": "={{ $('Setting actor').item.json.actorId}}",
+        "title": "Sorry!!",
+        "body": "Based on your income, you are not eligible for the disability credit application."
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [1472, 176],
+      "id": "0ed8a7f7-5cbb-4fe8-89b5-4e24e665b807",
+      "name": "Sorry",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2d022e9-e937-4d2a-919b-afee4b4ddd80",
+              "leftValue": "={{ $json.income }}",
+              "rightValue": 200000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1248, 272],
+      "id": "1ffc3718-eccc-4268-9337-94a5b13e32e7",
+      "name": "If income > 200000"
+    },
+    {
+      "parameters": {
+        "resource": "action",
+        "actorId": "={{ $json.actorId }}",
+        "actorType": "={{ $json.actorType }}",
+        "payload": "{\"question\" :\"Do you want to share your income data?\" ,\"option\": [\"Yes\", \"No\"] }",
+        "callbackUrl": "={{ $execution.resumeUrl }}",
+        "callbackPayloadSpec": "{\"option\" : \"string\"}",
+        "dueDate": "2024-08-09"
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [-144, 480],
+      "id": "68429e3d-782a-4513-a95b-d5d246bf9055",
+      "name": "Create an Approval Action for Income Details Sharing",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "action",
+        "operation": "update",
+        "actionId": "={{ $('Create an Approval Action for Income Details Sharing').item.json.id }}",
+        "status": "completed"
+      },
+      "type": "CUSTOM.workflowInteractionLayer",
+      "typeVersion": 1,
+      "position": [144, 496],
+      "id": "83f3d076-8295-42e8-9f4d-feb5c3dc60e9",
+      "name": "Update Approval action to Completed",
+      "credentials": {
+        "workflowInteractionLayerApi": {
+          "id": "YrblhgD0NR8IUKZe",
+          "name": "Workflow Interaction Layer account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Conditon Check",
+        "height": 400,
+        "width": 468,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1184, 144],
+      "id": "7cf9daab-56b3-40da-a856-30d9f3702da1",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6531d80b-3938-4741-881f-390550f2ed84",
+              "name": "actorId",
+              "value": "={{ $json.body.actorId }}",
+              "type": "string"
+            },
+            {
+              "id": "18f989ce-ab1e-44e5-a652-f443aff7b506",
+              "name": "actorType",
+              "value": "user",
+              "type": "string"
+            },
+            {
+              "id": "fda87e7d-375c-4ada-b9ed-9146931ef394",
+              "name": "title",
+              "value": "Application Received",
+              "type": "string"
+            },
+            {
+              "id": "89062790-611e-48b9-8264-a1c04b49ceb8",
+              "name": "body",
+              "value": "We got your application for disability credit and we are waiting for your approval to share data.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-368, 240],
+      "id": "d0671a91-e3bb-4bda-8171-8f0a0b3b87ac",
+      "name": "Setting actor"
+    },
+    {
+      "parameters": {
+        "submissionId": "={{ $json.body.submission_id }}",
+        "fieldMappingMode": "json",
+        "includeSubmissionMeta": true,
+        "fieldMappingJson": "{\"income\": \"yourLastYearReportedIncome\"}"
+      },
+      "type": "CUSTOM.chefsSubmissionExtractor",
+      "typeVersion": 1,
+      "position": [992, 448],
+      "id": "d71f4529-5538-4ae7-a24a-3bd99ab2833b",
+      "name": "CHEFS Submission Extractor",
+      "credentials": {
+        "chefsFormAuth": {
+          "id": "sIdopdtafh1aF1lZ",
+          "name": "CHEFS Form Authentication account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "zQCO14kswPxChH5y",
+          "mode": "list",
+          "cachedResultName": "CHEF Form table",
+          "cachedResultUrl": "/projects/fymVZI1wMLadW15d/datatables/zQCO14kswPxChH5y"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "slug",
+              "keyValue": "income_details_form"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [336, 480],
+      "id": "73bf7eb2-b9c1-4c0d-9f81-e637ff46c802",
+      "name": "Get CHEF Income Form Details"
+    }
+  ],
+  "pinData": {
+    "Wait For Income form": [
+      {
+        "json": {
+          "headers": {
+            "host": "localhost:5678",
+            "connection": "keep-alive",
+            "x-n8n-api-key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNDBmMjQ0My1jMWIzLTQ2YmQtOTRmNS03YmQyZjEzMzNkNDAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiN2M4YTFiNjUtZTkyNy00ZWYxLWFlZjgtNjE3OWY0NjQ1NTMwIiwiaWF0IjoxNzc2MTE1OTM1fQ.SJVUVmH-bu71CSCqdp7Z35n2Uk7aximOdgyoc-t0WTw",
+            "x-tenant-id": "a778f5a2-4f45-4f37-9707-2494b9de5113",
+            "content-type": "application/json",
+            "accept": "application/json",
+            "accept-language": "*",
+            "sec-fetch-mode": "cors",
+            "user-agent": "node",
+            "accept-encoding": "gzip, deflate",
+            "content-length": "122"
+          },
+          "params": {},
+          "query": {
+            "signature": "707a5ce59b4b8db6b304920f3581654faa2b655349b2d2eb1c6083e0237e3d9f"
+          },
+          "body": {
+            "formId": "e499dd20-40d5-4a7b-9006-bc5f0fbba252",
+            "actorId": "amina",
+            "submission_id": "167f0d50-6f90-4efb-ab0d-620671d88967"
+          },
+          "webhookUrl": "http://localhost:5678/webhook/71cfbd67-501d-4451-9b3a-5198696ef33e",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Create a message": {
+      "main": [
+        [
+          {
+            "node": "Get messages by actor ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get messages by actor ID": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Update Approval action to Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Application": {
+      "main": [
+        [
+          {
+            "node": "Setting actor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask actor to fill the income details form": {
+      "main": [
+        [
+          {
+            "node": "Wait For Income form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Income form": {
+      "main": [
+        [
+          {
+            "node": "CHEFS Submission Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a Thanks message": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "If income > 200000": {
+      "main": [
+        [
+          {
+            "node": "Sorry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a Thanks message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sorry": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Create an Approval Action for Income Details Sharing": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Approval action to Completed": {
+      "main": [
+        [
+          {
+            "node": "Get CHEF Income Form Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setting actor": {
+      "main": [
+        [
+          {
+            "node": "Create a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create an Approval Action for Income Details Sharing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHEFS Submission Extractor": {
+      "main": [
+        [
+          {
+            "node": "If income > 200000",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get CHEF Income Form Details": {
+      "main": [
+        [
+          {
+            "node": "Ask actor to fill the income details form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "00c52b01-938e-4e3c-ab3f-1690c34df746",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a"
+  },
+  "id": "8bOWrGvKVT8UPgQ1",
+  "tags": []
+}

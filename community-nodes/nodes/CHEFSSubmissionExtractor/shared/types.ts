@@ -1,3 +1,9 @@
+export interface ChefsFormCredentials {
+  baseUrl: string;
+  formId: string;
+  apiKey: string;
+}
+
 export interface FieldMapping {
   /** The key name in the output object */
   outputKey: string;

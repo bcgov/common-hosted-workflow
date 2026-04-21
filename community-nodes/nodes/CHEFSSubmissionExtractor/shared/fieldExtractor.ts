@@ -2,13 +2,18 @@ import type { FieldMapping, FieldResolution, ValidationResult } from './types';
 
 /**
  * Resolves a dot-separated path against a nested object.
+ * Supports array index access via numeric segments (e.g. "items.0.name").
  * Never throws, never mutates the input data.
  *
  * @param data - The root object to traverse
- * @param dotPath - A dot-separated path string, e.g. "company.address.city"
+ * @param dotPath - A dot-separated path string, e.g. "company.address.city" or "items.0.name"
  * @returns FieldResolution indicating whether the path exists and its value
  */
 export function resolveFieldPath(data: Record<string, unknown>, dotPath: string): FieldResolution {
+  if (!dotPath || dotPath.trim() === '') {
+    return { exists: false, value: undefined };
+  }
+
   const segments = dotPath.split('.');
   let current: unknown = data;
 
@@ -16,11 +21,21 @@ export function resolveFieldPath(data: Record<string, unknown>, dotPath: string)
     if (current === null || current === undefined || typeof current !== 'object') {
       return { exists: false, value: undefined };
     }
+
     const segment = segments[i];
-    if (!Object.prototype.hasOwnProperty.call(current, segment)) {
-      return { exists: false, value: undefined };
+
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        return { exists: false, value: undefined };
+      }
+      current = current[index];
+    } else {
+      if (!Object.prototype.hasOwnProperty.call(current, segment)) {
+        return { exists: false, value: undefined };
+      }
+      current = (current as Record<string, unknown>)[segment];
     }
-    current = (current as Record<string, unknown>)[segment];
   }
 
   return { exists: true, value: current };

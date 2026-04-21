@@ -9,7 +9,7 @@ import {
   type IDataObject,
   type JsonObject,
 } from 'n8n-workflow';
-import type { FieldMapping } from './shared/types';
+import type { ChefsFormCredentials, FieldMapping } from './shared/types';
 import { validateFieldPaths, extractFields } from './shared/fieldExtractor';
 import { chefsApiRequest } from './shared/chefsApiRequest';
 
@@ -34,9 +34,25 @@ function parseFieldMappings(ctx: IExecuteFunctions, itemIndex: number): FieldMap
     } catch (e) {
       throw new NodeOperationError(ctx.getNode(), `Invalid field mapping JSON: ${(e as Error).message}`, { itemIndex });
     }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new NodeOperationError(
+        ctx.getNode(),
+        'Field mapping JSON must be a flat object mapping output keys to source path strings',
+        { itemIndex },
+      );
+    }
+    for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof val !== 'string') {
+        throw new NodeOperationError(
+          ctx.getNode(),
+          `Field mapping value for "${key}" must be a string, got ${typeof val}`,
+          { itemIndex },
+        );
+      }
+    }
     mappings = Object.entries(parsed as Record<string, string>).map(([outputKey, sourcePath]) => ({
       outputKey,
-      sourcePath: sourcePath as string,
+      sourcePath,
     }));
   } else {
     // mode === 'keyValue'
@@ -71,31 +87,13 @@ export class CHEFSSubmissionExtractor implements INodeType {
     usableAsTool: true,
     inputs: [NodeConnectionTypes.Main],
     outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'chefsFormAuth',
+        required: true,
+      },
+    ],
     properties: [
-      {
-        displayName: 'Domain',
-        name: 'domain',
-        type: 'string',
-        default: 'https://submit.digital.gov.bc.ca/app/api/v1',
-        description: 'Base URL of the CHEFS API',
-      },
-      {
-        displayName: 'Form ID',
-        name: 'formId',
-        type: 'string',
-        required: true,
-        default: '',
-        description: 'The CHEFS Form ID (used as Basic Auth username)',
-      },
-      {
-        displayName: 'API Key',
-        name: 'apiKey',
-        type: 'string',
-        typeOptions: { password: true },
-        required: true,
-        default: '',
-        description: 'The CHEFS API Key for the form (used as Basic Auth password)',
-      },
       {
         displayName: 'Submission ID',
         name: 'submissionId',
@@ -159,7 +157,8 @@ export class CHEFSSubmissionExtractor implements INodeType {
                 name: 'sourcePath',
                 type: 'string',
                 default: '',
-                description: 'Dot-notation path into the submission data, e.g. company.headquarters.address.city',
+                description:
+                  'Dot-notation path into the submission data, e.g. company.headquarters.address.city or items.0.name',
               },
             ],
           },
@@ -182,13 +181,21 @@ export class CHEFSSubmissionExtractor implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
+    const credentials = (await this.getCredentials('chefsFormAuth')) as unknown as ChefsFormCredentials;
+
+    if (!credentials.formId || !credentials.apiKey) {
+      throw new NodeOperationError(this.getNode(), 'CHEFS credentials are incomplete: formId and apiKey are required');
+    }
+
     for (let i = 0; i < items.length; i++) {
       try {
         // Step 1: Read node parameters
-        const submissionId = this.getNodeParameter('submissionId', i) as string;
-        const formId = this.getNodeParameter('formId', i) as string;
-        const apiKey = this.getNodeParameter('apiKey', i) as string;
-        const domain = this.getNodeParameter('domain', i) as string;
+        const submissionId = (this.getNodeParameter('submissionId', i) as string).trim();
+        if (!submissionId) {
+          throw new NodeOperationError(this.getNode(), 'Submission ID is required and cannot be empty', {
+            itemIndex: i,
+          });
+        }
         const missingPathBehavior = this.getNodeParameter('missingPathBehavior', i) as string;
         const includeSubmissionMeta = this.getNodeParameter('includeSubmissionMeta', i) as boolean;
 
@@ -196,7 +203,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
         const mappings = parseFieldMappings(this, i);
 
         // Step 3: Fetch submission from CHEFS API
-        const response = await chefsApiRequest(this, 'GET', `/submissions/${submissionId}`, formId, apiKey, domain);
+        const response = await chefsApiRequest(this, 'GET', `/submissions/${submissionId}`, credentials);
 
         // Step 4: Validate response structure and extract submission data
         // The CHEFS API wraps everything in a top-level `submission` key.
@@ -268,6 +275,9 @@ export class CHEFSSubmissionExtractor implements INodeType {
             pairedItem: { item: i },
           });
           continue;
+        }
+        if (error instanceof NodeOperationError) {
+          throw error;
         }
         if ((error as Error & { response?: unknown }).response) {
           throw new NodeApiError(this.getNode(), error as unknown as JsonObject);

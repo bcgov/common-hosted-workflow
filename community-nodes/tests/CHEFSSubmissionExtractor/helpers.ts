@@ -81,7 +81,7 @@ interface CreateContextOptions {
   submissionId?: string;
   formId?: string;
   apiKey?: string;
-  domain?: string;
+  baseUrl?: string;
   fieldMappingMode?: 'keyValue' | 'json';
   missingPathBehavior?: 'returnNull' | 'throwError';
   includeSubmissionMeta?: boolean;
@@ -96,7 +96,7 @@ export function createExecutionContext(opts: CreateContextOptions) {
     submissionId = 'sub-001',
     formId = 'form-001',
     apiKey = MOCK_API_KEY,
-    domain = 'https://submit.digital.gov.bc.ca/app/api/v1',
+    baseUrl = 'https://submit.digital.gov.bc.ca/app/api/v1',
     fieldMappingMode = 'keyValue',
     missingPathBehavior = 'returnNull',
     includeSubmissionMeta = false,
@@ -108,11 +108,17 @@ export function createExecutionContext(opts: CreateContextOptions) {
 
   const httpRequest = vi.fn().mockResolvedValue(httpResponse);
 
+  const getCredentials = vi.fn().mockResolvedValue({
+    formId,
+    apiKey,
+    baseUrl,
+  });
+
   const allParams: ParamMap = {
     submissionId,
     formId,
     apiKey,
-    domain,
+    baseUrl,
     fieldMappingMode,
     missingPathBehavior,
     includeSubmissionMeta,
@@ -126,6 +132,7 @@ export function createExecutionContext(opts: CreateContextOptions) {
       if (name in allParams) return allParams[name];
       return fallback;
     }),
+    getCredentials: getCredentials,
     getNode: vi.fn(() => ({ name: 'CHEFS Submission Extractor Test' })),
     continueOnFail: vi.fn(() => continueOnFail),
     helpers: {
