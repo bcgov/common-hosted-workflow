@@ -277,15 +277,9 @@ This source is intended for Sysdig alert webhook payloads. If you connect it thr
 
 This source is intended for Uptime.com alert webhook payloads. If you connect it through n8n, use the incoming request body directly, usually with `{{ $json.body }}`.
 
-<<<<<<< HEAD
-
 ### Status Cake
 
 This source is intended for StatusCake webhook payloads. If you connect it through n8n, use the incoming request body directly, usually with `{{ $json.body }}`.
-
-=======
-
-> > > > > > > f721948cf902b1f89dc1e49dbcd246fb5f5389da
 
 ## Common Payload Expressions
 
