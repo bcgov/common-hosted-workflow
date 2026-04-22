@@ -346,38 +346,7 @@
       "name": "Get CHEF Income Form Details"
     }
   ],
-  "pinData": {
-    "Wait For Income form": [
-      {
-        "json": {
-          "headers": {
-            "host": "localhost:5678",
-            "connection": "keep-alive",
-            "x-n8n-api-key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNDBmMjQ0My1jMWIzLTQ2YmQtOTRmNS03YmQyZjEzMzNkNDAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiN2M4YTFiNjUtZTkyNy00ZWYxLWFlZjgtNjE3OWY0NjQ1NTMwIiwiaWF0IjoxNzc2MTE1OTM1fQ.SJVUVmH-bu71CSCqdp7Z35n2Uk7aximOdgyoc-t0WTw",
-            "x-tenant-id": "a778f5a2-4f45-4f37-9707-2494b9de5113",
-            "content-type": "application/json",
-            "accept": "application/json",
-            "accept-language": "*",
-            "sec-fetch-mode": "cors",
-            "user-agent": "node",
-            "accept-encoding": "gzip, deflate",
-            "content-length": "122"
-          },
-          "params": {},
-          "query": {
-            "signature": "707a5ce59b4b8db6b304920f3581654faa2b655349b2d2eb1c6083e0237e3d9f"
-          },
-          "body": {
-            "formId": "e499dd20-40d5-4a7b-9006-bc5f0fbba252",
-            "actorId": "amina",
-            "submission_id": "167f0d50-6f90-4efb-ab0d-620671d88967"
-          },
-          "webhookUrl": "http://localhost:5678/webhook/71cfbd67-501d-4451-9b3a-5198696ef33e",
-          "executionMode": "production"
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Create a message": {
       "main": [
