@@ -73,13 +73,13 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
   );
 
   return (
-    <div className="border-r border-border flex flex-col">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-[95px] z-10">
+    <div className="border-r border-border flex flex-col overflow-y-auto">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-0 z-10">
         <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-text-muted">
           <span className="text-base">📋</span> Forms
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+      <div className="flex-1 p-3 flex flex-col gap-2">
         {chefsLoading ? (
           <div className="text-xs text-text-dim text-center py-4">Loading CHEFS forms…</div>
         ) : chefsError ? (

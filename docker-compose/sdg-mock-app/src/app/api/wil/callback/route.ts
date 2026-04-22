@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { wilCallback, wilGetAction } from '@/lib/wil-proxy';
+import { resolvePlaygroundConfig } from '@/lib/playground-resolve';
+import type { ResolvedConfig } from '@/lib/playground-resolve';
 
 /**
  * Secure callback proxy.
@@ -11,6 +13,17 @@ import { wilCallback, wilGetAction } from '@/lib/wil-proxy';
  * This keeps signed webhook URLs and callback details server-side only.
  */
 export async function POST(request: NextRequest) {
+  // Resolve playground-specific config when the header is present
+  const playgroundName = request.headers.get('x-playground-id');
+  const config: ResolvedConfig | undefined = (() => {
+    if (playgroundName === null) return undefined;
+    const resolved = resolvePlaygroundConfig(playgroundName);
+    return resolved ?? undefined;
+  })();
+  if (playgroundName !== null && config === undefined) {
+    return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
+  }
+
   const { actionId, body } = await request.json();
 
   if (!actionId || typeof actionId !== 'string') {
@@ -18,7 +31,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Fetch the full action (with callbackUrl) from the WIL API server-side
-  const actionResp = await wilGetAction(actionId);
+  const actionResp = await wilGetAction(actionId, config);
   if (!actionResp.ok) {
     const errText = await actionResp.text();
     return NextResponse.json(
@@ -34,7 +47,7 @@ export async function POST(request: NextRequest) {
   }
 
   const method = ((action.callbackMethod as string) || 'POST').toUpperCase();
-  const upstream = await wilCallback(callbackUrl, method, body ?? {});
+  const upstream = await wilCallback(callbackUrl, method, body ?? {}, config);
 
   // Try to return JSON; fall back to text
   const contentType = upstream.headers.get('content-type') || '';

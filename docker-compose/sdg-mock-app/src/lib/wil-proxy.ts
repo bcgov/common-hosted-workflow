@@ -1,25 +1,32 @@
 /**
  * Server-side helper for proxying requests to the Workflow Interaction Layer API.
- * Reads credentials from environment variables so they never reach the browser.
+ *
+ * All callers must provide a ResolvedConfig with the playground's credentials.
+ * Environment-variable fallback has been removed — credentials come exclusively
+ * from the playground database.
  */
 
-const getEnv = () => {
-  const n8nTarget = (process.env.N8N_TARGET || 'http://localhost:5678').replace(/\/+$/, '');
-  const apiKey = process.env.X_N8N_API_KEY || '';
-  const tenantId = process.env.X_TENANT_ID || '';
-  return { n8nTarget, apiKey, tenantId };
-};
+import type { ResolvedConfig } from './playground-resolve';
 
-function logRequest(method: string, url: string, status?: number) {
-  const { apiKey, tenantId, n8nTarget } = getEnv();
+function getEffective(config: ResolvedConfig) {
+  return {
+    n8nTarget: config.n8nTarget.replace(/\/+$/, ''),
+    apiKey: config.apiKey,
+    tenantId: config.tenantId,
+  };
+}
+
+function logRequest(method: string, url: string, status?: number, config?: ResolvedConfig) {
+  if (!config) return;
+  const { apiKey, tenantId, n8nTarget } = getEffective(config);
   const maskedKey = apiKey ? `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}` : '(empty)';
   console.log(
     `[wil-proxy] ${method} ${url} → status=${status ?? '?'} | target=${n8nTarget} apiKey=${maskedKey} tenantId=${tenantId || '(empty)'}`,
   );
 }
 
-export function wilHeaders(): Record<string, string> {
-  const { apiKey, tenantId } = getEnv();
+export function wilHeaders(config: ResolvedConfig): Record<string, string> {
+  const { apiKey, tenantId } = getEffective(config);
   return {
     'X-N8N-API-KEY': apiKey,
     'X-TENANT-ID': tenantId,
@@ -28,17 +35,18 @@ export function wilHeaders(): Record<string, string> {
   };
 }
 
-export function wilBaseUrl(): string {
-  const { n8nTarget } = getEnv();
+export function wilBaseUrl(config: ResolvedConfig): string {
+  const { n8nTarget } = getEffective(config);
   return `${n8nTarget}/rest/custom/v1`;
 }
 
 /** Forward a GET request to the WIL API and return the raw Response. */
-export async function wilGet(path: string, searchParams?: URLSearchParams): Promise<Response> {
+export async function wilGet(path: string, searchParams?: URLSearchParams, config?: ResolvedConfig): Promise<Response> {
+  if (!config) throw new Error('[wil-proxy] ResolvedConfig is required');
   const qs = searchParams?.toString();
-  const url = `${wilBaseUrl()}${path}${qs ? '?' + qs : ''}`;
-  const resp = await fetch(url, { headers: wilHeaders(), cache: 'no-store' });
-  logRequest('GET', url, resp.status);
+  const url = `${wilBaseUrl(config)}${path}${qs ? '?' + qs : ''}`;
+  const resp = await fetch(url, { headers: wilHeaders(config), cache: 'no-store' });
+  logRequest('GET', url, resp.status, config);
   if (!resp.ok) {
     const body = await resp.clone().text();
     console.error(`[wil-proxy] GET ${url} error body:`, body);
@@ -47,14 +55,15 @@ export async function wilGet(path: string, searchParams?: URLSearchParams): Prom
 }
 
 /** Forward a PATCH request to the WIL API. */
-export async function wilPatch(path: string, body: unknown): Promise<Response> {
-  const url = `${wilBaseUrl()}${path}`;
+export async function wilPatch(path: string, body: unknown, config?: ResolvedConfig): Promise<Response> {
+  if (!config) throw new Error('[wil-proxy] ResolvedConfig is required');
+  const url = `${wilBaseUrl(config)}${path}`;
   const resp = await fetch(url, {
     method: 'PATCH',
-    headers: wilHeaders(),
+    headers: wilHeaders(config),
     body: JSON.stringify(body),
   });
-  logRequest('PATCH', url, resp.status);
+  logRequest('PATCH', url, resp.status, config);
   if (!resp.ok) {
     const errBody = await resp.clone().text();
     console.error(`[wil-proxy] PATCH ${url} error body:`, errBody);
@@ -63,10 +72,11 @@ export async function wilPatch(path: string, body: unknown): Promise<Response> {
 }
 
 /** Fetch a single action by ID from the WIL API (server-side only). */
-export async function wilGetAction(actionId: string): Promise<Response> {
-  const url = `${wilBaseUrl()}/actions/${encodeURIComponent(actionId)}`;
-  const resp = await fetch(url, { headers: wilHeaders(), cache: 'no-store' });
-  logRequest('GET', url, resp.status);
+export async function wilGetAction(actionId: string, config?: ResolvedConfig): Promise<Response> {
+  if (!config) throw new Error('[wil-proxy] ResolvedConfig is required');
+  const url = `${wilBaseUrl(config)}/actions/${encodeURIComponent(actionId)}`;
+  const resp = await fetch(url, { headers: wilHeaders(config), cache: 'no-store' });
+  logRequest('GET', url, resp.status, config);
   if (!resp.ok) {
     const body = await resp.clone().text();
     console.error(`[wil-proxy] GET ${url} error body:`, body);
@@ -75,17 +85,21 @@ export async function wilGetAction(actionId: string): Promise<Response> {
 }
 
 /** Forward an arbitrary request to a callback URL with WIL credentials. */
-export async function wilCallback(callbackUrl: string, method: string, body: unknown): Promise<Response> {
-  // Rewrite public-facing n8n URLs to the internal Docker hostname.
-  // The browser sends localhost:5678 but this container must reach n8n via the Docker network.
-  const { n8nTarget } = getEnv();
+export async function wilCallback(
+  callbackUrl: string,
+  method: string,
+  body: unknown,
+  config?: ResolvedConfig,
+): Promise<Response> {
+  if (!config) throw new Error('[wil-proxy] ResolvedConfig is required');
+  const { n8nTarget } = getEffective(config);
   const rewritten = callbackUrl.replace(/^https?:\/\/localhost:5678/, n8nTarget);
   const resp = await fetch(rewritten, {
     method,
-    headers: wilHeaders(),
+    headers: wilHeaders(config),
     body: JSON.stringify(body),
   });
-  logRequest(method, rewritten, resp.status);
+  logRequest(method, rewritten, resp.status, config);
   if (!resp.ok) {
     const errBody = await resp.clone().text();
     console.error(`[wil-proxy] ${method} ${rewritten} error body:`, errBody);

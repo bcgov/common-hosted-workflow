@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadChefsConfig } from '@/lib/chefs-config';
 import { wilGet } from '@/lib/wil-proxy';
+import { resolvePlaygroundConfig, resolvePlaygroundForms } from '@/lib/playground-resolve';
 
-const CHEFS_BASE_URL = process.env.CHEFS_BASE_URL || 'https://submit.digital.gov.bc.ca/app';
+const DEFAULT_CHEFS_BASE_URL = 'https://submit.digital.gov.bc.ca/app';
 
 /**
  * GET /api/chefs/token?formId=abc-123[&actionId=xyz-456]
@@ -20,15 +21,40 @@ const CHEFS_BASE_URL = process.env.CHEFS_BASE_URL || 'https://submit.digital.gov
  * In both cases, calls the CHEFS gateway token endpoint server-to-server
  * with Basic auth (formId:apiKey) and returns the short-lived JWT.
  *
+ * When the X-PLAYGROUND-ID header is present, uses playground-specific
+ * chefsBaseUrl and form apiKey from the database.
+ *
  * @see https://developer.gov.bc.ca/docs/default/component/chefs-techdocs/Capabilities/Integrations/Embedding-Webcomponent/#getting-an-auth-token
  */
 export async function GET(request: NextRequest) {
   const formId = request.nextUrl.searchParams.get('formId');
   const actionId = request.nextUrl.searchParams.get('actionId');
+  const playgroundName = request.headers.get('x-playground-id') ?? null;
 
   if (!formId) {
     return NextResponse.json({ error: 'formId query parameter is required' }, { status: 400 });
   }
+
+  // ── Resolve playground config (used for both chefsBaseUrl and WIL proxy) ──
+  let chefsBaseUrl = DEFAULT_CHEFS_BASE_URL;
+  const pgConfig = playgroundName !== null ? resolvePlaygroundConfig(playgroundName) : null;
+
+  if (playgroundName !== null) {
+    if (pgConfig === null) {
+      return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
+    }
+    chefsBaseUrl = pgConfig.chefsBaseUrl || DEFAULT_CHEFS_BASE_URL;
+  }
+
+  // Build the ResolvedConfig shape that wilGet expects (or undefined for env fallback)
+  const wilConfig = pgConfig
+    ? {
+        n8nTarget: pgConfig.n8nTarget,
+        apiKey: pgConfig.apiKey,
+        tenantId: pgConfig.tenantId,
+        chefsBaseUrl: pgConfig.chefsBaseUrl,
+      }
+    : undefined;
 
   let apiKey: string | undefined;
   let formName = '';
@@ -36,7 +62,7 @@ export async function GET(request: NextRequest) {
   if (actionId) {
     // ── Mode 2: Get apiKey from the action's payload ──
     try {
-      const resp = await wilGet(`/actions/${encodeURIComponent(actionId)}`);
+      const resp = await wilGet(`/actions/${encodeURIComponent(actionId)}`, undefined, wilConfig);
       if (!resp.ok) {
         const text = await resp.text();
         console.error(`[chefs-token] Failed to fetch action ${actionId}: ${resp.status} ${text}`);
@@ -50,8 +76,20 @@ export async function GET(request: NextRequest) {
       console.error('[chefs-token] Error fetching action:', err);
       return NextResponse.json({ error: 'Failed to reach WIL API' }, { status: 502 });
     }
+  } else if (playgroundName !== null) {
+    // ── Mode 1 (playground): Get apiKey from playground DB ──
+    const resolvedForms = resolvePlaygroundForms(playgroundName);
+    if (resolvedForms === null) {
+      return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
+    }
+    const entry = resolvedForms.find((f) => f.formId === formId);
+    if (!entry) {
+      return NextResponse.json({ error: 'Form not found in configuration' }, { status: 404 });
+    }
+    apiKey = entry.apiKey;
+    formName = entry.formName;
   } else {
-    // ── Mode 1: Get apiKey from chefs-config.json ──
+    // ── Mode 1 (legacy): Get apiKey from chefs-config.json ──
     const chefsConfig = loadChefsConfig();
     const entry = chefsConfig.forms.find((f) => f.formId === formId);
     if (!entry) {
@@ -67,7 +105,7 @@ export async function GET(request: NextRequest) {
 
   // Call the CHEFS gateway token endpoint with Basic auth
   const basicAuth = Buffer.from(`${formId}:${apiKey}`).toString('base64');
-  const tokenUrl = `${CHEFS_BASE_URL}/gateway/v1/auth/token/forms/${formId}`;
+  const tokenUrl = `${chefsBaseUrl}/gateway/v1/auth/token/forms/${formId}`;
 
   try {
     const resp = await fetch(tokenUrl, {

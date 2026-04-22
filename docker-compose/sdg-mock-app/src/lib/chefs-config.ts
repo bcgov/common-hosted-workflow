@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { getPlaygroundForms } from './playground-db';
 
 export interface ChefsFormConfig {
   formId: string;
@@ -9,7 +10,7 @@ export interface ChefsFormConfig {
   callbackWebhookUrl: string;
 }
 
-interface ChefsConfig {
+export interface ChefsConfig {
   forms: ChefsFormConfig[];
 }
 
@@ -40,4 +41,25 @@ export function loadChefsConfig(): ChefsConfig {
 
   console.warn('[chefs-config] chefs-config.json not found — using empty config');
   return EMPTY_CONFIG;
+}
+
+/**
+ * Load CHEFS form configuration from the playground database.
+ *
+ * Queries the playground DB for form entries associated with the given
+ * playground name and maps them to the existing ChefsConfig shape.
+ * Returns an empty forms array if the playground has no form entries.
+ */
+export function loadPlaygroundChefsConfig(playgroundName: string): ChefsConfig {
+  const formRecords = getPlaygroundForms(playgroundName);
+
+  return {
+    forms: formRecords.map((record) => ({
+      formId: record.form_id,
+      formName: record.form_name,
+      apiKey: record.api_key,
+      allowedActors: JSON.parse(record.allowed_actors) as string[],
+      callbackWebhookUrl: record.callback_webhook_url,
+    })),
+  };
 }

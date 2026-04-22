@@ -5,3 +5,11 @@ out/
 
 # Contains CHEFS API keys — do not commit
 src/app/api/chefs/chefs-config.json
+
+# SQLite database files
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo

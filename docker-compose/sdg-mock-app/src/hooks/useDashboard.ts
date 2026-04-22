@@ -1,11 +1,29 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type FormConfig, type Message, type ActionRequest, loadFormConfig, saveFormConfig, apiFetch } from '@/lib/api';
+import {
+  type FormConfig,
+  type Message,
+  type ActionRequest,
+  loadFormConfig,
+  saveFormConfig,
+  apiFetch,
+  setPlaygroundContext,
+} from '@/lib/api';
 import { useToast } from '@/components/Toast';
 
-export function useDashboard() {
+export function useDashboard(playgroundName?: string) {
   const toast = useToast();
+
+  // ── Playground context ──
+  useEffect(() => {
+    if (playgroundName) {
+      setPlaygroundContext(playgroundName);
+    }
+    return () => {
+      setPlaygroundContext(null);
+    };
+  }, [playgroundName]);
 
   // ── Config state ──
   const [formCfg, setFormCfg] = useState<FormConfig | null>(null);
