@@ -3,9 +3,6 @@ node_modules/
 out/
 .env*.local
 
-# Contains CHEFS API keys — do not commit
-src/app/api/chefs/chefs-config.json
-
 # SQLite database files
 data/*.db
 data/*.db-wal

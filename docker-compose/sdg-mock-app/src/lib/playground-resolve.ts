@@ -22,11 +22,8 @@ export interface ResolvedFormEntry {
 /**
  * Resolve a playground's WIL/CHEFS configuration from the database.
  *
- * Returns `null` when `playgroundName` is null (signals the caller to
- * fall back to environment variables).
- *
- * Returns `null` when the playground is not found in the database
- * (the caller should return HTTP 404).
+ * Returns `null` when `playgroundName` is null or the playground is
+ * not found in the database (the caller should return HTTP 404).
  */
 export function resolvePlaygroundConfig(playgroundName: string | null): ResolvedConfig | null {
   if (playgroundName === null) {
@@ -49,11 +46,8 @@ export function resolvePlaygroundConfig(playgroundName: string | null): Resolved
 /**
  * Resolve a playground's CHEFS form entries from the database.
  *
- * Returns `null` when `playgroundName` is null (signals the caller to
- * fall back to `chefs-config.json`).
- *
- * Returns `null` when the playground is not found in the database
- * (the caller should return HTTP 404).
+ * Returns `null` when `playgroundName` is null or the playground is
+ * not found in the database (the caller should return HTTP 404).
  */
 export function resolvePlaygroundForms(playgroundName: string | null): ResolvedFormEntry[] | null {
   if (playgroundName === null) {

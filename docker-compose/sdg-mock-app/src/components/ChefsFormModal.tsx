@@ -7,11 +7,19 @@ interface ChefsFormModalProps {
   formId: string;
   formName?: string;
   token: string;
+  chefsBaseUrl?: string;
   onClose: () => void;
   onSubmitted: (detail: unknown) => void;
 }
 
-export default function ChefsFormModal({ formId, formName, token, onClose, onSubmitted }: ChefsFormModalProps) {
+export default function ChefsFormModal({
+  formId,
+  formName,
+  token,
+  chefsBaseUrl,
+  onClose,
+  onSubmitted,
+}: ChefsFormModalProps) {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
   // Close on Escape key
@@ -64,6 +72,7 @@ export default function ChefsFormModal({ formId, formName, token, onClose, onSub
           <ChefsFormViewer
             formId={formId}
             authToken={token}
+            baseUrl={chefsBaseUrl || undefined}
             onSubmissionComplete={handleSubmissionComplete}
             onSubmissionError={(err) => {
               console.error('Form submission error:', err);

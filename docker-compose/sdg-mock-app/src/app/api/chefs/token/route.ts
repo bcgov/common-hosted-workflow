@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadChefsConfig } from '@/lib/chefs-config';
 import { wilGet } from '@/lib/wil-proxy';
 import { resolvePlaygroundConfig, resolvePlaygroundForms } from '@/lib/playground-resolve';
 
@@ -11,7 +10,7 @@ const DEFAULT_CHEFS_BASE_URL = 'https://submit.digital.gov.bc.ca/app';
  * Two modes:
  *
  * 1. Forms panel (no actionId):
- *    Looks up the form in chefs-config.json → uses the stored apiKey.
+ *    Looks up the form in the playground database → uses the stored apiKey.
  *
  * 2. Action "showform" (with actionId):
  *    Fetches the action from the WIL API → extracts the apiKey from
@@ -21,7 +20,7 @@ const DEFAULT_CHEFS_BASE_URL = 'https://submit.digital.gov.bc.ca/app';
  * In both cases, calls the CHEFS gateway token endpoint server-to-server
  * with Basic auth (formId:apiKey) and returns the short-lived JWT.
  *
- * When the X-PLAYGROUND-ID header is present, uses playground-specific
+ * The X-PLAYGROUND-ID header is required. Uses playground-specific
  * chefsBaseUrl and form apiKey from the database.
  *
  * @see https://developer.gov.bc.ca/docs/default/component/chefs-techdocs/Capabilities/Integrations/Embedding-Webcomponent/#getting-an-auth-token
@@ -29,32 +28,30 @@ const DEFAULT_CHEFS_BASE_URL = 'https://submit.digital.gov.bc.ca/app';
 export async function GET(request: NextRequest) {
   const formId = request.nextUrl.searchParams.get('formId');
   const actionId = request.nextUrl.searchParams.get('actionId');
-  const playgroundName = request.headers.get('x-playground-id') ?? null;
+  const playgroundName = request.headers.get('x-playground-id');
 
   if (!formId) {
     return NextResponse.json({ error: 'formId query parameter is required' }, { status: 400 });
   }
 
-  // ── Resolve playground config (used for both chefsBaseUrl and WIL proxy) ──
-  let chefsBaseUrl = DEFAULT_CHEFS_BASE_URL;
-  const pgConfig = playgroundName !== null ? resolvePlaygroundConfig(playgroundName) : null;
-
-  if (playgroundName !== null) {
-    if (pgConfig === null) {
-      return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
-    }
-    chefsBaseUrl = pgConfig.chefsBaseUrl || DEFAULT_CHEFS_BASE_URL;
+  if (!playgroundName) {
+    return NextResponse.json({ error: 'X-PLAYGROUND-ID header is required' }, { status: 400 });
   }
 
-  // Build the ResolvedConfig shape that wilGet expects (or undefined for env fallback)
-  const wilConfig = pgConfig
-    ? {
-        n8nTarget: pgConfig.n8nTarget,
-        apiKey: pgConfig.apiKey,
-        tenantId: pgConfig.tenantId,
-        chefsBaseUrl: pgConfig.chefsBaseUrl,
-      }
-    : undefined;
+  // ── Resolve playground config ──
+  const pgConfig = resolvePlaygroundConfig(playgroundName);
+  if (pgConfig === null) {
+    return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
+  }
+
+  const chefsBaseUrl = pgConfig.chefsBaseUrl || DEFAULT_CHEFS_BASE_URL;
+
+  const wilConfig = {
+    n8nTarget: pgConfig.n8nTarget,
+    apiKey: pgConfig.apiKey,
+    tenantId: pgConfig.tenantId,
+    chefsBaseUrl: pgConfig.chefsBaseUrl,
+  };
 
   let apiKey: string | undefined;
   let formName = '';
@@ -76,22 +73,13 @@ export async function GET(request: NextRequest) {
       console.error('[chefs-token] Error fetching action:', err);
       return NextResponse.json({ error: 'Failed to reach WIL API' }, { status: 502 });
     }
-  } else if (playgroundName !== null) {
-    // ── Mode 1 (playground): Get apiKey from playground DB ──
+  } else {
+    // ── Mode 1: Get apiKey from playground DB ──
     const resolvedForms = resolvePlaygroundForms(playgroundName);
     if (resolvedForms === null) {
       return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
     }
     const entry = resolvedForms.find((f) => f.formId === formId);
-    if (!entry) {
-      return NextResponse.json({ error: 'Form not found in configuration' }, { status: 404 });
-    }
-    apiKey = entry.apiKey;
-    formName = entry.formName;
-  } else {
-    // ── Mode 1 (legacy): Get apiKey from chefs-config.json ──
-    const chefsConfig = loadChefsConfig();
-    const entry = chefsConfig.forms.find((f) => f.formId === formId);
     if (!entry) {
       return NextResponse.json({ error: 'Form not found in configuration' }, { status: 404 });
     }
@@ -127,7 +115,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await resp.json();
-    return NextResponse.json({ formId, formName, authToken: data.token });
+    return NextResponse.json({ formId, formName, authToken: data.token, chefsBaseUrl });
   } catch (err) {
     console.error('[chefs-token] Error calling CHEFS token endpoint:', err);
     return NextResponse.json({ error: 'Failed to reach CHEFS server' }, { status: 502 });

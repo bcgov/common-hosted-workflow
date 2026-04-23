@@ -166,7 +166,7 @@ export async function fetchChefsFormsForActor(actorId: string): Promise<ChefsFor
 export async function fetchChefsToken(
   formId: string,
   actionId?: string,
-): Promise<{ authToken: string; formName: string }> {
+): Promise<{ authToken: string; formName: string; chefsBaseUrl: string }> {
   const params = new URLSearchParams({ formId });
   if (actionId) params.set('actionId', actionId);
   const resp = await fetch(`/api/chefs/token?${params}`, {
@@ -177,7 +177,11 @@ export async function fetchChefsToken(
     throw new Error(`${resp.status}: ${text}`);
   }
   const data = await resp.json();
-  return { authToken: data.authToken as string, formName: (data.formName as string) || '' };
+  return {
+    authToken: data.authToken as string,
+    formName: (data.formName as string) || '',
+    chefsBaseUrl: (data.chefsBaseUrl as string) || '',
+  };
 }
 
 /** Forward a CHEFS form submission to the backend callback. */

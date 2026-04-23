@@ -1,10 +1,35 @@
-# SDG Mock App — Next.js
+# SDG Mock App — Multi-Tenant Testing Platform
 
 A Next.js application that serves as a demo frontend for the Workflow Interaction Layer (WIL) and CHEFS form rendering. Runs on port **8081**.
 
+This app exists to help teams test the SDG ↔ CHEFS ↔ n8n integration without deploying a full SDG frontend. It is not part of the production SDG architecture — it is a standalone testing tool.
+
+## How the Real SDG Integration Works
+
+In a production-like setup the data flow is straightforward:
+
+```
+SDG Frontend  →  SDG Backend  →  WIL API (n8n)  +  CHEFS API
+```
+
+The SDG backend talks to the WIL API for workflow actions/messages and to the CHEFS API for form rendering and submissions. No playgrounds, no SQLite database, no `X-PLAYGROUND-ID` header — those concepts are specific to this mock app.
+
+## Why Playgrounds Exist (Mock App Only)
+
+To let multiple testers exercise the integration simultaneously without stepping on each other, this mock app introduces the concept of **playgrounds**. Each playground is an isolated configuration that stores its own:
+
+- n8n target URL and WIL API key
+- WIL tenant ID
+- CHEFS base URL
+- CHEFS form entries (form IDs, API keys, callback webhook URLs)
+
+This means two testers can point at different n8n instances (or the same instance with different tenants) and manage their own set of CHEFS forms independently.
+
+Playgrounds are stored in a local SQLite database (`data/playgrounds.db`) and are purely a mock-app concern. The real SDG integration does not use playgrounds.
+
 ## Architecture
 
-### Forms for Triggering Workflow (chefs-config.json)
+### Forms for Triggering Workflow (chefs-config)
 
 ```mermaid
 sequenceDiagram
@@ -17,7 +42,7 @@ sequenceDiagram
     S-->>B: { forms: [{ formId, formName }] }
 
     B->>S: GET /api/chefs/token?formId=X
-    S->>C: POST /gateway/v1/auth/token/forms/X<br/>(Basic formId:apiKey — from chefs-config.json)
+    S->>C: POST /gateway/v1/auth/token/forms/X<br/>(Basic formId:apiKey)
     C-->>S: { token: "short-lived JWT" }
     S-->>B: { formId, formName, authToken }
 
@@ -67,7 +92,7 @@ sequenceDiagram
     S-->>B: { success }
 ```
 
-> The frontend never sees CHEFS API keys. The backend reads them from `chefs-config.json` (Forms panel) or from the action's payload in the WIL database (`showform` actions), exchanges them for short-lived JWTs via the CHEFS gateway, and returns only the JWT to the browser. The `<chefs-form-viewer>` web component handles automatic token refresh.
+> The frontend never sees CHEFS API keys. The backend reads them from the playground's form configuration (or from the action's payload for `showform` actions), exchanges them for short-lived JWTs via the CHEFS gateway, and returns only the JWT to the browser. The `<chefs-form-viewer>` web component handles automatic token refresh.
 
 ## Security — Sensitive Data Never Reaches the Browser
 
@@ -97,15 +122,27 @@ The proxy strips `callbackUrl`, `callbackMethod`, and `callbackPayloadSpec` from
 
 ## Pages
 
-### 1. SDG Demo Dashboard — `/`
+### 1. Landing Page — `/`
 
-Three-panel layout:
+Prompts for a tester name (stored in localStorage), then shows the list of playgrounds owned by that tester. From here you can create, import, clone, or delete playgrounds.
 
-- **Forms** — Lists CHEFS forms available for the current actor (from `chefs-config.json`). Click "Fill Form" to open a modal with the CHEFS form viewer.
+### 2. Playground Configuration — `/playground/:name/configuration`
+
+Edit a playground's connection settings (n8n target, API key, tenant ID, CHEFS base URL) and manage its CHEFS form entries. You can also export the configuration as JSON or test the n8n connection.
+
+### 3. Playground User Test Dashboard — `/playground/:name/user-test`
+
+Three-panel layout for testing the integration as a specific actor:
+
+- **Forms** — Lists CHEFS forms configured in this playground. Click "Fill Form" to open a modal with the CHEFS form viewer.
 - **Messages** — Workflow messages for the actor.
 - **Action Requests** — Pending actions. `showform` actions show a "Fill Form" button that opens the form in a modal; on submit the response is sent to the action's callback URL and the action is marked completed.
 
-### 2. CHEFS Form Preview — `/check-form-rendering`
+### 4. Admin Dashboard — `/admin`
+
+Read-only overview of all playgrounds across all testers, grouped by owner. Useful for seeing who has what configured.
+
+### 5. CHEFS Form Preview — `/check-form-rendering`
 
 Standalone page for testing CHEFS form rendering outside the dashboard.
 
@@ -121,79 +158,109 @@ http://localhost:8081/check-form-rendering?form-id=FORM_ID&auth-token=AUTH_TOKEN
 pnpm install
 ```
 
-### 2. Configure environment variables
-
-Copy the example and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-| Variable         | Description                                                                    | Default                                |
-| ---------------- | ------------------------------------------------------------------------------ | -------------------------------------- |
-| `N8N_TARGET`     | n8n instance URL (server-side proxy)                                           | `http://localhost:5678`                |
-| `CHEFS_BASE_URL` | CHEFS API base URL (used by both API routes and the form viewer web component) | `https://submit.digital.gov.bc.ca/app` |
-| `X_N8N_API_KEY`  | WIL API key (server-side only)                                                 | —                                      |
-| `X_TENANT_ID`    | WIL tenant ID (server-side only)                                               | —                                      |
-
-### 3. Configure CHEFS forms
-
-Copy the example config and add your form IDs and API keys:
-
-```bash
-cp src/app/api/chefs/chefs-config-example.json src/app/api/chefs/chefs-config.json
-```
-
-Edit `chefs-config.json`:
-
-```json
-{
-  "forms": [
-    {
-      "formId": "your-chefs-form-uuid",
-      "formName": "Human-readable form name",
-      "apiKey": "", // Your CHEF form API key goes here
-      "allowedActors": ["*"],
-      "callbackWebhookUrl": "http://localhost:5678/webhook/your-webhook"
-    }
-  ]
-}
-```
-
-| Field                | Description                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| `formId`             | The CHEFS form UUID                                                                               |
-| `formName`           | Display name shown in the Forms panel                                                             |
-| `apiKey`             | CHEFS API key for this form (never sent to the browser)                                           |
-| `allowedActors`      | Actor IDs that can see this form. Use `["*"]` for everyone                                        |
-| `callbackWebhookUrl` | Optional n8n webhook URL to POST submission data to after form submit. Leave empty (`""`) to skip |
-
-This file is gitignored since it contains secrets.
-
-### 4. Run
+### 2. Run
 
 ```bash
 pnpm dev
 ```
 
+That's it. All configuration (n8n credentials, CHEFS forms, etc.) is managed through the UI via playgrounds. The SQLite database is created automatically at `data/playgrounds.db` on first run.
+
+### Optional: Override the database path
+
+Set the `PLAYGROUND_DB_PATH` environment variable to store the SQLite database somewhere other than the default:
+
+```bash
+PLAYGROUND_DB_PATH=/path/to/playgrounds.db pnpm dev
+```
+
+## How Playgrounds Work
+
+When you open the app, you enter a tester name. This scopes the playground list to your name. Each playground you create stores a complete set of credentials and form configurations in the SQLite database.
+
+When you navigate to a playground's User Test dashboard, the frontend sets an `X-PLAYGROUND-ID` header on all API calls to `/api/wil/*` and `/api/chefs/*`. The backend reads this header, looks up the playground's credentials from the database, and uses them to proxy requests to the correct n8n instance and CHEFS gateway.
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant S as SDG Mock Backend
+    participant E as External Services
+
+    B->>S: GET /api/wil/actors/amina/actions<br/>X-PLAYGROUND-ID: my-playground
+    Note over S: Lookup "my-playground" in SQLite<br/>→ n8nTarget, apiKey, tenantId
+    S->>E: GET /rest/custom/v1/actors/amina/actions<br/>X-N8N-API-KEY: (from DB)<br/>X-TENANT-ID: (from DB)
+    E-->>S: [ ...actions ]
+    S-->>B: (sanitized response)
+```
+
+This is a mock-app-only mechanism. In a real SDG deployment, the backend would read its credentials from environment variables or a secrets manager — not from a SQLite database with a playground header.
+
 ## API Endpoints
 
-### WIL Proxy (existing)
+### WIL Proxy
+
+These endpoints proxy requests to the n8n WIL API using the playground's credentials (resolved from the `X-PLAYGROUND-ID` header).
 
 | Method | Path                                         | Description                                               |
 | ------ | -------------------------------------------- | --------------------------------------------------------- |
 | GET    | `/api/wil/actors/:actorId/messages`          | List messages for actor                                   |
-| GET    | `/api/wil/actors/:actorId/actions`           | List actions for actor                                    |
+| GET    | `/api/wil/actors/:actorId/actions`           | List actions for actor (sanitized)                        |
 | PATCH  | `/api/wil/actors/:actorId/actions/:actionId` | Update action status                                      |
 | POST   | `/api/wil/callback`                          | Forward callback to n8n (accepts `actionId`, not the URL) |
 
-### CHEFS Integration (new)
+### CHEFS Integration
+
+These endpoints handle CHEFS form listing, token exchange, and submission forwarding. They also use the `X-PLAYGROUND-ID` header to resolve form configurations and CHEFS base URL.
 
 | Method | Path                                   | Description                                                  |
 | ------ | -------------------------------------- | ------------------------------------------------------------ |
 | GET    | `/api/chefs/actors/:actorId/forms`     | List forms available for actor                               |
-| GET    | `/api/chefs/token?formId=X`            | Get short-lived JWT for a form (from config)                 |
+| GET    | `/api/chefs/token?formId=X`            | Get short-lived JWT for a form (from playground config)      |
 | GET    | `/api/chefs/token?formId=X&actionId=Y` | Get short-lived JWT for a form (API key from action payload) |
 | POST   | `/api/chefs/submissions`               | Forward form submission to configured webhook                |
 
-The app also proxies `/rest/*`, `/webhook/*`, and `/webhook-waiting/*` requests to the n8n instance.
+### Playground Management (Mock App Only)
+
+These endpoints manage the playground database. They are not part of the SDG integration — they exist only to support multi-tenant testing.
+
+| Method | Path                                     | Description                               |
+| ------ | ---------------------------------------- | ----------------------------------------- |
+| GET    | `/api/playgrounds?owner=<name>`          | List playgrounds for a tester             |
+| POST   | `/api/playgrounds`                       | Create a new playground                   |
+| GET    | `/api/playgrounds/:name`                 | Get full playground detail (with secrets) |
+| PUT    | `/api/playgrounds/:name`                 | Update playground configuration           |
+| DELETE | `/api/playgrounds/:name`                 | Delete a playground                       |
+| POST   | `/api/playgrounds/:name/clone`           | Clone a playground under a new name       |
+| GET    | `/api/playgrounds/:name/export`          | Export playground config as JSON          |
+| POST   | `/api/playgrounds/import`                | Import a playground from exported JSON    |
+| POST   | `/api/playgrounds/:name/test-connection` | Test connectivity to the n8n instance     |
+| GET    | `/api/admin/playgrounds`                 | List all playgrounds (admin view)         |
+
+## Database Schema (Mock App Only)
+
+The SQLite database has two tables:
+
+**playgrounds** — One row per playground, storing connection credentials.
+
+| Column           | Description                       |
+| ---------------- | --------------------------------- |
+| `name`           | Unique playground identifier (PK) |
+| `owner`          | Tester name who created it        |
+| `n8n_target`     | n8n instance URL                  |
+| `x_n8n_api_key`  | WIL API key                       |
+| `x_tenant_id`    | WIL tenant ID                     |
+| `chefs_base_url` | CHEFS API base URL                |
+| `created_at`     | Creation timestamp                |
+| `updated_at`     | Last update timestamp             |
+
+**playground_forms** — CHEFS form entries, linked to a playground via foreign key with cascade delete.
+
+| Column                 | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| `id`                   | Auto-increment PK                              |
+| `playground_name`      | FK → playgrounds.name                          |
+| `form_id`              | CHEFS form UUID                                |
+| `form_name`            | Display name                                   |
+| `api_key`              | CHEFS API key for this form                    |
+| `allowed_actors`       | JSON array of actor IDs (`["*"]` for everyone) |
+| `callback_webhook_url` | n8n webhook URL for form submissions           |

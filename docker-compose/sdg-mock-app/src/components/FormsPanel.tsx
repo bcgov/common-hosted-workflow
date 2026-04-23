@@ -23,6 +23,7 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
   const [modalFormId, setModalFormId] = useState<string | null>(null);
   const [modalFormName, setModalFormName] = useState<string | null>(null);
   const [modalToken, setModalToken] = useState<string | null>(null);
+  const [modalChefsBaseUrl, setModalChefsBaseUrl] = useState<string | null>(null);
   const [tokenLoading, setTokenLoading] = useState<string | null>(null);
 
   // Fetch CHEFS forms for the current actor
@@ -41,10 +42,11 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
     async (formId: string, formName: string) => {
       setTokenLoading(formId);
       try {
-        const { authToken } = await fetchChefsToken(formId);
+        const { authToken, chefsBaseUrl } = await fetchChefsToken(formId);
         setModalFormId(formId);
         setModalFormName(formName);
         setModalToken(authToken);
+        setModalChefsBaseUrl(chefsBaseUrl);
       } catch (err) {
         toast(err instanceof Error ? err.message : String(err), 'error');
       } finally {
@@ -67,6 +69,7 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
       setModalFormId(null);
       setModalFormName(null);
       setModalToken(null);
+      setModalChefsBaseUrl(null);
       setTimeout(onRefresh, 2000);
     },
     [modalFormId, actorId, toast, onRefresh],
@@ -109,10 +112,12 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
           formId={modalFormId}
           formName={modalFormName ?? undefined}
           token={modalToken}
+          chefsBaseUrl={modalChefsBaseUrl ?? undefined}
           onClose={() => {
             setModalFormId(null);
             setModalFormName(null);
             setModalToken(null);
+            setModalChefsBaseUrl(null);
           }}
           onSubmitted={handleChefsSubmitted}
         />

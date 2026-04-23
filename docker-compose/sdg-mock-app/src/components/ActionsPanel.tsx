@@ -79,6 +79,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [formToken, setFormToken] = useState<string | null>(null);
   const [formName, setFormName] = useState<string | null>(null);
+  const [formChefsBaseUrl, setFormChefsBaseUrl] = useState<string | null>(null);
   const [formTokenLoading, setFormTokenLoading] = useState(false);
 
   const isPatchable = ['pending', 'in_progress'].includes(a.status);
@@ -99,9 +100,10 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
     if (!showFormId) return;
     setFormTokenLoading(true);
     try {
-      const { authToken, formName: name } = await fetchChefsToken(showFormId, a.id);
+      const { authToken, formName: name, chefsBaseUrl } = await fetchChefsToken(showFormId, a.id);
       setFormToken(authToken);
       setFormName(name);
+      setFormChefsBaseUrl(chefsBaseUrl);
       setFormModalOpen(true);
     } catch (err) {
       toast(err instanceof Error ? err.message : String(err), 'error');
@@ -137,6 +139,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
       setFormModalOpen(false);
       setFormToken(null);
       setFormName(null);
+      setFormChefsBaseUrl(null);
     },
     [a.id, showFormId, actorId, toast, onRefresh],
   );
@@ -288,10 +291,12 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
           formId={showFormId}
           formName={formName ?? undefined}
           token={formToken}
+          chefsBaseUrl={formChefsBaseUrl ?? undefined}
           onClose={() => {
             setFormModalOpen(false);
             setFormToken(null);
             setFormName(null);
+            setFormChefsBaseUrl(null);
           }}
           onSubmitted={handleFormSubmitted}
         />

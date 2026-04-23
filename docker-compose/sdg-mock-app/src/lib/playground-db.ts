@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import { runMigrations } from './migrations';
 
 // ── Record interfaces (DB row shapes) ──
 
@@ -77,44 +78,13 @@ function getDb(): Database.Database {
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
-  initSchema(db);
+  runMigrations(db);
   return db;
 }
 
 /**
- * Create tables and indexes if they don't already exist.
- */
-function initSchema(database: Database.Database): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS playgrounds (
-      name           TEXT PRIMARY KEY,
-      owner          TEXT NOT NULL,
-      n8n_target     TEXT NOT NULL DEFAULT '',
-      x_n8n_api_key  TEXT NOT NULL DEFAULT '',
-      x_tenant_id    TEXT NOT NULL DEFAULT '',
-      chefs_base_url TEXT NOT NULL DEFAULT '',
-      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_playgrounds_owner ON playgrounds(owner);
-
-    CREATE TABLE IF NOT EXISTS playground_forms (
-      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-      playground_name      TEXT    NOT NULL REFERENCES playgrounds(name) ON DELETE CASCADE,
-      form_id              TEXT    NOT NULL,
-      form_name            TEXT    NOT NULL DEFAULT '',
-      api_key              TEXT    NOT NULL DEFAULT '',
-      allowed_actors       TEXT    NOT NULL DEFAULT '["*"]',
-      callback_webhook_url TEXT    NOT NULL DEFAULT '',
-      UNIQUE(playground_name, form_id)
-    );
-  `);
-}
-
-/**
  * Initialize the database explicitly. Useful for tests or eager startup.
- * Calling this multiple times is safe — the schema uses IF NOT EXISTS.
+ * Calling this multiple times is safe — migrations track what has already run.
  */
 export function initDatabase(): void {
   getDb();

@@ -13,7 +13,7 @@ export function ChefsFormViewer({
   readOnly = false,
   language = 'en',
   isolateStyles = false,
-  baseUrl = process.env.NEXT_PUBLIC_CHEFS_BASE_URL || 'https://submit.digital.gov.bc.ca/app',
+  baseUrl = 'https://submit.digital.gov.bc.ca/app',
   onFormReady,
   onSubmissionComplete,
   onSubmissionError,

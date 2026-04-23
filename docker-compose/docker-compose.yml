@@ -1,6 +1,7 @@
 volumes:
   n8n_storage:
   postgres_storage:
+  sdg_mock_app_data:
 
 networks:
   chwf:
@@ -64,6 +65,8 @@ services:
     - 8081:8081
     environment:
       NODE_ENV: production
+    volumes:
+    - sdg_mock_app_data:/app/data
     depends_on:
       n8n:
         condition: service_started
