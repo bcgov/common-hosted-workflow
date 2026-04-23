@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolvePlaygroundConfig, resolvePlaygroundForms } from '@/lib/playground-resolve';
+import { trimTrailingSlashes } from '@/lib/url';
 
 /**
  * POST /api/chefs/submissions
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   const callbackWebhookUrl = entry.callbackWebhookUrl;
 
   const pgConfig = resolvePlaygroundConfig(playgroundName);
-  const n8nTarget = (pgConfig?.n8nTarget || '').replace(/\/+$/, '');
+  const n8nTarget = trimTrailingSlashes(pgConfig?.n8nTarget || '');
 
   if (!callbackWebhookUrl?.trim()) {
     return NextResponse.json({ message: 'Submission received, no callback configured' });

@@ -67,7 +67,7 @@ export function validateImportPayload(data: unknown): ValidationResult {
   // Required top-level string fields
   const requiredStringFields = ['n8nTarget', 'xN8nApiKey', 'tenantId', 'chefsBaseUrl'] as const;
   for (const field of requiredStringFields) {
-    if (!Object.prototype.hasOwnProperty.call(obj, field)) {
+    if (!Object.hasOwn(obj, field)) {
       return { valid: false, error: `Missing required field: '${field}'` };
     }
     if (typeof obj[field] !== 'string') {
@@ -76,7 +76,7 @@ export function validateImportPayload(data: unknown): ValidationResult {
   }
 
   // Required forms array
-  if (!Object.prototype.hasOwnProperty.call(obj, 'forms')) {
+  if (!Object.hasOwn(obj, 'forms')) {
     return { valid: false, error: "Missing required field: 'forms'" };
   }
   if (!Array.isArray(obj.forms)) {
@@ -107,7 +107,7 @@ function validateFormEntry(entry: unknown, index: number): ValidationResult {
 
   const requiredStringFields = ['formId', 'formName', 'apiKey', 'callbackWebhookUrl'] as const;
   for (const field of requiredStringFields) {
-    if (!Object.prototype.hasOwnProperty.call(obj, field)) {
+    if (!Object.hasOwn(obj, field)) {
       return { valid: false, error: `forms[${index}] is missing required field: '${field}'` };
     }
     if (typeof obj[field] !== 'string') {
@@ -116,7 +116,7 @@ function validateFormEntry(entry: unknown, index: number): ValidationResult {
   }
 
   // allowedActors must be an array of strings
-  if (!Object.prototype.hasOwnProperty.call(obj, 'allowedActors')) {
+  if (!Object.hasOwn(obj, 'allowedActors')) {
     return { valid: false, error: `forms[${index}] is missing required field: 'allowedActors'` };
   }
   if (!Array.isArray(obj.allowedActors)) {

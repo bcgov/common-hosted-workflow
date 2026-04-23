@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPlayground, playgroundExists } from '@/lib/playground-db';
 import { validatePlaygroundName, validateImportPayload } from '@/lib/validation';
+import { parseJsonObjectBody, requireStringField } from '@/lib/http';
 import type { PlaygroundExport } from '@/types/playground';
 
 /**
@@ -12,40 +13,25 @@ import type { PlaygroundExport } from '@/types/playground';
  * Returns 201 with { name } on success, 400 for validation errors, 409 for duplicates.
  */
 export async function POST(request: NextRequest) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
-  }
-
-  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
-  }
-
-  const data = body as Record<string, unknown>;
+  const parsed = await parseJsonObjectBody(request);
+  if (!parsed.ok) return parsed.response;
+  const data = parsed.data;
 
   // Validate required field: name
-  if (!Object.prototype.hasOwnProperty.call(data, 'name') || typeof data.name !== 'string') {
-    return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
-  }
+  const nameField = requireStringField(data, 'name');
+  if (!nameField.ok) return nameField.response;
 
-  const nameValidation = validatePlaygroundName(data.name);
+  const nameValidation = validatePlaygroundName(nameField.value);
   if (!nameValidation.valid) {
     return NextResponse.json({ error: `Invalid playground name: ${nameValidation.error}` }, { status: 400 });
   }
 
   // Validate required field: owner
-  if (
-    !Object.prototype.hasOwnProperty.call(data, 'owner') ||
-    typeof data.owner !== 'string' ||
-    data.owner.length === 0
-  ) {
-    return NextResponse.json({ error: 'Missing required field: owner' }, { status: 400 });
-  }
+  const ownerField = requireStringField(data, 'owner');
+  if (!ownerField.ok) return ownerField.response;
 
   // Validate required field: config
-  if (!Object.prototype.hasOwnProperty.call(data, 'config')) {
+  if (!Object.hasOwn(data, 'config')) {
     return NextResponse.json({ error: 'Missing required field: config' }, { status: 400 });
   }
 
@@ -58,13 +44,13 @@ export async function POST(request: NextRequest) {
 
   try {
     // Check for duplicate name
-    if (playgroundExists(data.name)) {
+    if (playgroundExists(nameField.value)) {
       return NextResponse.json({ error: 'Playground name already exists for this owner' }, { status: 409 });
     }
 
     createPlayground({
-      name: data.name,
-      owner: data.owner,
+      name: nameField.value,
+      owner: ownerField.value,
       n8nTarget: config.n8nTarget,
       xN8nApiKey: config.xN8nApiKey,
       tenantId: config.tenantId,
@@ -72,7 +58,7 @@ export async function POST(request: NextRequest) {
       forms: config.forms,
     });
 
-    return NextResponse.json({ name: data.name }, { status: 201 });
+    return NextResponse.json({ name: nameField.value }, { status: 201 });
   } catch (err) {
     console.error('Database error while importing playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

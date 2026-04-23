@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getTesterName, setTesterName, clearTesterName } from '@/lib/tester-identity';
+import { getTesterName, clearTesterName } from '@/lib/tester-identity';
 import { validatePlaygroundName } from '@/lib/validation';
 import { fetchPlaygrounds, deletePlayground, clonePlayground } from '@/lib/api';
 import type { PlaygroundSummary } from '@/types/playground';
@@ -13,7 +13,7 @@ import ImportPlaygroundDialog from '@/components/ImportPlaygroundDialog';
 
 export default function LandingPage() {
   const router = useRouter();
-  const [testerName, setTesterNameState] = useState<string | null>(null);
+  const [testerName, setTesterName] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [playgrounds, setPlaygrounds] = useState<PlaygroundSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,7 +30,7 @@ export default function LandingPage() {
   // Read tester name from localStorage on mount
   useEffect(() => {
     const stored = getTesterName();
-    setTesterNameState(stored);
+    setTesterName(stored);
     setInitialized(true);
   }, []);
 
@@ -55,12 +55,12 @@ export default function LandingPage() {
   }, [testerName, loadPlaygrounds]);
 
   function handleIdentityComplete(name: string) {
-    setTesterNameState(name);
+    setTesterName(name);
   }
 
   function handleSwitchUser() {
     clearTesterName();
-    setTesterNameState(null);
+    setTesterName(null);
     setPlaygrounds([]);
   }
 

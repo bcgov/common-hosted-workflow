@@ -49,5 +49,7 @@ exclude: |
     CHANGELOG\.md |
     (.*/)?package-lock\.json |
     (.*/)?yarn\.lock |
-    (.*/)?pnpm-lock\.yaml
+    (.*/)?pnpm-lock\.yaml |
+    docker-compose/n8n/demo-data/workflows/.* |
+    docker-compose/sdg-mock-app/next-env\.d\.ts
   )$

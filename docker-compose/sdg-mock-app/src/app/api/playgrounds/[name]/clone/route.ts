@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const data = body as Record<string, unknown>;
 
   // Validate required field: newName
-  if (!Object.prototype.hasOwnProperty.call(data, 'newName') || typeof data.newName !== 'string') {
+  if (!Object.hasOwn(data, 'newName') || typeof data.newName !== 'string') {
     return NextResponse.json({ error: 'Missing required field: newName' }, { status: 400 });
   }
 
@@ -43,11 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   // Validate required field: owner
-  if (
-    !Object.prototype.hasOwnProperty.call(data, 'owner') ||
-    typeof data.owner !== 'string' ||
-    data.owner.length === 0
-  ) {
+  if (!Object.hasOwn(data, 'owner') || typeof data.owner !== 'string' || data.owner.length === 0) {
     return NextResponse.json({ error: 'Missing required field: owner' }, { status: 400 });
   }
 

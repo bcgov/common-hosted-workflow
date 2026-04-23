@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { wilPatch } from '@/lib/wil-proxy';
-import { resolvePlaygroundConfig } from '@/lib/playground-resolve';
-import type { ResolvedConfig } from '@/lib/playground-resolve';
+import { requirePlaygroundConfigFromHeader } from '@/lib/playground-resolve';
 
 export async function PATCH(
   request: NextRequest,
@@ -9,22 +8,14 @@ export async function PATCH(
 ) {
   const { actorId, actionId } = await params;
 
-  // Resolve playground-specific config when the header is present
-  const playgroundName = request.headers.get('x-playground-id');
-  const config: ResolvedConfig | undefined = (() => {
-    if (playgroundName === null) return undefined;
-    const resolved = resolvePlaygroundConfig(playgroundName);
-    return resolved ?? undefined;
-  })();
-  if (playgroundName !== null && config === undefined) {
-    return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
-  }
+  const resolved = requirePlaygroundConfigFromHeader(request);
+  if (!resolved.ok) return resolved.response;
 
   const body = await request.json();
   const upstream = await wilPatch(
     `/actors/${encodeURIComponent(actorId)}/actions/${encodeURIComponent(actionId)}`,
     body,
-    config,
+    resolved.config,
   );
   const data = await upstream.json();
   return NextResponse.json(data, { status: upstream.status });

@@ -7,10 +7,11 @@
  */
 
 import type { ResolvedConfig } from './playground-resolve';
+import { trimTrailingSlashes } from './url';
 
 function getEffective(config: ResolvedConfig) {
   return {
-    n8nTarget: config.n8nTarget.replace(/\/+$/, ''),
+    n8nTarget: trimTrailingSlashes(config.n8nTarget),
     apiKey: config.apiKey,
     tenantId: config.tenantId,
   };

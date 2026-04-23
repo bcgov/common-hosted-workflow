@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { wilCallback, wilGetAction } from '@/lib/wil-proxy';
-import { resolvePlaygroundConfig } from '@/lib/playground-resolve';
-import type { ResolvedConfig } from '@/lib/playground-resolve';
+import { requirePlaygroundConfigFromHeader } from '@/lib/playground-resolve';
 
 /**
  * Secure callback proxy.
@@ -13,16 +12,8 @@ import type { ResolvedConfig } from '@/lib/playground-resolve';
  * This keeps signed webhook URLs and callback details server-side only.
  */
 export async function POST(request: NextRequest) {
-  // Resolve playground-specific config when the header is present
-  const playgroundName = request.headers.get('x-playground-id');
-  const config: ResolvedConfig | undefined = (() => {
-    if (playgroundName === null) return undefined;
-    const resolved = resolvePlaygroundConfig(playgroundName);
-    return resolved ?? undefined;
-  })();
-  if (playgroundName !== null && config === undefined) {
-    return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
-  }
+  const resolved = requirePlaygroundConfigFromHeader(request);
+  if (!resolved.ok) return resolved.response;
 
   const { actionId, body } = await request.json();
 
@@ -31,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Fetch the full action (with callbackUrl) from the WIL API server-side
-  const actionResp = await wilGetAction(actionId, config);
+  const actionResp = await wilGetAction(actionId, resolved.config);
   if (!actionResp.ok) {
     const errText = await actionResp.text();
     return NextResponse.json(
@@ -47,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const method = ((action.callbackMethod as string) || 'POST').toUpperCase();
-  const upstream = await wilCallback(callbackUrl, method, body ?? {}, config);
+  const upstream = await wilCallback(callbackUrl, method, body ?? {}, resolved.config);
 
   // Try to return JSON; fall back to text
   const contentType = upstream.headers.get('content-type') || '';

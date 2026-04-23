@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getPlayground,
-  getPlaygroundForms,
-  updatePlayground,
-  deletePlayground,
-  playgroundExists,
-  type FormEntryInput,
-} from '@/lib/playground-db';
-import type { PlaygroundDetail, FormEntry } from '@/types/playground';
+import { updatePlayground, deletePlayground, playgroundExists, type FormEntryInput } from '@/lib/playground-db';
+import { getPlaygroundDetail } from '@/lib/playground-resolve';
 
 type RouteContext = { params: Promise<{ name: string }> };
 
@@ -22,33 +15,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { name } = await params;
 
   try {
-    const playground = getPlayground(name);
+    const detail = getPlaygroundDetail(name);
 
-    if (!playground) {
+    if (!detail) {
       return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
     }
-
-    const formRecords = getPlaygroundForms(name);
-
-    const forms: FormEntry[] = formRecords.map((f) => ({
-      formId: f.form_id,
-      formName: f.form_name,
-      apiKey: f.api_key,
-      allowedActors: JSON.parse(f.allowed_actors) as string[],
-      callbackWebhookUrl: f.callback_webhook_url,
-    }));
-
-    const detail: PlaygroundDetail = {
-      name: playground.name,
-      owner: playground.owner,
-      n8nTarget: playground.n8n_target,
-      xN8nApiKey: playground.x_n8n_api_key,
-      tenantId: playground.x_tenant_id,
-      chefsBaseUrl: playground.chefs_base_url,
-      forms,
-      createdAt: playground.created_at,
-      updatedAt: playground.updated_at,
-    };
 
     return NextResponse.json(detail);
   } catch (err) {
