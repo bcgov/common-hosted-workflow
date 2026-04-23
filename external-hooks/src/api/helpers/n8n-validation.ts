@@ -6,6 +6,7 @@
 import type { Response } from 'express';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
+import { formatDbErrorForLog } from './db-helper';
 
 const log = createLogger('CustomAPIs');
 
@@ -150,4 +151,69 @@ export function requireChwfAllowedProjectIds(
     throw new AppError(403, 'Missing tenant project scope');
   }
   return allowed;
+}
+
+/**
+ * Validates the n8n execution matches the claimed workflowId, then resolves a `projectId` from the
+ * intersection of the workflow's shared-project list and the caller's allowed tenant projects.
+ *
+ * Throws `AppError` on validation failure or scope mismatch. Unexpected errors are logged and
+ * re-thrown as 500.
+ */
+export async function resolveProjectIdForCreate(params: {
+  executionRepository: N8nExecutionLookup;
+  sharedWorkflowRepository: { findProjectIds: (id: string) => Promise<string[]> };
+  workflowInstanceId: string;
+  workflowId: string;
+  allowedProjectIds: string[];
+  logLabel: string;
+}): Promise<string> {
+  try {
+    const execCheck = await validateN8nExecutionMatchesWorkflow({
+      executionRepository: params.executionRepository,
+      workflowInstanceId: params.workflowInstanceId,
+      workflowId: params.workflowId,
+    });
+    if (execCheck.ok === false) {
+      throw new AppError(execCheck.status, execCheck.error);
+    }
+
+    const scopedWorkflowProjects = await resolveWorkflowProjectScope(
+      params.workflowId,
+      params.allowedProjectIds,
+      params.sharedWorkflowRepository,
+    );
+    if (!scopedWorkflowProjects.length) {
+      throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');
+    }
+    return scopedWorkflowProjects[0];
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    const dbDetail = formatDbErrorForLog(error);
+    log.error(`${params.logLabel} resolution error`, { statusCode: 500, dbDetail, error: String(error) });
+    throw new AppError(500, 'Internal Server Error');
+  }
+}
+
+/**
+ * For GET list filters: when `workflowInstanceId` is provided, validates that the execution exists
+ * and its workflow intersects the caller's tenant/project scope. Throws `AppError` on failure.
+ * No-ops when `workflowInstanceId` is `undefined`.
+ */
+export async function requireExecutionInTenantScope(params: {
+  executionRepository: N8nExecutionLookup;
+  workflowInstanceId: string | undefined;
+  allowedProjectIds: string[];
+  sharedWorkflowRepository: { findProjectIds: (id: string) => Promise<string[]> };
+}): Promise<void> {
+  if (!params.workflowInstanceId) return;
+  const scopeCheck = await validateN8nExecutionInTenantScope({
+    executionRepository: params.executionRepository,
+    workflowInstanceId: params.workflowInstanceId,
+    allowedProjectIds: params.allowedProjectIds,
+    sharedWorkflowRepository: params.sharedWorkflowRepository,
+  });
+  if (scopeCheck.ok === false) {
+    throw new AppError(scopeCheck.status, scopeCheck.error);
+  }
 }

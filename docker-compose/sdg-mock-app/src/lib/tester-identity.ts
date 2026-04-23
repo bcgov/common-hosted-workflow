@@ -6,12 +6,14 @@ export function getTesterName(): string | null {
   return localStorage.getItem(STORAGE_KEY);
 }
 
-/** Writes the tester name to localStorage. */
+/** Writes the tester name to localStorage. No-ops during SSR. */
 export function setTesterName(name: string): void {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, name);
 }
 
-/** Removes the tester name from localStorage. */
+/** Removes the tester name from localStorage. No-ops during SSR. */
 export function clearTesterName(): void {
+  if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
 }

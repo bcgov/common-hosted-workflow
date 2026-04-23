@@ -85,8 +85,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     });
 
     return NextResponse.json({ name: data.newName }, { status: 201 });
-  } catch {
-    console.error('Database error while cloning playground');
+  } catch (err) {
+    console.error('Database error while cloning playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }

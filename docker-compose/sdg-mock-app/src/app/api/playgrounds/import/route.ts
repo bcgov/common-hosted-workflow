@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ name: data.name }, { status: 201 });
-  } catch {
-    console.error('Database error while importing playground');
+  } catch (err) {
+    console.error('Database error while importing playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }

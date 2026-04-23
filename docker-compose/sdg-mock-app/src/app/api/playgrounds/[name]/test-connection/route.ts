@@ -24,8 +24,8 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
   let config;
   try {
     config = resolvePlaygroundConfig(name);
-  } catch {
-    console.error('Database error while resolving playground config');
+  } catch (err) {
+    console.error('Database error while resolving playground config', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 

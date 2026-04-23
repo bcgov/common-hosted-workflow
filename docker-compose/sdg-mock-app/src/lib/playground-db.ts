@@ -28,6 +28,15 @@ export interface FormEntryRecord {
 
 // ── Input interfaces ──
 
+/** Shape of a single form entry in create/update payloads. */
+export interface FormEntryInput {
+  formId: string;
+  formName: string;
+  apiKey: string;
+  allowedActors: string[];
+  callbackWebhookUrl: string;
+}
+
 export interface CreatePlaygroundInput {
   name: string;
   owner: string;
@@ -35,13 +44,7 @@ export interface CreatePlaygroundInput {
   xN8nApiKey?: string;
   tenantId?: string;
   chefsBaseUrl?: string;
-  forms?: Array<{
-    formId: string;
-    formName: string;
-    apiKey: string;
-    allowedActors: string[];
-    callbackWebhookUrl: string;
-  }>;
+  forms?: FormEntryInput[];
 }
 
 export interface UpdatePlaygroundInput {
@@ -49,13 +52,7 @@ export interface UpdatePlaygroundInput {
   xN8nApiKey?: string;
   tenantId?: string;
   chefsBaseUrl?: string;
-  forms?: Array<{
-    formId: string;
-    formName: string;
-    apiKey: string;
-    allowedActors: string[];
-    callbackWebhookUrl: string;
-  }>;
+  forms?: FormEntryInput[];
 }
 
 // ── Database singleton (lazy init) ──

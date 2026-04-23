@@ -4,9 +4,8 @@ import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import {
   requireChwfAllowedProjectIds,
-  resolveWorkflowProjectScope,
-  validateN8nExecutionInTenantScope,
-  validateN8nExecutionMatchesWorkflow,
+  requireExecutionInTenantScope,
+  resolveProjectIdForCreate,
 } from '../helpers/n8n-validation';
 import { AppError, wrapAsyncRoute } from '../utils/errors';
 import { shortenIdForLog } from '../utils/string';
@@ -58,33 +57,14 @@ export function createActionRequestRouter({
       const { dueDate, checkIn } = normalizeCreateActionTimestamps(body);
       const callbackMethod = body.callbackMethod ?? 'POST';
 
-      let projectId = '';
-      try {
-        // verify execution vs workflowId, then derive projectId from shared workflow ∩ tenant scope.
-        const execCheck = await validateN8nExecutionMatchesWorkflow({
-          executionRepository: execution,
-          workflowInstanceId: body.workflowInstanceId,
-          workflowId: body.workflowId,
-        });
-        if (execCheck.ok === false) {
-          throw new AppError(execCheck.status, execCheck.error);
-        }
-
-        const scopedWorkflowProjects = await resolveWorkflowProjectScope(
-          body.workflowId,
-          allowedProjectIds,
-          sharedWorkflow,
-        );
-        if (!scopedWorkflowProjects.length) {
-          throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');
-        }
-        projectId = scopedWorkflowProjects[0];
-      } catch (error) {
-        if (error instanceof AppError) throw error;
-        const dbDetail = formatDbErrorForLog(error);
-        log.error('Create action resolution error', { statusCode: 500, dbDetail, error: String(error) });
-        throw new AppError(500, 'Internal Server Error');
-      }
+      const projectId = await resolveProjectIdForCreate({
+        executionRepository: execution,
+        sharedWorkflowRepository: sharedWorkflow,
+        workflowInstanceId: body.workflowInstanceId,
+        workflowId: body.workflowId,
+        allowedProjectIds,
+        logLabel: 'Create action',
+      });
 
       try {
         const created = await actionRequestRepository.create({
@@ -133,17 +113,12 @@ export function createActionRequestRouter({
       const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actions', 'actions');
       const { actorId, since, limit, workflowInstanceId } = parsed.query;
 
-      if (workflowInstanceId) {
-        const scopeCheck = await validateN8nExecutionInTenantScope({
-          executionRepository: execution,
-          workflowInstanceId,
-          allowedProjectIds,
-          sharedWorkflowRepository: sharedWorkflow,
-        });
-        if (scopeCheck.ok === false) {
-          throw new AppError(scopeCheck.status, scopeCheck.error);
-        }
-      }
+      await requireExecutionInTenantScope({
+        executionRepository: execution,
+        workflowInstanceId,
+        allowedProjectIds,
+        sharedWorkflowRepository: sharedWorkflow,
+      });
       const pageLimit = limit ?? 50;
       const rows = await actionRequestRepository.list({
         allowedProjectIds,
@@ -211,17 +186,12 @@ export function createActionRequestRouter({
       const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/actions', 'actions');
       const { since, limit, workflowInstanceId } = parsed.query;
 
-      if (workflowInstanceId) {
-        const scopeCheck = await validateN8nExecutionInTenantScope({
-          executionRepository: execution,
-          workflowInstanceId,
-          allowedProjectIds,
-          sharedWorkflowRepository: sharedWorkflow,
-        });
-        if (scopeCheck.ok === false) {
-          throw new AppError(scopeCheck.status, scopeCheck.error);
-        }
-      }
+      await requireExecutionInTenantScope({
+        executionRepository: execution,
+        workflowInstanceId,
+        allowedProjectIds,
+        sharedWorkflowRepository: sharedWorkflow,
+      });
       const pageLimit = limit ?? 50;
       const rows = await actionRequestRepository.list({
         allowedProjectIds,

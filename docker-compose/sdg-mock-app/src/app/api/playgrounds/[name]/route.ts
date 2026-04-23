@@ -5,6 +5,7 @@ import {
   updatePlayground,
   deletePlayground,
   playgroundExists,
+  type FormEntryInput,
 } from '@/lib/playground-db';
 import type { PlaygroundDetail, FormEntry } from '@/types/playground';
 
@@ -50,8 +51,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     };
 
     return NextResponse.json(detail);
-  } catch {
-    console.error('Database error while fetching playground');
+  } catch (err) {
+    console.error('Database error while fetching playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }
@@ -88,20 +89,12 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       xN8nApiKey: typeof data.xN8nApiKey === 'string' ? data.xN8nApiKey : undefined, // pragma: allowlist secret
       tenantId: typeof data.tenantId === 'string' ? data.tenantId : undefined,
       chefsBaseUrl: typeof data.chefsBaseUrl === 'string' ? data.chefsBaseUrl : undefined,
-      forms: Array.isArray(data.forms)
-        ? (data.forms as Array<{
-            formId: string;
-            formName: string;
-            apiKey: string;
-            allowedActors: string[];
-            callbackWebhookUrl: string;
-          }>)
-        : undefined,
+      forms: Array.isArray(data.forms) ? (data.forms as FormEntryInput[]) : undefined,
     });
 
     return NextResponse.json({ name });
-  } catch {
-    console.error('Database error while updating playground');
+  } catch (err) {
+    console.error('Database error while updating playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }
@@ -122,8 +115,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     deletePlayground(name);
 
     return NextResponse.json({ deleted: true });
-  } catch {
-    console.error('Database error while deleting playground');
+  } catch (err) {
+    console.error('Database error while deleting playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }

@@ -39,8 +39,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     };
 
     return NextResponse.json(exportData);
-  } catch {
-    console.error('Database error while exporting playground');
+  } catch (err) {
+    console.error('Database error while exporting playground', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 }
