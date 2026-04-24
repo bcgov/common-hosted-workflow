@@ -53,7 +53,7 @@ jobs:
   deploy-sdg-dev:
     name: Deploys SDG (Dev)
     uses: ./.github/workflows/deploy-sdg.yml
-    needs: [build-push-n8n]
+    needs: [build-push-n8n, build-push-sdg-mock-app]
     secrets: inherit # pragma: allowlist secret
     with:
       environment: dev

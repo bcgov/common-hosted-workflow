@@ -11,5 +11,8 @@ dependencies:
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 25.3.9
-digest: sha256:bb989323bdbfb95e22aa29943fb27712f7ec5af8660f6302c594e7f17e6ee634
-generated: "2026-04-10T16:20:35.805141422Z"
+- name: sdg-mock-app
+  repository: file://../_sdg-mock-app
+  version: 0.1.0
+digest: sha256:13cf5f733e816d934e0f5369f2ecf8746a1ba71d02b3ec8ddad3a7b1eeaec849
+generated: "2026-04-24T14:15:06.103249877-07:00"
