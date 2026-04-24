@@ -561,7 +561,9 @@ const hookConfig = {
                   .getCount();
 
                 if (otherOwnerCount === 0) {
-                  throw new Error('Cannot change role for the last global:owner user');
+                  return res.redirect(
+                    '/signin?error=' + encodeURIComponent('Cannot change role for the last global:owner user'),
+                  );
                 }
               }
 

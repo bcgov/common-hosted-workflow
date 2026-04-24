@@ -11,6 +11,7 @@ n8n:
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
     OIDC_ISSUER_URL: https://test.loginproxy.gov.bc.ca/auth/realms/standard
     OIDC_REDIRECT_URI: https://test-chwf.apps.golddr.devops.gov.bc.ca/rest/auth/oidc/callback
+    SSO_RESTRICT_NO_ROLE: "true"
 
   route:
     enabled: true
