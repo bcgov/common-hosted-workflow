@@ -1,32 +1,50 @@
+{{- $imageRepository := .Values.image.repository -}}
+{{- $deploymentTag := coalesce .Values.image.tag .Chart.AppVersion -}}
+{{- $imagePullPolicy := .Values.image.pullPolicy -}}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "_sdg.fullname" . }}
+  name: {{ include "_.fullname" . }}
   labels:
-    {{- include "_sdg.labels" . | nindent 4 }}
+    {{- include "_.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   strategy:
-    type: Recreate
+    type: {{ .Values.deploymentStrategy.type }}
   selector:
     matchLabels:
-      {{- include "_sdg.selectorLabels" . | nindent 6 }}
+      {{- include "_.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels:
-        {{- include "_sdg.labels" . | nindent 8 }}
-    spec:
-      {{- with (default .Values.serviceAccountName ((.Values.global).serviceAccountName)) }}
-      serviceAccountName: {{ . }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
+      labels:
+        {{- include "_.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ default .Values.serviceAccountName .Values.global.serviceAccountName }}
       automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
       securityContext:
-        runAsUser: 1001
-        fsGroup: 1001
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ $imageRepository }}:{{ $deploymentTag }}"
+          imagePullPolicy: {{ $imagePullPolicy }}
           env:
             - name: PLAYGROUND_DB_PATH
               value: /app/data/playgrounds.db
@@ -36,23 +54,16 @@ spec:
             {{- end }}
           ports:
             - name: http
-              containerPort: 8081
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
+          {{- with .Values.livenessProbe }}
           livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 5
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
           readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -60,7 +71,28 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/data
+          {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "_sdg.fullname" . }}
+            claimName: {{ include "_.fullname" . }}
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

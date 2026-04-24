@@ -24,4 +24,4 @@ dependencies:
   - name: sdg-mock-app
     version: '0.1.0'
     repository: 'file://../_sdg-mock-app'
-    condition: sdgMockApp.enabled
+    condition: sdg-mock-app.enabled

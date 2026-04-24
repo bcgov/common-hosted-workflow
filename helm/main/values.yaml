@@ -247,7 +247,7 @@ pgo:
   - name: n8n-custom
 
 # sdg-mock-app (Next.js + SQLite playground)
-sdgMockApp:
+sdg-mock-app:
   enabled: false
 
   nameOverride: chwf-sdg-mock-app
