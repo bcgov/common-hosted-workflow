@@ -80,7 +80,7 @@ async function main() {
     });
 
     if (user.roleHandle) {
-      userHandle.assignClientRole(user.roleHandle);
+      await userHandle.assignClientRole(user.roleHandle);
     }
   }
   console.log('Provision complete!');
