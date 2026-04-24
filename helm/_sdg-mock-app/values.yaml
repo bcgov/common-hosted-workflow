@@ -1,0 +1,33 @@
+image:
+  repository: ghcr.io/bcgov/chwf-sdg-mock-app
+  tag: main
+  pullPolicy: IfNotPresent
+
+# This is to override the chart name.
+nameOverride: sdg-mock-app
+fullnameOverride: sdg-mock-app
+
+serviceAccountName: ""
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8081
+
+route:
+  enabled: false
+  host:
+
+persistence:
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 250m
+    memory: 512Mi
+
+env: {}

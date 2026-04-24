@@ -47,3 +47,9 @@ pgo:
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+
+sdgMockApp:
+  enabled: true
+  route:
+    enabled: true
+    host: dev-chwf-sdg-mock.apps.gold.devops.gov.bc.ca

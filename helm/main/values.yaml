@@ -245,3 +245,30 @@ pgo:
   databases:
   - name: n8n
   - name: n8n-custom
+
+# sdg-mock-app (Next.js + SQLite playground)
+sdgMockApp:
+  enabled: false
+
+  nameOverride: chwf-sdg-mock-app
+  fullnameOverride: chwf-sdg-mock-app
+
+  image:
+    repository: ghcr.io/bcgov/chwf-sdg-mock-app
+    tag: main
+    pullPolicy: IfNotPresent
+
+  route:
+    enabled: false
+    host:
+
+  persistence:
+    size: 1Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
