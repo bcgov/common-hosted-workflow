@@ -9,7 +9,7 @@ interface PlaygroundListProps {
   onClone: (name: string) => void;
 }
 
-export default function PlaygroundList({ playgrounds, onDelete, onClone }: PlaygroundListProps) {
+export default function PlaygroundList({ playgrounds, onDelete, onClone }: Readonly<PlaygroundListProps>) {
   if (playgrounds.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">

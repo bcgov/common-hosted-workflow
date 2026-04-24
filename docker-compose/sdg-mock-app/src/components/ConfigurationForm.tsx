@@ -19,7 +19,7 @@ const EMPTY_FORM_ENTRY: FormEntry = {
   callbackWebhookUrl: '',
 };
 
-export default function ConfigurationForm({ name, detail, onSaved }: ConfigurationFormProps) {
+export default function ConfigurationForm({ name, detail, onSaved }: Readonly<ConfigurationFormProps>) {
   const [n8nTarget, setN8nTarget] = useState(detail.n8nTarget);
   const [xN8nApiKey, setXN8nApiKey] = useState(detail.xN8nApiKey);
   const [tenantId, setTenantId] = useState(detail.tenantId);
@@ -150,7 +150,7 @@ export default function ConfigurationForm({ name, detail, onSaved }: Configurati
           <div className="space-y-3">
             {forms.map((entry, i) => (
               <FormEntryEditor
-                key={i}
+                key={entry.formId || `new-form-${i}`}
                 entry={entry}
                 index={i}
                 onChange={handleFormChange}

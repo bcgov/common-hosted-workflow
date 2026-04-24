@@ -10,7 +10,7 @@ import FormsPanel from '@/components/FormsPanel';
 import MessagesPanel from '@/components/MessagesPanel';
 import ActionsPanel from '@/components/ActionsPanel';
 
-function UserTestContent({ name }: { name: string }) {
+function UserTestContent({ name }: Readonly<{ name: string }>) {
   const router = useRouter();
   const [verified, setVerified] = useState(false);
 
@@ -133,7 +133,7 @@ function UserTestContent({ name }: { name: string }) {
   );
 }
 
-export default function UserTestPage({ params }: { params: Promise<{ name: string }> }) {
+export default function UserTestPage({ params }: Readonly<{ params: Promise<{ name: string }> }>) {
   const { name } = React.use(params);
 
   return (

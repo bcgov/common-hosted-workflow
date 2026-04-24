@@ -36,12 +36,12 @@ export function requireStringField(
   data: Record<string, unknown>,
   field: string,
 ): { ok: true; value: string } | { ok: false; response: NextResponse } {
-  if (!Object.hasOwn(data, field) || typeof data[field] !== 'string' || (data[field] as string).length === 0) {
+  if (!Object.hasOwn(data, field) || typeof data[field] !== 'string' || data[field].length === 0) {
     return {
       ok: false,
       response: NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 }),
     };
   }
 
-  return { ok: true, value: data[field] as string };
+  return { ok: true, value: data[field] };
 }

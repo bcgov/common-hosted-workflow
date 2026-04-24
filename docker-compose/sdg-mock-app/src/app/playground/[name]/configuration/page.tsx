@@ -8,7 +8,7 @@ import PlaygroundHeader from '@/components/PlaygroundHeader';
 import ConfigurationForm from '@/components/ConfigurationForm';
 import ConnectionTestButton from '@/components/ConnectionTestButton';
 
-export default function ConfigurationPage({ params }: { params: Promise<{ name: string }> }) {
+export default function ConfigurationPage({ params }: Readonly<{ params: Promise<{ name: string }> }>) {
   const { name } = React.use(params);
   const router = useRouter();
 
@@ -57,7 +57,7 @@ export default function ConfigurationPage({ params }: { params: Promise<{ name: 
       a.download = `playground-${name}.json`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to export playground');

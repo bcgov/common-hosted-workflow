@@ -11,7 +11,7 @@ interface ImportPlaygroundDialogProps {
   onClose: () => void;
 }
 
-export default function ImportPlaygroundDialog({ owner, onImported, onClose }: ImportPlaygroundDialogProps) {
+export default function ImportPlaygroundDialog({ owner, onImported, onClose }: Readonly<ImportPlaygroundDialogProps>) {
   const [name, setName] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [config, setConfig] = useState<PlaygroundExport | null>(null);
@@ -19,29 +19,26 @@ export default function ImportPlaygroundDialog({ owner, onImported, onClose }: I
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
     setError(null);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result as string);
-        const validation = validateImportPayload(parsed);
-        if (!validation.valid) {
-          setError(validation.error ?? 'Invalid file structure');
-          setConfig(null);
-          return;
-        }
-        setConfig(parsed as PlaygroundExport);
-      } catch {
-        setError('File is not valid JSON');
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const validation = validateImportPayload(parsed);
+      if (!validation.valid) {
+        setError(validation.error ?? 'Invalid file structure');
         setConfig(null);
+        return;
       }
-    };
-    reader.readAsText(file);
+      setConfig(parsed as PlaygroundExport);
+    } catch {
+      setError('File is not valid JSON');
+      setConfig(null);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

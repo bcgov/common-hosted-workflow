@@ -103,10 +103,10 @@ export default function AdminPage() {
       {/* Stats bar */}
       <div className="flex items-center gap-6 px-7 py-3 border-b border-border bg-surface text-xs text-text-muted">
         <span>
-          {owners.length} user{owners.length !== 1 ? 's' : ''}
+          {owners.length} user{owners.length === 1 ? '' : 's'}
         </span>
         <span>
-          {totalPlaygrounds} playground{totalPlaygrounds !== 1 ? 's' : ''}
+          {totalPlaygrounds} playground{totalPlaygrounds === 1 ? '' : 's'}
         </span>
       </div>
 
@@ -114,92 +114,98 @@ export default function AdminPage() {
       <div className="px-7 py-6 max-w-5xl">
         {error && <div className="mb-4 px-4 py-2.5 rounded-md bg-red-soft text-red-400 text-sm">{error}</div>}
 
-        {loading && owners.length === 0 ? (
-          <div className="text-sm text-text-muted text-center py-12">Loading…</div>
-        ) : owners.length === 0 ? (
-          <div className="text-sm text-text-muted text-center py-12">No playgrounds found in the database.</div>
-        ) : (
-          <div className="space-y-4">
-            {owners.map((group) => (
-              <div key={group.owner} className="rounded-lg border border-border bg-surface overflow-hidden">
-                {/* Owner header */}
-                <button
-                  type="button"
-                  onClick={() => toggleOwner(group.owner)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-surface-2 transition-colors duration-100"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-accent-soft flex items-center justify-center text-accent text-sm font-bold uppercase">
-                      {group.owner.charAt(0)}
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold">{group.owner}</div>
-                      <div className="text-[11px] text-text-muted">
-                        {group.playgrounds.length} playground{group.playgrounds.length !== 1 ? 's' : ''}
+        {(() => {
+          if (loading && owners.length === 0) {
+            return <div className="text-sm text-text-muted text-center py-12">Loading…</div>;
+          }
+          if (owners.length === 0) {
+            return (
+              <div className="text-sm text-text-muted text-center py-12">No playgrounds found in the database.</div>
+            );
+          }
+          return (
+            <div className="space-y-4">
+              {owners.map((group) => (
+                <div key={group.owner} className="rounded-lg border border-border bg-surface overflow-hidden">
+                  {/* Owner header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleOwner(group.owner)}
+                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-surface-2 transition-colors duration-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-accent-soft flex items-center justify-center text-accent text-sm font-bold uppercase">
+                        {group.owner.charAt(0)}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-sm font-semibold">{group.owner}</div>
+                        <div className="text-[11px] text-text-muted">
+                          {group.playgrounds.length} playground{group.playgrounds.length === 1 ? '' : 's'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className={`size-4 text-text-muted transition-transform duration-150 ${collapsed.has(group.owner) ? '' : 'rotate-180'}`}
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className={`size-4 text-text-muted transition-transform duration-150 ${collapsed.has(group.owner) ? '' : 'rotate-180'}`}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
 
-                {/* Playground list */}
-                {!collapsed.has(group.owner) && (
-                  <div className="border-t border-border">
-                    {group.playgrounds.map((pg) => (
-                      <div
-                        key={pg.name}
-                        className="flex items-center justify-between px-5 py-3 border-b border-border last:border-b-0 hover:bg-surface-2/50 transition-colors duration-100"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">{pg.name}</div>
-                          <div className="flex items-center gap-3 mt-1 text-[11px] text-text-dim font-mono flex-wrap">
-                            <span title="n8n target">{pg.n8nTarget || '(no target)'}</span>
-                            <span>·</span>
-                            <span>
-                              {pg.formCount} form{pg.formCount !== 1 ? 's' : ''}
-                            </span>
-                            <span>·</span>
-                            <span>created {pg.createdAt}</span>
+                  {/* Playground list */}
+                  {!collapsed.has(group.owner) && (
+                    <div className="border-t border-border">
+                      {group.playgrounds.map((pg) => (
+                        <div
+                          key={pg.name}
+                          className="flex items-center justify-between px-5 py-3 border-b border-border last:border-b-0 hover:bg-surface-2/50 transition-colors duration-100"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{pg.name}</div>
+                            <div className="flex items-center gap-3 mt-1 text-[11px] text-text-dim font-mono flex-wrap">
+                              <span title="n8n target">{pg.n8nTarget || '(no target)'}</span>
+                              <span>·</span>
+                              <span>
+                                {pg.formCount} form{pg.formCount === 1 ? '' : 's'}
+                              </span>
+                              <span>·</span>
+                              <span>created {pg.createdAt}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-4 shrink-0">
+                            <Link
+                              href={`/playground/${encodeURIComponent(pg.name)}/configuration`}
+                              className="px-2.5 py-1 rounded-md border border-border bg-surface-2 text-text text-[11px] font-medium hover:border-accent/40 transition-all duration-150"
+                            >
+                              View
+                            </Link>
+                            <Link
+                              href={`/playground/${encodeURIComponent(pg.name)}/user-test`}
+                              className="px-2.5 py-1 rounded-md border border-accent bg-accent-soft text-accent text-[11px] font-medium hover:bg-accent hover:text-white transition-all duration-150"
+                            >
+                              Test
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(pg.name)}
+                              disabled={deleting === pg.name}
+                              className="px-2.5 py-1 rounded-md border border-red-400/40 text-red-400 text-[11px] font-medium hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
+                            >
+                              {deleting === pg.name ? '…' : 'Delete'}
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-4 shrink-0">
-                          <Link
-                            href={`/playground/${encodeURIComponent(pg.name)}/configuration`}
-                            className="px-2.5 py-1 rounded-md border border-border bg-surface-2 text-text text-[11px] font-medium hover:border-accent/40 transition-all duration-150"
-                          >
-                            View
-                          </Link>
-                          <Link
-                            href={`/playground/${encodeURIComponent(pg.name)}/user-test`}
-                            className="px-2.5 py-1 rounded-md border border-accent bg-accent-soft text-accent text-[11px] font-medium hover:bg-accent hover:text-white transition-all duration-150"
-                          >
-                            Test
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(pg.name)}
-                            disabled={deleting === pg.name}
-                            className="px-2.5 py-1 rounded-md border border-red-400/40 text-red-400 text-[11px] font-medium hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
-                          >
-                            {deleting === pg.name ? '…' : 'Delete'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

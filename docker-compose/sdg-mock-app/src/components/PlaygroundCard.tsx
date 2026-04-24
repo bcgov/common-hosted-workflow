@@ -11,7 +11,7 @@ interface PlaygroundCardProps {
   onClone: (name: string) => void;
 }
 
-export default function PlaygroundCard({ playground, onDelete, onClone }: PlaygroundCardProps) {
+export default function PlaygroundCard({ playground, onDelete, onClone }: Readonly<PlaygroundCardProps>) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (

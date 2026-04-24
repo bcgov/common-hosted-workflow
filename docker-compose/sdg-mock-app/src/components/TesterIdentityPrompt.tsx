@@ -8,7 +8,7 @@ interface TesterIdentityPromptProps {
   onComplete: (name: string) => void;
 }
 
-export default function TesterIdentityPrompt({ onComplete }: TesterIdentityPromptProps) {
+export default function TesterIdentityPrompt({ onComplete }: Readonly<TesterIdentityPromptProps>) {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
 

@@ -7,7 +7,7 @@ interface PlaygroundHeaderProps {
   activeTab?: 'configuration' | 'user-test';
 }
 
-export default function PlaygroundHeader({ playgroundName, activeTab }: PlaygroundHeaderProps) {
+export default function PlaygroundHeader({ playgroundName, activeTab }: Readonly<PlaygroundHeaderProps>) {
   const encodedName = encodeURIComponent(playgroundName);
 
   return (

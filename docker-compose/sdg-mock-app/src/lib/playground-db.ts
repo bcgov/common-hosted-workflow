@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { runMigrations } from './migrations';
 
 // ── Record interfaces (DB row shapes) ──

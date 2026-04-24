@@ -8,7 +8,7 @@ interface ConnectionTestButtonProps {
   playgroundName: string;
 }
 
-export default function ConnectionTestButton({ playgroundName }: ConnectionTestButtonProps) {
+export default function ConnectionTestButton({ playgroundName }: Readonly<ConnectionTestButtonProps>) {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<ConnectionTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);

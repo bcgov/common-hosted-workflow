@@ -19,7 +19,7 @@ export default function ChefsFormModal({
   chefsBaseUrl,
   onClose,
   onSubmitted,
-}: ChefsFormModalProps) {
+}: Readonly<ChefsFormModalProps>) {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
   // Close on Escape key

@@ -9,7 +9,7 @@ interface FormEntryEditorProps {
   onRemove: (index: number) => void;
 }
 
-export default function FormEntryEditor({ entry, index, onChange, onRemove }: FormEntryEditorProps) {
+export default function FormEntryEditor({ entry, index, onChange, onRemove }: Readonly<FormEntryEditorProps>) {
   function handleField(field: keyof FormEntry, value: string) {
     if (field === 'allowedActors') {
       onChange(index, {

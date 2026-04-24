@@ -10,7 +10,7 @@ interface CreatePlaygroundDialogProps {
   onClose: () => void;
 }
 
-export default function CreatePlaygroundDialog({ owner, onCreated, onClose }: CreatePlaygroundDialogProps) {
+export default function CreatePlaygroundDialog({ owner, onCreated, onClose }: Readonly<CreatePlaygroundDialogProps>) {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
