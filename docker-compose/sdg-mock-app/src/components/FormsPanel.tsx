@@ -23,6 +23,7 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
   const [modalFormId, setModalFormId] = useState<string | null>(null);
   const [modalFormName, setModalFormName] = useState<string | null>(null);
   const [modalToken, setModalToken] = useState<string | null>(null);
+  const [modalChefsBaseUrl, setModalChefsBaseUrl] = useState<string | null>(null);
   const [tokenLoading, setTokenLoading] = useState<string | null>(null);
 
   // Fetch CHEFS forms for the current actor
@@ -41,10 +42,11 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
     async (formId: string, formName: string) => {
       setTokenLoading(formId);
       try {
-        const { authToken } = await fetchChefsToken(formId);
+        const { authToken, chefsBaseUrl } = await fetchChefsToken(formId);
         setModalFormId(formId);
         setModalFormName(formName);
         setModalToken(authToken);
+        setModalChefsBaseUrl(chefsBaseUrl);
       } catch (err) {
         toast(err instanceof Error ? err.message : String(err), 'error');
       } finally {
@@ -67,19 +69,20 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
       setModalFormId(null);
       setModalFormName(null);
       setModalToken(null);
+      setModalChefsBaseUrl(null);
       setTimeout(onRefresh, 2000);
     },
     [modalFormId, actorId, toast, onRefresh],
   );
 
   return (
-    <div className="border-r border-border flex flex-col">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-[95px] z-10">
+    <div className="border-r border-border flex flex-col overflow-y-auto">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-0 z-10">
         <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-text-muted">
           <span className="text-base">📋</span> Forms
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+      <div className="flex-1 p-3 flex flex-col gap-2">
         {chefsLoading ? (
           <div className="text-xs text-text-dim text-center py-4">Loading CHEFS forms…</div>
         ) : chefsError ? (
@@ -109,10 +112,12 @@ export default function FormsPanel({ actorId, onRefresh }: Props) {
           formId={modalFormId}
           formName={modalFormName ?? undefined}
           token={modalToken}
+          chefsBaseUrl={modalChefsBaseUrl ?? undefined}
           onClose={() => {
             setModalFormId(null);
             setModalFormName(null);
             setModalToken(null);
+            setModalChefsBaseUrl(null);
           }}
           onSubmitted={handleChefsSubmitted}
         />

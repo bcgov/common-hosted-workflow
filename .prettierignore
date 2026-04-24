@@ -1,2 +1,6 @@
 **/*.yaml
 **/*.yml
+
+# Auto-generated files
+docker-compose/n8n/demo-data/workflows/**
+next-env.d.ts

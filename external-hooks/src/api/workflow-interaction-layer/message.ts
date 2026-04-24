@@ -2,9 +2,8 @@ import { Router, Request, Response } from 'express';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import {
   requireChwfAllowedProjectIds,
-  resolveWorkflowProjectScope,
-  validateN8nExecutionInTenantScope,
-  validateN8nExecutionMatchesWorkflow,
+  requireExecutionInTenantScope,
+  resolveProjectIdForCreate,
 } from '../helpers/n8n-validation';
 import { AppError, wrapAsyncRoute } from '../utils/errors';
 import { formatDbErrorForLog } from '../helpers/db-helper';
@@ -49,17 +48,12 @@ export function createMessageRouter({
       const parsed = parseValidatedRequest(listActorMessagesSchema, req);
       const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
       const { workflowInstanceId } = parsed.query;
-      if (workflowInstanceId) {
-        const scopeCheck = await validateN8nExecutionInTenantScope({
-          executionRepository: execution,
-          workflowInstanceId,
-          allowedProjectIds,
-          sharedWorkflowRepository: sharedWorkflow,
-        });
-        if (scopeCheck.ok === false) {
-          throw new AppError(scopeCheck.status, scopeCheck.error);
-        }
-      }
+      await requireExecutionInTenantScope({
+        executionRepository: execution,
+        workflowInstanceId,
+        allowedProjectIds,
+        sharedWorkflowRepository: sharedWorkflow,
+      });
       const rows = await messageRepository.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
@@ -81,17 +75,12 @@ export function createMessageRouter({
       const parsed = parseValidatedRequest(listMessagesSchema, req);
       const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/messages/', 'messages');
       const { workflowInstanceId } = parsed.query;
-      if (workflowInstanceId) {
-        const scopeCheck = await validateN8nExecutionInTenantScope({
-          executionRepository: execution,
-          workflowInstanceId,
-          allowedProjectIds,
-          sharedWorkflowRepository: sharedWorkflow,
-        });
-        if (scopeCheck.ok === false) {
-          throw new AppError(scopeCheck.status, scopeCheck.error);
-        }
-      }
+      await requireExecutionInTenantScope({
+        executionRepository: execution,
+        workflowInstanceId,
+        allowedProjectIds,
+        sharedWorkflowRepository: sharedWorkflow,
+      });
       const pageLimit = parsed.query.limit ?? 50;
       const rows = await messageRepository.list({
         allowedProjectIds,
@@ -118,29 +107,14 @@ export function createMessageRouter({
       const { title, body, actorId, actorType, workflowInstanceId, workflowId, metadata, status } = parsed.body;
       const allowedProjectIds = requireChwfAllowedProjectIds(res, 'POST /v1/messages/', 'messages');
 
-      let projectId = '';
-      try {
-        // Align n8n execution with body workflowId, then pick a projectId shared by workflow + tenant scope.
-        const execCheck = await validateN8nExecutionMatchesWorkflow({
-          executionRepository: execution,
-          workflowInstanceId,
-          workflowId,
-        });
-        if (execCheck.ok === false) {
-          throw new AppError(execCheck.status, execCheck.error);
-        }
-
-        const scopedWorkflowProjects = await resolveWorkflowProjectScope(workflowId, allowedProjectIds, sharedWorkflow);
-        if (!scopedWorkflowProjects.length) {
-          throw new AppError(403, 'workflowId is not accessible for this tenant/user scope');
-        }
-        projectId = scopedWorkflowProjects[0];
-      } catch (error) {
-        if (error instanceof AppError) throw error;
-        const dbDetail = formatDbErrorForLog(error);
-        log.error('Create message resolution error', { statusCode: 500, dbDetail, error: String(error) });
-        throw new AppError(500, 'Internal Server Error');
-      }
+      const projectId = await resolveProjectIdForCreate({
+        executionRepository: execution,
+        sharedWorkflowRepository: sharedWorkflow,
+        workflowInstanceId,
+        workflowId,
+        allowedProjectIds,
+        logLabel: 'Create message',
+      });
 
       try {
         const created = await messageRepository.create({

@@ -1,3 +1,34 @@
+import type {
+  PlaygroundSummary,
+  PlaygroundDetail,
+  CreatePlaygroundRequest,
+  UpdatePlaygroundRequest,
+  PlaygroundExport,
+  ConnectionTestResult,
+} from '@/types/playground';
+
+// ── Playground Context ──
+
+let currentPlayground: string | null = null;
+
+/** Set the active playground name. All subsequent API calls will include the X-PLAYGROUND-ID header. */
+export function setPlaygroundContext(name: string | null): void {
+  currentPlayground = name;
+}
+
+/** Get the currently active playground name. */
+export function getPlaygroundContext(): string | null {
+  return currentPlayground;
+}
+
+/** Returns the X-PLAYGROUND-ID header object when a playground is active, or empty object. */
+function playgroundHeaders(): Record<string, string> {
+  if (currentPlayground) {
+    return { 'X-PLAYGROUND-ID': currentPlayground };
+  }
+  return {};
+}
+
 // ── Types ──
 
 export interface Message {
@@ -73,7 +104,9 @@ function buildQueryString(filters: { since?: string; limit?: number }): string {
 
 export async function apiFetch<T>(path: string, filters: { since?: string; limit?: number } = {}): Promise<T> {
   const url = `/api/wil${path}${buildQueryString(filters)}`;
-  const resp = await fetch(url);
+  const resp = await fetch(url, {
+    headers: { ...playgroundHeaders() },
+  });
   if (!resp.ok) {
     const body = await resp.text();
     throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
@@ -85,7 +118,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   const url = `/api/wil${path}`;
   const resp = await fetch(url, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...playgroundHeaders() },
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
@@ -100,7 +133,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
 export async function apiCallback(actionId: string, body: unknown): Promise<void> {
   const resp = await fetch('/api/wil/callback', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...playgroundHeaders() },
     body: JSON.stringify({ actionId, body }),
   });
   if (!resp.ok) {
@@ -118,7 +151,9 @@ export interface ChefsFormEntry {
 
 /** Fetch the list of CHEFS forms available for a given actor. */
 export async function fetchChefsFormsForActor(actorId: string): Promise<ChefsFormEntry[]> {
-  const resp = await fetch(`/api/chefs/actors/${encodeURIComponent(actorId)}/forms`);
+  const resp = await fetch(`/api/chefs/actors/${encodeURIComponent(actorId)}/forms`, {
+    headers: { ...playgroundHeaders() },
+  });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`${resp.status}: ${text}`);
@@ -131,23 +166,29 @@ export async function fetchChefsFormsForActor(actorId: string): Promise<ChefsFor
 export async function fetchChefsToken(
   formId: string,
   actionId?: string,
-): Promise<{ authToken: string; formName: string }> {
+): Promise<{ authToken: string; formName: string; chefsBaseUrl: string }> {
   const params = new URLSearchParams({ formId });
   if (actionId) params.set('actionId', actionId);
-  const resp = await fetch(`/api/chefs/token?${params}`);
+  const resp = await fetch(`/api/chefs/token?${params}`, {
+    headers: { ...playgroundHeaders() },
+  });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`${resp.status}: ${text}`);
   }
   const data = await resp.json();
-  return { authToken: data.authToken as string, formName: (data.formName as string) || '' };
+  return {
+    authToken: data.authToken as string,
+    formName: (data.formName as string) || '',
+    chefsBaseUrl: (data.chefsBaseUrl as string) || '',
+  };
 }
 
 /** Forward a CHEFS form submission to the backend callback. */
 export async function submitChefsForm(formId: string, submission: unknown, actorId?: string): Promise<void> {
   const resp = await fetch('/api/chefs/submissions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...playgroundHeaders() },
     body: JSON.stringify({ formId, submission, actorId }),
   });
   if (!resp.ok) {
@@ -176,4 +217,113 @@ export function fmtDate(iso?: string | null): string {
   } catch {
     return iso;
   }
+}
+
+// ── Playground CRUD API Helpers ──
+
+/** Fetch all playgrounds owned by the given tester. */
+export async function fetchPlaygrounds(owner: string): Promise<PlaygroundSummary[]> {
+  const params = new URLSearchParams({ owner });
+  const resp = await fetch(`/api/playgrounds?${params}`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  const data = await resp.json();
+  return data.playgrounds as PlaygroundSummary[];
+}
+
+/** Fetch full detail for a single playground (including sensitive fields). */
+export async function fetchPlayground(name: string): Promise<PlaygroundDetail> {
+  const resp = await fetch(`/api/playgrounds/${encodeURIComponent(name)}`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  return resp.json();
+}
+
+/** Create a new playground. */
+export async function createPlayground(data: CreatePlaygroundRequest): Promise<void> {
+  const resp = await fetch('/api/playgrounds', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
+/** Update an existing playground's configuration. */
+export async function updatePlayground(name: string, data: UpdatePlaygroundRequest): Promise<void> {
+  const resp = await fetch(`/api/playgrounds/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
+/** Delete a playground. */
+export async function deletePlayground(name: string): Promise<void> {
+  const resp = await fetch(`/api/playgrounds/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
+/** Clone a playground under a new name. */
+export async function clonePlayground(name: string, newName: string, owner: string): Promise<void> {
+  const resp = await fetch(`/api/playgrounds/${encodeURIComponent(name)}/clone`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newName, owner }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
+/** Export a playground's full configuration as JSON. */
+export async function exportPlayground(name: string): Promise<PlaygroundExport> {
+  const resp = await fetch(`/api/playgrounds/${encodeURIComponent(name)}/export`);
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  return resp.json();
+}
+
+/** Import a playground from an exported configuration. */
+export async function importPlayground(name: string, owner: string, config: PlaygroundExport): Promise<void> {
+  const resp = await fetch('/api/playgrounds/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, owner, config }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
+/** Test connectivity to a playground's configured n8n instance. */
+export async function testConnection(name: string): Promise<ConnectionTestResult> {
+  const resp = await fetch(`/api/playgrounds/${encodeURIComponent(name)}/test-connection`, {
+    method: 'POST',
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  return resp.json();
 }

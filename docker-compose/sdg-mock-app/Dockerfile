@@ -14,8 +14,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ARG N8N_TARGET=http://n8n:5678
-ENV N8N_TARGET=${N8N_TARGET}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 

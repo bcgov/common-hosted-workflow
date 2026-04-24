@@ -31,8 +31,8 @@ export default function ActionsPanel({ actions, error, actorId, onRefresh }: Pro
   const toast = useToast();
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-[95px] z-10">
+    <div className="flex flex-col overflow-y-auto">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-0 z-10">
         <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-text-muted">
           <span className="text-base">⚡</span> Action Requests
           <span className="bg-accent-soft text-accent px-2 py-0.5 rounded-full text-[11px] font-bold font-mono">
@@ -40,7 +40,7 @@ export default function ActionsPanel({ actions, error, actorId, onRefresh }: Pro
           </span>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+      <div className="flex-1 p-3 flex flex-col gap-2">
         {error ? (
           <div className="flex flex-col items-center justify-center py-12 px-5 text-text-dim text-center flex-1">
             <div className="text-3xl mb-2.5 opacity-50 text-red-400">✕</div>
@@ -79,6 +79,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [formToken, setFormToken] = useState<string | null>(null);
   const [formName, setFormName] = useState<string | null>(null);
+  const [formChefsBaseUrl, setFormChefsBaseUrl] = useState<string | null>(null);
   const [formTokenLoading, setFormTokenLoading] = useState(false);
 
   const isPatchable = ['pending', 'in_progress'].includes(a.status);
@@ -99,9 +100,10 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
     if (!showFormId) return;
     setFormTokenLoading(true);
     try {
-      const { authToken, formName: name } = await fetchChefsToken(showFormId, a.id);
+      const { authToken, formName: name, chefsBaseUrl } = await fetchChefsToken(showFormId, a.id);
       setFormToken(authToken);
       setFormName(name);
+      setFormChefsBaseUrl(chefsBaseUrl);
       setFormModalOpen(true);
     } catch (err) {
       toast(err instanceof Error ? err.message : String(err), 'error');
@@ -137,6 +139,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
       setFormModalOpen(false);
       setFormToken(null);
       setFormName(null);
+      setFormChefsBaseUrl(null);
     },
     [a.id, showFormId, actorId, toast, onRefresh],
   );
@@ -288,10 +291,12 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
           formId={showFormId}
           formName={formName ?? undefined}
           token={formToken}
+          chefsBaseUrl={formChefsBaseUrl ?? undefined}
           onClose={() => {
             setFormModalOpen(false);
             setFormToken(null);
             setFormName(null);
+            setFormChefsBaseUrl(null);
           }}
           onSubmitted={handleFormSubmitted}
         />

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { wilGet } from '@/lib/wil-proxy';
+import { requirePlaygroundConfigFromHeader } from '@/lib/playground-resolve';
 
 /**
  * Fields that must never reach the browser.
@@ -27,8 +28,12 @@ function sanitizeAction(action: Record<string, unknown>): Record<string, unknown
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ actorId: string }> }) {
   const { actorId } = await params;
+
+  const resolved = requirePlaygroundConfigFromHeader(request);
+  if (!resolved.ok) return resolved.response;
+
   const sp = request.nextUrl.searchParams;
-  const upstream = await wilGet(`/actors/${encodeURIComponent(actorId)}/actions`, sp);
+  const upstream = await wilGet(`/actors/${encodeURIComponent(actorId)}/actions`, sp, resolved.config);
   const data = await upstream.json();
 
   if (!upstream.ok) {

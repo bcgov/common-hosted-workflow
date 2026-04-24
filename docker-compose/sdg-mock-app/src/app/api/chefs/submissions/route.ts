@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadChefsConfig } from '@/lib/chefs-config';
+import { resolvePlaygroundConfig, resolvePlaygroundForms } from '@/lib/playground-resolve';
+import { trimTrailingSlashes } from '@/lib/url';
 
 /**
  * POST /api/chefs/submissions
@@ -7,27 +8,43 @@ import { loadChefsConfig } from '@/lib/chefs-config';
  * Receives { formId, submission, actorId } from the frontend after a CHEFS
  * form is submitted. If the form has a callbackWebhookUrl configured,
  * forwards the submission data to that webhook (typically an n8n endpoint).
+ *
+ * The X-PLAYGROUND-ID header is required. Form configuration and n8nTarget
+ * are resolved from the playground database.
  */
 export async function POST(request: NextRequest) {
   const { formId, submission, actorId } = await request.json();
+  const playgroundName = request.headers.get('x-playground-id');
 
   if (!formId) {
     return NextResponse.json({ error: 'formId is required' }, { status: 400 });
   }
 
-  const chefsConfig = loadChefsConfig();
-  const entry = chefsConfig.forms.find((f) => f.formId === formId);
+  if (!playgroundName) {
+    return NextResponse.json({ error: 'X-PLAYGROUND-ID header is required' }, { status: 400 });
+  }
+
+  const resolvedForms = resolvePlaygroundForms(playgroundName);
+  if (resolvedForms === null) {
+    return NextResponse.json({ error: 'Playground not found' }, { status: 404 });
+  }
+
+  const entry = resolvedForms.find((f) => f.formId === formId);
   if (!entry) {
     return NextResponse.json({ error: 'Form not found in configuration' }, { status: 404 });
   }
 
-  if (!entry.callbackWebhookUrl?.trim()) {
+  const callbackWebhookUrl = entry.callbackWebhookUrl;
+
+  const pgConfig = resolvePlaygroundConfig(playgroundName);
+  const n8nTarget = trimTrailingSlashes(pgConfig?.n8nTarget || '');
+
+  if (!callbackWebhookUrl?.trim()) {
     return NextResponse.json({ message: 'Submission received, no callback configured' });
   }
 
   // Rewrite localhost:5678 URLs to the internal Docker hostname (same as wil-proxy)
-  const n8nTarget = (process.env.N8N_TARGET || 'http://localhost:5678').replace(/\/+$/, '');
-  const callbackUrl = entry.callbackWebhookUrl.replace(/^https?:\/\/localhost:5678/, n8nTarget);
+  const callbackUrl = callbackWebhookUrl.replace(/^https?:\/\/localhost:5678/, n8nTarget);
 
   // Forward to the configured webhook
   const resp = await fetch(callbackUrl, {

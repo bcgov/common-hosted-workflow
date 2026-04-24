@@ -11,8 +11,8 @@ interface Props {
 
 export default function MessagesPanel({ messages, error }: Props) {
   return (
-    <div className="border-r border-border flex flex-col">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-[95px] z-10">
+    <div className="border-r border-border flex flex-col overflow-y-auto">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface sticky top-0 z-10">
         <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-text-muted">
           <span className="text-base">✉</span> Messages
           <span className="bg-accent-soft text-accent px-2 py-0.5 rounded-full text-[11px] font-bold font-mono">
@@ -20,7 +20,7 @@ export default function MessagesPanel({ messages, error }: Props) {
           </span>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+      <div className="flex-1 p-3 flex flex-col gap-2">
         {error ? (
           <div className="flex flex-col items-center justify-center py-12 px-5 text-text-dim text-center flex-1">
             <div className="text-3xl mb-2.5 opacity-50 text-red-400">✕</div>

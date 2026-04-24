@@ -1,6 +1,7 @@
 volumes:
   n8n_storage:
   postgres_storage:
+  sdg_mock_app_data:
 
 networks:
   chwf:
@@ -60,15 +61,12 @@ services:
     build:
       context: ./sdg-mock-app
       dockerfile: Dockerfile
-      args:
-        N8N_TARGET: http://n8n:5678
     ports:
     - 8081:8081
     environment:
       NODE_ENV: production
-      N8N_TARGET: http://n8n:5678
-      X_N8N_API_KEY: ${X_N8N_API_KEY}
-      X_TENANT_ID: ${X_TENANT_ID}
+    volumes:
+    - sdg_mock_app_data:/app/data
     depends_on:
       n8n:
         condition: service_started
