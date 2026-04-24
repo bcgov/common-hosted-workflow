@@ -30,40 +30,58 @@ async function main() {
   const authRealmHandle = await kc.realm(AUTH_REALM_NAME).ensure({ displayName: AUTH_REALM_NAME });
 
   console.log('Creating test auth client...');
-  await authRealmHandle.confidentialBrowserLoginClient(AUTH_CLIENT_ID).ensure({
+  const authClientHandle = await authRealmHandle.confidentialBrowserLoginClient(AUTH_CLIENT_ID).ensure({
     secret: AUTH_CLIENT_SECRET,
   });
 
-  console.log('Creating test users...');
-  await authRealmHandle.user('admin@testapp.com').ensure({
-    email: 'admin@testapp.com',
-    password: 'admin@testapp.com', // pragma: allowlist secret
-    firstName: 'Admin',
-    lastName: 'User',
+  await authClientHandle.protocolMapper('client-roles').ensure({
+    protocol: 'openid-connect',
+    protocolMapper: 'oidc-usermodel-client-role-mapper',
+    config: {
+      'usermodel.clientRoleMapping.clientId': '',
+      'usermodel.clientRoleMapping.rolePrefix': '',
+      multivalued: 'true',
+      'claim.name': 'client_roles',
+      'jsonType.label': 'String',
+      'id.token.claim': 'true',
+      'access.token.claim': 'true',
+      'lightweight.claim': 'false',
+      'userinfo.token.claim': 'true',
+      'introspection.token.claim': 'true',
+    },
   });
 
+  const globalAdminRoleHandle = await authClientHandle.role('global:admin').ensure({});
+  const globalMemberRoleHandle = await authClientHandle.role('global:member').ensure({});
+
+  console.log('Creating test users...');
   const users = [
-    { firstName: 'John', lastName: 'Doe' },
-    { firstName: 'Jane', lastName: 'Smith' },
-    { firstName: 'Michael', lastName: 'Brown' },
-    { firstName: 'Emily', lastName: 'Johnson' },
-    { firstName: 'Daniel', lastName: 'Wilson' },
-    { firstName: 'Olivia', lastName: 'Martinez' },
-    { firstName: 'David', lastName: 'Anderson' },
-    { firstName: 'Sophia', lastName: 'Taylor' },
-    { firstName: 'James', lastName: 'Thomas' },
-    { firstName: 'Isabella', lastName: 'Moore' },
+    { firstName: 'Admin', lastName: 'User', roleHandle: globalAdminRoleHandle },
+    { firstName: 'John', lastName: 'Doe', roleHandle: globalMemberRoleHandle },
+    { firstName: 'Jane', lastName: 'Smith', roleHandle: globalMemberRoleHandle },
+    { firstName: 'Michael', lastName: 'Brown', roleHandle: globalMemberRoleHandle },
+    { firstName: 'Emily', lastName: 'Johnson', roleHandle: globalMemberRoleHandle },
+    { firstName: 'Daniel', lastName: 'Wilson', roleHandle: globalMemberRoleHandle },
+    { firstName: 'Olivia', lastName: 'Martinez', roleHandle: null },
+    { firstName: 'David', lastName: 'Anderson', roleHandle: null },
+    { firstName: 'Sophia', lastName: 'Taylor', roleHandle: null },
+    { firstName: 'James', lastName: 'Thomas', roleHandle: null },
+    { firstName: 'Isabella', lastName: 'Moore', roleHandle: null },
   ];
 
   for (const user of users) {
     const email = `${user.firstName.toLowerCase()}.${user.lastName.toLowerCase()}@testapp.com`;
 
-    await authRealmHandle.user(email).ensure({
+    const userHandle = await authRealmHandle.user(email).ensure({
       email,
       password: email, // pragma: allowlist secret
       firstName: user.firstName,
       lastName: user.lastName,
     });
+
+    if (user.roleHandle) {
+      userHandle.assignClientRole(user.roleHandle);
+    }
   }
   console.log('Provision complete!');
 }

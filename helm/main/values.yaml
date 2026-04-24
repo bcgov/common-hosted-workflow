@@ -77,6 +77,7 @@ n8n:
     N8N_HIDE_ACTIVATION_ALERT: "true"
     N8N_HIDE_HIDE_GITHUB_STAR_BUTTON: "true"
     N8N_AI_ENABLED: "false"
+    SSO_RESTRICT_NO_ROLE: "false"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
