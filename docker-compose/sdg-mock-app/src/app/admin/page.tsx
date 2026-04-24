@@ -19,6 +19,53 @@ interface OwnerGroup {
   playgrounds: PlaygroundInfo[];
 }
 
+interface PlaygroundRowProps {
+  pg: PlaygroundInfo;
+  deleting: string | null;
+  onDelete: (name: string) => void;
+}
+
+function PlaygroundRow({ pg, deleting, onDelete }: Readonly<PlaygroundRowProps>) {
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-b border-border last:border-b-0 hover:bg-surface-2/50 transition-colors duration-100">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate">{pg.name}</div>
+        <div className="flex items-center gap-3 mt-1 text-[11px] text-text-dim font-mono flex-wrap">
+          <span title="n8n target">{pg.n8nTarget || '(no target)'}</span>
+          <span>·</span>
+          <span>
+            {pg.formCount} form{pg.formCount === 1 ? '' : 's'}
+          </span>
+          <span>·</span>
+          <span>created {pg.createdAt}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 ml-4 shrink-0">
+        <Link
+          href={`/playground/${encodeURIComponent(pg.name)}/configuration`}
+          className="px-2.5 py-1 rounded-md border border-border bg-surface-2 text-text text-[11px] font-medium hover:border-accent/40 transition-all duration-150"
+        >
+          View
+        </Link>
+        <Link
+          href={`/playground/${encodeURIComponent(pg.name)}/user-test`}
+          className="px-2.5 py-1 rounded-md border border-accent bg-accent-soft text-accent text-[11px] font-medium hover:bg-accent hover:text-white transition-all duration-150"
+        >
+          Test
+        </Link>
+        <button
+          type="button"
+          onClick={() => onDelete(pg.name)}
+          disabled={deleting === pg.name}
+          className="px-2.5 py-1 rounded-md border border-red-400/40 text-red-400 text-[11px] font-medium hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
+        >
+          {deleting === pg.name ? '…' : 'Delete'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [owners, setOwners] = useState<OwnerGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,45 +206,7 @@ export default function AdminPage() {
                   {!collapsed.has(group.owner) && (
                     <div className="border-t border-border">
                       {group.playgrounds.map((pg) => (
-                        <div
-                          key={pg.name}
-                          className="flex items-center justify-between px-5 py-3 border-b border-border last:border-b-0 hover:bg-surface-2/50 transition-colors duration-100"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium truncate">{pg.name}</div>
-                            <div className="flex items-center gap-3 mt-1 text-[11px] text-text-dim font-mono flex-wrap">
-                              <span title="n8n target">{pg.n8nTarget || '(no target)'}</span>
-                              <span>·</span>
-                              <span>
-                                {pg.formCount} form{pg.formCount === 1 ? '' : 's'}
-                              </span>
-                              <span>·</span>
-                              <span>created {pg.createdAt}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 ml-4 shrink-0">
-                            <Link
-                              href={`/playground/${encodeURIComponent(pg.name)}/configuration`}
-                              className="px-2.5 py-1 rounded-md border border-border bg-surface-2 text-text text-[11px] font-medium hover:border-accent/40 transition-all duration-150"
-                            >
-                              View
-                            </Link>
-                            <Link
-                              href={`/playground/${encodeURIComponent(pg.name)}/user-test`}
-                              className="px-2.5 py-1 rounded-md border border-accent bg-accent-soft text-accent text-[11px] font-medium hover:bg-accent hover:text-white transition-all duration-150"
-                            >
-                              Test
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(pg.name)}
-                              disabled={deleting === pg.name}
-                              className="px-2.5 py-1 rounded-md border border-red-400/40 text-red-400 text-[11px] font-medium hover:bg-red-400/10 transition-all duration-150 disabled:opacity-50"
-                            >
-                              {deleting === pg.name ? '…' : 'Delete'}
-                            </button>
-                          </div>
-                        </div>
+                        <PlaygroundRow key={pg.name} pg={pg} deleting={deleting} onDelete={handleDelete} />
                       ))}
                     </div>
                   )}
