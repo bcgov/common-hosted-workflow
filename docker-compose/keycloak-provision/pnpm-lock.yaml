@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@egose/keycloak-fluent':
-        specifier: ^0.6.0
-        version: 0.6.3
+        specifier: ^0.6.4
+        version: 0.6.4
       wait-on:
         specifier: ^9.0.0
         version: 9.0.5
@@ -33,8 +33,8 @@ importers:
 
 packages:
 
-  '@egose/keycloak-fluent@0.6.3':
-    resolution: {integrity: sha512-xvynBYVKBPKwHfG4cuyZSULTDrbIi8DRMyvOkmsxV7A49jCqZS98LCvQARtKCm8pzEvhRdxeqpefcgoPT3yg+w==}
+  '@egose/keycloak-fluent@0.6.4':
+    resolution: {integrity: sha512-YY2xadLOdqHGkmkfo/StvkeSDZXK2zavXqy8LrdqEUetg18vh6HP4/QPkc43UJMCKRhA81XubCw3tvgvGwkKdQ==}
     engines: {node: '>=20'}
 
   '@esbuild/aix-ppc64@0.27.7':
@@ -213,8 +213,8 @@ packages:
   '@hapi/topo@6.0.2':
     resolution: {integrity: sha512-KR3rD5inZbGMrHmgPxsJ9dbi6zEK+C3ZwUwTa+eMwWLz7oijWUTWD2pMSNNYJAU6Qq+65NkxXjqHr/7LM2Xkqg==}
 
-  '@keycloak/keycloak-admin-client@26.6.0':
-    resolution: {integrity: sha512-L3dQDkvVWT2fJWsDUa0qDlQAf0Q41qrsMILHD0Uoy8PsHvoD24hTxmyHhxSLlUPwsURmpChkKo2lMS7BDFJ9IA==}
+  '@keycloak/keycloak-admin-client@26.6.1':
+    resolution: {integrity: sha512-IWzXCyUFhLkk2LkryCunEAGbRVB7ttC7WNmjXlFT83WlBrmxRCDKo52LzmIRgtWcy0VU1qe3Poj5BGyIkE1AnQ==}
     engines: {node: '>=18'}
 
   '@microsoft/kiota-abstractions@1.0.0-preview.100':
@@ -447,9 +447,9 @@ packages:
 
 snapshots:
 
-  '@egose/keycloak-fluent@0.6.3':
+  '@egose/keycloak-fluent@0.6.4':
     dependencies:
-      '@keycloak/keycloak-admin-client': 26.6.0
+      '@keycloak/keycloak-admin-client': 26.6.1
       lodash-es: 4.18.1
 
   '@esbuild/aix-ppc64@0.27.7':
@@ -546,7 +546,7 @@ snapshots:
     dependencies:
       '@hapi/hoek': 11.0.7
 
-  '@keycloak/keycloak-admin-client@26.6.0':
+  '@keycloak/keycloak-admin-client@26.6.1':
     dependencies:
       '@microsoft/kiota-abstractions': 1.0.0-preview.100
       '@microsoft/kiota-http-fetchlibrary': 1.0.0-preview.100

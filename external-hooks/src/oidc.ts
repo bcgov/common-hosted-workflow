@@ -38,6 +38,7 @@ const config = {
   redirectUri: process.env.OIDC_REDIRECT_URI,
   scopes: process.env.OIDC_SCOPES || 'openid email profile',
   rolesClaim: process.env.OIDC_ROLES_CLAIM || 'roles',
+  restrictNoRole: process.env.SSO_RESTRICT_NO_ROLE === 'true',
 };
 
 // Validate configuration
@@ -517,6 +518,13 @@ const hookConfig = {
             });
 
             if (!user) {
+              if (config.restrictNoRole && !jwtRole) {
+                log.warn('Skipping user creation because token did not include a role', {
+                  email: userInfo.email,
+                });
+                return res.redirect('/signin?error=' + encodeURIComponent('No role found in OIDC response'));
+              }
+
               // Check if this is the first user (should be owner)
               const userCount = await User.count();
               let role = userCount === 0 ? 'global:owner' : 'global:member';
@@ -541,11 +549,26 @@ const hookConfig = {
               return res.redirect('/signin?error=' + encodeURIComponent('Failed to create or find user'));
             }
 
-            if (jwtRole && user.role.slug !== jwtRole) {
-              await userService.changeUserRole(user, { newRoleName: jwtRole });
+            const currentRole = user.role?.slug || '';
+            const nextRole = config.restrictNoRole ? jwtRole : jwtRole || 'global:member';
+
+            if (currentRole !== nextRole) {
+              if (currentRole === 'global:owner' && nextRole !== 'global:owner') {
+                const otherOwnerCount = await User.createQueryBuilder('user')
+                  .innerJoin('user.role', 'role')
+                  .where('role.slug = :ownerRole', { ownerRole: 'global:owner' })
+                  .andWhere('user.id != :userId', { userId: user.id })
+                  .getCount();
+
+                if (otherOwnerCount === 0) {
+                  throw new Error('Cannot change role for the last global:owner user');
+                }
+              }
+
+              await userService.changeUserRole(user, { newRoleName: nextRole });
               log.info('User role updated', {
-                previousRole: user.role.slug,
-                newRole: jwtRole,
+                previousRole: currentRole,
+                newRole: nextRole,
                 email: userInfo.email,
               });
             }
