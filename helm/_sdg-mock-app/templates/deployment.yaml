@@ -19,6 +19,7 @@ spec:
       {{- with (default .Values.serviceAccountName ((.Values.global).serviceAccountName)) }}
       serviceAccountName: {{ . }}
       {{- end }}
+      automountServiceAccountToken: false
       securityContext:
         runAsUser: 1001
         fsGroup: 1001
