@@ -9,7 +9,9 @@ export type N8nRepositories = {
   project: any;
   projectRelation: any;
   workflow: any;
+  credential: any;
   sharedWorkflow: any;
+  sharedCredential: any;
   withTransaction: any;
   execution: N8nExecutionLookup;
 };
