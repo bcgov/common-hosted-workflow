@@ -28,6 +28,25 @@ export const associateWorkflowSchema = z.object({
     }),
 });
 
+export const associateCredentialSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+  body: z
+    .object({
+      credentialId: z.unknown(),
+      projectId: z.unknown(),
+      singleOwner: z.boolean().optional(),
+    })
+    .transform((b) => ({
+      credentialId: trimString(b.credentialId),
+      projectId: trimString(b.projectId),
+      singleOwner: b.singleOwner === true,
+    }))
+    .refine((b) => Boolean(b.credentialId && b.projectId), {
+      message: 'Missing credentialId or projectId in request body.',
+    }),
+});
+
 export const tenantProjectRelationSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   query: z.record(z.string(), z.unknown()).optional(),
@@ -53,6 +72,11 @@ export const getUserProjectResponseSchema = z.object({
 });
 
 export const associateWorkflowResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+});
+
+export const associateCredentialResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),
 });

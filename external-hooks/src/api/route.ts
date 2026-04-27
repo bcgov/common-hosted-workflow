@@ -34,6 +34,8 @@ export function createHookConfig() {
             ProjectRelationRepository,
             WorkflowRepository,
             SharedWorkflowRepository,
+            CredentialsRepository,
+            SharedCredentialsRepository,
             ExecutionRepository,
             GLOBAL_OWNER_ROLE,
             GLOBAL_ADMIN_ROLE,
@@ -47,6 +49,8 @@ export function createHookConfig() {
             projectRelation: Container.get(ProjectRelationRepository),
             workflow: Container.get(WorkflowRepository),
             sharedWorkflow: Container.get(SharedWorkflowRepository),
+            credential: Container.get(CredentialsRepository),
+            sharedCredential: Container.get(SharedCredentialsRepository),
             withTransaction,
             execution: Container.get(ExecutionRepository),
           };
