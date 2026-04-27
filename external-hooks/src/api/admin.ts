@@ -2,7 +2,9 @@ import { Request, Response, Router } from 'express';
 import { tenantUuidRegex } from './constants/regex';
 import {
   associateWorkflowResponseSchema,
+  associateCredentialResponseSchema,
   associateWorkflowSchema,
+  associateCredentialSchema,
   getUserProjectResponseSchema,
   getUserProjectSchema,
   tenantProjectCreatedResponseSchema,
@@ -25,7 +27,7 @@ export function createAdminRouter({
   n8nRepositories: N8nRepositories;
   customRepositories: CustomRepositories;
 }) {
-  const { user, project, workflow, sharedWorkflow, withTransaction } = n8nRepositories;
+  const { user, project, workflow, credential, sharedWorkflow, sharedCredential, withTransaction } = n8nRepositories;
   const { tenantProjectRelation } = customRepositories;
   const router = Router();
 
@@ -84,6 +86,48 @@ export function createAdminRouter({
       const payload = parseValidatedResponse(associateWorkflowResponseSchema, {
         success: true as const,
         message: `Workflow '${workflowId}' successfully associated with project '${projectId}'`,
+      });
+
+      res.json(payload);
+    }),
+  );
+
+  router.post(
+    '/associate-credential',
+    adminAuthMiddleware,
+    createRequestSchemaValidator(associateCredentialSchema),
+    wrapAsyncRoute(async (req: Request, res: Response) => {
+      const parsed = parseValidatedRequest(associateCredentialSchema, req);
+      const { credentialId, projectId, singleOwner } = parsed.body;
+
+      console.log(credentialId, projectId, singleOwner);
+
+      const [cred, proj] = await Promise.all([
+        credential.findOneBy({ id: credentialId }),
+        project.findOneBy({ id: projectId }),
+      ]);
+
+      console.log(cred, proj);
+
+      if (!cred) {
+        log.warn('Credential move failed: credential not found', { statusCode: 404, credentialId });
+        throw new AppError(404, 'Credential not found.');
+      }
+
+      if (!proj) {
+        log.warn('Credential move failed: project not found', { statusCode: 404, projectId });
+        throw new AppError(404, 'Project not found.');
+      }
+
+      await withTransaction(sharedCredential.manager, null, async (em: any) => {
+        if (singleOwner) await em.delete('SharedCredentials', { credentials: cred });
+        const newShare = em.create('SharedCredentials', { project: proj, credentials: cred, role: 'credential:owner' });
+        await em.save(newShare);
+      });
+
+      const payload = parseValidatedResponse(associateCredentialResponseSchema, {
+        success: true as const,
+        message: `Credential '${credentialId}' successfully associated with project '${projectId}'`,
       });
       res.json(payload);
     }),

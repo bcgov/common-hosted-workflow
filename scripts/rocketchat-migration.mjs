@@ -24,11 +24,22 @@ const CONFIG = {
 };
 
 const CSV_COLUMNS = {
-  LEGACY_URL: 'Rocket.Chat webhook URL',
-  WEBHOOK_NAME: 'The webhook name',
-  USER_EMAIL: 'The valid IDIR user email',
-  SOURCE_TYPE: 'The source type',
-  TEAMS_CHANNEL_ID: 'The target Teams channel ID',
+  LEGACY_URL: 'URL',
+  WEBHOOK_NAME: 'WebHook Name',
+  USER_EMAIL: 'Owner Email',
+  SOURCE_TYPE: 'Payload Type',
+  TEAMS_TEAM_ID: 'Team ID',
+  TEAMS_CHANNEL_ID: 'Channel ID',
+};
+
+const SOURCES = {
+  Backup: 'template,backup-container',
+  Github: 'template,github',
+  'Rocket.Chat': 'template,rocket-chat',
+  StatusCake: 'template,status-cake',
+  Sysdig: 'template,sysdig',
+  UptimeCom: 'template,uptime-com',
+  Other: 'text',
 };
 
 const api = axios.create({
@@ -39,10 +50,23 @@ const api = axios.create({
   },
 });
 
+function generateTeamsLink(channelId, groupId, tenantId, title = 'title') {
+  const baseUrl = 'https://teams.microsoft.com';
+
+  const path = `/l/channel/${encodeURIComponent(channelId)}/${encodeURIComponent(title)}`;
+
+  const url = new URL(path, baseUrl);
+
+  if (groupId) url.searchParams.append('groupId', groupId);
+  if (tenantId) url.searchParams.append('tenantId', tenantId);
+
+  return url.toString();
+}
+
 /**
  * Step 1: Ensures user exists and retrieves their auto-provisioned project
  */
-const ensureUserAndGetProject = async (email) => {
+async function ensureUserAndGetProject(email) {
   try {
     const { data } = await api.get(`/rest/custom/admin/users/${email}/project`);
     return data;
@@ -61,13 +85,29 @@ const ensureUserAndGetProject = async (email) => {
 
     throw new Error(`User lookup failed: ${error.message}`);
   }
-};
+}
 
 /**
  * Step 2: Creates the workflow and moves it to the specific project
  */
-const createAndLinkWorkflow = async (name, projectId, source) => {
+async function createAndLinkWorkflow(name, projectId, sourceType, sourceSubtype = '', channelLink, payload) {
   const webhookId = getUniversalUUID();
+
+  const { data: credential } = await api.post('/api/v1/credentials', {
+    name: `DevX Connector - ${name}`,
+    type: 'devXConnector',
+    data: { channelLink },
+    isGlobal: false,
+    isResolvable: false,
+    projectId,
+  });
+
+  await api.post('/rest/custom/admin/associate-credential', {
+    credentialId: credential.id,
+    projectId,
+    singleOwner: true,
+  });
+
   const { data: workflow } = await api.post('/api/v1/workflows', {
     name,
     nodes: [
@@ -89,8 +129,15 @@ const createAndLinkWorkflow = async (name, projectId, source) => {
         typeVersion: 0.1,
         position: [208, 0],
         parameters: {
-          source,
-          payload: '={{ $json.body }}',
+          type: sourceType,
+          source: sourceSubtype,
+          payload,
+        },
+        credentials: {
+          devXConnector: {
+            id: credential.id,
+            name: credential.name,
+          },
         },
       },
     ],
@@ -114,17 +161,19 @@ const createAndLinkWorkflow = async (name, projectId, source) => {
   // Associate it with the project (Transfer ownership)
   await api.post('/rest/custom/admin/associate-workflow', {
     workflowId: workflow.id,
-    projectId: projectId,
+    projectId,
     singleOwner: true,
   });
 
   return workflow;
-};
+}
 
-const processMigrationRow = async (row) => {
+async function processMigrationRow(row) {
   const email = row[CSV_COLUMNS.USER_EMAIL];
   const webhookName = row[CSV_COLUMNS.WEBHOOK_NAME];
   const source = row[CSV_COLUMNS.SOURCE_TYPE];
+  const teamId = row[CSV_COLUMNS.TEAMS_TEAM_ID];
+  const channelId = row[CSV_COLUMNS.TEAMS_CHANNEL_ID];
 
   try {
     const userProject = await ensureUserAndGetProject(email);
@@ -132,7 +181,21 @@ const processMigrationRow = async (row) => {
 
     if (!projectId) throw new Error('Could not resolve Project ID');
 
-    const workflow = await createAndLinkWorkflow(webhookName, projectId, source);
+    const channelLink = generateTeamsLink(channelId, teamId, null, webhookName);
+    const messageTypes = SOURCES[source] || SOURCES['Other'];
+    const [sourceType, sourceSubtype] = messageTypes.split(',');
+    const payload =
+      source === 'Other' ? `${webhookName} has triggered, please configure workflow output` : '={{ $json.body }}';
+
+    const workflow = await createAndLinkWorkflow(
+      webhookName,
+      projectId,
+      sourceType,
+      sourceSubtype,
+      channelLink,
+      payload,
+    );
+
     const webhookNode = workflow.nodes.find((node) => node.name);
 
     logger.info(`✅ [${email}] Migrated: ${webhookName}`);
@@ -141,9 +204,9 @@ const processMigrationRow = async (row) => {
     logger.error(`❌ [${email}] Failed: ${err.message}`);
     return { ...row, 'Workflow ID': '', 'Webhook ID': '', Status: 'Failed', error: err.message };
   }
-};
+}
 
-const migrate = async () => {
+async function migrate() {
   const inputRows = [];
   const outputData = [];
 
@@ -165,7 +228,7 @@ const migrate = async () => {
   csv
     .writeToPath(CONFIG.OUTPUT_FILE, outputData, { headers: true })
     .on('finish', () => logger.info(`✨ Done! Saved to ${CONFIG.OUTPUT_FILE}`));
-};
+}
 
 migrate().catch((err) => logger.error(err));
 
