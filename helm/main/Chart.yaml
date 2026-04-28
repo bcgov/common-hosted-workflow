@@ -14,11 +14,11 @@ dependencies:
     repository: 'file://../_pgo'
     condition: pgo.enabled
   - name: postgresql
-    version: 18.5.15
+    version: 18.5.24
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
   - name: redis
-    version: 25.3.9
+    version: 25.3.11
     repository: https://charts.bitnami.com/bitnami
     condition: redis.enabled
   - name: sdg-mock-app

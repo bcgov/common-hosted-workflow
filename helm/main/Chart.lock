@@ -7,12 +7,12 @@ dependencies:
   version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 18.5.15
+  version: 18.5.24
 - name: redis
   repository: https://charts.bitnami.com/bitnami
-  version: 25.3.9
+  version: 25.3.11
 - name: sdg-mock-app
   repository: file://../_sdg-mock-app
   version: 0.1.0
-digest: sha256:13cf5f733e816d934e0f5369f2ecf8746a1ba71d02b3ec8ddad3a7b1eeaec849
-generated: "2026-04-24T14:15:06.103249877-07:00"
+digest: sha256:1549189b03cc932eeae0fbcaee876ed4300486c192cc182a2e2c350a0a3f77de
+generated: "2026-04-28T09:12:28.720198824Z"

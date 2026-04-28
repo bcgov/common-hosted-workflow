@@ -1,4 +1,4 @@
-FROM node:24.14.1-alpine3.23 AS build-nodes
+FROM node:24.15.0-alpine3.23 AS build-nodes
 
 RUN apk add --no-cache libc6-compat
 
@@ -13,7 +13,7 @@ RUN pnpm install --frozen-lockfile
 COPY community-nodes .
 RUN pnpm build
 
-FROM node:24.14.1-alpine3.23 AS build-hooks
+FROM node:24.15.0-alpine3.23 AS build-hooks
 
 RUN apk add --no-cache libc6-compat
 
@@ -28,7 +28,7 @@ RUN pnpm install --frozen-lockfile
 COPY external-hooks .
 RUN pnpm bundle
 
-FROM n8nio/n8n:2.16.0
+FROM n8nio/n8n:2.17.3
 
 WORKDIR /home/node
 
