@@ -3,7 +3,8 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../db/repository/workflow-interaction-layer/action-request';
 import { MessageRepository } from '../db/repository/workflow-interaction-layer/message';
 import { TenantProjectRelationRepository } from '../db/repository/workflow-interaction-layer/tenant-project-relation';
-import { N8N_API_KEY_SERVICE_PATH, N8N_DB_PATH, N8N_DI_PATH } from './constants/n8n-paths';
+import { ApiKeyService } from './services/api-key';
+import { N8N_DB_PATH, N8N_DI_PATH } from './constants/n8n-paths';
 import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from './middlewares';
 import { buildActionRouter } from './routes/actions';
 import { buildActorRouter } from './routes/actors';
@@ -11,6 +12,7 @@ import { buildAdminRouter } from './routes/admin';
 import { buildMessageRouter } from './routes/messages';
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
 import type { ApiRouteContext } from './types/routes';
+import type { ApiServices } from './types/services';
 import { handleErrorResponse } from './utils/errors';
 import { createLogger } from './utils/logger';
 import { mountSwaggerUi } from './swagger-ui';
@@ -38,9 +40,7 @@ function createHookConfig() {
             GLOBAL_OWNER_ROLE,
             GLOBAL_ADMIN_ROLE,
           } = require(N8N_DB_PATH);
-          const { PublicApiKeyService } = require(N8N_API_KEY_SERVICE_PATH);
 
-          const apiKeyService = Container.get(PublicApiKeyService);
           const n8nRepositories: N8nRepositories = {
             user: Container.get(UserRepository),
             project: Container.get(ProjectRepository),
@@ -52,9 +52,12 @@ function createHookConfig() {
             withTransaction,
             execution: Container.get(ExecutionRepository),
           };
+          const services: ApiServices = {
+            apiKey: new ApiKeyService(n8nRepositories.user),
+          };
 
           const { apiKeyAuthMiddleware, adminAuthMiddleware } = createAuthMiddleware({
-            apiKeyService,
+            services,
             globalOwnerRoleSlug: GLOBAL_OWNER_ROLE.slug,
             globalAdminRoleSlug: GLOBAL_ADMIN_ROLE.slug,
           });
@@ -88,6 +91,7 @@ function createHookConfig() {
             workflowInteractionTenantMiddleware,
             n8nRepositories,
             customRepositories,
+            services,
           };
 
           const v1Router = Router();

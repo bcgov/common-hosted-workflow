@@ -68,7 +68,7 @@ function generateTeamsLink(channelId, groupId, tenantId, title = 'title') {
  */
 async function ensureUserAndGetProject(email) {
   try {
-    const { data } = await api.get(`/rest/custom/admin/users/${email}/project`);
+    const { data } = await api.get(`/rest/custom/v1/admin/users/${email}/project`);
     return data;
   } catch (error) {
     if (error.response?.status === 404) {
@@ -79,7 +79,7 @@ async function ensureUserAndGetProject(email) {
 
       // Short delay for n8n background project provisioning
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      const retry = await api.get(`/rest/custom/admin/users/${email}/project`);
+      const retry = await api.get(`/rest/custom/v1/admin/users/${email}/project`);
       return retry.data;
     }
 
@@ -88,7 +88,7 @@ async function ensureUserAndGetProject(email) {
 }
 
 /**
- * Step 2: Creates the workflow and moves it to the specific project
+ * Step 2: Creates the workflow, moves it to the specific project, and activates it
  */
 async function createAndLinkWorkflow(name, projectId, sourceType, sourceSubtype = '', channelLink, payload) {
   const webhookId = getUniversalUUID();
@@ -102,7 +102,7 @@ async function createAndLinkWorkflow(name, projectId, sourceType, sourceSubtype 
     projectId,
   });
 
-  await api.post('/rest/custom/admin/associate-credential', {
+  await api.post('/rest/custom/v1/admin/associate-credential', {
     credentialId: credential.id,
     projectId,
     singleOwner: true,
@@ -159,11 +159,13 @@ async function createAndLinkWorkflow(name, projectId, sourceType, sourceSubtype 
   });
 
   // Associate it with the project (Transfer ownership)
-  await api.post('/rest/custom/admin/associate-workflow', {
+  await api.post('/rest/custom/v1/admin/associate-workflow', {
     workflowId: workflow.id,
     projectId,
     singleOwner: true,
   });
+
+  await api.post(`/api/v1/workflows/${workflow.id}/activate`, {});
 
   return workflow;
 }
@@ -197,12 +199,18 @@ async function processMigrationRow(row) {
     );
 
     const webhookNode = workflow.nodes.find((node) => node.name);
+    console.log('webhookNode', webhookNode);
 
     logger.info(`✅ [${email}] Migrated: ${webhookName}`);
-    return { ...row, 'Workflow ID': workflow.id, 'Webhook ID': webhookNode.webhookId, Status: 'Success' };
+    return {
+      ...row,
+      'Workflow ID': workflow.id,
+      'Webhook URL': `${CONFIG.N8N_BASE_URL}/webhook/${webhookNode.parameters.path}`,
+      Status: 'Success',
+    };
   } catch (err) {
     logger.error(`❌ [${email}] Failed: ${err.message}`);
-    return { ...row, 'Workflow ID': '', 'Webhook ID': '', Status: 'Failed', error: err.message };
+    return { ...row, 'Workflow ID': '', 'Webhook URL': '', Status: 'Failed', error: err.message };
   }
 }
 
