@@ -164,7 +164,7 @@ n8n:
 
     image:
       repository: n8nio/runners
-      tag: 2.15.0
+      tag: 2.17.3
       pullPolicy: IfNotPresent
 
     env:
