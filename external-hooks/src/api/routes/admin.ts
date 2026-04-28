@@ -1,5 +1,5 @@
 import { Request, Response, Router } from 'express';
-import { tenantUuidRegex } from './constants/regex';
+import { tenantUuidRegex } from '../constants/regex';
 import {
   associateWorkflowResponseSchema,
   associateCredentialResponseSchema,
@@ -10,23 +10,15 @@ import {
   tenantProjectCreatedResponseSchema,
   tenantProjectExistsResponseSchema,
   tenantProjectRelationSchema,
-} from './schemas/admin';
-import type { CustomRepositories, N8nRepositories } from './types/repositories';
-import { AppError, wrapAsyncRoute } from './utils/errors';
-import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from './utils/validation';
-import { createLogger } from './utils/logger';
+} from '../schemas/admin';
+import type { ApiRouteContext } from '../types/routes';
+import { AppError, wrapAsyncRoute } from '../utils/errors';
+import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import { createLogger } from '../utils/logger';
 
 const log = createLogger('CustomAPIs');
 
-export function createAdminRouter({
-  adminAuthMiddleware,
-  n8nRepositories,
-  customRepositories,
-}: {
-  adminAuthMiddleware: unknown;
-  n8nRepositories: N8nRepositories;
-  customRepositories: CustomRepositories;
-}) {
+export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customRepositories }: ApiRouteContext) {
   const { user, project, workflow, credential, sharedWorkflow, sharedCredential, withTransaction } = n8nRepositories;
   const { tenantProjectRelation } = customRepositories;
   const router = Router();
@@ -100,14 +92,10 @@ export function createAdminRouter({
       const parsed = parseValidatedRequest(associateCredentialSchema, req);
       const { credentialId, projectId, singleOwner } = parsed.body;
 
-      console.log(credentialId, projectId, singleOwner);
-
       const [cred, proj] = await Promise.all([
         credential.findOneBy({ id: credentialId }),
         project.findOneBy({ id: projectId }),
       ]);
-
-      console.log(cred, proj);
 
       if (!cred) {
         log.warn('Credential move failed: credential not found', { statusCode: 404, credentialId });

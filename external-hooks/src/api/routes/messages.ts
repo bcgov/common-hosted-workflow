@@ -11,60 +11,25 @@ import { shortenIdForLog } from '../utils/string';
 import {
   createMessageSchema,
   createMessageResponseSchema,
-  listActorMessagesResponseSchema,
-  listActorMessagesSchema,
   listMessagesResponseSchema,
   listMessagesSchema,
   mapMessageRowToResponse,
 } from '../schemas/message';
-import type { CustomRepositories, N8nRepositories } from '../types/repositories';
+import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('CustomAPIs');
 
-/** Factory for the messages `Router` (caller supplies middleware and repos from `route.ts`). */
-export function createMessageRouter({
+export function buildMessageRouter({
   apiKeyAuthMiddleware,
   workflowInteractionTenantMiddleware,
   n8nRepositories,
   customRepositories,
-}: {
-  apiKeyAuthMiddleware: unknown;
-  workflowInteractionTenantMiddleware: unknown;
-  n8nRepositories: N8nRepositories;
-  customRepositories: CustomRepositories;
-}) {
+}: ApiRouteContext) {
   const { sharedWorkflow, execution } = n8nRepositories;
   const { message: messageRepository } = customRepositories;
   const router = Router();
-
-  router.get(
-    '/actors/:actorId/messages',
-    apiKeyAuthMiddleware,
-    workflowInteractionTenantMiddleware,
-    createRequestSchemaValidator(listActorMessagesSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
-      const parsed = parseValidatedRequest(listActorMessagesSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
-      const { workflowInstanceId } = parsed.query;
-      await requireExecutionInTenantScope({
-        executionRepository: execution,
-        workflowInstanceId,
-        allowedProjectIds,
-        sharedWorkflowRepository: sharedWorkflow,
-      });
-      const rows = await messageRepository.list({
-        allowedProjectIds,
-        actorId: parsed.params.actorId,
-        paginationSince: parsed.query.since,
-        workflowInstanceId,
-        limit: parsed.query.limit ?? 50,
-      });
-      const payload = parseValidatedResponse(listActorMessagesResponseSchema, rows.map(mapMessageRowToResponse));
-      res.status(200).json(payload);
-    }),
-  );
 
   router.get(
     '/messages/',
