@@ -31,7 +31,7 @@ on:
 jobs:
   deploy-devX:
     name: Deploy devX-${{ inputs.environment }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -65,7 +65,7 @@ jobs:
 
   deploy-devX-dr:
     name: Deploy devX-${{ inputs.environment }}dr
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
