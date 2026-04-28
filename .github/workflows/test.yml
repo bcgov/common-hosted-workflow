@@ -43,3 +43,10 @@ jobs:
         pnpm lint
       working-directory: ./docker-compose/sdg-mock-app
       shell: bash
+
+    - name: Test external-hooks build & test
+      run: |
+        pnpm bundle
+        pnpm test
+      working-directory: ./external-hooks
+      shell: bash

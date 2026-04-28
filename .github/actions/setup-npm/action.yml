@@ -34,3 +34,9 @@ runs:
       pnpm install
     working-directory: ./docker-compose/sdg-mock-app
     shell: bash
+
+  - name: Install external-hooks NPM packages
+    run: |
+      pnpm install
+    working-directory: ./external-hooks
+    shell: bash
