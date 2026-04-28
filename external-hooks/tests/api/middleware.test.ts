@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from '../../src/api/middleware';
+import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from '../../src/api/middlewares';
 import { AppError } from '../../src/api/utils/errors';
 import {
   createMockRequest,

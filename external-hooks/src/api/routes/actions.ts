@@ -13,33 +13,24 @@ import {
   createActionRequestResponseSchema,
   createActionRequestSchema,
   getActionByIdSchema,
-  getActorActionByIdSchema,
   listActionsResponseSchema,
   listActionsSchema,
-  listActorActionsSchema,
   mapActionRequestRowToResponse,
   patchActionStatusByIdSchema,
   patchActionStatusResponseSchema,
-  patchActorActionStatusSchema,
 } from '../schemas/action-request';
-import type { CustomRepositories, N8nRepositories } from '../types/repositories';
+import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('CustomAPIs');
 
-/** Factory for the action-requests `Router`. */
-export function createActionRequestRouter({
+export function buildActionRouter({
   apiKeyAuthMiddleware,
   workflowInteractionTenantMiddleware,
   n8nRepositories,
   customRepositories,
-}: {
-  apiKeyAuthMiddleware: unknown;
-  workflowInteractionTenantMiddleware: unknown;
-  n8nRepositories: N8nRepositories;
-  customRepositories: CustomRepositories;
-}) {
+}: ApiRouteContext) {
   const { sharedWorkflow, execution } = n8nRepositories;
   const { actionRequest: actionRequestRepository } = customRepositories;
   const router = Router();
@@ -153,60 +144,6 @@ export function createActionRequestRouter({
     }),
   );
 
-  router.get(
-    '/actors/:actorId/actions/:actionId',
-    apiKeyAuthMiddleware,
-    workflowInteractionTenantMiddleware,
-    createRequestSchemaValidator(getActorActionByIdSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
-      const parsed = parseValidatedRequest(getActorActionByIdSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(
-        res,
-        'GET /v1/actors/:actorId/actions/:actionId',
-        'actions',
-      );
-      const row = await actionRequestRepository.getById({
-        allowedProjectIds,
-        actionId: parsed.params.actionId,
-        actorId: parsed.params.actorId,
-      });
-      if (!row) throw new AppError(404, 'Action not found');
-      const payload = parseValidatedResponse(createActionRequestResponseSchema, mapActionRequestRowToResponse(row));
-      res.status(200).json(payload);
-    }),
-  );
-
-  router.get(
-    '/actors/:actorId/actions',
-    apiKeyAuthMiddleware,
-    workflowInteractionTenantMiddleware,
-    createRequestSchemaValidator(listActorActionsSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
-      const parsed = parseValidatedRequest(listActorActionsSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/actions', 'actions');
-      const { since, limit, workflowInstanceId } = parsed.query;
-
-      await requireExecutionInTenantScope({
-        executionRepository: execution,
-        workflowInstanceId,
-        allowedProjectIds,
-        sharedWorkflowRepository: sharedWorkflow,
-      });
-      const pageLimit = limit ?? 50;
-      const rows = await actionRequestRepository.list({
-        allowedProjectIds,
-        actorId: parsed.params.actorId,
-        paginationSince: since,
-        workflowInstanceId,
-        limit: pageLimit,
-      });
-      const items = rows.map(mapActionRequestRowToResponse);
-      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
-      const payload = parseValidatedResponse(listActionsResponseSchema, { items, nextCursor });
-      res.status(200).json(payload);
-    }),
-  );
-
   router.patch(
     '/actions/:actionId',
     apiKeyAuthMiddleware,
@@ -219,34 +156,6 @@ export function createActionRequestRouter({
       const updated = await actionRequestRepository.updateStatus({
         allowedProjectIds,
         actionId: parsed.params.actionId,
-        status: patchStatus,
-      });
-      if (!updated) throw new AppError(404, 'Action not found');
-      const payload = parseValidatedResponse(patchActionStatusResponseSchema, {
-        status: patchStatus,
-        message: formatPatchActionStatusMessage(patchStatus),
-      });
-      res.status(200).json(payload);
-    }),
-  );
-
-  router.patch(
-    '/actors/:actorId/actions/:actionId',
-    apiKeyAuthMiddleware,
-    workflowInteractionTenantMiddleware,
-    createRequestSchemaValidator(patchActorActionStatusSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
-      const parsed = parseValidatedRequest(patchActorActionStatusSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(
-        res,
-        'PATCH /v1/actors/:actorId/actions/:actionId',
-        'actions',
-      );
-      const patchStatus = parsed.body.status;
-      const updated = await actionRequestRepository.updateStatus({
-        allowedProjectIds,
-        actionId: parsed.params.actionId,
-        actorId: parsed.params.actorId,
         status: patchStatus,
       });
       if (!updated) throw new AppError(404, 'Action not found');

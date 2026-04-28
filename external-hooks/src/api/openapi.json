@@ -3,7 +3,7 @@
   "info": {
     "title": "CHWF Workflow Interaction Layer APIs — Messages, Action Requests, Tenant Project Admin",
     "version": "0.5.0",
-    "description": "Workflow interaction layer: message and action_request endpoints scoped by tenant and the caller's n8n project access. POST create for messages and actions requires INTERNAL_AUTH_TOKEN bearer plus X-N8N-API-KEY. Admin routes under /rest/custom/admin: user/project lookup, workflow–project association, and tenant_project_relation mappings used by tenant scoping.",
+    "description": "Workflow interaction layer: message and action_request endpoints scoped by tenant and the caller's n8n project access. POST create for messages and actions requires INTERNAL_AUTH_TOKEN bearer plus X-N8N-API-KEY. Admin routes under /rest/custom/v1/admin: user/project lookup, workflow–project association, and tenant_project_relation mappings used by tenant scoping.",
     "contact": {
       "name": "common-hosted-workflow",
       "url": "https://github.com/bcgov/common-hosted-workflow"
@@ -794,7 +794,7 @@
         }
       }
     },
-    "/rest/custom/admin/users/{email}/project": {
+    "/rest/custom/v1/admin/users/{email}/project": {
       "get": {
         "tags": ["Admin"],
         "summary": "Resolve user by email and return their personal project",
@@ -841,7 +841,7 @@
         }
       }
     },
-    "/rest/custom/admin/associate-workflow": {
+    "/rest/custom/v1/admin/associate-workflow": {
       "post": {
         "tags": ["Admin"],
         "summary": "Attach workflow to project as owner (shared workflow)",
@@ -887,7 +887,7 @@
         }
       }
     },
-    "/rest/custom/admin/tenant-project-relation": {
+    "/rest/custom/v1/admin/tenant-project-relation": {
       "post": {
         "tags": ["Admin"],
         "summary": "Insert into tenant_project_relation",

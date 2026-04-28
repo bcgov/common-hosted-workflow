@@ -1,14 +1,15 @@
 /**
  * Unit tests for the message route handlers in
- * `src/api/workflow-interaction-layer/message.ts`.
+ * `src/api/routes/messages.ts`.
  *
- * Strategy: instantiate the router via `createMessageRouter`, then invoke
+ * Strategy: register the routes on an Express router, then invoke
  * each registered handler directly with mock req/res/next objects.
  * Middleware (auth, tenant) is stubbed as pass-through so we test only
  * the handler logic, schema validation, and repository interactions.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { createMessageRouter } from '../../../src/api/workflow-interaction-layer/message';
+import { buildMessageRouter } from '../../../src/api/routes/messages';
+import type { ApiRouteContext } from '../../../src/api/types/routes';
 import {
   createMockRequest,
   createMockResponse,
@@ -75,9 +76,9 @@ async function runHandlerChain(handlers: Array<(req: any, res: any, next: any) =
 function createTestRouter() {
   const messageRepo = createMockMessageRepository();
   const n8nRepos = createMockN8nRepositories();
-
-  const router = createMessageRouter({
+  const routeContext: ApiRouteContext = {
     apiKeyAuthMiddleware: (_req: any, _res: any, next: any) => next(),
+    adminAuthMiddleware: (_req: any, _res: any, next: any) => next(),
     workflowInteractionTenantMiddleware: (_req: any, _res: any, next: any) => next(),
     n8nRepositories: n8nRepos as any,
     customRepositories: {
@@ -85,87 +86,11 @@ function createTestRouter() {
       message: messageRepo as any,
       actionRequest: {} as any,
     },
-  });
+  };
+  const router = buildMessageRouter(routeContext);
 
   return { router, messageRepo, n8nRepos };
 }
-
-/* ================================================================== */
-/*  GET /actors/:actorId/messages                                      */
-/* ================================================================== */
-
-describe('GET /actors/:actorId/messages', () => {
-  it('returns 200 with messages for a valid request', async () => {
-    const { router, messageRepo } = createTestRouter();
-    const rows = [makeMessageRow(), makeMessageRow({ id: 'msg-002' })];
-    messageRepo.list.mockResolvedValue(rows);
-
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
-    expect(handlers).not.toBeNull();
-
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: {},
-    });
-    const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeNull();
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalled();
-    const payload = res.json.mock.calls[0][0];
-    expect(payload).toHaveLength(2);
-  });
-
-  it('passes workflowInstanceId filter to repository', async () => {
-    const { router, messageRepo, n8nRepos } = createTestRouter();
-    messageRepo.list.mockResolvedValue([]);
-
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: { workflowInstanceId: VALID_EXECUTION_ID },
-    });
-    const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(n8nRepos.execution.findSingleExecution).toHaveBeenCalled();
-    expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ workflowInstanceId: VALID_EXECUTION_ID }));
-  });
-
-  it('uses default limit of 50 when not specified', async () => {
-    const { router, messageRepo } = createTestRouter();
-    messageRepo.list.mockResolvedValue([]);
-
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: {},
-    });
-    const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
-  });
-
-  it('returns validation error for empty actorId', async () => {
-    const { router } = createTestRouter();
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
-    const req = createMockRequest({
-      params: { actorId: '' },
-      query: {},
-    });
-    const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeDefined();
-    expect((error as any).statusCode).toBe(400);
-  });
-});
 
 /* ================================================================== */
 /*  GET /messages/                                                     */
