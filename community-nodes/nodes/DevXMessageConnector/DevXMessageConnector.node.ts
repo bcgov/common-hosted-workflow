@@ -18,6 +18,7 @@ import {
   uptimeComTransform,
 } from './sources';
 import { parseTeamsLink } from './helpers';
+import { toSerializableNodeJson } from './sources/shared/payload';
 import type { TextMessageContent } from './sources/Text/types';
 import type { HtmlMessageContent } from './sources/Html/types';
 import type { GenericMessageContent } from './sources/Generic/types';
@@ -194,7 +195,7 @@ export class DevXMessageConnector implements INodeType {
       }
 
       const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId, mode);
-      returnData.push({ json: response as unknown as IDataObject });
+      returnData.push({ json: toSerializableNodeJson(response) as IDataObject });
     }
 
     return [returnData];
@@ -238,6 +239,7 @@ async function sendMessageToDevXConnector(
     headers,
     body,
     json: true,
+    returnFullResponse: false,
   };
 
   return await this.helpers.httpRequest(options);
