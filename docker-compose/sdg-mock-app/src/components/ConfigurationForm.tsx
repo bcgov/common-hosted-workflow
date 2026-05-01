@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { PlaygroundDetail, FormEntry, UpdatePlaygroundRequest } from '@/types/playground';
+import type { PlaygroundDetail, FormEntry, ButtonTrigger, UpdatePlaygroundRequest } from '@/types/playground';
 import { updatePlayground } from '@/lib/api';
 import FormEntryEditor from '@/components/FormEntryEditor';
+import ButtonTriggerEditor from '@/components/ButtonTriggerEditor';
 
 interface ConfigurationFormProps {
   name: string;
@@ -19,12 +20,21 @@ const EMPTY_FORM_ENTRY: FormEntry = {
   callbackWebhookUrl: '',
 };
 
+const EMPTY_BUTTON_TRIGGER: ButtonTrigger = {
+  buttonText: '',
+  method: 'POST',
+  webhookUrl: '',
+  postBody: '',
+  includeActorId: true,
+};
+
 export default function ConfigurationForm({ name, detail, onSaved }: Readonly<ConfigurationFormProps>) {
   const [n8nTarget, setN8nTarget] = useState(detail.n8nTarget);
   const [xN8nApiKey, setXN8nApiKey] = useState(detail.xN8nApiKey);
   const [tenantId, setTenantId] = useState(detail.tenantId);
   const [chefsBaseUrl, setChefsBaseUrl] = useState(detail.chefsBaseUrl);
   const [forms, setForms] = useState<FormEntry[]>(detail.forms);
+  const [buttonTriggers, setButtonTriggers] = useState<ButtonTrigger[]>(detail.buttonTriggers ?? []);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +52,18 @@ export default function ConfigurationForm({ name, detail, onSaved }: Readonly<Co
     setForms((prev) => [...prev, { ...EMPTY_FORM_ENTRY, allowedActors: ['*'] }]);
   }
 
+  function handleTriggerChange(index: number, updated: ButtonTrigger) {
+    setButtonTriggers((prev) => prev.map((t, i) => (i === index ? updated : t)));
+  }
+
+  function handleTriggerRemove(index: number) {
+    setButtonTriggers((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleAddTrigger() {
+    setButtonTriggers((prev) => [...prev, { ...EMPTY_BUTTON_TRIGGER }]);
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -54,6 +76,7 @@ export default function ConfigurationForm({ name, detail, onSaved }: Readonly<Co
         tenantId,
         chefsBaseUrl,
         forms,
+        buttonTriggers,
       };
       await updatePlayground(name, data);
       setSuccess(true);
@@ -155,6 +178,41 @@ export default function ConfigurationForm({ name, detail, onSaved }: Readonly<Co
                 index={i}
                 onChange={handleFormChange}
                 onRemove={handleFormRemove}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Button triggers */}
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-text">Button Triggers</h3>
+          <button
+            type="button"
+            onClick={handleAddTrigger}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-surface-2 text-text text-xs font-medium hover:border-accent/40 transition-all duration-150"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-3.5">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add Button
+          </button>
+        </div>
+
+        {buttonTriggers.length === 0 ? (
+          <p className="text-xs text-text-muted py-4 text-center">
+            No button triggers yet. Click &quot;Add Button&quot; to add one.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {buttonTriggers.map((trigger, i) => (
+              <ButtonTriggerEditor
+                key={trigger.id ?? `new-trigger-${i}`}
+                trigger={trigger}
+                index={i}
+                onChange={handleTriggerChange}
+                onRemove={handleTriggerRemove}
               />
             ))}
           </div>

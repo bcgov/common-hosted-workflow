@@ -19,6 +19,7 @@ export interface PlaygroundDetail {
   tenantId: string;
   chefsBaseUrl: string;
   forms: FormEntry[];
+  buttonTriggers: ButtonTrigger[];
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +33,16 @@ export interface FormEntry {
   callbackWebhookUrl: string;
 }
 
+/** A button trigger that fires a webhook when clicked. */
+export interface ButtonTrigger {
+  id?: number;
+  buttonText: string;
+  method: 'GET' | 'POST';
+  webhookUrl: string;
+  postBody: string;
+  includeActorId: boolean;
+}
+
 /** Request body for creating a playground. */
 export interface CreatePlaygroundRequest {
   name: string;
@@ -41,6 +52,7 @@ export interface CreatePlaygroundRequest {
   tenantId?: string;
   chefsBaseUrl?: string;
   forms?: FormEntry[];
+  buttonTriggers?: ButtonTrigger[];
 }
 
 /** Request body for updating a playground. */
@@ -50,6 +62,7 @@ export interface UpdatePlaygroundRequest {
   tenantId?: string;
   chefsBaseUrl?: string;
   forms?: FormEntry[];
+  buttonTriggers?: ButtonTrigger[];
 }
 
 /** Exported playground configuration (for import/export). */
@@ -59,6 +72,7 @@ export interface PlaygroundExport {
   tenantId: string;
   chefsBaseUrl: string;
   forms: FormEntry[];
+  buttonTriggers?: ButtonTrigger[];
 }
 
 /** Connection test result. */

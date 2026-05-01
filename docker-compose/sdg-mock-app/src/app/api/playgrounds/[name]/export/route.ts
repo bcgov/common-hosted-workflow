@@ -26,6 +26,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       tenantId: detail.tenantId,
       chefsBaseUrl: detail.chefsBaseUrl,
       forms: detail.forms,
+      buttonTriggers: detail.buttonTriggers,
     };
 
     return NextResponse.json(exportData);

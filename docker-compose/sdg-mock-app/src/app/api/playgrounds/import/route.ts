@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       tenantId: config.tenantId,
       chefsBaseUrl: config.chefsBaseUrl,
       forms: config.forms,
+      buttonTriggers: config.buttonTriggers ?? [],
     });
 
     return NextResponse.json({ name: nameField.value }, { status: 201 });
