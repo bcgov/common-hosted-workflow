@@ -13,7 +13,7 @@ import {
 } from './schema';
 import { createTextMessageContent } from '../Text';
 import { TextMessageContent } from '../Text/types';
-import { safeParsePayload } from '../shared/payload';
+import { safeParsePayload, safeStringifyPayload } from '../shared/payload';
 
 type allTypes = PullRequestEvent | WorkflowRunEvent;
 
@@ -55,7 +55,7 @@ export function githubTransform(
     return createGitHubWorkflowRunTemplateContent(data);
   }
 
-  const jsonStr = JSON.stringify(payload);
+  const jsonStr = safeStringifyPayload(payload);
   return createTextMessageContent(jsonStr);
 }
 

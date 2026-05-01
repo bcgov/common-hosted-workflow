@@ -1,10 +1,11 @@
 import { IExecuteFunctions } from 'n8n-workflow';
 import type { HtmlMessageContent } from './types';
 import sanitizeHtml from 'sanitize-html';
+import { safeStringifyPayload } from '../shared/payload';
 
 export function htmlTransform(this: IExecuteFunctions, index: number): HtmlMessageContent {
   const rawPayload = this.getNodeParameter('payload', index);
-  const payload = typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload);
+  const payload = safeStringifyPayload(rawPayload);
   return createHtmlMessageContent(payload);
 }
 
