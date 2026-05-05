@@ -64,9 +64,29 @@ export function validateImportPayload(data: unknown): ValidationResult {
 
   const obj = data as Record<string, unknown>;
 
-  // Required top-level string fields
-  const requiredStringFields = ['n8nTarget', 'xN8nApiKey', 'tenantId', 'chefsBaseUrl'] as const;
-  for (const field of requiredStringFields) {
+  const stringFieldsResult = validateRequiredStringFields(obj, ['n8nTarget', 'xN8nApiKey', 'tenantId', 'chefsBaseUrl']);
+  if (!stringFieldsResult.valid) {
+    return stringFieldsResult;
+  }
+
+  const formsResult = validateFormsArray(obj);
+  if (!formsResult.valid) {
+    return formsResult;
+  }
+
+  const triggersResult = validateButtonTriggersArray(obj);
+  if (!triggersResult.valid) {
+    return triggersResult;
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate that all specified fields exist on the object and are strings.
+ */
+function validateRequiredStringFields(obj: Record<string, unknown>, fields: string[]): ValidationResult {
+  for (const field of fields) {
     if (!Object.hasOwn(obj, field)) {
       return { valid: false, error: `Missing required field: '${field}'` };
     }
@@ -74,8 +94,13 @@ export function validateImportPayload(data: unknown): ValidationResult {
       return { valid: false, error: `Field '${field}' must be a string` };
     }
   }
+  return { valid: true };
+}
 
-  // Required forms array
+/**
+ * Validate the required `forms` array and each entry within it.
+ */
+function validateFormsArray(obj: Record<string, unknown>): ValidationResult {
   if (!Object.hasOwn(obj, 'forms')) {
     return { valid: false, error: "Missing required field: 'forms'" };
   }
@@ -83,29 +108,34 @@ export function validateImportPayload(data: unknown): ValidationResult {
     return { valid: false, error: "Field 'forms' must be an array" };
   }
 
-  // Validate each form entry
   const forms = obj.forms as unknown[];
-  for (let i = 0; i < forms.length; i++) {
-    const result = validateFormEntry(forms[i], i);
+  for (const [i, form] of forms.entries()) {
+    const result = validateFormEntry(form, i);
     if (!result.valid) {
       return result;
     }
   }
+  return { valid: true };
+}
 
-  // Optional buttonTriggers array (backward compat with old exports)
-  if (Object.hasOwn(obj, 'buttonTriggers')) {
-    if (!Array.isArray(obj.buttonTriggers)) {
-      return { valid: false, error: "Field 'buttonTriggers' must be an array" };
-    }
-    const triggers = obj.buttonTriggers as unknown[];
-    for (let i = 0; i < triggers.length; i++) {
-      const result = validateButtonTriggerEntry(triggers[i], i);
-      if (!result.valid) {
-        return result;
-      }
-    }
+/**
+ * Validate the optional `buttonTriggers` array and each entry within it.
+ */
+function validateButtonTriggersArray(obj: Record<string, unknown>): ValidationResult {
+  if (!Object.hasOwn(obj, 'buttonTriggers')) {
+    return { valid: true };
+  }
+  if (!Array.isArray(obj.buttonTriggers)) {
+    return { valid: false, error: "Field 'buttonTriggers' must be an array" };
   }
 
+  const triggers = obj.buttonTriggers as unknown[];
+  for (const [i, trigger] of triggers.entries()) {
+    const result = validateButtonTriggerEntry(trigger, i);
+    if (!result.valid) {
+      return result;
+    }
+  }
   return { valid: true };
 }
 
