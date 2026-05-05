@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updatePlayground, deletePlayground, playgroundExists, type FormEntryInput } from '@/lib/playground-db';
+import {
+  updatePlayground,
+  deletePlayground,
+  playgroundExists,
+  type FormEntryInput,
+  type ButtonTriggerInput,
+} from '@/lib/playground-db';
 import { getPlaygroundDetail } from '@/lib/playground-resolve';
 
 type RouteContext = { params: Promise<{ name: string }> };
@@ -61,6 +67,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       tenantId: typeof data.tenantId === 'string' ? data.tenantId : undefined,
       chefsBaseUrl: typeof data.chefsBaseUrl === 'string' ? data.chefsBaseUrl : undefined,
       forms: Array.isArray(data.forms) ? (data.forms as FormEntryInput[]) : undefined,
+      buttonTriggers: Array.isArray(data.buttonTriggers) ? (data.buttonTriggers as ButtonTriggerInput[]) : undefined,
     });
 
     return NextResponse.json({ name });

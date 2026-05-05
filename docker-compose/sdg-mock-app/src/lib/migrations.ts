@@ -58,14 +58,23 @@ export const migrations: Migration[] = [
     },
   },
 
-  // ── Future migrations go here ──
-  // {
-  //   version: 2,
-  //   name: 'add_playground_description',
-  //   up(db) {
-  //     db.exec(`ALTER TABLE playgrounds ADD COLUMN description TEXT NOT NULL DEFAULT ''`);
-  //   },
-  // },
+  {
+    version: 2,
+    name: 'add_button_triggers',
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS playground_button_triggers (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          playground_name  TEXT    NOT NULL REFERENCES playgrounds(name) ON DELETE CASCADE,
+          button_text      TEXT    NOT NULL DEFAULT '',
+          method           TEXT    NOT NULL DEFAULT 'POST' CHECK(method IN ('GET', 'POST')),
+          webhook_url      TEXT    NOT NULL DEFAULT '',
+          post_body        TEXT    NOT NULL DEFAULT '',
+          include_actor_id INTEGER NOT NULL DEFAULT 0
+        );
+      `);
+    },
+  },
 ];
 
 // ────────────────────────────────────────────────────────────────────

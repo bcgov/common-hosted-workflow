@@ -26,6 +26,16 @@ export interface FormEntryRecord {
   callback_webhook_url: string;
 }
 
+export interface ButtonTriggerRecord {
+  id: number;
+  playground_name: string;
+  button_text: string;
+  method: string;
+  webhook_url: string;
+  post_body: string;
+  include_actor_id: number; // 0 or 1 (SQLite boolean)
+}
+
 // ── Input interfaces ──
 
 /** Shape of a single form entry in create/update payloads. */
@@ -37,6 +47,15 @@ export interface FormEntryInput {
   callbackWebhookUrl: string;
 }
 
+/** Shape of a single button trigger in create/update payloads. */
+export interface ButtonTriggerInput {
+  buttonText: string;
+  method: 'GET' | 'POST';
+  webhookUrl: string;
+  postBody: string;
+  includeActorId: boolean;
+}
+
 export interface CreatePlaygroundInput {
   name: string;
   owner: string;
@@ -45,6 +64,7 @@ export interface CreatePlaygroundInput {
   tenantId?: string;
   chefsBaseUrl?: string;
   forms?: FormEntryInput[];
+  buttonTriggers?: ButtonTriggerInput[];
 }
 
 export interface UpdatePlaygroundInput {
@@ -53,6 +73,7 @@ export interface UpdatePlaygroundInput {
   tenantId?: string;
   chefsBaseUrl?: string;
   forms?: FormEntryInput[];
+  buttonTriggers?: ButtonTriggerInput[];
 }
 
 // ── Database singleton (lazy init) ──
@@ -122,6 +143,14 @@ export function getPlaygroundForms(name: string): FormEntryRecord[] {
 }
 
 /**
+ * Get all button triggers for a playground.
+ */
+export function getPlaygroundButtonTriggers(name: string): ButtonTriggerRecord[] {
+  const stmt = getDb().prepare('SELECT * FROM playground_button_triggers WHERE playground_name = ? ORDER BY id');
+  return stmt.all(name) as ButtonTriggerRecord[];
+}
+
+/**
  * Check whether a playground with the given name exists.
  */
 export function playgroundExists(name: string): boolean {
@@ -148,6 +177,11 @@ export function createPlayground(data: CreatePlaygroundInput): void {
     VALUES (?, ?, ?, ?, ?, ?)
   `);
 
+  const insertTrigger = database.prepare(`
+    INSERT INTO playground_button_triggers (playground_name, button_text, method, webhook_url, post_body, include_actor_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
   const run = database.transaction(() => {
     insertPlayground.run(
       data.name,
@@ -167,6 +201,19 @@ export function createPlayground(data: CreatePlaygroundInput): void {
           form.apiKey,
           JSON.stringify(form.allowedActors),
           form.callbackWebhookUrl,
+        );
+      }
+    }
+
+    if (data.buttonTriggers) {
+      for (const trigger of data.buttonTriggers) {
+        insertTrigger.run(
+          data.name,
+          trigger.buttonText,
+          trigger.method,
+          trigger.webhookUrl,
+          trigger.postBody,
+          trigger.includeActorId ? 1 : 0,
         );
       }
     }
@@ -199,6 +246,13 @@ export function updatePlayground(name: string, data: UpdatePlaygroundInput): voi
     VALUES (?, ?, ?, ?, ?, ?)
   `);
 
+  const deleteTriggers = database.prepare('DELETE FROM playground_button_triggers WHERE playground_name = ?');
+
+  const insertTrigger = database.prepare(`
+    INSERT INTO playground_button_triggers (playground_name, button_text, method, webhook_url, post_body, include_actor_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
   const run = database.transaction(() => {
     updateStmt.run(
       data.n8nTarget ?? null,
@@ -218,6 +272,20 @@ export function updatePlayground(name: string, data: UpdatePlaygroundInput): voi
           form.apiKey,
           JSON.stringify(form.allowedActors),
           form.callbackWebhookUrl,
+        );
+      }
+    }
+
+    if (data.buttonTriggers !== undefined) {
+      deleteTriggers.run(name);
+      for (const trigger of data.buttonTriggers) {
+        insertTrigger.run(
+          name,
+          trigger.buttonText,
+          trigger.method,
+          trigger.webhookUrl,
+          trigger.postBody,
+          trigger.includeActorId ? 1 : 0,
         );
       }
     }

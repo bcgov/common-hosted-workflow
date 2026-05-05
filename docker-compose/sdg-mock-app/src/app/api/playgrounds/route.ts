@@ -5,6 +5,7 @@ import {
   createPlayground,
   playgroundExists,
   type CreatePlaygroundInput,
+  type ButtonTriggerInput,
 } from '@/lib/playground-db';
 import { validatePlaygroundName } from '@/lib/validation';
 import { parseJsonObjectBody, requireStringField } from '@/lib/http';
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
       tenantId: typeof data.tenantId === 'string' ? data.tenantId : undefined,
       chefsBaseUrl: typeof data.chefsBaseUrl === 'string' ? data.chefsBaseUrl : undefined,
       forms: Array.isArray(data.forms) ? (data.forms as CreatePlaygroundInput['forms']) : undefined,
+      buttonTriggers: Array.isArray(data.buttonTriggers) ? (data.buttonTriggers as ButtonTriggerInput[]) : undefined,
     });
 
     return NextResponse.json({ name: nameField.value }, { status: 201 });

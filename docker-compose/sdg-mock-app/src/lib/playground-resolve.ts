@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getPlayground, getPlaygroundForms } from './playground-db';
-import type { PlaygroundDetail, FormEntry } from '@/types/playground';
+import {
+  getPlayground,
+  getPlaygroundForms,
+  getPlaygroundButtonTriggers,
+  type ButtonTriggerRecord,
+} from './playground-db';
+import type { PlaygroundDetail, FormEntry, ButtonTrigger } from '@/types/playground';
 
 // ── Resolved interfaces (camelCase, ready for proxy consumption) ──
 
@@ -17,6 +22,23 @@ export interface ResolvedFormEntry {
   apiKey: string;
   allowedActors: string[];
   callbackWebhookUrl: string;
+}
+
+// ── Shared mapping helpers ──
+
+/**
+ * Convert a ButtonTriggerRecord (DB row) to a ButtonTrigger (camelCase interface).
+ * Used by getPlaygroundDetail, clone, and the button-trigger API route.
+ */
+export function mapTriggerRecord(t: ButtonTriggerRecord): ButtonTrigger {
+  return {
+    id: t.id,
+    buttonText: t.button_text,
+    method: t.method as 'GET' | 'POST',
+    webhookUrl: t.webhook_url,
+    postBody: t.post_body,
+    includeActorId: t.include_actor_id === 1,
+  };
 }
 
 // ── Resolver functions ──
@@ -102,6 +124,9 @@ export function getPlaygroundDetail(name: string): PlaygroundDetail | null {
     };
   });
 
+  const triggerRecords = getPlaygroundButtonTriggers(name);
+  const buttonTriggers: ButtonTrigger[] = triggerRecords.map(mapTriggerRecord);
+
   return {
     name: playground.name,
     owner: playground.owner,
@@ -110,6 +135,7 @@ export function getPlaygroundDetail(name: string): PlaygroundDetail | null {
     tenantId: playground.x_tenant_id,
     chefsBaseUrl: playground.chefs_base_url,
     forms,
+    buttonTriggers,
     createdAt: playground.created_at,
     updatedAt: playground.updated_at,
   };

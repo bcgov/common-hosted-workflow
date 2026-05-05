@@ -197,6 +197,40 @@ export async function submitChefsForm(formId: string, submission: unknown, actor
   }
 }
 
+/** Trigger a button webhook through the backend proxy. */
+export async function triggerButton(triggerId: number, actorId: string): Promise<void> {
+  const resp = await fetch('/api/button-trigger', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...playgroundHeaders() },
+    body: JSON.stringify({ triggerId, actorId }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+}
+
+/** Non-sensitive button trigger info for the user-test panel. */
+export interface ButtonTriggerInfo {
+  id: number;
+  buttonText: string;
+  method: string;
+}
+
+/** Fetch the list of button triggers configured for the playground. */
+export async function fetchButtonTriggers(): Promise<ButtonTriggerInfo[]> {
+  // actorId is not used for filtering but the endpoint sits under /actors for consistency
+  const resp = await fetch('/api/chefs/actors/_/triggers', {
+    headers: { ...playgroundHeaders() },
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  const data = await resp.json();
+  return data.triggers as ButtonTriggerInfo[];
+}
+
 // ── Formatting helpers ──
 
 export function shortId(id?: string | null): string {

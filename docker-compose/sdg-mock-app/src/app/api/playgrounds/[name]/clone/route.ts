@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlayground, getPlaygroundForms, createPlayground, playgroundExists } from '@/lib/playground-db';
+import {
+  getPlayground,
+  getPlaygroundForms,
+  getPlaygroundButtonTriggers,
+  createPlayground,
+  playgroundExists,
+} from '@/lib/playground-db';
 import { validatePlaygroundName } from '@/lib/validation';
+import { mapTriggerRecord } from '@/lib/playground-resolve';
 import type { FormEntry } from '@/types/playground';
 
 type RouteContext = { params: Promise<{ name: string }> };
@@ -69,6 +76,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       callbackWebhookUrl: f.callback_webhook_url,
     }));
 
+    // Read source button triggers for deep copy
+    const sourceTriggerRecords = getPlaygroundButtonTriggers(name);
+    const buttonTriggers = sourceTriggerRecords.map(mapTriggerRecord);
+
     // Create the cloned playground with deep-copied config
     createPlayground({
       name: data.newName,
@@ -78,6 +89,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       tenantId: source.x_tenant_id,
       chefsBaseUrl: source.chefs_base_url,
       forms,
+      buttonTriggers,
     });
 
     return NextResponse.json({ name: data.newName }, { status: 201 });

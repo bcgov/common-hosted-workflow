@@ -64,9 +64,29 @@ export function validateImportPayload(data: unknown): ValidationResult {
 
   const obj = data as Record<string, unknown>;
 
-  // Required top-level string fields
-  const requiredStringFields = ['n8nTarget', 'xN8nApiKey', 'tenantId', 'chefsBaseUrl'] as const;
-  for (const field of requiredStringFields) {
+  const stringFieldsResult = validateRequiredStringFields(obj, ['n8nTarget', 'xN8nApiKey', 'tenantId', 'chefsBaseUrl']);
+  if (!stringFieldsResult.valid) {
+    return stringFieldsResult;
+  }
+
+  const formsResult = validateFormsArray(obj);
+  if (!formsResult.valid) {
+    return formsResult;
+  }
+
+  const triggersResult = validateButtonTriggersArray(obj);
+  if (!triggersResult.valid) {
+    return triggersResult;
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate that all specified fields exist on the object and are strings.
+ */
+function validateRequiredStringFields(obj: Record<string, unknown>, fields: string[]): ValidationResult {
+  for (const field of fields) {
     if (!Object.hasOwn(obj, field)) {
       return { valid: false, error: `Missing required field: '${field}'` };
     }
@@ -74,8 +94,13 @@ export function validateImportPayload(data: unknown): ValidationResult {
       return { valid: false, error: `Field '${field}' must be a string` };
     }
   }
+  return { valid: true };
+}
 
-  // Required forms array
+/**
+ * Validate the required `forms` array and each entry within it.
+ */
+function validateFormsArray(obj: Record<string, unknown>): ValidationResult {
   if (!Object.hasOwn(obj, 'forms')) {
     return { valid: false, error: "Missing required field: 'forms'" };
   }
@@ -83,15 +108,34 @@ export function validateImportPayload(data: unknown): ValidationResult {
     return { valid: false, error: "Field 'forms' must be an array" };
   }
 
-  // Validate each form entry
   const forms = obj.forms as unknown[];
-  for (let i = 0; i < forms.length; i++) {
-    const result = validateFormEntry(forms[i], i);
+  for (const [i, form] of forms.entries()) {
+    const result = validateFormEntry(form, i);
     if (!result.valid) {
       return result;
     }
   }
+  return { valid: true };
+}
 
+/**
+ * Validate the optional `buttonTriggers` array and each entry within it.
+ */
+function validateButtonTriggersArray(obj: Record<string, unknown>): ValidationResult {
+  if (!Object.hasOwn(obj, 'buttonTriggers')) {
+    return { valid: true };
+  }
+  if (!Array.isArray(obj.buttonTriggers)) {
+    return { valid: false, error: "Field 'buttonTriggers' must be an array" };
+  }
+
+  const triggers = obj.buttonTriggers as unknown[];
+  for (const [i, trigger] of triggers.entries()) {
+    const result = validateButtonTriggerEntry(trigger, i);
+    if (!result.valid) {
+      return result;
+    }
+  }
   return { valid: true };
 }
 
@@ -126,6 +170,47 @@ function validateFormEntry(entry: unknown, index: number): ValidationResult {
     if (typeof actor !== 'string') {
       return { valid: false, error: `forms[${index}].allowedActors must contain only strings` };
     }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate a single button trigger entry inside an import payload.
+ */
+function validateButtonTriggerEntry(entry: unknown, index: number): ValidationResult {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    return { valid: false, error: `buttonTriggers[${index}] must be an object` };
+  }
+
+  const obj = entry as Record<string, unknown>;
+
+  const requiredStringFields = ['buttonText', 'webhookUrl'] as const;
+  for (const field of requiredStringFields) {
+    if (!Object.hasOwn(obj, field)) {
+      return { valid: false, error: `buttonTriggers[${index}] is missing required field: '${field}'` };
+    }
+    if (typeof obj[field] !== 'string') {
+      return { valid: false, error: `buttonTriggers[${index}].${field} must be a string` };
+    }
+  }
+
+  // method must be GET or POST
+  if (!Object.hasOwn(obj, 'method')) {
+    return { valid: false, error: `buttonTriggers[${index}] is missing required field: 'method'` };
+  }
+  if (obj.method !== 'GET' && obj.method !== 'POST') {
+    return { valid: false, error: `buttonTriggers[${index}].method must be 'GET' or 'POST'` };
+  }
+
+  // postBody is optional but must be a string if present
+  if (Object.hasOwn(obj, 'postBody') && typeof obj.postBody !== 'string') {
+    return { valid: false, error: `buttonTriggers[${index}].postBody must be a string` };
+  }
+
+  // includeActorId is optional but must be a boolean if present
+  if (Object.hasOwn(obj, 'includeActorId') && typeof obj.includeActorId !== 'boolean') {
+    return { valid: false, error: `buttonTriggers[${index}].includeActorId must be a boolean` };
   }
 
   return { valid: true };
