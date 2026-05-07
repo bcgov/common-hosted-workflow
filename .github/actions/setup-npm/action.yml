@@ -10,7 +10,7 @@ runs:
       ignore-scripts: 'true'
       paths: |
         .
-        ./community-nodes
-        ./docker-compose/adaptivecard
-        ./docker-compose/sdg-mock-app
-        ./external-hooks
+        community-nodes
+        docker-compose/adaptivecard
+        docker-compose/sdg-mock-app
+        external-hooks
