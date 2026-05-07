@@ -4,6 +4,18 @@ vi.mock('n8n-workflow', () => ({
   NodeConnectionTypes: {
     Main: 'main',
   },
+  NodeApiError: class NodeApiError extends Error {
+    constructor(_node: unknown, error: Error) {
+      super(error.message);
+      this.name = 'NodeApiError';
+    }
+  },
+  NodeOperationError: class NodeOperationError extends Error {
+    constructor(_node: unknown, error: string | Error) {
+      super(typeof error === 'string' ? error : error.message);
+      this.name = 'NodeOperationError';
+    }
+  },
 }));
 
 import { DevXMessageConnector } from '../../nodes/DevXMessageConnector/DevXMessageConnector.node';
@@ -11,6 +23,7 @@ import { DevXMessageConnector } from '../../nodes/DevXMessageConnector/DevXMessa
 export type NodeParameters = {
   type: 'template' | 'text' | 'html' | string;
   source?: string;
+  mode?: string;
   payload: unknown;
 };
 
@@ -30,6 +43,7 @@ type ExecutionContext = {
   getInputData: ReturnType<typeof vi.fn>;
   getCredentials: ReturnType<typeof vi.fn>;
   getNodeParameter: ReturnType<typeof vi.fn>;
+  getNode: ReturnType<typeof vi.fn>;
   helpers: {
     httpRequest: ReturnType<typeof vi.fn>;
   };
@@ -70,7 +84,14 @@ export function createExecutionContext(
   return {
     getInputData: vi.fn(() => parametersByIndex.map(() => ({ json: {} }))),
     getCredentials: vi.fn().mockResolvedValue({ channelLink }),
-    getNodeParameter: vi.fn((name: keyof NodeParameters, index: number) => parametersByIndex[index]?.[name]),
+    getNodeParameter: vi.fn((name: keyof NodeParameters | 'mode', index: number) => {
+      if (name === 'mode') {
+        return parametersByIndex[index]?.mode ?? 'send';
+      }
+
+      return parametersByIndex[index]?.[name as keyof NodeParameters];
+    }),
+    getNode: vi.fn(() => ({ name: 'DevXMessageConnector', type: 'custom.devXMessageConnector' })),
     helpers: {
       httpRequest,
     },
