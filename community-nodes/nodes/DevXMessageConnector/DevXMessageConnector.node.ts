@@ -3,6 +3,9 @@ import {
   IExecuteFunctions,
   INodeExecutionData,
   NodeConnectionTypes,
+  NodeApiError,
+  NodeOperationError,
+  type JsonObject,
   type INodeType,
   type INodeTypeDescription,
 } from 'n8n-workflow';
@@ -159,43 +162,51 @@ export class DevXMessageConnector implements INodeType {
     const returnData: INodeExecutionData[] = [];
 
     for (let i = 0; i < items.length; i++) {
-      const type = this.getNodeParameter('type', i) as string;
-      const mode = this.getNodeParameter('mode', i) as string;
-      let messageContent: MessageContent | null = null;
+      try {
+        const type = this.getNodeParameter('type', i) as string;
+        const mode = this.getNodeParameter('mode', i) as string;
+        let messageContent: MessageContent | null = null;
 
-      if (type === 'text') {
-        messageContent = textTransform.call(this, i);
-      } else if (type === 'html') {
-        messageContent = htmlTransform.call(this, i);
-      } else if (type === 'template') {
-        const source = this.getNodeParameter('source', i) as string;
-        if (source === 'generic') {
-          messageContent = genericTransform.call(this, i);
-        } else if (source === 'rocket-chat') {
-          messageContent = rocketChatTransform.call(this, i);
-        } else if (source === 'github') {
-          messageContent = githubTransform.call(this, i);
-        } else if (source === 'backup-container') {
-          messageContent = backupContainerTransform.call(this, i);
-        } else if (source === 'sysdig') {
-          messageContent = sysdigTransform.call(this, i);
-        } else if (source === 'status-cake') {
-          messageContent = statusCakeTransform.call(this, i);
-        } else if (source === 'uptime-com') {
-          messageContent = uptimeComTransform.call(this, i);
+        if (type === 'text') {
+          messageContent = textTransform.call(this, i);
+        } else if (type === 'html') {
+          messageContent = htmlTransform.call(this, i);
+        } else if (type === 'template') {
+          const source = this.getNodeParameter('source', i) as string;
+          if (source === 'generic') {
+            messageContent = genericTransform.call(this, i);
+          } else if (source === 'rocket-chat') {
+            messageContent = rocketChatTransform.call(this, i);
+          } else if (source === 'github') {
+            messageContent = githubTransform.call(this, i);
+          } else if (source === 'backup-container') {
+            messageContent = backupContainerTransform.call(this, i);
+          } else if (source === 'sysdig') {
+            messageContent = sysdigTransform.call(this, i);
+          } else if (source === 'status-cake') {
+            messageContent = statusCakeTransform.call(this, i);
+          } else if (source === 'uptime-com') {
+            messageContent = uptimeComTransform.call(this, i);
+          } else {
+            throw new Error(`The source "${source}" is not known!`);
+          }
         } else {
-          throw new Error(`The source "${source}" is not known!`);
+          throw new Error(`The type "${type}" is not known!`);
         }
-      } else {
-        throw new Error(`The type "${type}" is not known!`);
-      }
 
-      if (!messageContent) {
-        throw new Error('Failed to generate message content');
-      }
+        if (!messageContent) {
+          throw new Error('Failed to generate message content');
+        }
 
-      const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId, mode);
-      returnData.push({ json: toSerializableNodeJson(response) as IDataObject });
+        const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId, mode);
+        returnData.push({ json: toSerializableNodeJson(response) as IDataObject });
+      } catch (error) {
+        if ((error as Error & { response?: unknown }).response) {
+          throw new NodeApiError(this.getNode(), error as JsonObject);
+        }
+
+        throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+      }
     }
 
     return [returnData];
@@ -242,5 +253,27 @@ async function sendMessageToDevXConnector(
     returnFullResponse: false,
   };
 
-  return await this.helpers.httpRequest(options);
+  try {
+    return await this.helpers.httpRequest(options);
+  } catch (error) {
+    const requestError = error as Error & {
+      code?: string;
+      response?: {
+        status?: number;
+        statusText?: string;
+        data?: unknown;
+      };
+    };
+
+    console.error('DevX Connector request failed', {
+      url,
+      mode,
+      status: requestError.response?.status,
+      statusText: requestError.response?.statusText,
+      code: requestError.code,
+      responseBody: toSerializableNodeJson(requestError.response?.data),
+    });
+
+    throw error;
+  }
 }

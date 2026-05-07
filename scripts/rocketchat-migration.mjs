@@ -171,11 +171,11 @@ async function createAndLinkWorkflow(name, projectId, sourceType, sourceSubtype 
 }
 
 async function processMigrationRow(row) {
-  const email = row[CSV_COLUMNS.USER_EMAIL];
-  const webhookName = row[CSV_COLUMNS.WEBHOOK_NAME];
-  const source = row[CSV_COLUMNS.SOURCE_TYPE];
-  const teamId = row[CSV_COLUMNS.TEAMS_TEAM_ID];
-  const channelId = row[CSV_COLUMNS.TEAMS_CHANNEL_ID];
+  const email = row[CSV_COLUMNS.USER_EMAIL].toString().trim();
+  const webhookName = row[CSV_COLUMNS.WEBHOOK_NAME].toString().trim();
+  const source = row[CSV_COLUMNS.SOURCE_TYPE].toString().trim();
+  const teamId = row[CSV_COLUMNS.TEAMS_TEAM_ID].toString().trim();
+  const channelId = row[CSV_COLUMNS.TEAMS_CHANNEL_ID].toString().trim();
 
   try {
     const userProject = await ensureUserAndGetProject(email);
