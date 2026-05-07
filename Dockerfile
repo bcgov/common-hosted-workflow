@@ -2,13 +2,13 @@ FROM node:24.14.1-alpine3.23 AS build-nodes
 
 RUN apk add --no-cache libc6-compat
 
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@11.0.8
 
 WORKDIR /app
 
 COPY community-nodes/package.json community-nodes/pnpm-lock.yaml ./
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY community-nodes .
 RUN pnpm build
@@ -17,13 +17,13 @@ FROM node:24.14.1-alpine3.23 AS build-hooks
 
 RUN apk add --no-cache libc6-compat
 
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@11.0.8
 
 WORKDIR /app
 
 COPY external-hooks/package.json external-hooks/pnpm-lock.yaml ./
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY external-hooks .
 RUN pnpm bundle
