@@ -3,40 +3,14 @@ description: Setup required NPM packages with caching for pnpm
 runs:
   using: composite
   steps:
-    # Cache pnpm store
-  - name: Cache pnpm store
-    uses: actions/cache@v5
+  - name: Setup Tools
+    uses: egose/actions/pnpm-packages@5b9b0f545e5b9e9af6ae82d57ea943acab3b9bba
     with:
-      path: ~/.local/share/pnpm/store/v3
-      key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-      restore-keys: |
-        pnpm-${{ runner.os }}-
-
-  - name: Install NPM packages
-    run: |
-      pnpm install
-    shell: bash
-
-  - name: Install Custom node NPM packages
-    run: |
-      pnpm install
-    working-directory: ./community-nodes
-    shell: bash
-
-  - name: Install adaptivecard sample app NPM packages
-    run: |
-      pnpm install
-    working-directory: ./docker-compose/adaptivecard
-    shell: bash
-
-  - name: Install sdg-mock-app sample app NPM packages
-    run: |
-      pnpm install
-    working-directory: ./docker-compose/sdg-mock-app
-    shell: bash
-
-  - name: Install external-hooks NPM packages
-    run: |
-      pnpm install
-    working-directory: ./external-hooks
-    shell: bash
+      frozen: 'true'
+      ignore-scripts: 'true'
+      paths: |
+        .
+        ./community-nodes
+        ./docker-compose/adaptivecard
+        ./docker-compose/sdg-mock-app
+        ./external-hooks
