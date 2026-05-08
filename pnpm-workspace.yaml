@@ -1,4 +1,10 @@
 # pnpm-workspace.yaml
 packages:
-- packages/*
+- ./*
+allowBuilds:
+  '@scarf/scarf': false
+  esbuild: false
+  eslint-plugin-n8n-nodes-base: false
+  isolated-vm: false
+  unrs-resolver: false
 confirmModulesPurge: false
