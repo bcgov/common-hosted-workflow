@@ -7,7 +7,7 @@ runs:
     uses: egose/actions/pnpm-packages@5b9b0f545e5b9e9af6ae82d57ea943acab3b9bba
     with:
       frozen: 'true'
-      ignore-scripts: 'true'
+      ignore-scripts: 'false'
       paths: |
         .
         community-nodes
