@@ -10,3 +10,5 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
 confirmModulesPurge: false
+ignoredBuiltDependencies:
+- better-sqlite3
