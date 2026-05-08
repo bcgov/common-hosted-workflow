@@ -1,10 +1,12 @@
 # pnpm-workspace.yaml
 packages:
-- ./*
+- '**'
 allowBuilds:
   '@scarf/scarf': false
+  better-sqlite3: false
   esbuild: false
   eslint-plugin-n8n-nodes-base: false
   isolated-vm: false
+  sharp: false
   unrs-resolver: false
 confirmModulesPurge: false
