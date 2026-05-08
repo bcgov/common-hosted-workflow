@@ -6,7 +6,7 @@ RUN npm install -g pnpm@11.0.8
 
 WORKDIR /app
 
-COPY community-nodes/package.json community-nodes/pnpm-lock.yaml ./
+COPY community-nodes/package.json community-nodes/pnpm-lock.yaml community-nodes/pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
@@ -21,7 +21,7 @@ RUN npm install -g pnpm@11.0.8
 
 WORKDIR /app
 
-COPY external-hooks/package.json external-hooks/pnpm-lock.yaml ./
+COPY external-hooks/package.json external-hooks/pnpm-lock.yaml external-hooks/pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile --ignore-scripts
 

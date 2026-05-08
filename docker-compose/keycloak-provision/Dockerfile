@@ -3,7 +3,7 @@ FROM node:24.14.1-alpine3.23 AS build
 WORKDIR /opt
 
 RUN npm install -g turbo pnpm
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
