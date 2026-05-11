@@ -1,0 +1,4 @@
+# pnpm-workspace.yaml
+allowBuilds:
+  esbuild: false
+confirmModulesPurge: false
