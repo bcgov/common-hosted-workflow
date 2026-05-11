@@ -36,14 +36,14 @@ permissions:
 jobs:
   deploy-sdg:
     name: Deploy SDG-${{ inputs.environment }}
-    uses: ./.github/workflows/deploy.yml
+    uses: ./.github/workflows/_deploy.yml
     with:
       environment: sdg-${{ inputs.environment }}
       tag: ${{ github.sha }}
 
   deploy-sdg-dr:
     name: Deploy SDG-${{ inputs.environment }}dr
-    uses: ./.github/workflows/deploy.yml
+    uses: ./.github/workflows/_deploy.yml
     with:
       environment: sdg-${{ inputs.environment }}dr
       tag: ${{ github.sha }}
