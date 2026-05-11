@@ -42,6 +42,9 @@ jobs:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx.yml
     needs: [build-push-n8n]
+    secrets:
+      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
     with:
       environment: dev
       tag: ${{ github.sha }}
@@ -50,6 +53,9 @@ jobs:
     name: Deploys SDG (Dev)
     uses: ./.github/workflows/deploy-sdg.yml
     needs: [build-push-n8n, build-push-sdg-mock-app]
+    secrets:
+      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
     with:
       environment: dev
       tag: ${{ github.sha }}

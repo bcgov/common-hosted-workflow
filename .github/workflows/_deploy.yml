@@ -23,6 +23,11 @@ on:
         description: Environment to run the deployment in
         type: string
         required: true
+    secrets:
+      OPENSHIFT_SERVER:
+        required: true
+      OPENSHIFT_TOKEN:
+        required: true
 jobs:
   deploy:
     name: Deploy - ${{ inputs.environment }}
