@@ -130,7 +130,7 @@ export class CHEFS implements INodeType {
             },
           },
         ],
-        default: 'get',
+        default: 'getFormStatuses',
       },
       {
         displayName: 'Form ID',
@@ -148,6 +148,7 @@ export class CHEFS implements INodeType {
         displayName: 'Authorization Token',
         name: 'authorizationToken',
         type: 'string',
+        typeOptions: { password: true },
         default: '',
         required: true,
         displayOptions: {

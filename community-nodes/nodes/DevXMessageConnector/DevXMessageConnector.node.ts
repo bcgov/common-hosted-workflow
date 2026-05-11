@@ -45,7 +45,7 @@ export class DevXMessageConnector implements INodeType {
     displayName: 'DevX Message Connector',
     name: 'devXMessageConnector',
     description: 'Transforms external message payloads into DevX Connector format',
-    icon: { light: 'file:../../icons/bcgov.png', dark: 'file:../../icons/bcgov.png' },
+    icon: { light: 'file:../../icons/bcgov.svg', dark: 'file:../../icons/bcgov.svg' },
     group: ['input'],
     version: 0.1,
     subtitle: '',
@@ -57,7 +57,7 @@ export class DevXMessageConnector implements INodeType {
     outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
-        name: 'devXConnector',
+        name: 'devXConnectorApi',
         required: true,
       },
     ],

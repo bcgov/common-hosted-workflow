@@ -164,7 +164,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
     outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
-        name: 'chefsFormAuth',
+        name: 'chefsFormAuthApi',
         required: true,
       },
     ],

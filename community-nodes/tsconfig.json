@@ -2,7 +2,7 @@
   "compilerOptions": {
     "strict": true,
     "module": "commonjs",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "target": "es2019",
     "lib": ["es2019", "es2020", "es2022.error"],
     "removeComments": true,
@@ -19,7 +19,8 @@
     "declaration": true,
     "sourceMap": true,
     "skipLibCheck": true,
-    "outDir": "./dist/"
+    "outDir": "./dist/",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "package.json"]
 }

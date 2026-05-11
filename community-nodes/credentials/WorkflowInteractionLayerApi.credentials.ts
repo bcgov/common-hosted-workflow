@@ -2,7 +2,7 @@ import { Icon, ICredentialType, INodeProperties } from 'n8n-workflow';
 
 export class WorkflowInteractionLayerApi implements ICredentialType {
   name = 'workflowInteractionLayerApi';
-  icon: Icon = { light: 'file:../icons/bcgov.png', dark: 'file:../icons/bcgov.png' };
+  icon: Icon = { light: 'file:../icons/bcgov.svg', dark: 'file:../icons/bcgov.dark.svg' };
   displayName = 'Workflow Interaction Layer API';
   documentationUrl =
     'https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/workflow-interaction-layer';
