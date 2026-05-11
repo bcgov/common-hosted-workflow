@@ -4,18 +4,23 @@
   "type": "module",
   "scripts": {
     "build": "rimraf ./build && tsc",
-    "start": "tsx main.ts"
+    "start": "tsx main.ts",
+    "lint": "eslint ."
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@egose/keycloak-fluent": "^0.6.4",
-    "wait-on": "^9.0.0"
+    "wait-on": "^9.0.6"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.6.2",
     "@types/wait-on": "^5.3.4",
-    "rimraf": "^6.0.0",
-    "tsx": "^4.11.2",
-    "typescript": "^5.4.5"
+    "eslint": "10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "rimraf": "^6.1.3",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.2"
   }
 }
