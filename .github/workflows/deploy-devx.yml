@@ -29,6 +29,10 @@ on:
         required: true
         type: string
         default: dev
+
+permissions:
+  contents: read
+
 jobs:
   deploy-devx:
     name: Deploy DevX-${{ inputs.environment }}
