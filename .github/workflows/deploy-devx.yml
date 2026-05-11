@@ -37,7 +37,6 @@ jobs:
   deploy-devx:
     name: Deploy DevX-${{ inputs.environment }}
     uses: ./.github/workflows/deploy.yml
-    secrets: inherit # pragma: allowlist secret
     with:
       environment: devx-${{ inputs.environment }}
       tag: ${{ github.sha }}
@@ -45,7 +44,6 @@ jobs:
   deploy-devx-dr:
     name: Deploy DevX-${{ inputs.environment }}dr
     uses: ./.github/workflows/deploy.yml
-    secrets: inherit # pragma: allowlist secret
     with:
       environment: devx-${{ inputs.environment }}dr
       tag: ${{ github.sha }}

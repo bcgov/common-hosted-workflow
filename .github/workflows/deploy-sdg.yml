@@ -37,7 +37,6 @@ jobs:
   deploy-sdg:
     name: Deploy SDG-${{ inputs.environment }}
     uses: ./.github/workflows/deploy.yml
-    secrets: inherit # pragma: allowlist secret
     with:
       environment: sdg-${{ inputs.environment }}
       tag: ${{ github.sha }}
@@ -45,7 +44,6 @@ jobs:
   deploy-sdg-dr:
     name: Deploy SDG-${{ inputs.environment }}dr
     uses: ./.github/workflows/deploy.yml
-    secrets: inherit # pragma: allowlist secret
     with:
       environment: sdg-${{ inputs.environment }}dr
       tag: ${{ github.sha }}
