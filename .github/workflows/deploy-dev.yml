@@ -1,4 +1,4 @@
-name: Merge
+name: Deploy Dev
 
 on:
   push:
