@@ -29,6 +29,11 @@ on:
         required: true
         type: string
         default: dev
+    secrets:
+      OPENSHIFT_SERVER:
+        required: true
+      OPENSHIFT_TOKEN:
+        required: true
 
 permissions:
   contents: read
@@ -37,13 +42,19 @@ jobs:
   deploy-sdg:
     name: Deploy SDG-${{ inputs.environment }}
     uses: ./.github/workflows/_deploy.yml
+    secrets:
+      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
     with:
       environment: sdg-${{ inputs.environment }}
-      tag: ${{ github.sha }}
+      tag: ${{ inputs.tag }}
 
   deploy-sdg-dr:
     name: Deploy SDG-${{ inputs.environment }}dr
     uses: ./.github/workflows/_deploy.yml
+    secrets:
+      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
     with:
       environment: sdg-${{ inputs.environment }}dr
-      tag: ${{ github.sha }}
+      tag: ${{ inputs.tag }}
