@@ -24,11 +24,11 @@
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "strict": true,
+    "strict": false,
     "credentials": [
       "dist/credentials/ChefsApi.credentials.js",
-      "dist/credentials/ChefsFormAuth.credentials.js",
-      "dist/credentials/DevXConnector.credentials.js",
+      "dist/credentials/ChefsFormAuthApi.credentials.js",
+      "dist/credentials/DevXConnectorApi.credentials.js",
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],
     "nodes": [
@@ -39,18 +39,29 @@
     ]
   },
   "devDependencies": {
-    "@n8n/node-cli": "^0.29.1",
-    "@types/node": "^25.2.0",
+    "@eslint/js": "^10.0.1",
+    "@n8n/eslint-plugin-community-nodes": "^0.15.0",
+    "@n8n/node-cli": "^0.30.1",
+    "@types/node": "^25.6.2",
     "@types/sanitize-html": "^2.16.1",
-    "eslint": "9.39.4",
-    "typescript": "5.9.3",
-    "vitest": "^4.1.1"
+    "eslint": "10.3.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import-x": "^4.16.2",
+    "eslint-plugin-n8n-nodes-base": "1.16.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.59.2",
+    "vitest": "^4.1.5"
   },
   "peerDependencies": {
     "n8n-workflow": "^2.16.0"
   },
   "dependencies": {
-    "sanitize-html": "^2.17.2",
-    "zod": "^4.3.6"
+    "sanitize-html": "^2.17.3",
+    "zod": "^4.4.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "eslint-plugin-n8n-nodes-base": "1.16.6"
+    }
   }
 }

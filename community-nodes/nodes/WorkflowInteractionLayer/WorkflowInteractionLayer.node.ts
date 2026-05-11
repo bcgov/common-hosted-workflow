@@ -17,8 +17,7 @@ export class WorkflowInteractionLayer implements INodeType {
     displayName: 'Workflow Interaction Layer',
     name: 'workflowInteractionLayer',
     description: 'Interact with the Workflow Interaction Layer API for messages and actions',
-    // eslint-disable-next-line n8n-nodes-base/node-class-description-icon-not-svg, @n8n/community-nodes/icon-validation
-    icon: 'file:../../icons/bcgov.png',
+    icon: 'file:../../icons/bcgov.svg',
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"]}}',

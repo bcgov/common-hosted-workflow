@@ -17,7 +17,6 @@ export type { MessageCreatePayload, MessageResponse, ActionCreatePayload, Action
  */
 export async function getAuthHeaders(ctx: IExecuteFunctions): Promise<Record<string, string>> {
   const credentials = await ctx.getCredentials('workflowInteractionLayerApi');
-  // eslint-disable-next-line @n8n/community-nodes/no-restricted-globals
   const internalToken = process.env.INTERNAL_AUTH_TOKEN || 'mock-internal-token';
 
   return {
