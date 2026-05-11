@@ -1,4 +1,4 @@
-name: Merge
+name: Deploy Dev
 
 on:
   push:
@@ -25,27 +25,23 @@ jobs:
     with:
       image-name: bcgov/chwf
       docker-path: .
-    secrets: inherit # pragma: allowlist secret
 
   build-push-adaptivecard:
     uses: ./.github/workflows/build-and-push.yml
     with:
       image-name: bcgov/chwf-adaptivecard
       docker-path: docker-compose/adaptivecard
-    secrets: inherit # pragma: allowlist secret
 
   build-push-sdg-mock-app:
     uses: ./.github/workflows/build-and-push.yml
     with:
       image-name: bcgov/chwf-sdg-mock-app
       docker-path: docker-compose/sdg-mock-app
-    secrets: inherit # pragma: allowlist secret
 
   deploy-devx-dev:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx.yml
     needs: [build-push-n8n]
-    secrets: inherit # pragma: allowlist secret
     with:
       environment: dev
       tag: ${{ github.sha }}
@@ -54,7 +50,6 @@ jobs:
     name: Deploys SDG (Dev)
     uses: ./.github/workflows/deploy-sdg.yml
     needs: [build-push-n8n, build-push-sdg-mock-app]
-    secrets: inherit # pragma: allowlist secret
     with:
       environment: dev
       tag: ${{ github.sha }}

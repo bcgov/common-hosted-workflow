@@ -1,14 +1,15 @@
 SHELL := /usr/bin/env bash
 
 NAME := chwf
-NAMESPACE =
-IMAGE_TAG =
+NAMESPACE ?=
+IMAGE_TAG ?=
+CLUSTER ?=
 
-ifndef NAMESPACE
+ifeq ($(strip $(NAMESPACE)),)
     $(error NAMESPACE is not set)
 endif
 
-ifndef CLUSTER
+ifeq ($(strip $(CLUSTER)),)
     $(error CLUSTER is not set, should be one of silver,gold,golddr)
 endif
 
