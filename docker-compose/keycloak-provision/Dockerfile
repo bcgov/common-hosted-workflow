@@ -1,4 +1,4 @@
-FROM node:24.14.1-alpine3.23 AS build
+FROM node:24.15.0-alpine3.23 AS build
 
 WORKDIR /opt
 
@@ -10,7 +10,7 @@ COPY . .
 
 RUN pnpm build
 
-FROM node:24.14.1-alpine3.23
+FROM node:24.15.0-alpine3.23
 
 WORKDIR /opt
 
