@@ -28,6 +28,21 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY external-hooks .
 RUN pnpm bundle
 
+FROM node:24.15.0-alpine3.23 AS build-ui
+
+RUN apk add --no-cache libc6-compat
+
+RUN npm install -g pnpm@11.0.8
+
+WORKDIR /app
+
+COPY docker-compose/external-ui/package.json docker-compose/external-ui/pnpm-lock.yaml docker-compose/external-ui/pnpm-workspace.yaml ./
+
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+COPY docker-compose/external-ui .
+RUN pnpm build
+
 FROM n8nio/n8n:2.19.2
 
 WORKDIR /home/node
@@ -35,6 +50,7 @@ WORKDIR /home/node
 COPY --from=build-nodes /app/dist /community-nodes/dist
 COPY --from=build-nodes /app/package.json /community-nodes/package.json
 COPY --from=build-hooks /app/dist /external-hooks
+COPY --from=build-ui /app/dist /external-ui/dist
 COPY external-hooks/drizzle /external-hooks/drizzle
 
 # Keep Swagger UI disabled by default. Enable per environment.
@@ -46,4 +62,5 @@ ENV N8N_PORT=5678 \
     N8N_COMMUNITY_PACKAGES_ENABLED=true \
     N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/nodes" \
     EXTERNAL_HOOK_FILES=/external-hooks/oidc.cjs:/external-hooks/api/hooks.cjs \
-    EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js
+    EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js \
+    EXTERNAL_UI_PATH=/external-ui/dist

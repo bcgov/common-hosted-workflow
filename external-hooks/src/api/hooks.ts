@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, static as serveStatic } from 'express';
+import path from 'node:path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../db/repository/workflow-interaction-layer/action-request';
 import { MessageRepository } from '../db/repository/workflow-interaction-layer/message';
@@ -104,8 +105,12 @@ function createHookConfig() {
           mountSwaggerUi(app);
 
           app.use('/rest/custom/v1', v1Router);
-          app.use(handleErrorResponse);
 
+          const uiPath =
+            process.env.EXTERNAL_UI_PATH || path.resolve(__dirname, '../../../../docker-compose/external-ui/dist');
+          app.use('/ui', serveStatic(uiPath, { index: 'index.html' }));
+
+          app.use(handleErrorResponse);
           log.info('Custom Routes Active.');
         },
       ],
