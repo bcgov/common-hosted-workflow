@@ -21,7 +21,7 @@ export function buildUiApiRouter() {
       const origin = getRequestOrigin(req);
 
       res.json({
-        issuer: process.env.UI_OIDC_ISSUER || 'http://localhost:8080/realms/starter',
+        issuer: process.env.UI_OIDC_ISSUER,
         clientId: process.env.UI_OIDC_CLIENT_ID || 'external-ui',
         redirectUri: process.env.UI_OIDC_REDIRECT_URI || `${origin}/ui/auth/callback`,
         postLogoutRedirectUri: process.env.UI_OIDC_POST_LOGOUT_URI || `${origin}/ui/`,

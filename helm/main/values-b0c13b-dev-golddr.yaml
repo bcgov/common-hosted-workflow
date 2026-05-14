@@ -11,6 +11,12 @@ n8n:
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
     OIDC_ISSUER_URL: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
     OIDC_REDIRECT_URI: https://dev-chwf.apps.golddr.devops.gov.bc.ca/rest/auth/oidc/callback
+    EXTERNAL_UI_ENABLED: 'true'
+    UI_OIDC_ISSUER: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
+    UI_OIDC_REDIRECT_URI: https://dev-chwf.apps.golddr.devops.gov.bc.ca/ui/auth/callback
+    UI_OIDC_POST_LOGOUT_URI: https://dev-chwf.apps.golddr.devops.gov.bc.ca/ui
+    UI_OIDC_JWKS_URI: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
+    UI_OIDC_EXPECTED_ISSUER: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
 
   route:
     enabled: true
