@@ -2,6 +2,10 @@ import { Router, type Request } from 'express';
 import { createOidcJwtMiddleware } from '../middlewares';
 import { wrapAsyncRoute } from '../utils/errors';
 
+function getRequestOrigin(req: Request) {
+  return req.get('origin') ?? `${req.protocol}://${req.get('host')}`;
+}
+
 export function buildUiApiRouter() {
   const router = Router();
   const oidcJwtMiddleware = createOidcJwtMiddleware({
@@ -10,6 +14,21 @@ export function buildUiApiRouter() {
     expectedAzp: process.env.UI_OIDC_EXPECTED_AZP,
     expectedAudience: process.env.UI_OIDC_EXPECTED_AUDIENCE,
   });
+
+  router.get(
+    '/runtime-config',
+    wrapAsyncRoute(async (req, res) => {
+      const origin = getRequestOrigin(req);
+
+      res.json({
+        issuer: process.env.UI_OIDC_ISSUER || 'http://localhost:8080/realms/starter',
+        clientId: process.env.UI_OIDC_CLIENT_ID || 'external-ui',
+        redirectUri: process.env.UI_OIDC_REDIRECT_URI || `${origin}/ui/auth/callback`,
+        postLogoutRedirectUri: process.env.UI_OIDC_POST_LOGOUT_URI || `${origin}/ui/`,
+        scopes: process.env.UI_OIDC_SCOPES || 'openid email profile',
+      });
+    }),
+  );
 
   router.get(
     '/whoami',

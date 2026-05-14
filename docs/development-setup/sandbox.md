@@ -63,6 +63,10 @@ The sandbox uses a "Dependency Chain" to ensure services configure themselves in
 - **Custom Nodes**: Injects community nodes into the `/home/node/.n8n/nodes` directory.
 - **Hooks**: Runs `migrate.cjs` to set up external hooks (e.g., custom logging or auditing).
 
+## UI Runtime OIDC Config
+
+The external UI reads OIDC settings from `GET /ui-api/runtime-config` at startup. In the sandbox, those values come from the `UI_OIDC_*` variables defined in `docker-compose/.env.example` and passed through `docker-compose/docker-compose.yml`.
+
 ## 💾 Persistence & Volumes
 
 Data is persisted across restarts using named Docker volumes. If you need to **wipe the environment**, run `docker-compose down -v`.

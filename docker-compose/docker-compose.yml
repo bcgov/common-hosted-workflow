@@ -41,6 +41,12 @@ x-n8n-env: &n8n-env
   # OIDC
   OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
   OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+  # Runtime config for /ui-api/runtime-config
+  UI_OIDC_ISSUER: ${UI_OIDC_ISSUER:-http://localhost:8080/realms/starter}
+  UI_OIDC_CLIENT_ID: ${UI_OIDC_CLIENT_ID:-external-ui}
+  UI_OIDC_REDIRECT_URI: ${UI_OIDC_REDIRECT_URI:-http://localhost:5678/ui/auth/callback}
+  UI_OIDC_POST_LOGOUT_URI: ${UI_OIDC_POST_LOGOUT_URI:-http://localhost:5678/ui/}
+  UI_OIDC_SCOPES: ${UI_OIDC_SCOPES:-openid email profile}
   UI_OIDC_EXPECTED_ISSUER: ${UI_OIDC_EXPECTED_ISSUER:-http://localhost:8080/realms/starter}
   UI_OIDC_JWKS_URI: ${UI_OIDC_JWKS_URI:-http://keycloak:8080/realms/starter/protocol/openid-connect/certs}
   UI_OIDC_EXPECTED_AZP: ${UI_OIDC_EXPECTED_AZP:-external-ui}
