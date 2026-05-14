@@ -12,7 +12,7 @@ export class CHEFS implements INodeType {
     displayName: 'Common Hosted Form Service (CHEFS)',
     name: 'chefs',
     description: 'API connector for the Common Hosted Form Service',
-    icon: { light: 'file:../../icons/chefs.svg', dark: 'file:../../icons/chefs.dark.svg' },
+    icon: 'file:../../icons/file-search.svg',
     group: ['input'],
     version: 1,
     subtitle: '',
