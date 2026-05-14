@@ -17,7 +17,7 @@ pnpm install
 pnpm dev
 ```
 
-Runs on `http://localhost:5173/ui/` with HMR. Requests to `/rest` and `/ui-api` are proxied to `http://localhost:5678` so the SPA can talk to the local n8n backend. Keycloak must be running (`docker compose up keycloak keycloak-provision -d`).
+Runs on `http://localhost:5173/` with HMR. Requests to `/rest` and `/ui-api` are proxied to `http://localhost:5678` so the SPA can talk to the local n8n backend. Keycloak must be running (`docker compose up keycloak keycloak-provision -d`).
 
 ## Build
 

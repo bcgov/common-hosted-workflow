@@ -1,4 +1,5 @@
 import { instance } from './axios';
+import { withAppBasePath } from '../../config/base-path';
 
 export interface OidcRuntimeConfig {
   issuer: string;
@@ -11,8 +12,8 @@ export interface OidcRuntimeConfig {
 const defaultOidcRuntimeConfig: OidcRuntimeConfig = {
   issuer: 'http://localhost:8080/realms/starter',
   clientId: 'external-ui',
-  redirectUri: `${window.location.origin}/ui/auth/callback`,
-  postLogoutRedirectUri: `${window.location.origin}/ui/`,
+  redirectUri: `${window.location.origin}${withAppBasePath('/auth/callback')}`,
+  postLogoutRedirectUri: `${window.location.origin}${withAppBasePath('/')}`,
   scopes: 'openid email profile',
 };
 

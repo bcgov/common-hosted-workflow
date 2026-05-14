@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import { getAppBasePath } from './config/base-path';
 import { loadOidcRuntimeConfig } from './services/backend/oidc';
 
 async function bootstrap() {
@@ -21,7 +22,7 @@ async function bootstrap() {
 
   createRoot(root).render(
     <StrictMode>
-      <BrowserRouter>
+      <BrowserRouter basename={getAppBasePath() || undefined}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <App />
