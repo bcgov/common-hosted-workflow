@@ -152,7 +152,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
     displayName: 'CHEFS Submission Extractor',
     name: 'chefsSubmissionExtractor',
     description: 'Fetch a CHEFS form submission and extract specific fields using dot-notation path mappings',
-    icon: { light: 'file:../../icons/chefs.svg', dark: 'file:../../icons/chefs.dark.svg' },
+    icon: 'file:../../icons/file-search.svg',
     group: ['transform'],
     version: 1,
     subtitle: '=Extract fields from submission',

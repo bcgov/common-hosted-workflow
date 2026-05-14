@@ -2,7 +2,7 @@ import type { Icon, ICredentialTestRequest, ICredentialType, INodeProperties } f
 
 export class ChefsFormAuthApi implements ICredentialType {
   name = 'chefsFormAuthApi';
-  icon: Icon = { light: 'file:../icons/chefs.svg', dark: 'file:../icons/chefs.dark.svg' };
+  icon: Icon = 'file:../icons/file-search.svg';
   displayName = 'CHEFS Form Authentication API';
   documentationUrl = 'https://github.com/bcgov/common-hosted-form-service/wiki';
   test: ICredentialTestRequest = {
