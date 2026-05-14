@@ -7,6 +7,9 @@ import {
   AUTH_REALM_NAME,
   AUTH_CLIENT_ID,
   AUTH_CLIENT_SECRET,
+  SPA_CLIENT_ID,
+  SPA_REDIRECT_URIS,
+  SPA_WEB_ORIGINS,
 } from './config.js';
 
 async function main() {
@@ -53,6 +56,13 @@ async function main() {
 
   const globalAdminRoleHandle = await authClientHandle.role('global:admin').ensure({});
   const globalMemberRoleHandle = await authClientHandle.role('global:member').ensure({});
+
+  console.log('Creating SPA public client...');
+  await authRealmHandle.publicBrowserLoginClient(SPA_CLIENT_ID).ensure({
+    redirectUris: SPA_REDIRECT_URIS,
+    webOrigins: SPA_WEB_ORIGINS,
+    attributes: { 'pkce.code.challenge.method': 'S256' },
+  });
 
   console.log('Creating test users...');
   const users = [
