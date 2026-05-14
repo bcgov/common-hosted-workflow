@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 
-export default function About() {
+export function About() {
   return (
     <div className="max-w-2xl mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold text-gray-800 mb-4">About</h1>

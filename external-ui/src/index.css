@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+
+:root {
+  --bc-blue: #003366;
+  --bc-blue-dark: #002244;
+  --bc-gold: #fcba19;
+  --bc-surface: #f5f7fb;
+  --bc-card: #ffffff;
+  --bc-border: #d6dce8;
+  --bc-text: #1a1f2b;
+  --bc-muted: #5a6475;
+  --bc-link: #1f5fbf;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bc-surface);
+  color: var(--bc-text);
+}
+
+a {
+  color: var(--bc-link);
+}
