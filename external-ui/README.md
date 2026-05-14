@@ -31,17 +31,21 @@ Output goes to `dist/` with all asset paths prefixed with `/ui/`.
 
 Built files are served by the `external-hooks` Express app at `/ui` (e.g. `http://localhost:5678/ui/`). React Router uses `basename="/ui"` so client-side routing works under that prefix. Unmatched paths under `/ui/*` fall back to `index.html` for SPA routing.
 
-## Environment Variables (Vite)
+## Runtime OIDC Config
 
-Set in `.env.development` or the shell:
+The UI fetches `GET /ui-api/runtime-config` before mounting React, so OIDC settings can be changed on the backend without rebuilding the frontend.
 
-| Var                         | Default                                | Description               |
-| --------------------------- | -------------------------------------- | ------------------------- |
-| `VITE_OIDC_AUTHORITY`       | `http://localhost:8080/realms/starter` | Keycloak issuer URL       |
-| `VITE_OIDC_CLIENT_ID`       | `external-ui`                          | Public Keycloak client ID |
-| `VITE_OIDC_REDIRECT_URI`    | `{origin}/ui/auth/callback`            | OIDC callback URL         |
-| `VITE_OIDC_POST_LOGOUT_URI` | `{origin}/ui/`                         | Post-logout redirect      |
-| `VITE_OIDC_SCOPES`          | `openid email profile`                 | OIDC scopes               |
+Set these on the backend process at runtime:
+
+| Var                       | Default                                | Description               |
+| ------------------------- | -------------------------------------- | ------------------------- |
+| `UI_OIDC_ISSUER`          | `http://localhost:8080/realms/starter` | Keycloak issuer URL       |
+| `UI_OIDC_CLIENT_ID`       | `external-ui`                          | Public Keycloak client ID |
+| `UI_OIDC_REDIRECT_URI`    | `{origin}/ui/auth/callback`            | OIDC callback URL         |
+| `UI_OIDC_POST_LOGOUT_URI` | `{origin}/ui/`                         | Post-logout redirect      |
+| `UI_OIDC_SCOPES`          | `openid email profile`                 | OIDC scopes               |
+
+If the endpoint is unavailable, the UI falls back to the same defaults locally.
 
 ## Authentication
 

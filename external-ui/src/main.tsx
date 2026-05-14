@@ -1,20 +1,35 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './auth/auth-context';
-import { queryClient } from './query-client';
 import './index.css';
-import { App } from './app';
+import { loadOidcRuntimeConfig } from './services/backend/oidc';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter basename="/ui">
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
-  </StrictMode>,
-);
+async function bootstrap() {
+  await loadOidcRuntimeConfig();
+
+  const [{ BrowserRouter }, { QueryClientProvider }, { AuthProvider }, { queryClient }, { App }] = await Promise.all([
+    import('react-router'),
+    import('@tanstack/react-query'),
+    import('./auth/auth-context'),
+    import('./query-client'),
+    import('./app'),
+  ]);
+
+  const root = document.getElementById('root');
+  if (!root) {
+    throw new Error('Root element not found');
+  }
+
+  createRoot(root).render(
+    <StrictMode>
+      <BrowserRouter basename="/ui">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
+    </StrictMode>,
+  );
+}
+
+void bootstrap();
