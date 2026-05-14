@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router';
 import type { ReactNode } from 'react';
 import { useAuth } from '../auth/auth-context';
+import { withAppBasePath } from '../config/base-path';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -14,7 +15,11 @@ export function AppLayout({ children }: AppLayoutProps) {
       <header className="sticky top-0 z-50 border-b-2 border-[var(--bc-gold)] bg-[var(--bc-blue)] text-white shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-3">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="BC Government logo" className="h-11 w-11 shrink-0 object-contain" />
+            <img
+              src={withAppBasePath('/logo.png')}
+              alt="BC Government logo"
+              className="h-11 w-11 shrink-0 object-contain"
+            />
             <div className="leading-tight">
               <div className="text-base font-semibold sm:text-lg">Workflow User Portal</div>
             </div>
