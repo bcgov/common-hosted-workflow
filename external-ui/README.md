@@ -29,7 +29,7 @@ Output goes to `dist/` with all asset paths prefixed with `/ui/`.
 
 ## Production
 
-Built files are served by the `external-hooks` Express app at `/ui` (e.g. `http://localhost:5678/ui/`). React Router uses `basename="/ui"` so client-side routing works under that prefix. Unmatched paths under `/ui/*` fall back to `index.html` for SPA routing.
+Built files are served by the `external-hooks` Express app at `/ui` (e.g. `http://localhost:5678/ui/`).
 
 ## Runtime OIDC Config
 

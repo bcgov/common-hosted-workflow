@@ -21,7 +21,7 @@ async function bootstrap() {
 
   createRoot(root).render(
     <StrictMode>
-      <BrowserRouter basename="/ui">
+      <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <App />
