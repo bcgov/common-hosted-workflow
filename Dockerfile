@@ -36,11 +36,11 @@ RUN npm install -g pnpm@11.0.8
 
 WORKDIR /app
 
-COPY docker-compose/external-ui/package.json docker-compose/external-ui/pnpm-lock.yaml docker-compose/external-ui/pnpm-workspace.yaml ./
+COPY external-ui/package.json external-ui/pnpm-lock.yaml external-ui/pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-COPY docker-compose/external-ui .
+COPY external-ui .
 RUN pnpm build
 
 FROM n8nio/n8n:2.19.2

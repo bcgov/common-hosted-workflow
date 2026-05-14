@@ -41,6 +41,15 @@ x-n8n-env: &n8n-env
   # OIDC
   OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
   OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+  # Runtime config for /ui-api/runtime-config
+  UI_OIDC_ISSUER: ${UI_OIDC_ISSUER:-http://localhost:8080/realms/starter}
+  UI_OIDC_CLIENT_ID: ${UI_OIDC_CLIENT_ID:-external-ui}
+  UI_OIDC_REDIRECT_URI: ${UI_OIDC_REDIRECT_URI:-http://localhost:5173/auth/callback}
+  UI_OIDC_POST_LOGOUT_URI: ${UI_OIDC_POST_LOGOUT_URI:-http://localhost:5173}
+  UI_OIDC_SCOPES: ${UI_OIDC_SCOPES:-openid email profile}
+  UI_OIDC_JWKS_URI: ${UI_OIDC_JWKS_URI:-http://keycloak:8080/realms/starter/protocol/openid-connect/certs}
+  UI_OIDC_EXPECTED_ISSUER: ${UI_OIDC_EXPECTED_ISSUER:-http://localhost:8080/realms/starter}
+  UI_OIDC_EXPECTED_AZP: ${UI_OIDC_EXPECTED_AZP:-external-ui}
   # OIDC_ISSUER_URL: http://keycloak:8080/realms/starter
   OIDC_AUTHORIZATION_ENDPOINT: http://localhost:8080/realms/starter/protocol/openid-connect/auth
   OIDC_TOKEN_ENDPOINT: http://keycloak:8080/realms/starter/protocol/openid-connect/token
@@ -154,6 +163,9 @@ services:
       AUTH_REALM_NAME: starter
       AUTH_CLIENT_ID: ${OIDC_CLIENT_ID}
       AUTH_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      SPA_CLIENT_ID: ${SPA_CLIENT_ID:-external-ui}
+      SPA_REDIRECT_URIS: ${SPA_REDIRECT_URIS:-http://localhost:5173/*,http://localhost:5678/ui/*}
+      SPA_WEB_ORIGINS: ${SPA_WEB_ORIGINS:-http://localhost:5173,http://localhost:5678}
     depends_on:
       keycloak:
         condition: service_started

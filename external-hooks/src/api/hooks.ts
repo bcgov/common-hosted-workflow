@@ -1,5 +1,6 @@
 import { Router, static as serveStatic } from 'express';
 import path from 'node:path';
+import fs from 'node:fs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../db/repository/workflow-interaction-layer/action-request';
 import { MessageRepository } from '../db/repository/workflow-interaction-layer/message';
@@ -11,6 +12,7 @@ import { buildActionRouter } from './routes/actions';
 import { buildActorRouter } from './routes/actors';
 import { buildAdminRouter } from './routes/admin';
 import { buildMessageRouter } from './routes/messages';
+import { buildUiApiRouter } from './routes/ui-api';
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
 import type { ApiRouteContext } from './types/routes';
 import type { ApiServices } from './types/services';
@@ -106,9 +108,21 @@ function createHookConfig() {
 
           app.use('/rest/custom/v1', v1Router);
 
-          const uiPath =
-            process.env.EXTERNAL_UI_PATH || path.resolve(__dirname, '../../../../docker-compose/external-ui/dist');
-          app.use('/ui', serveStatic(uiPath, { index: 'index.html' }));
+          const uiPath = process.env.EXTERNAL_UI_PATH;
+          if (uiPath) {
+            const indexPath = path.resolve(uiPath, 'index.html');
+
+            app.use('/ui', serveStatic(uiPath, { index: 'index.html' }));
+            app.get(/^\/ui\/.*$/, (req, res) => {
+              res.sendFile(indexPath, (err) => {
+                if (err) {
+                  res.status(404).send('UI asset not found');
+                }
+              });
+            });
+
+            app.use('/ui-api', buildUiApiRouter());
+          }
 
           app.use(handleErrorResponse);
           log.info('Custom Routes Active.');
