@@ -109,7 +109,8 @@ function createHookConfig() {
           app.use('/rest/custom/v1', v1Router);
 
           const uiPath = process.env.EXTERNAL_UI_PATH;
-          if (uiPath) {
+          const externalUiEnabled = process.env.EXTERNAL_UI_ENABLED === 'true';
+          if (uiPath && externalUiEnabled) {
             const indexPath = path.resolve(uiPath, 'index.html');
 
             app.use('/ui', serveStatic(uiPath, { index: 'index.html' }));
