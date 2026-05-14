@@ -1,4 +1,5 @@
 import type { User } from './user';
+import type { OidcTokenDetails } from './oidc';
 
 declare global {
   namespace Express {
@@ -7,6 +8,8 @@ declare global {
       chwfTenantId?: string;
       chwfAllowedProjectIds?: string[];
       chwfInternal?: boolean;
+      oidcToken?: string;
+      oidcTokenDetails?: OidcTokenDetails;
     }
   }
 }
