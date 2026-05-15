@@ -1,9 +1,9 @@
 import type { Icon, ICredentialTestRequest, ICredentialType, INodeProperties } from 'n8n-workflow';
 
-export class ChefsFormAuthApi implements ICredentialType {
-  name = 'chefsFormAuthApi';
-  icon: Icon = 'file:../icons/file-search.svg';
-  displayName = 'CHEFS Form Authentication API';
+export class ChefsFormAuth implements ICredentialType {
+  name = 'chefsFormAuth';
+  icon: Icon = { light: 'file:../icons/file-search.svg', dark: 'file:../icons/file-search.dark.svg' };
+  displayName = 'CHEFS Form Authentication';
   documentationUrl = 'https://github.com/bcgov/common-hosted-form-service/wiki';
   test: ICredentialTestRequest = {
     request: {

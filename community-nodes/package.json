@@ -27,7 +27,7 @@
     "strict": false,
     "credentials": [
       "dist/credentials/ChefsApi.credentials.js",
-      "dist/credentials/ChefsFormAuthApi.credentials.js",
+      "dist/credentials/ChefsFormAuth.credentials.js",
       "dist/credentials/DevXConnector.credentials.js",
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],

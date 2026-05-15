@@ -152,7 +152,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
     displayName: 'CHEFS Submission Extractor',
     name: 'chefsSubmissionExtractor',
     description: 'Fetch a CHEFS form submission and extract specific fields using dot-notation path mappings',
-    icon: 'file:../../icons/file-search.svg',
+    icon: { light: 'file:../../icons/file-search.svg', dark: 'file:../../icons/file-search.dark.svg' },
     group: ['transform'],
     version: 1,
     subtitle: '=Extract fields from submission',
@@ -164,7 +164,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
     outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
-        name: 'chefsFormAuthApi',
+        name: 'chefsFormAuth',
         required: true,
       },
     ],
