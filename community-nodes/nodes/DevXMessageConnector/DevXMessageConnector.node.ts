@@ -57,7 +57,7 @@ export class DevXMessageConnector implements INodeType {
     outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
-        name: 'devXConnectorApi',
+        name: 'devXConnector',
         required: true,
       },
     ],
