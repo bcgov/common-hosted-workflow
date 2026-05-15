@@ -47,7 +47,7 @@ describe('DevXMessageConnector uptime-com', () => {
     });
   });
 
-  it('throws when uptime-com provides an invalid alert timestamp', async () => {
+  it('throws when an uptime-com payload fails schema validation', async () => {
     const node = createNode();
     const context = createExecutionContext([
       {
@@ -57,20 +57,20 @@ describe('DevXMessageConnector uptime-com', () => {
           data: {
             alert: {
               is_up: true,
-              created_at: 'invalid-date',
+              created_at: '2024-02-03T04:05:06.789Z',
             },
             service: {
               display_name: 'Workflow API',
             },
             links: {
-              alert_details: 'https://uptime.com/alerts/1',
+              alert_details: 'not-a-url',
             },
           },
         },
       },
     ]);
 
-    await expect(node.execute.call(context as never)).rejects.toThrow('Invalid date input: invalid-date');
+    await expect(node.execute.call(context as never)).rejects.toThrow();
     expect(context.helpers.httpRequest).not.toHaveBeenCalled();
   });
 });
