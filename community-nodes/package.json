@@ -28,7 +28,7 @@
     "credentials": [
       "dist/credentials/ChefsApi.credentials.js",
       "dist/credentials/ChefsFormAuthApi.credentials.js",
-      "dist/credentials/DevXConnectorApi.credentials.js",
+      "dist/credentials/DevXConnector.credentials.js",
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],
     "nodes": [
