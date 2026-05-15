@@ -1,11 +1,12 @@
 /**
- * Converts a Unix timestamp (ms) or an ISO string into
+ * Converts a Unix timestamp (ms or microseconds) or an ISO string into
  * the specific YYYY-MM-DDTHH:mm:ssZ format.
  */
 export const formatToIsoTimestamp = (input: number | string | null | undefined): string | undefined => {
   if (!input) return undefined;
 
-  const date = new Date(input);
+  const normalizedInput = typeof input === 'number' && input >= 1e14 ? Math.trunc(input / 1000) : input;
+  const date = new Date(normalizedInput);
 
   if (isNaN(date.getTime())) {
     return undefined;
