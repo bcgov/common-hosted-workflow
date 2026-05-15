@@ -17,7 +17,7 @@ export class WorkflowInteractionLayer implements INodeType {
     displayName: 'Workflow Interaction Layer',
     name: 'workflowInteractionLayer',
     description: 'Interact with the Workflow Interaction Layer API for messages and actions',
-    icon: 'file:../../icons/message-2-cog.svg',
+    icon: { light: 'file:../../icons/message-2-cog.svg', dark: 'file:../../icons/message-2-cog.dark.svg' },
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"]}}',

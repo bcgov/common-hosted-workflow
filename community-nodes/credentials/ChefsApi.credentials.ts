@@ -2,7 +2,7 @@ import { Icon, ICredentialType, INodeProperties } from 'n8n-workflow';
 
 export class ChefsApi implements ICredentialType {
   name = 'chefsApi';
-  icon: Icon = 'file:../icons/file-search.svg';
+  icon: Icon = { light: 'file:../icons/file-search.svg', dark: 'file:../icons/file-search.dark.svg' };
   displayName = 'CHEFS API';
   documentationUrl = 'https://github.com/bcgov/common-hosted-form-service/wiki';
   properties: INodeProperties[] = [
