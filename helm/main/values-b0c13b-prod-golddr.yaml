@@ -22,6 +22,10 @@ n8n:
     enabled: true
     host: prod-chwf.apps.golddr.devops.gov.bc.ca
 
+  main:
+    deploymentStrategy:
+      type: "RollingUpdate"
+
   worker:
     enabled: true
 
