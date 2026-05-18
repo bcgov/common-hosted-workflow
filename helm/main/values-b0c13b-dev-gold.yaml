@@ -40,17 +40,49 @@ redis:
 
 pgo:
   enabled: true
+
+  # --- pgBackRest repositories ---
   pgBackRest:
     repos:
+      # Local repository (optional)
       - name: repo1
         enabled: true
         type: volume
         retention: "2"
         retentionType: count
+
         volume:
           size: 256Mi
           accessModes: ReadWriteOnce
           storageClassName: netapp-file-standard
+
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+
+      # Shared MinIO repository used by standby clusters
+      - name: repo2
+        enabled: true
+        type: s3
+        secretName: minio-creds
+        retention: "30"
+        retentionType: full
+
+        s3:
+          bucket: workflow-dev
+          endpoint: chwf-minio-api.apps.gold.devops.gov.bc.ca
+          region: us-east-1
+          path: /backups/pgo
+          uriStyle: path
+
+        schedules:
+          full: 0 8 * * *
+          incremental: 0 0,4,12,16,20 * * *
+
+  # --- Primary cluster (NOT standby) ---
+  standby:
+    enabled: false
+
+  # --- No restore/bootstrap on primary ---
+  dataSource:
+    enabled: false
