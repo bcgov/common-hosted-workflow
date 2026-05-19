@@ -284,26 +284,29 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['action'], operation: ['create'] } },
       },
       {
+        displayName: 'Callback Method',
+        name: 'callbackMethod',
+        type: 'options',
+        default: 'POST',
+        options: [
+          { name: 'None', value: 'none' },
+          { name: 'POST', value: 'POST' },
+          { name: 'PUT', value: 'PUT' },
+          { name: 'PATCH', value: 'PATCH' },
+        ],
+        description: 'HTTP method for the callback. Select "None" if no callback is needed.',
+        displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+      },
+      {
         displayName: 'Callback URL',
         name: 'callbackUrl',
         type: 'string',
         default: '',
         required: true,
         description: 'URL to call when the action is completed',
-        displayOptions: { show: { resource: ['action'], operation: ['create'] } },
-      },
-      {
-        displayName: 'Callback Method',
-        name: 'callbackMethod',
-        type: 'options',
-        default: 'POST',
-        options: [
-          { name: 'POST', value: 'POST' },
-          { name: 'PUT', value: 'PUT' },
-          { name: 'PATCH', value: 'PATCH' },
-        ],
-        description: 'HTTP method for the callback',
-        displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+        displayOptions: {
+          show: { resource: ['action'], operation: ['create'], callbackMethod: ['POST', 'PUT', 'PATCH'] },
+        },
       },
       {
         displayName: 'Callback Payload Spec',
@@ -311,7 +314,9 @@ export class WorkflowInteractionLayer implements INodeType {
         type: 'json',
         default: '{}',
         description: 'Optional template for expected callback body',
-        displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+        displayOptions: {
+          show: { resource: ['action'], operation: ['create'], callbackMethod: ['POST', 'PUT', 'PATCH'] },
+        },
       },
       {
         displayName: 'Due Date',

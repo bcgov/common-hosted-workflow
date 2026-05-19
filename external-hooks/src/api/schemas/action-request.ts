@@ -16,7 +16,7 @@ export const actionRequestItemSchema = z.object({
   actionType: z.string(),
   payload: z.record(z.string(), z.unknown()),
   callbackUrl: z.string(),
-  callbackMethod: callbackHttpMethodZodEnum,
+  callbackMethod: z.string(),
   callbackPayloadSpec: z.record(z.string(), z.unknown()).nullable(),
   actorId: z.string(),
   actorType: z.string(),
@@ -120,7 +120,7 @@ export const createActionRequestSchema = z
       .object({
         actionType: z.string().trim().min(1),
         payload: z.record(z.string(), z.unknown()),
-        callbackUrl: z.string().trim().min(1),
+        callbackUrl: z.string().trim().optional().default(''),
         callbackMethod: z
           .string()
           .trim()
@@ -141,7 +141,17 @@ export const createActionRequestSchema = z
       .strict(),
   })
   .superRefine((data, ctx) => {
-    const { dueDate, checkIn } = data.body;
+    const { callbackUrl, callbackMethod, dueDate, checkIn } = data.body;
+    const method = callbackMethod ?? 'POST';
+
+    if (method !== 'NONE' && (!callbackUrl || callbackUrl.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'callbackUrl is required when callbackMethod is not NONE',
+        path: ['body', 'callbackUrl'],
+      });
+    }
+
     if (dueDate !== undefined && dueDate !== null) {
       const d = parseOptionalBodyTimestamp(dueDate);
       if (d === undefined) {

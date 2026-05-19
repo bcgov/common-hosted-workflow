@@ -28,8 +28,8 @@ export interface ActionCreatePayload {
   actorType: 'user' | 'group' | 'role' | 'system' | 'other';
   actionType: string;
   payload: Record<string, unknown>;
-  callbackUrl: string;
-  callbackMethod?: 'POST' | 'PUT' | 'PATCH';
+  callbackUrl?: string;
+  callbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'none';
   callbackPayloadSpec?: Record<string, unknown>;
   workflowId: string;
   dueDate?: string;

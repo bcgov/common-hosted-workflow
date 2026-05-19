@@ -12,7 +12,6 @@ export async function createAction(ctx: IExecuteFunctions, i: number): Promise<A
     actorId: ctx.getNodeParameter('actorId', i) as string,
     actorType: ctx.getNodeParameter('actorType', i) as ActionCreatePayload['actorType'],
     actionType: ctx.getNodeParameter('actionType', i) as string,
-    callbackUrl: ctx.getNodeParameter('callbackUrl', i) as string,
     payload: {},
   };
 
@@ -20,10 +19,16 @@ export async function createAction(ctx: IExecuteFunctions, i: number): Promise<A
   if (parsedPayload) body.payload = parsedPayload as Record<string, unknown>;
 
   const callbackMethod = ctx.getNodeParameter('callbackMethod', i) as ActionCreatePayload['callbackMethod'];
-  if (callbackMethod) body.callbackMethod = callbackMethod;
+  if (callbackMethod && callbackMethod !== 'none') {
+    body.callbackMethod = callbackMethod;
+    body.callbackUrl = ctx.getNodeParameter('callbackUrl', i) as string;
 
-  const callbackPayloadSpec = safeParse(ctx.getNodeParameter('callbackPayloadSpec', i, '{}'));
-  if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec as Record<string, unknown>;
+    const callbackPayloadSpec = safeParse(ctx.getNodeParameter('callbackPayloadSpec', i, '{}'));
+    if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec as Record<string, unknown>;
+  } else {
+    body.callbackMethod = 'none';
+    body.callbackUrl = '';
+  }
 
   const dueDate = ctx.getNodeParameter('dueDate', i, '') as string;
   if (dueDate) body.dueDate = dueDate;
