@@ -133,7 +133,7 @@ spec:
 
       {{- if $configs }}
       configuration:
-      {{ toYaml $configs | nindent 8}}
+      {{ toYaml $configs | nindent 8 }}
       {{- end }}
 
       global:
