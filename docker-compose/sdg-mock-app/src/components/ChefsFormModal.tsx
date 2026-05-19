@@ -8,6 +8,8 @@ interface ChefsFormModalProps {
   formName?: string;
   token: string;
   chefsBaseUrl?: string;
+  submissionId?: string;
+  prefillData?: Record<string, unknown>;
   onClose: () => void;
   onSubmitted: (detail: unknown) => void;
 }
@@ -17,6 +19,8 @@ export default function ChefsFormModal({
   formName,
   token,
   chefsBaseUrl,
+  submissionId,
+  prefillData,
   onClose,
   onSubmitted,
 }: Readonly<ChefsFormModalProps>) {
@@ -73,6 +77,8 @@ export default function ChefsFormModal({
             formId={formId}
             authToken={token}
             baseUrl={chefsBaseUrl || undefined}
+            submissionId={submissionId}
+            prefillData={prefillData}
             onSubmissionComplete={handleSubmissionComplete}
             onSubmissionError={(err) => {
               console.error('Form submission error:', err);

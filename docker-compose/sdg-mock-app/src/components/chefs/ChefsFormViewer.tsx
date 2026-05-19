@@ -10,6 +10,7 @@ export function ChefsFormViewer({
   apiKey,
   headers,
   submissionId,
+  prefillData,
   readOnly = false,
   language = 'en',
   isolateStyles = false,
@@ -17,10 +18,12 @@ export function ChefsFormViewer({
   onFormReady,
   onSubmissionComplete,
   onSubmissionError,
-}: ChefsFormViewerProps) {
+}: Readonly<ChefsFormViewerProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptStatus = useChefsScript();
   const [isFormMounted, setIsFormMounted] = useState(false);
+
+  console.log('[ChefsFormViewer] Render', { scriptStatus, formId, isFormMounted, hasPrefillData: !!prefillData });
 
   const headersAttr = headers ? `headers="${encodeURIComponent(JSON.stringify(headers))}"` : '';
 
@@ -94,12 +97,59 @@ export function ChefsFormViewer({
   useEffect(() => {
     if (scriptStatus !== 'ready' || !containerRef.current) return;
 
-    const formViewer = containerRef.current.querySelector('chefs-form-viewer');
-    if (!formViewer) return;
+    console.log('[ChefsFormViewer] Main effect running', {
+      scriptStatus,
+      formId,
+      hasPrefillData: !!prefillData,
+      prefillKeys: prefillData ? Object.keys(prefillData) : [],
+      submissionId: submissionId ?? null,
+    });
 
-    const handleFormReady = () => {
+    const formViewer = containerRef.current.querySelector('chefs-form-viewer');
+    if (!formViewer) {
+      console.warn('[ChefsFormViewer] No <chefs-form-viewer> element found in container');
+      return;
+    }
+
+    const handleFormReady = (event: Event) => {
       setIsFormMounted(true);
-      onFormReady?.({ formio: null });
+      const customEvent = event as CustomEvent;
+      const formioInstance = customEvent.detail?.form ?? customEvent.detail;
+
+      console.log('[ChefsFormViewer] formio:ready fired', {
+        hasDetail: !!customEvent.detail,
+        detailKeys: customEvent.detail ? Object.keys(customEvent.detail) : [],
+        formioInstance: !!formioInstance,
+        formioType: typeof formioInstance,
+        hasSubmissionProp: formioInstance && typeof formioInstance === 'object' && 'submission' in formioInstance,
+      });
+
+      // Apply prefill data for fresh forms (no submissionId)
+      if (prefillData && !submissionId) {
+        console.log('[ChefsFormViewer] Attempting prefill via setSubmission', {
+          prefillKeys: Object.keys(prefillData),
+          prefillData,
+        });
+
+        const viewer = formViewer as unknown as { setSubmission?: (data: Record<string, unknown>) => void };
+        if (typeof viewer.setSubmission === 'function') {
+          console.log('[ChefsFormViewer] Calling setSubmission() on web component');
+          viewer.setSubmission(prefillData);
+        } else {
+          console.warn('[ChefsFormViewer] setSubmission not available on web component, trying direct assignment');
+          // Last resort: direct assignment on the formio instance
+          if (formioInstance && typeof formioInstance === 'object' && 'submission' in formioInstance) {
+            formioInstance.submission = { data: { ...prefillData } };
+          }
+        }
+      } else {
+        console.log('[ChefsFormViewer] Skipping prefill', {
+          hasPrefillData: !!prefillData,
+          hasSubmissionId: !!submissionId,
+        });
+      }
+
+      onFormReady?.({ formio: formioInstance });
     };
 
     const handleSubmit = (event: Event) => {
@@ -118,7 +168,22 @@ export function ChefsFormViewer({
 
     const shadowRoot = (formViewer as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot;
     if (shadowRoot && shadowRoot.children.length > 0) {
-      queueMicrotask(() => setIsFormMounted(true));
+      console.log('[ChefsFormViewer] Shadow root already present, applying prefill via queueMicrotask');
+      queueMicrotask(() => {
+        setIsFormMounted(true);
+        // If form is already ready, apply prefill data now
+        if (prefillData && !submissionId) {
+          const viewer = formViewer as unknown as { setSubmission?: (data: Record<string, unknown>) => void };
+          if (typeof viewer.setSubmission === 'function') {
+            console.log('[ChefsFormViewer] queueMicrotask: calling setSubmission()');
+            viewer.setSubmission(prefillData);
+          } else {
+            console.warn('[ChefsFormViewer] queueMicrotask: setSubmission not available');
+          }
+        }
+      });
+    } else {
+      console.log('[ChefsFormViewer] No shadow root yet, waiting for formio:ready event');
     }
 
     if (headers) {
@@ -135,7 +200,7 @@ export function ChefsFormViewer({
       formViewer.removeEventListener('formio:submitDone', handleSubmit);
       formViewer.removeEventListener('formio:submitError', handleSubmitError);
     };
-  }, [scriptStatus, headers, onFormReady, onSubmissionComplete, onSubmissionError]);
+  }, [scriptStatus, headers, prefillData, submissionId, onFormReady, onSubmissionComplete, onSubmissionError]);
 
   if (scriptStatus === 'error') {
     return (

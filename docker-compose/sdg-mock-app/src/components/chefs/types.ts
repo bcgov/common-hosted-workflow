@@ -5,6 +5,7 @@ export interface ChefsFormViewerProps {
   apiKey?: string;
   headers?: Record<string, string>;
   submissionId?: string;
+  prefillData?: Record<string, unknown>;
   readOnly?: boolean;
   language?: string;
   isolateStyles?: boolean;

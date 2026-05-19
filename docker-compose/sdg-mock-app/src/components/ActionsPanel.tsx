@@ -94,6 +94,18 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
   const payloadFormName =
     a.actionType === 'showform' ? ((a.payload?.FormName ?? a.payload?.formName) as string | undefined) : undefined;
 
+  // Resolve submissionId from payload (for loading existing submissions)
+  const payloadSubmissionId =
+    a.actionType === 'showform'
+      ? ((a.payload?.FormSubmissionId ?? a.payload?.formSubmissionId) as string | undefined)
+      : undefined;
+
+  // Resolve prefill data from payload (for fresh forms with pre-populated fields)
+  const payloadPrefillData =
+    a.actionType === 'showform'
+      ? ((a.payload?.FormPreFillData ?? a.payload?.formPreFillData) as Record<string, unknown> | undefined)
+      : undefined;
+
   const isShowForm = a.actionType === 'showform' && ['pending', 'in_progress'].includes(a.status) && !!showFormId;
 
   const handleOpenForm = useCallback(async () => {
@@ -292,6 +304,8 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
           formName={formName ?? undefined}
           token={formToken}
           chefsBaseUrl={formChefsBaseUrl ?? undefined}
+          submissionId={payloadSubmissionId}
+          prefillData={payloadPrefillData}
           onClose={() => {
             setFormModalOpen(false);
             setFormToken(null);
