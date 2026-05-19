@@ -20,6 +20,52 @@ export class SharedWorkflowRepository {
     return this.sharedWorkflowRepository.metadata;
   }
 
+  async findProjectIds(workflowId: string) {
+    const sharedWorkflowMetadata = this.sharedWorkflowRepository.metadata;
+    const sharedWorkflowTable = quoteIdentifier(sharedWorkflowMetadata.tableName);
+    const sharedWorkflowWorkflowColumn = quoteIdentifier(getColumnName(sharedWorkflowMetadata, 'workflowId'));
+    const sharedWorkflowProjectColumn = quoteIdentifier(getColumnName(sharedWorkflowMetadata, 'projectId'));
+
+    const rows = await this.sharedWorkflowRepository.manager.query(
+      `
+        SELECT sw.${sharedWorkflowProjectColumn} AS "projectId"
+        FROM ${sharedWorkflowTable} sw
+        WHERE sw.${sharedWorkflowWorkflowColumn} = $1
+      `,
+      [workflowId],
+    );
+
+    return rows.map((row) => String(row.projectId));
+  }
+
+  async findRowsByWorkflowId(workflowId: string) {
+    const sharedWorkflowMetadata = this.sharedWorkflowRepository.metadata;
+    const workflowMetadata = this.workflowRepository.metadata;
+
+    const sharedWorkflowTable = quoteIdentifier(sharedWorkflowMetadata.tableName);
+    const workflowTable = quoteIdentifier(workflowMetadata.tableName);
+
+    const sharedWorkflowProjectColumn = quoteIdentifier(getColumnName(sharedWorkflowMetadata, 'projectId'));
+    const sharedWorkflowWorkflowColumn = quoteIdentifier(getColumnName(sharedWorkflowMetadata, 'workflowId'));
+    const workflowIdColumn = quoteIdentifier(getColumnName(workflowMetadata, 'id'));
+    const workflowNameColumn = quoteIdentifier(getColumnName(workflowMetadata, 'name'));
+
+    const rows = await this.sharedWorkflowRepository.manager.query(
+      `
+        SELECT
+          sw.${sharedWorkflowWorkflowColumn} AS "workflowId",
+          w.${workflowNameColumn} AS "workflowName",
+          sw.${sharedWorkflowProjectColumn} AS "projectId"
+        FROM ${sharedWorkflowTable} sw
+        INNER JOIN ${workflowTable} w ON w.${workflowIdColumn} = sw.${sharedWorkflowWorkflowColumn}
+        WHERE sw.${sharedWorkflowWorkflowColumn} = $1
+      `,
+      [workflowId],
+    );
+
+    return rows as SharedWorkflowRow[];
+  }
+
   async findWorkflowRowsByProjectIds(projectIds?: string[]) {
     const sharedWorkflowMetadata = this.sharedWorkflowRepository.metadata;
     const workflowMetadata = this.workflowRepository.metadata;

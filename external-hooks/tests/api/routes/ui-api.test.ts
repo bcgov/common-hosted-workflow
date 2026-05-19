@@ -98,3 +98,78 @@ describe('GET /ui-api/workflows', () => {
     );
   });
 });
+
+describe('POST /ui-api/workflows/:workflowId/share', () => {
+  it('delegates to the ui api service', async () => {
+    const uiApi = {
+      shareWorkflow: vi.fn().mockResolvedValue({
+        workflowId: 'wf-1',
+        sharedWithEmail: 'new@example.com',
+      }),
+    };
+    const router = buildUiApiRouter({ services: { uiApi } } as any);
+    const handler = getRouteHandler(router, 'post', '/workflows/:workflowId/share');
+    const req = createMockRequest({
+      params: { workflowId: 'wf-1' },
+      body: { email: 'new@example.com' },
+      get: vi.fn(() => undefined) as any,
+    });
+    const res = createMockResponse({
+      oidcTokenDetails: {
+        email: 'person@example.com',
+        issuer: 'https://issuer.example.com',
+        subject: 'sub-1',
+        audience: ['external-ui'],
+        claims: {},
+      },
+    });
+
+    await handler(req as any, res as any, vi.fn());
+
+    expect(uiApi.shareWorkflow).toHaveBeenCalledWith('person@example.com', 'wf-1', 'new@example.com');
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-1',
+        sharedWithEmail: 'new@example.com',
+      }),
+    );
+  });
+});
+
+describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
+  it('delegates to the ui api service', async () => {
+    const uiApi = {
+      unshareWorkflow: vi.fn().mockResolvedValue({
+        workflowId: 'wf-1',
+        projectId: 'proj-1',
+      }),
+    };
+    const router = buildUiApiRouter({ services: { uiApi } } as any);
+    const handler = getRouteHandler(router, 'delete', '/workflows/:workflowId/projects/:projectId');
+    const req = createMockRequest({
+      params: { workflowId: 'wf-1', projectId: 'proj-1' },
+      get: vi.fn(() => undefined) as any,
+    });
+    const res = createMockResponse({
+      oidcTokenDetails: {
+        email: 'person@example.com',
+        issuer: 'https://issuer.example.com',
+        subject: 'sub-1',
+        audience: ['external-ui'],
+        claims: {},
+      },
+    });
+
+    await handler(req as any, res as any, vi.fn());
+
+    expect(uiApi.unshareWorkflow).toHaveBeenCalledWith('person@example.com', 'wf-1', 'proj-1');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-1',
+        projectId: 'proj-1',
+      }),
+    );
+  });
+});

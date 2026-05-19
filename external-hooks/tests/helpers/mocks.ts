@@ -199,6 +199,13 @@ export function createMockN8nRepositories() {
 
   const makeManager = () => ({
     query: vi.fn().mockResolvedValue([]),
+    transaction: vi.fn(async (callback: (em: any) => Promise<unknown>) => {
+      const em = {
+        create: vi.fn((_entityName, payload) => payload),
+        save: vi.fn(async (value) => value),
+      };
+      return await callback(em);
+    }),
     connection: {
       getMetadata: vi.fn((entityName: keyof typeof metadata) => metadata[entityName]),
     },
@@ -221,6 +228,14 @@ export function createMockN8nRepositories() {
     credential: { findOneBy: vi.fn() },
     sharedWorkflow: {
       findProjectIds: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
+      findRowsByWorkflowId: vi
+        .fn()
+        .mockResolvedValue([
+          { workflowId: VALID_WORKFLOW_ID, workflowName: 'Test workflow', projectId: VALID_PROJECT_ID },
+        ]),
+      create: vi.fn((_value) => _value),
+      save: vi.fn(async (value) => value),
+      delete: vi.fn(async () => undefined),
       metadata: metadata.SharedWorkflow,
       manager: makeManager(),
     },

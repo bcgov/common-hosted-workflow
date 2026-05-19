@@ -2,6 +2,13 @@ import { Router, type Request } from 'express';
 import { createOidcJwtMiddleware } from '../middlewares';
 import { wrapAsyncRoute } from '../utils/errors';
 import type { ApiRouteContext } from '../types/routes';
+import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import {
+  shareWorkflowResponseSchema,
+  shareWorkflowSchema,
+  unshareWorkflowResponseSchema,
+  unshareWorkflowSchema,
+} from '../schemas/ui';
 
 function getRequestOrigin(req: Request) {
   return req.get('origin') ?? `${req.protocol}://${req.get('host')}`;
@@ -93,6 +100,50 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
         accessibleProjectIds: context.accessibleProjectIds,
         workflows: context.workflows,
       });
+    }),
+  );
+
+  router.post(
+    '/workflows/:workflowId/share',
+    oidcJwtMiddleware,
+    createRequestSchemaValidator(shareWorkflowSchema),
+    wrapAsyncRoute(async (req, res) => {
+      const details = res.locals.oidcTokenDetails;
+      const parsed = parseValidatedRequest(shareWorkflowSchema, req);
+      const result = await services.uiApi.shareWorkflow(details.email, parsed.params.workflowId, parsed.body.email);
+
+      const payload = parseValidatedResponse(shareWorkflowResponseSchema, {
+        success: true as const,
+        message: `Workflow '${result.workflowId}' shared with '${result.sharedWithEmail}'.`,
+        workflowId: result.workflowId,
+        sharedWithEmail: result.sharedWithEmail,
+      });
+
+      res.status(201).json(payload);
+    }),
+  );
+
+  router.delete(
+    '/workflows/:workflowId/projects/:projectId',
+    oidcJwtMiddleware,
+    createRequestSchemaValidator(unshareWorkflowSchema),
+    wrapAsyncRoute(async (req, res) => {
+      const details = res.locals.oidcTokenDetails;
+      const parsed = parseValidatedRequest(unshareWorkflowSchema, req);
+      const result = await services.uiApi.unshareWorkflow(
+        details.email,
+        parsed.params.workflowId,
+        parsed.params.projectId,
+      );
+
+      const payload = parseValidatedResponse(unshareWorkflowResponseSchema, {
+        success: true as const,
+        message: `Workflow '${result.workflowId}' unshared from project '${result.projectId}'.`,
+        workflowId: result.workflowId,
+        projectId: result.projectId,
+      });
+
+      res.status(200).json(payload);
     }),
   );
 
