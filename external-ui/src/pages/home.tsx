@@ -38,7 +38,14 @@ export function Home() {
 
             {user ? (
               <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
-                Signed in as <span className="font-semibold">{user.profile.email}</span>
+                <div>
+                  Signed in as <span className="font-semibold">{user.profile.email}</span>
+                </div>
+                {whoami?.n8nUser?.role ? (
+                  <div className="mt-1 text-xs uppercase tracking-wide text-green-800">
+                    n8n role: <span className="font-semibold">{whoami.n8nUser.role.slug}</span>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--bc-border)] bg-[var(--bc-surface)] px-4 py-3">
@@ -64,11 +71,8 @@ export function Home() {
             ) : null}
 
             <div className="flex gap-4 pt-1 text-sm font-medium">
-              <Link to="/about" className="underline underline-offset-2 hover:text-[var(--bc-blue-dark)]">
-                About
-              </Link>
-              <Link to="/contact" className="underline underline-offset-2 hover:text-[var(--bc-blue-dark)]">
-                Contact
+              <Link to="/workflows" className="underline underline-offset-2 hover:text-[var(--bc-blue-dark)]">
+                Workflows
               </Link>
             </div>
           </div>

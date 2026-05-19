@@ -38,24 +38,14 @@ export function AppLayout({ children }: AppLayoutProps) {
               Home
             </NavLink>
             <NavLink
-              to="/about"
+              to="/workflows"
               className={({ isActive }) =>
                 isActive
                   ? 'font-semibold !text-white visited:!text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
                   : '!text-white visited:!text-white hover:!text-white'
               }
             >
-              About
-            </NavLink>
-            <NavLink
-              to="/contact"
-              className={({ isActive }) =>
-                isActive
-                  ? 'font-semibold !text-white visited:!text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                  : '!text-white visited:!text-white hover:!text-white'
-              }
-            >
-              Contact
+              Workflows
             </NavLink>
           </nav>
 
@@ -91,7 +81,6 @@ export function AppLayout({ children }: AppLayoutProps) {
           <span>Disclaimer</span>
           <span>Privacy</span>
           <span>Accessibility</span>
-          <span>Contact Us</span>
         </div>
       </footer>
     </div>

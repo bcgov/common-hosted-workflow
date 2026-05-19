@@ -6,6 +6,7 @@ import { ActionRequestRepository } from '../db/repository/workflow-interaction-l
 import { MessageRepository } from '../db/repository/workflow-interaction-layer/message';
 import { TenantProjectRelationRepository } from '../db/repository/workflow-interaction-layer/tenant-project-relation';
 import { ApiKeyService } from './services/api-key';
+import { UiApiService } from './services/ui-api';
 import { N8N_DB_PATH, N8N_DI_PATH } from './constants/n8n-paths';
 import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from './middlewares';
 import { buildActionRouter } from './routes/actions';
@@ -57,6 +58,7 @@ function createHookConfig() {
           };
           const services: ApiServices = {
             apiKey: new ApiKeyService(n8nRepositories.user),
+            uiApi: new UiApiService(n8nRepositories),
           };
 
           const { apiKeyAuthMiddleware, adminAuthMiddleware } = createAuthMiddleware({
@@ -122,7 +124,7 @@ function createHookConfig() {
               });
             });
 
-            app.use('/ui-api', buildUiApiRouter());
+            app.use('/ui-api', buildUiApiRouter(routeContext));
           }
 
           app.use(handleErrorResponse);

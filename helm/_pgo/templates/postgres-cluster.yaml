@@ -124,12 +124,16 @@ spec:
       image: {{ .Values.pgBackRest.image }}
       {{ end }}
 
-      configuration:
+      {{- $configs := list }}
       {{- range .Values.pgBackRest.repos }}
         {{- if and .enabled .secretName }}
-        - secret:
-            name: {{ .secretName }}
+          {{- $configs = append $configs (dict "secret" (dict "name" .secretName)) }}
         {{- end }}
+      {{- end }}
+
+      {{- if $configs }}
+      configuration:
+      {{ toYaml $configs | nindent 2 }}
       {{- end }}
 
       global:

@@ -35,6 +35,7 @@ x-n8n-env: &n8n-env
   N8N_PORT: '5678'
   NODE_ENV: production
   ENABLE_SWAGGER_UI: 'true'
+  EXTERNAL_UI_ENABLED: 'true'
   N8N_PROTOCOL: http
   N8N_TRUST_PROXY: 'true'
   N8N_PROXY_HOPS: '1'
