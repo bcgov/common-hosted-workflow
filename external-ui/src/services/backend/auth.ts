@@ -19,6 +19,14 @@ export type WhoamiResponse = {
     notBefore?: number;
     claims: Record<string, unknown>;
   } | null;
+  n8nUser: {
+    id: string;
+    email: string;
+    role: {
+      slug: string;
+      displayName: string;
+    } | null;
+  } | null;
 };
 
 export async function getWhoami(params?: { signal?: AbortSignal }) {
