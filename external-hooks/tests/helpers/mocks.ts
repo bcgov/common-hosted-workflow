@@ -166,8 +166,46 @@ export function createMockTenantProjectRelationRepository() {
 /* ------------------------------------------------------------------ */
 
 export function createMockN8nRepositories() {
+  const metadata = {
+    SharedWorkflow: {
+      tableName: 'shared_workflow',
+      columns: [
+        { propertyName: 'workflowId', databaseName: 'workflow_id' },
+        { propertyName: 'projectId', databaseName: 'project_id' },
+      ],
+    },
+    Workflow: {
+      tableName: 'workflow_entity',
+      columns: [
+        { propertyName: 'id', databaseName: 'id' },
+        { propertyName: 'name', databaseName: 'name' },
+      ],
+    },
+    ProjectRelation: {
+      tableName: 'project_relation',
+      columns: [
+        { propertyName: 'projectId', databaseName: 'project_id' },
+        { propertyName: 'userId', databaseName: 'user_id' },
+      ],
+    },
+    User: {
+      tableName: 'user',
+      columns: [
+        { propertyName: 'id', databaseName: 'id' },
+        { propertyName: 'email', databaseName: 'email' },
+      ],
+    },
+  } as const;
+
+  const makeManager = () => ({
+    query: vi.fn().mockResolvedValue([]),
+    connection: {
+      getMetadata: vi.fn((entityName: keyof typeof metadata) => metadata[entityName]),
+    },
+  });
+
   return {
-    user: { findOneBy: vi.fn() },
+    user: { findOne: vi.fn(), findOneBy: vi.fn(), metadata: metadata.User },
     project: {
       findOneBy: vi.fn(),
       getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: VALID_PROJECT_ID }),
@@ -176,12 +214,15 @@ export function createMockN8nRepositories() {
     projectRelation: {
       findProjectRole: vi.fn().mockResolvedValue(null),
       findAllByUser: vi.fn().mockResolvedValue([{ projectId: VALID_PROJECT_ID }]),
+      metadata: metadata.ProjectRelation,
+      manager: makeManager(),
     },
-    workflow: { findOneBy: vi.fn() },
+    workflow: { findOneBy: vi.fn(), metadata: metadata.Workflow },
     credential: { findOneBy: vi.fn() },
     sharedWorkflow: {
       findProjectIds: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
-      manager: {},
+      metadata: metadata.SharedWorkflow,
+      manager: makeManager(),
     },
     sharedCredential: { manager: {} },
     withTransaction: vi.fn(),

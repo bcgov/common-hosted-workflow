@@ -1,12 +1,13 @@
 import { Router, type Request } from 'express';
 import { createOidcJwtMiddleware } from '../middlewares';
 import { wrapAsyncRoute } from '../utils/errors';
+import type { ApiRouteContext } from '../types/routes';
 
 function getRequestOrigin(req: Request) {
   return req.get('origin') ?? `${req.protocol}://${req.get('host')}`;
 }
 
-export function buildUiApiRouter() {
+export function buildUiApiRouter({ services }: ApiRouteContext) {
   const router = Router();
   const oidcJwtMiddleware = createOidcJwtMiddleware({
     issuer: process.env.UI_OIDC_EXPECTED_ISSUER || '',
@@ -35,6 +36,7 @@ export function buildUiApiRouter() {
     oidcJwtMiddleware,
     wrapAsyncRoute(async (req, res) => {
       const details = res.locals.oidcTokenDetails;
+      const n8nUser = await services.uiApi.getWhoami(details.email);
 
       res.json({
         ok: true,
@@ -56,7 +58,40 @@ export function buildUiApiRouter() {
               claims: details.claims,
             }
           : null,
+        n8nUser: n8nUser
+          ? {
+              id: n8nUser.id,
+              email: n8nUser.email,
+              role: n8nUser.role ? { slug: n8nUser.role.slug, displayName: n8nUser.role.displayName } : null,
+            }
+          : null,
         userAgent: req.get('user-agent') ?? null,
+      });
+    }),
+  );
+
+  router.get(
+    '/workflows',
+    oidcJwtMiddleware,
+    wrapAsyncRoute(async (req, res) => {
+      const details = res.locals.oidcTokenDetails;
+      const context = await services.uiApi.getWorkflows(details.email);
+
+      res.json({
+        ok: true,
+        route: '/ui-api/workflows',
+        method: req.method,
+        n8nUser: context.n8nUser
+          ? {
+              id: context.n8nUser.id,
+              email: context.n8nUser.email,
+              role: context.n8nUser.role
+                ? { slug: context.n8nUser.role.slug, displayName: context.n8nUser.role.displayName }
+                : null,
+            }
+          : null,
+        accessibleProjectIds: context.accessibleProjectIds,
+        workflows: context.workflows,
       });
     }),
   );
