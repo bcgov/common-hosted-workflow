@@ -64,14 +64,14 @@ pgo:
       - name: repo2
         enabled: true
         type: s3
-        secretName: minio-creds
+        secretName: objectstorage-creds
         retention: "30"
         retentionType: time
 
         s3:
           bucket: workflow-dev
-          endpoint: chwf-minio-api.apps.gold.devops.gov.bc.ca
-          region: us-east-1
+          endpoint: commonservices.objectstore.gov.bc.ca
+          region: ca-central-1
           path: /backups/pgo
           uriStyle: path
 
