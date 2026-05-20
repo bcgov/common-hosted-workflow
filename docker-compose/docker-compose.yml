@@ -82,20 +82,6 @@ services:
       n8n:
         condition: service_started
 
-  adaptivecard:
-    <<: *common-props
-    container_name: adaptivecard
-    build:
-      context: ./adaptivecard
-      dockerfile: Dockerfile
-    ports:
-    - 8421:8421
-    environment:
-      NODE_ENV: production
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   postgres:
     <<: *common-props
     container_name: postgres

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as AdaptiveCards from 'adaptivecards';
 import markdownit from 'markdown-it';
 
-export default function Home() {
-  const [cards, setCards] = useState([]);
+export default function AdaptiveCardFeedPage() {
+  const [cards, setCards] = useState<any[]>([]);
 
   const fetchCards = useCallback(async () => {
     try {
@@ -36,12 +36,12 @@ export default function Home() {
   }, [fetchCards]);
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A] py-10 px-4 sm:px-6 lg:px-8 text-slate-200">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen bg-[#1A1A1A] px-4 py-10 text-slate-200 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Adaptive Card Feed</h1>
-            <p className="text-slate-500 text-sm mt-1">Monitoring incoming webhook payloads</p>
+            <h1 className="text-3xl font-bold tracking-tight text-white">Adaptive Card Feed</h1>
+            <p className="mt-1 text-sm text-slate-500">Monitoring incoming webhook payloads</p>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -49,7 +49,7 @@ export default function Home() {
               href="https://adaptivecards.microsoft.com/designer"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 bg-[#2D2D2D] hover:bg-blue-900/20 border border-[#3D3D3D] hover:border-blue-900/50 hover:text-blue-400 text-xs font-bold uppercase tracking-widest rounded-lg transition-all flex items-center gap-2"
+              className="flex items-center gap-2 rounded-lg border border-[#3D3D3D] bg-[#2D2D2D] px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all hover:border-blue-900/50 hover:bg-blue-900/20 hover:text-blue-400"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -71,7 +71,7 @@ export default function Home() {
 
             <button
               onClick={clearCards}
-              className="px-4 py-2 bg-[#2D2D2D] hover:bg-red-900/20 border border-[#3D3D3D] hover:border-red-900/50 hover:text-red-400 text-xs font-bold uppercase tracking-widest rounded-lg transition-all"
+              className="rounded-lg border border-[#3D3D3D] bg-[#2D2D2D] px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all hover:border-red-900/50 hover:bg-red-900/20 hover:text-red-400"
             >
               Clear
             </button>
@@ -80,8 +80,8 @@ export default function Home() {
 
         <div className="space-y-6">
           {cards.length === 0 ? (
-            <div className="text-center py-20 bg-[#242424] rounded-xl border-2 border-dashed border-[#3D3D3D]">
-              <p className="text-slate-500 font-medium italic">Waiting for incoming payloads...</p>
+            <div className="rounded-xl border-2 border-dashed border-[#3D3D3D] bg-[#242424] py-20 text-center">
+              <p className="font-medium italic text-slate-500">Waiting for incoming payloads...</p>
             </div>
           ) : (
             cards.map((cardJson, index) => <AdaptiveCardRenderer key={index} payload={cardJson} />)
@@ -117,7 +117,7 @@ function AdaptiveCardRenderer({ payload }: { payload: any }) {
     };
 
     adaptiveCard.hostConfig = new AdaptiveCards.HostConfig({
-      fontFamily: "Segoe UI, 'Helvetica Neue', sans-serif",
+      fontFamily: 'DM Sans, Arial, sans-serif',
       containerStyles: {
         default: {
           backgroundColor: '#2D2D2D',
@@ -155,11 +155,11 @@ function AdaptiveCardRenderer({ payload }: { payload: any }) {
 
   return (
     <div className="group relative">
-      <div className="flex items-center justify-between mb-2 px-1">
+      <div className="mb-2 flex items-center justify-between px-1">
         <div />
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2D2D2D] hover:bg-[#3D3D3D] text-slate-400 hover:text-white text-[10px] font-bold uppercase tracking-wider rounded-md border border-[#444] transition-all shadow-sm"
+          className="flex items-center gap-1.5 rounded-md border border-[#444] bg-[#2D2D2D] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 shadow-sm transition-all hover:bg-[#3D3D3D] hover:text-white"
         >
           {copied ? (
             <span className="text-green-400">Copied!</span>
@@ -186,8 +186,8 @@ function AdaptiveCardRenderer({ payload }: { payload: any }) {
       </div>
 
       <div
-        className="bg-[#2D2D2D] rounded-xl shadow-xl border border-[#3D3D3D] p-4 hover:border-[#4D4D4D] transition-colors"
         ref={cardRef}
+        className="rounded-xl border border-[#3D3D3D] bg-[#2D2D2D] p-4 shadow-xl transition-colors hover:border-[#4D4D4D]"
       />
     </div>
   );
