@@ -12,7 +12,7 @@ export class ProjectRelationRepository {
     return this.projectRelationRepository.metadata;
   }
 
-  async listUserEmailsByProjectIds(projectIds: string[]) {
+  private buildUserEmailLookup() {
     const projectRelationMetadata = this.projectRelationRepository.metadata;
     const userMetadata = this.userRepository.metadata;
 
@@ -24,17 +24,29 @@ export class ProjectRelationRepository {
     const userIdColumn = quoteIdentifier(getColumnName(userMetadata, 'id'));
     const userEmailColumn = quoteIdentifier(getColumnName(userMetadata, 'email'));
 
-    const rows = await this.projectRelationRepository.manager.query(
-      `
+    return {
+      projectRelationProjectColumn,
+      selectSql: `
         SELECT
           pr.${projectRelationProjectColumn} AS "projectId",
           u.${userEmailColumn} AS "email"
         FROM ${projectRelationTable} pr
         INNER JOIN ${userTable} u ON u.${userIdColumn} = pr.${projectRelationUserColumn}
-        WHERE pr.${projectRelationProjectColumn} = ANY($1)
       `,
-      [projectIds],
-    );
+    };
+  }
+
+  private async queryUserEmails(sql: string, params?: unknown[]) {
+    return await this.projectRelationRepository.manager.query(sql, params);
+  }
+
+  async listUserEmailsByProjectIds(projectIds: string[]) {
+    if (!projectIds.length) return [] as Array<{ projectId: string; email: string }>;
+
+    const { projectRelationProjectColumn, selectSql } = this.buildUserEmailLookup();
+    const rows = await this.queryUserEmails(`${selectSql} WHERE pr.${projectRelationProjectColumn} = ANY($1)`, [
+      projectIds,
+    ]);
 
     return rows as Array<{ projectId: string; email: string }>;
   }
