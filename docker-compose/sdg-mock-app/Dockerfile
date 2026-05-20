@@ -34,4 +34,4 @@ EXPOSE 8081
 ENV PORT=8081
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["pnpm", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
