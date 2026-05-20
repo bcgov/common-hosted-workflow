@@ -1,5 +1,5 @@
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@11.0.8 --activate
+RUN npm install -g pnpm@11.0.8
 
 FROM base AS deps
 RUN apk add --no-cache g++ libc6-compat make python3
