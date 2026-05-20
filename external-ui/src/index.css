@@ -1,5 +1,37 @@
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-italic.woff') format('woff');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-bold-italic.woff') format('woff');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   --bc-blue: #003366;
   --bc-blue-dark: #002244;
@@ -10,6 +42,7 @@
   --bc-text: #1a1f2b;
   --bc-muted: #5a6475;
   --bc-link: #1f5fbf;
+  font-family: 'BC Sans', Arial, sans-serif;
 }
 
 html,
@@ -22,6 +55,7 @@ body {
   margin: 0;
   background: var(--bc-surface);
   color: var(--bc-text);
+  font-family: inherit;
 }
 
 a {
