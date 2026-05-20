@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
+    "adaptivecards": "^3.0.6",
+    "markdown-it": "^14.1.1",
     "next": "^16.2.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4.3.0",
+    "@types/markdown-it": "^14.1.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.2",
     "@types/react": "^19.2.14",
