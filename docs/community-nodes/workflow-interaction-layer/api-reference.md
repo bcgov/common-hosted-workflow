@@ -111,21 +111,23 @@ POST /rest/custom/v1/actions
 
 **Request Body:**
 
-| Field                 | Type   | Required | Description                                        |
-| --------------------- | ------ | -------- | -------------------------------------------------- |
-| `workflowInstanceId`  | string | Yes      | Current execution ID                               |
-| `actorId`             | string | Yes      | Target actor identifier (max 50 chars)             |
-| `actorType`           | string | Yes      | One of: `user`, `group`, `role`, `system`, `other` |
-| `actionType`          | string | Yes      | One of: `getapproval`, `showform`, `waitonevent`   |
-| `payload`             | object | Yes      | Action-specific data (see below)                   |
-| `callbackUrl`         | string | Yes      | URL to call when action completes                  |
-| `callbackMethod`      | string | No       | `POST` (default), `PUT`, or `PATCH`                |
-| `callbackPayloadSpec` | object | No       | Template describing expected callback body         |
-| `workflowId`          | string | Yes      | Source workflow ID                                 |
-| `dueDate`             | string | No       | RFC 3339 timestamp                                 |
-| `priority`            | string | No       | `normal` (default) or `critical`                   |
-| `checkIn`             | string | No       | RFC 3339 reminder timestamp                        |
-| `metadata`            | object | No       | Arbitrary JSON metadata                            |
+| Field                 | Type   | Required | Description                                               |
+| --------------------- | ------ | -------- | --------------------------------------------------------- |
+| `workflowInstanceId`  | string | Yes      | Current execution ID                                      |
+| `actorId`             | string | Yes      | Target actor identifier (max 50 chars)                    |
+| `actorType`           | string | Yes      | One of: `user`, `group`, `role`, `system`, `other`        |
+| `actionType`          | string | Yes      | One of: `getapproval`, `showform`, `waitonevent`          |
+| `payload`             | object | Yes      | Action-specific data (see below)                          |
+| `callbackUrl`         | string | No       | URL to call when action completes (omit when no callback) |
+| `callbackMethod`      | string | No       | `POST` (default), `PUT`, `PATCH`, or `none`               |
+| `callbackPayloadSpec` | object | No       | Template describing expected callback body                |
+| `workflowId`          | string | Yes      | Source workflow ID                                        |
+| `dueDate`             | string | No       | RFC 3339 timestamp                                        |
+| `priority`            | string | No       | `normal` (default) or `critical`                          |
+| `checkIn`             | string | No       | RFC 3339 reminder timestamp                               |
+| `metadata`            | object | No       | Arbitrary JSON metadata                                   |
+
+> **Note:** When `callbackMethod` is `none` (or omitted along with `callbackUrl`), no callback will be issued upon action completion. The `callbackUrl` and `callbackPayloadSpec` fields should be omitted from the request body in this case.
 
 **Payload by Action Type:**
 

@@ -13,14 +13,17 @@ export function useChefsScript(): ScriptStatus {
   });
 
   useEffect(() => {
+    console.log('[useChefsScript] Hook running, current status:', status);
     let script = document.querySelector(`script[src="${SCRIPT_URL}"]`) as HTMLScriptElement | null;
 
     if (script?.dataset.status === 'ready') {
+      console.log('[useChefsScript] Script already loaded');
       setStatus('ready');
       return;
     }
 
     if (!script) {
+      console.log('[useChefsScript] Injecting script tag:', SCRIPT_URL);
       script = document.createElement('script');
       script.src = SCRIPT_URL;
       script.async = true;
@@ -31,10 +34,12 @@ export function useChefsScript(): ScriptStatus {
     setStatus('loading');
 
     const onLoad = () => {
+      console.log('[useChefsScript] Script loaded successfully');
       script!.dataset.status = 'ready';
       setStatus('ready');
     };
     const onError = () => {
+      console.error('[useChefsScript] Script failed to load');
       script!.dataset.status = 'error';
       setStatus('error');
     };

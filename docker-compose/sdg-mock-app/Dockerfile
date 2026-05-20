@@ -2,11 +2,11 @@ FROM node:24-alpine AS base
 RUN corepack enable && corepack prepare pnpm@11.0.8 --activate
 
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache g++ libc6-compat make python3
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm i --frozen-lockfile --ignore-scripts
+RUN pnpm i --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app

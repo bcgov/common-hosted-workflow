@@ -52,14 +52,32 @@ describe('createActionRequestSchema', () => {
   });
 
   it('accepts all valid callbackMethod values', () => {
-    for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
-      const result = createActionRequestSchema.parse({ body: { ...validBody, callbackMethod: method } });
+    for (const method of ['get', 'post', 'put', 'patch', 'delete', 'none']) {
+      const body =
+        method === 'none'
+          ? { ...validBody, callbackMethod: method, callbackUrl: '' }
+          : { ...validBody, callbackMethod: method };
+      const result = createActionRequestSchema.parse({ body });
       expect(result.body.callbackMethod).toBe(method.toUpperCase());
     }
   });
 
   it('rejects invalid callbackMethod', () => {
     expect(() => createActionRequestSchema.parse({ body: { ...validBody, callbackMethod: 'OPTIONS' } })).toThrow();
+  });
+
+  it('allows empty callbackUrl when callbackMethod is none', () => {
+    const result = createActionRequestSchema.parse({
+      body: { ...validBody, callbackUrl: '', callbackMethod: 'none' },
+    });
+    expect(result.body.callbackMethod).toBe('NONE');
+    expect(result.body.callbackUrl).toBe('');
+  });
+
+  it('rejects empty callbackUrl when callbackMethod is not none', () => {
+    expect(() =>
+      createActionRequestSchema.parse({ body: { ...validBody, callbackUrl: '', callbackMethod: 'post' } }),
+    ).toThrow();
   });
 
   it('accepts valid dueDate string', () => {

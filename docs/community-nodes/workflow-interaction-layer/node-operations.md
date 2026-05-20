@@ -60,19 +60,24 @@ Returns all messages for a specific actor.
 
 Creates a new action in the WIL-API Layer.
 
-| Parameter             | Type    | Required | Default       | Description                                |
-| --------------------- | ------- | -------- | ------------- | ------------------------------------------ |
-| Actor ID              | string  | Yes      | —             | Target actor identifier (max 50 chars)     |
-| Actor Type            | options | Yes      | `user`        | `user`, `group`, `role`, `system`, `other` |
-| Action Type           | options | Yes      | `getapproval` | `getapproval`, `showform`, `waitonevent`   |
-| Payload               | JSON    | Yes      | `{}`          | Action-specific data                       |
-| Callback URL          | string  | Yes      | —             | URL called when action completes           |
-| Callback Method       | options | No       | `POST`        | `POST`, `PUT`, `PATCH`                     |
-| Callback Payload Spec | JSON    | No       | `{}`          | Template for expected callback body        |
-| Due Date              | string  | No       | —             | RFC 3339 timestamp                         |
-| Priority              | options | No       | `normal`      | `normal` or `critical`                     |
-| Check In              | string  | No       | —             | RFC 3339 reminder timestamp                |
-| Metadata              | JSON    | No       | `{}`          | Arbitrary JSON metadata                    |
+| Parameter             | Type    | Required                          | Default       | Description                                                        |
+| --------------------- | ------- | --------------------------------- | ------------- | ------------------------------------------------------------------ |
+| Actor ID              | string  | Yes                               | —             | Target actor identifier (max 50 chars)                             |
+| Actor Type            | options | Yes                               | `user`        | `user`, `group`, `role`, `system`, `other`                         |
+| Action Type           | options | Yes                               | `getapproval` | `getapproval`, `showform`, `waitonevent`                           |
+| Payload               | JSON    | Yes                               | `{}`          | Action-specific data                                               |
+| Callback Method       | options | No                                | `POST`        | `none`, `POST`, `PUT`, `PATCH`                                     |
+| Callback URL          | string  | Yes (when Callback Method ≠ None) | —             | URL called when action completes. Hidden when method is "None".    |
+| Callback Payload Spec | JSON    | No                                | `{}`          | Template for expected callback body. Hidden when method is "None". |
+| Due Date              | string  | No                                | —             | RFC 3339 timestamp                                                 |
+| Priority              | options | No                                | `normal`      | `normal` or `critical`                                             |
+| Check In              | string  | No                                | —             | RFC 3339 reminder timestamp                                        |
+| Metadata              | JSON    | No                                | `{}`          | Arbitrary JSON metadata                                            |
+
+**Callback Method Behavior:**
+
+- **None** — No callback will be issued when the action completes. The Callback URL and Callback Payload Spec fields are hidden from the UI and omitted from the API request.
+- **POST / PUT / PATCH** — The specified HTTP method is used to call the Callback URL upon action completion. The Callback URL field becomes required.
 
 **Action Type Guidance:**
 

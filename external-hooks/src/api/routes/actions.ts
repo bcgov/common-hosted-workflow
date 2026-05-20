@@ -47,6 +47,7 @@ export function buildActionRouter({
 
       const { dueDate, checkIn } = normalizeCreateActionTimestamps(body);
       const callbackMethod = body.callbackMethod ?? 'POST';
+      const callbackUrl = callbackMethod === 'NONE' ? '' : (body.callbackUrl ?? '');
 
       const projectId = await resolveProjectIdForCreate({
         executionRepository: execution,
@@ -61,7 +62,7 @@ export function buildActionRouter({
         const created = await actionRequestRepository.create({
           actionType: body.actionType,
           payload: body.payload,
-          callbackUrl: body.callbackUrl,
+          callbackUrl,
           callbackMethod,
           callbackPayloadSpec: body.callbackPayloadSpec ?? null,
           actorId: body.actorId,
