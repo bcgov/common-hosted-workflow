@@ -64,7 +64,7 @@ pgo:
       - name: repo2
         enabled: true
         type: s3
-        secretName: objectstore-creds
+        secretName: objectstorage-creds
         retention: "30"
         retentionType: time
 
