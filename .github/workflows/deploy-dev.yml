@@ -26,12 +26,6 @@ jobs:
       image-name: bcgov/chwf
       docker-path: .
 
-  build-push-adaptivecard:
-    uses: ./.github/workflows/_build-and-push.yml
-    with:
-      image-name: bcgov/chwf-adaptivecard
-      docker-path: docker-compose/adaptivecard
-
   build-push-sdg-mock-app:
     uses: ./.github/workflows/_build-and-push.yml
     with:

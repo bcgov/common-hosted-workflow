@@ -29,13 +29,6 @@ jobs:
       working-directory: ./community-nodes
       shell: bash
 
-    - name: Test adaptivecard sample app build & lint
-      run: |
-        pnpm build
-        pnpm lint
-      working-directory: ./docker-compose/adaptivecard
-      shell: bash
-
     - name: Test sdg-mock-app sample app build & lint
       run: |
         pnpm build

@@ -11,6 +11,5 @@ runs:
       paths: |
         .
         community-nodes
-        docker-compose/adaptivecard
         docker-compose/sdg-mock-app
         external-hooks

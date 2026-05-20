@@ -1,5 +1,0 @@
-# pnpm-workspace.yaml
-allowBuilds:
-  sharp: false
-  unrs-resolver: false
-confirmModulesPurge: false
