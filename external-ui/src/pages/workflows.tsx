@@ -1,8 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { getWorkflows, shareWorkflow, unshareWorkflow } from '../services/backend/workflows';
+import { IconLogin2, IconShare, IconTrash, IconX } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export function Workflows() {
   const { user, login } = useAuth();
@@ -37,10 +54,7 @@ export function Workflows() {
   const currentRoleSlug = workflowsQuery.data?.n8nUser?.role?.slug ?? null;
   const canShareWorkflows = currentRoleSlug === 'global:owner' || currentRoleSlug === 'global:admin';
   const workflowsError = workflowsQuery.error instanceof Error ? workflowsQuery.error.message : null;
-  const sharingWorkflow = useMemo(
-    () => workflows.find((workflow) => workflow.workflowId === sharingWorkflowId) ?? null,
-    [sharingWorkflowId, workflows],
-  );
+  const sharingWorkflow = workflows.find((workflow) => workflow.workflowId === sharingWorkflowId) ?? null;
 
   function openShareDialog(workflowId: string) {
     setSharingWorkflowId(workflowId);
@@ -65,158 +79,167 @@ export function Workflows() {
         </div>
 
         {!user ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--bc-border)] bg-[var(--bc-surface)] px-4 py-3">
-            <p className="text-sm text-[var(--bc-muted)]">Sign in to see your workflows.</p>
-            <button
-              onClick={login}
-              className="rounded bg-[var(--bc-blue)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--bc-blue-dark)]"
-            >
-              Sign In
-            </button>
-          </div>
+          <Alert>
+            <AlertTitle>Sign in required</AlertTitle>
+            <AlertDescription>
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <p className="text-sm text-[var(--bc-muted)]">Sign in to see your workflows.</p>
+                <Button onClick={login}>
+                  <IconLogin2 size={16} aria-hidden="true" />
+                  Sign In
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
         ) : workflowsQuery.isLoading ? (
           <p className="text-sm text-[var(--bc-muted)]">Loading workflows...</p>
         ) : workflowsError ? (
-          <p className="text-sm text-red-600">workflow error: {workflowsError}</p>
+          <Alert variant="destructive">
+            <AlertTitle>workflow error</AlertTitle>
+            <AlertDescription>{workflowsError}</AlertDescription>
+          </Alert>
         ) : workflows.length === 0 ? (
-          <div className="rounded-md border border-[var(--bc-border)] bg-[var(--bc-card)] p-6 text-sm text-[var(--bc-muted)]">
-            No workflows found for this user.
-          </div>
+          <Card>
+            <CardContent className="p-6 text-sm text-[var(--bc-muted)]">No workflows found for this user.</CardContent>
+          </Card>
         ) : (
           <div className="space-y-4">
             {workflows.map((workflow) => {
               const canRemoveProjects = workflow.projectShares.length > 1;
               return (
-                <article
-                  key={workflow.workflowId}
-                  className="rounded-md border border-[var(--bc-border)] bg-[var(--bc-card)] p-5 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-lg font-semibold text-[var(--bc-text)]">{workflow.workflowName}</h2>
-                      <p className="mt-1 text-xs text-[var(--bc-muted)]">{workflow.workflowId}</p>
+                <Card key={workflow.workflowId}>
+                  <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">{workflow.workflowName}</CardTitle>
+                      <CardDescription className="font-mono text-xs break-all">{workflow.workflowId}</CardDescription>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="rounded-full bg-[var(--bc-surface)] px-3 py-1 text-xs font-medium text-[var(--bc-text)]">
+                      <Badge variant="secondary">
                         {workflow.projectIds.length} project{workflow.projectIds.length === 1 ? '' : 's'}
-                      </div>
+                      </Badge>
                       {canShareWorkflows ? (
-                        <button
-                          type="button"
-                          onClick={() => openShareDialog(workflow.workflowId)}
-                          className="rounded bg-[var(--bc-blue)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--bc-blue-dark)]"
-                        >
+                        <Button type="button" size="sm" onClick={() => openShareDialog(workflow.workflowId)}>
+                          <IconShare size={16} aria-hidden="true" />
                           Share
-                        </button>
+                        </Button>
                       ) : null}
                     </div>
-                  </div>
+                  </CardHeader>
 
-                  <div className="mt-4 overflow-hidden rounded border border-[var(--bc-border)] bg-white">
-                    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] border-b border-[var(--bc-border)] bg-[var(--bc-surface)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--bc-muted)]">
-                      <div>Project</div>
-                      <div>User emails</div>
-                      <div className="text-right">Action</div>
-                    </div>
-                    {workflow.projectShares.map((projectShare) => (
-                      <div
-                        key={projectShare.projectId}
-                        className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-start gap-3 border-b border-[var(--bc-border)] px-3 py-3 last:border-b-0"
-                      >
-                        <div className="min-w-0 font-mono text-xs break-all text-[var(--bc-text)]">
-                          {projectShare.projectId}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {projectShare.userEmails.length ? (
-                            projectShare.userEmails.map((email) => (
-                              <span
-                                key={email}
-                                className="rounded-full bg-[var(--bc-surface)] px-2 py-1 text-xs text-[var(--bc-text)]"
-                              >
-                                {email}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-[var(--bc-muted)]">No users</span>
-                          )}
-                        </div>
-                        <div className="flex justify-end">
-                          {canShareWorkflows && canRemoveProjects ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                unshareMutation.mutate({
-                                  workflowId: workflow.workflowId,
-                                  projectId: projectShare.projectId,
-                                })
-                              }
-                              disabled={unshareMutation.isPending}
-                              className="shrink-0 rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </article>
+                  <CardContent>
+                    <ScrollArea className="w-full rounded-md border border-[var(--bc-border)]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-[var(--bc-surface)] hover:bg-[var(--bc-surface)]">
+                            <TableHead className="w-[28%]">Project</TableHead>
+                            <TableHead>User emails</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {workflow.projectShares.map((projectShare) => (
+                            <TableRow key={projectShare.projectId}>
+                              <TableCell className="font-mono text-xs break-all">{projectShare.projectId}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-2">
+                                  {projectShare.userEmails.length ? (
+                                    projectShare.userEmails.map((email) => (
+                                      <Badge key={email} variant="outline">
+                                        {email}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-xs text-[var(--bc-muted)]">No users</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {canShareWorkflows && canRemoveProjects ? (
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      unshareMutation.mutate({
+                                        workflowId: workflow.workflowId,
+                                        projectId: projectShare.projectId,
+                                      })
+                                    }
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={unshareMutation.isPending}
+                                  >
+                                    <IconTrash size={14} aria-hidden="true" />
+                                    Remove
+                                  </Button>
+                                ) : null}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
         )}
 
-        {sharingWorkflow && canShareWorkflows ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
-            <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <Dialog
+          open={Boolean(sharingWorkflow && canShareWorkflows)}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeShareDialog();
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share workflow</DialogTitle>
+              <DialogDescription>{sharingWorkflow?.workflowName}</DialogDescription>
+            </DialogHeader>
+
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!sharingWorkflow) {
+                  return;
+                }
+                shareMutation.mutate({ workflowId: sharingWorkflow.workflowId, email: shareEmail.trim() });
+              }}
+            >
               <div className="space-y-2">
-                <h2 className="text-lg font-semibold text-[var(--bc-text)]">Share workflow</h2>
-                <p className="text-sm text-[var(--bc-muted)]">{sharingWorkflow.workflowName}</p>
+                <Label htmlFor="share-email">Email</Label>
+                <Input
+                  id="share-email"
+                  type="email"
+                  value={shareEmail}
+                  onChange={(event) => setShareEmail(event.target.value)}
+                  placeholder="person@example.com"
+                  autoFocus
+                />
               </div>
 
-              <form
-                className="mt-4 space-y-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  shareMutation.mutate({ workflowId: sharingWorkflow.workflowId, email: shareEmail.trim() });
-                }}
-              >
-                <label className="block space-y-2">
-                  <span className="text-sm font-medium text-[var(--bc-text)]">Email</span>
-                  <input
-                    type="email"
-                    value={shareEmail}
-                    onChange={(event) => setShareEmail(event.target.value)}
-                    className="w-full rounded border border-[var(--bc-border)] px-3 py-2 text-sm"
-                    placeholder="person@example.com"
-                    autoFocus
-                  />
-                </label>
+              {shareMutation.error instanceof Error ? (
+                <Alert variant="destructive">
+                  <AlertTitle>share error</AlertTitle>
+                  <AlertDescription>{shareMutation.error.message}</AlertDescription>
+                </Alert>
+              ) : null}
 
-                {shareMutation.error instanceof Error ? (
-                  <p className="text-sm text-red-600">{shareMutation.error.message}</p>
-                ) : null}
-
-                <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={closeShareDialog}
-                    className="rounded border border-[var(--bc-border)] px-4 py-2 text-sm font-semibold text-[var(--bc-text)]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={shareMutation.isPending || !shareEmail.trim()}
-                    className="rounded bg-[var(--bc-blue)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--bc-blue-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Share
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : null}
+              <DialogFooter>
+                <Button type="button" onClick={closeShareDialog} variant="outline">
+                  <IconX size={16} aria-hidden="true" />
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={shareMutation.isPending || !shareEmail.trim()}>
+                  <IconShare size={16} aria-hidden="true" />
+                  Share
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {user ? (
           <div className="flex gap-4 pt-1 text-sm font-medium">
