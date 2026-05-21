@@ -1,7 +1,15 @@
-import { NavLink } from 'react-router';
 import type { ReactNode } from 'react';
+import { NavLink } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { withAppBasePath } from '../config/base-path';
+import { IconLogin2, IconLogout } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+} from '@/components/ui/navigation-menu';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -25,29 +33,39 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
 
-          <nav className="ml-6 flex items-center gap-4 text-sm font-medium">
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                isActive
-                  ? 'font-semibold !text-white visited:!text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                  : '!text-white visited:!text-white hover:!text-white'
-              }
-            >
-              Home
-            </NavLink>
-            <NavLink
-              to="/workflows"
-              className={({ isActive }) =>
-                isActive
-                  ? 'font-semibold !text-white visited:!text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                  : '!text-white visited:!text-white hover:!text-white'
-              }
-            >
-              Workflows
-            </NavLink>
-          </nav>
+          <NavigationMenu className="ml-6 max-w-none">
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <NavLink
+                    to="/"
+                    end
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                        : '!text-white hover:!text-white'
+                    }
+                  >
+                    Home
+                  </NavLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <NavLink
+                    to="/workflows"
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                        : '!text-white hover:!text-white'
+                    }
+                  >
+                    Workflows
+                  </NavLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
 
           <div className="ml-auto flex items-center gap-3">
             {isLoading ? (
@@ -55,20 +73,16 @@ export function AppLayout({ children }: AppLayoutProps) {
             ) : user ? (
               <>
                 <span className="text-sm text-white/85">{user.profile.email}</span>
-                <button
-                  onClick={logout}
-                  className="rounded bg-white px-4 py-2 text-sm font-semibold text-[var(--bc-blue-dark)] shadow-sm hover:bg-white/90"
-                >
+                <Button onClick={logout} variant="secondary" size="sm">
+                  <IconLogout size={16} aria-hidden="true" />
                   Logout
-                </button>
+                </Button>
               </>
             ) : (
-              <button
-                onClick={login}
-                className="rounded bg-white px-4 py-2 text-sm font-semibold text-[var(--bc-blue-dark)] shadow-sm hover:bg-white/90"
-              >
+              <Button onClick={login} variant="secondary" size="sm">
+                <IconLogin2 size={16} aria-hidden="true" />
                 Login
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -77,7 +91,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="flex-1">{children}</main>
 
       <footer className="mt-auto border-t-2 border-[var(--bc-gold)] bg-[var(--bc-blue)] px-6 py-4 text-center text-xs text-white/80">
-        <div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3">
           <span>Disclaimer</span>
           <span>Privacy</span>
           <span>Accessibility</span>

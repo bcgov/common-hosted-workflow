@@ -2,6 +2,12 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/auth-context';
 import { getWhoami } from '../services/backend/auth';
+import { IconLogin2 } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function Home() {
   const { user, login } = useAuth();
@@ -26,48 +32,53 @@ export function Home() {
           </p>
         </div>
 
-        <div className="rounded-md border border-[var(--bc-border)] bg-[var(--bc-card)] p-6 shadow-sm">
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-semibold text-[var(--bc-text)]">Manage portal activity</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--bc-muted)]">
-                Use this portal to explore authenticated user access and verify backend integration points as the app
-                grows.
-              </p>
-            </div>
-
+        <Card>
+          <CardHeader>
+            <CardTitle>Manage portal activity</CardTitle>
+            <CardDescription>
+              Use this portal to explore authenticated user access and verify backend integration points as the app
+              grows.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {user ? (
-              <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
-                <div>
+              <Alert>
+                <AlertTitle className="flex flex-wrap items-center gap-2">
                   Signed in as <span className="font-semibold">{user.profile.email}</span>
-                </div>
-                {whoami?.n8nUser?.role ? (
-                  <div className="mt-1 text-xs uppercase tracking-wide text-green-800">
-                    n8n role: <span className="font-semibold">{whoami.n8nUser.role.slug}</span>
-                  </div>
-                ) : null}
-              </div>
+                  {whoami?.n8nUser?.role ? <Badge variant="secondary">{whoami.n8nUser.role.slug}</Badge> : null}
+                </AlertTitle>
+                <AlertDescription>Authenticated session active.</AlertDescription>
+              </Alert>
             ) : (
-              <div className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--bc-border)] bg-[var(--bc-surface)] px-4 py-3">
-                <p className="text-sm text-[var(--bc-muted)]">You are not signed in.</p>
-                <button
-                  onClick={login}
-                  className="rounded bg-[var(--bc-blue)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--bc-blue-dark)]"
-                >
-                  Sign In
-                </button>
-              </div>
+              <Alert>
+                <AlertTitle>You are not signed in.</AlertTitle>
+                <AlertDescription>
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <Button onClick={login}>
+                      <IconLogin2 size={16} aria-hidden="true" />
+                      Sign In
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
             )}
 
             {whoami ? (
-              <div className="overflow-hidden rounded-md border border-[var(--bc-border)] bg-white">
-                <div className="border-b border-[var(--bc-border)] bg-slate-50 px-4 py-2 text-sm font-semibold text-[var(--bc-text)]">
-                  /ui-api/whoami
-                </div>
-                <pre className="overflow-auto p-4 text-xs text-slate-700">{JSON.stringify(whoami, null, 2)}</pre>
-              </div>
+              <Card className="overflow-hidden">
+                <CardHeader className="border-b border-[var(--bc-border)] bg-[var(--bc-surface)] py-4">
+                  <CardTitle className="text-sm">/ui-api/whoami</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-72">
+                    <pre className="p-4 text-xs text-slate-700">{JSON.stringify(whoami, null, 2)}</pre>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
             ) : whoamiError ? (
-              <p className="text-sm text-red-600">whoami error: {whoamiError}</p>
+              <Alert variant="destructive">
+                <AlertTitle>whoami error</AlertTitle>
+                <AlertDescription>{whoamiError}</AlertDescription>
+              </Alert>
             ) : null}
 
             <div className="flex gap-4 pt-1 text-sm font-medium">
@@ -75,8 +86,8 @@ export function Home() {
                 Workflows
               </Link>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );
