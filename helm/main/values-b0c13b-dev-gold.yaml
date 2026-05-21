@@ -1,7 +1,9 @@
 n8n:
   enabled: true
+
   env:
     WEBHOOK_URL: "https://dev-chwf.apps.gold.devops.gov.bc.ca"
+
     N8N_SMTP_HOST: "apps.smtp.gov.bc.ca"
     N8N_SMTP_PORT: "25"
     N8N_SMTP_SSL: "false"
@@ -9,9 +11,12 @@ n8n:
     N8N_SMTP_USER: ""
     N8N_SMTP_PASS: ""
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+
     OIDC_ISSUER_URL: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
     OIDC_REDIRECT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/rest/auth/oidc/callback
-    EXTERNAL_UI_ENABLED: 'true'
+
+    EXTERNAL_UI_ENABLED: "true"
+
     UI_OIDC_ISSUER: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
     UI_OIDC_REDIRECT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/ui/auth/callback
     UI_OIDC_POST_LOGOUT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/ui
@@ -24,7 +29,7 @@ n8n:
 
   main:
     env:
-      ENABLE_SWAGGER_UI: 'true'
+      ENABLE_SWAGGER_UI: "true"
 
   worker:
     enabled: true
@@ -35,16 +40,23 @@ n8n:
   runner:
     enabled: true
 
+
 redis:
   enabled: true
+
 
 pgo:
   enabled: true
 
+  # Restore cluster name
+  fullnameOverride: chwf-pgo-restore
+  nameOverride: chwf-pgo-restore
+
   # --- pgBackRest repositories ---
   pgBackRest:
     repos:
-      # Local repository (optional)
+
+      # Local repository
       - name: repo1
         enabled: true
         type: volume
@@ -60,11 +72,12 @@ pgo:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
 
-      # Shared MinIO repository used by standby clusters
+      # Object storage repository
       - name: repo2
         enabled: true
         type: s3
         secretName: objectstorage-creds
+
         retention: "30"
         retentionType: time
 
@@ -79,10 +92,42 @@ pgo:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
 
-  # --- Primary cluster (NOT standby) ---
+  # Primary/standby mode
   standby:
     enabled: false
 
-  # --- No restore/bootstrap on primary ---
+  # Restore source
   dataSource:
-    enabled: false
+    enabled: true
+
+    pgbackrest:
+      stanza: db
+
+      configuration:
+        - secret:
+            name: objectstorage-creds
+
+      global:
+        repo2-path: /backups/pgo
+        repo2-s3-bucket: workflow-dev
+        repo2-s3-endpoint: commonservices.objectstore.gov.bc.ca
+        repo2-s3-region: ca-central-1
+        repo2-s3-uri-style: path
+        repo2-storage-verify-tls: "true"
+
+      repos:
+        - name: repo2
+          s3:
+            bucket: workflow-dev
+            endpoint: commonservices.objectstore.gov.bc.ca
+            region: ca-central-1
+
+  # Restore operation
+  bootstrap:
+    recovery:
+      repoName: repo2
+      clusterName: db
+
+      options:
+        - --type=immediate
+        - --set=20260520-200002F
