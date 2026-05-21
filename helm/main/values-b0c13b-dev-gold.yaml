@@ -86,3 +86,4 @@ pgo:
   # --- No restore/bootstrap on primary ---
   dataSource:
     enabled: false
+    secretName: objectstorage-creds
