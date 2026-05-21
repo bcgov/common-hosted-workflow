@@ -48,10 +48,6 @@ redis:
 pgo:
   enabled: true
 
-  # Restore cluster name
-  fullnameOverride: chwf-pgo-restore
-  nameOverride: chwf-pgo-restore
-
   # --- pgBackRest repositories ---
   pgBackRest:
     repos:
