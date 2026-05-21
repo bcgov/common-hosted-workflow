@@ -91,6 +91,7 @@ pgo:
         bucket: workflow-dev
         endpoint: commonservices.objectstore.gov.bc.ca
         region: ca-central-1
+        uriStyle: path
 
   # --- Standby / Disaster Recovery ---
   standby:

@@ -82,6 +82,9 @@ spec:
       global:
         # Dynamically map the repo path (e.g., repo84-path)
         {{ .Values.dataSource.repo.name }}-path: {{ .Values.dataSource.repo.path | quote }}
+        {{- if eq .Values.dataSource.repo.provider "s3" }}
+        {{ .Values.dataSource.repo.name }}-s3-uri-style: {{ .Values.dataSource.repo.s3.uriStyle | default "host" | quote }}
+        {{- end }}
         {{- if eq .Values.dataSource.repo.provider "azure" }}
         {{ .Values.dataSource.repo.name }}-azure-account: {{ .Values.dataSource.repo.azure.account | quote }}
         {{- end }}
