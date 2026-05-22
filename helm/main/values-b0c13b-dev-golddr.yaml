@@ -77,7 +77,7 @@ pgo:
 
   # --- Restore / Bootstrap Configuration ---
   dataSource:
-    enabled: true
+    enabled: false
     type: pgbackrest
     secretName: objectstorage-creds
     stanza: db
