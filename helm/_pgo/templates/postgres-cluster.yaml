@@ -228,6 +228,10 @@ spec:
   patroni:
     dynamicConfiguration:
       postgresql:
+        {{ if .Values.standby.enabled }}
+        recovery_conf:
+          recovery_target_timeline: latest
+        {{ end }}
         pg_hba:
         {{- range .Values.patroni.postgresql.pg_hba }}
         - {{ . | quote }}
