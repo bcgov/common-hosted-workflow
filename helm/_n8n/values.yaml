@@ -350,7 +350,7 @@ runner:
 
   image:
     repository: n8nio/runners
-    tag: 2.19.2
+    tag: 2.21.3
     pullPolicy: IfNotPresent
 
   imagePullSecrets: []
