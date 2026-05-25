@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .signinRedirectCallback()
       .then((u) => {
         setUser(u);
-        window.history.replaceState({}, '', userManager.settings.redirect_uri?.replace('/auth/callback', '') ?? '/ui/');
+        window.history.replaceState({}, '', userManager.settings.redirect_uri?.replace('/auth/callback', '') ?? '/ui');
       })
       .catch(() => {
         return userManager.getUser();
