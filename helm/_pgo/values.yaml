@@ -38,7 +38,7 @@ pgBackRest:
       retention: "2"
       retentionType: count
       volume:
-        size: 64Mi
+        size: 240Mi
         accessModes: ReadWriteOnce
         storageClassName: netapp-file-standard
       schedules:

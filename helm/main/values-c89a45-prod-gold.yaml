@@ -39,7 +39,7 @@ pgo:
         retention: "2"
         retentionType: count
         volume:
-          size: 256Mi
+          size: 1Gi
           accessModes: ReadWriteOnce
           storageClassName: netapp-file-standard
         schedules:

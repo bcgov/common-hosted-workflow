@@ -50,7 +50,7 @@ pgo:
         retentionType: count
 
         volume:
-          size: 256Mi
+          size: 512Mi
           accessModes: ReadWriteOnce
           storageClassName: netapp-file-standard
 
