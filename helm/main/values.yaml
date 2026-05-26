@@ -248,6 +248,10 @@ pgo:
   - name: n8n
   - name: n8n-custom
 
+  instances:
+    dataVolumeClaimSpec:
+      storage: 1Gi
+
 # sdg-mock-app (Next.js + SQLite playground)
 sdg-mock-app:
   enabled: false
