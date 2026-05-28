@@ -1,4 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { getUiSessionMock } = vi.hoisted(() => ({
+  getUiSessionMock: vi.fn(),
+}));
+
+vi.mock('../../../src/api/helpers/ui-oidc-session', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/helpers/ui-oidc-session')>(
+    '../../../src/api/helpers/ui-oidc-session',
+  );
+
+  return {
+    ...actual,
+    getUiSession: getUiSessionMock,
+  };
+});
+
 import { buildUiApiRouter } from '../../../src/api/routes/ui-api';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 
@@ -11,37 +27,39 @@ function getRouteHandler(router: any, method: string, path: string) {
   return null;
 }
 
+beforeEach(() => {
+  getUiSessionMock.mockReset();
+  getUiSessionMock.mockResolvedValue({
+    subject: 'sub-1',
+    email: 'person@example.com',
+    issuer: 'https://issuer.example.com',
+    audience: ['app'],
+    claims: {},
+    n8nUser: {
+      id: 'user-123',
+      email: 'person@example.com',
+      role: null,
+    },
+  });
+});
+
 describe('GET /ui-api/whoami', () => {
   it('delegates to the ui api service', async () => {
-    const uiApi = {
-      getWhoami: vi.fn().mockResolvedValue({
-        id: 'user-123',
-        email: 'person@example.com',
-        role: { slug: 'global:admin', displayName: 'Admin' },
-      }),
-    };
+    const uiApi = {};
     const router = buildUiApiRouter({ services: { uiApi } } as any);
     const handler = getRouteHandler(router, 'get', '/whoami');
     const req = createMockRequest({ get: vi.fn(() => undefined) as any });
-    const res = createMockResponse({
-      oidcTokenDetails: {
-        email: 'person@example.com',
-        issuer: 'https://issuer.example.com',
-        subject: 'sub-1',
-        audience: ['app'],
-        claims: {},
-      },
-    });
+    const res = createMockResponse();
 
     await handler(req as any, res as any, vi.fn());
 
-    expect(uiApi.getWhoami).toHaveBeenCalledWith('person@example.com');
+    expect(getUiSessionMock).toHaveBeenCalledWith(req);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
-          role: { slug: 'global:admin', displayName: 'Admin' },
+          role: null,
         },
       }),
     );
@@ -71,15 +89,7 @@ describe('GET /ui-api/workflows', () => {
     const router = buildUiApiRouter({ services: { uiApi } } as any);
     const handler = getRouteHandler(router, 'get', '/workflows');
     const req = createMockRequest({ get: vi.fn(() => undefined) as any });
-    const res = createMockResponse({
-      oidcTokenDetails: {
-        email: 'person@example.com',
-        issuer: 'https://issuer.example.com',
-        subject: 'sub-1',
-        audience: ['app'],
-        claims: {},
-      },
-    });
+    const res = createMockResponse();
 
     await handler(req as any, res as any, vi.fn());
 
@@ -114,15 +124,7 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
       body: { email: 'new@example.com' },
       get: vi.fn(() => undefined) as any,
     });
-    const res = createMockResponse({
-      oidcTokenDetails: {
-        email: 'person@example.com',
-        issuer: 'https://issuer.example.com',
-        subject: 'sub-1',
-        audience: ['app'],
-        claims: {},
-      },
-    });
+    const res = createMockResponse();
 
     await handler(req as any, res as any, vi.fn());
 
@@ -151,15 +153,7 @@ describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
       params: { workflowId: 'wf-1', projectId: 'proj-1' },
       get: vi.fn(() => undefined) as any,
     });
-    const res = createMockResponse({
-      oidcTokenDetails: {
-        email: 'person@example.com',
-        issuer: 'https://issuer.example.com',
-        subject: 'sub-1',
-        audience: ['app'],
-        claims: {},
-      },
-    });
+    const res = createMockResponse();
 
     await handler(req as any, res as any, vi.fn());
 
