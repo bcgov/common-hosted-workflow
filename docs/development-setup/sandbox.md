@@ -63,9 +63,9 @@ The sandbox uses a "Dependency Chain" to ensure services configure themselves in
 - **Custom Nodes**: Injects community nodes into the `/home/node/.n8n/nodes` directory.
 - **Hooks**: Runs `migrate.cjs` to set up external hooks (e.g., custom logging or auditing).
 
-## UI Runtime OIDC Config
+## UI Backend Auth Config
 
-The external UI reads OIDC settings from `GET /ui-api/runtime-config` at startup. In the sandbox, those values come from the `UI_OIDC_*` variables defined in `docker-compose/.env.example` and passed through `docker-compose/docker-compose.yml`.
+The external UI no longer bootstraps OIDC settings from `GET /ui-api/runtime-config`. In the sandbox, the backend reads `UI_OIDC_*` variables from `docker-compose/.env.example` and `docker-compose/docker-compose.yml`, manages the OIDC callback itself, then returns a signed UI JWT to the browser.
 
 ## 💾 Persistence & Volumes
 
