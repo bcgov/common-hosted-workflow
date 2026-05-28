@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { deleteUiOidcState, getUiOidcState, setUiOidcState } from './ui-oidc-store';
 import { getOidcConfigFromEnv, type OidcDiscoveryDocument, type UiOidcConfig } from './ui-oidc';
+import { logger } from '../utils/logger';
 
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const OIDC_DISCOVERY_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -194,6 +195,8 @@ export async function buildUiLoginRedirect(req: Request) {
     },
     AUTH_STATE_TTL_MS,
   );
+
+  logger.info('Redirecting to OIDC provider', { authorizationEndpoint, returnTo });
 
   const authUrl = new URL(authorizationEndpoint);
   authUrl.searchParams.set('client_id', config.clientId);
