@@ -79,6 +79,7 @@ n8n:
     N8N_AI_ENABLED: "false"
     N8N_ADDITIONAL_NON_UI_ROUTES: "ui"
     SSO_RESTRICT_NO_ROLE: "false"
+    UI_OIDC_REDIS_URL: chwf-redis-master
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
@@ -112,6 +113,11 @@ n8n:
     #       name: chwf-postgresql
     #       key: user-password
     QUEUE_BULL_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-redis
+          key: redis-password
+    UI_OIDC_REDIS_PASSWORD:
       valueFrom:
         secretKeyRef:
           name: chwf-redis

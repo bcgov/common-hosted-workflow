@@ -67,7 +67,7 @@ export type UiOidcConfig = {
 
 export function getOidcConfigFromEnv(): UiOidcConfig {
   return {
-    issuerUrl: process.env.UI_OIDC_ISSUER || process.env.OIDC_ISSUER_URL || '',
+    issuerUrl: process.env.UI_OIDC_ISSUER || process.env.OIDC_ISSUER || '',
     authorizationEndpoint: process.env.UI_OIDC_AUTHORIZATION_ENDPOINT || process.env.OIDC_AUTHORIZATION_ENDPOINT || '',
     tokenEndpoint: process.env.UI_OIDC_TOKEN_ENDPOINT || process.env.OIDC_TOKEN_ENDPOINT || '',
     userinfoEndpoint: process.env.UI_OIDC_USERINFO_ENDPOINT || process.env.OIDC_USERINFO_ENDPOINT || '',
@@ -75,7 +75,7 @@ export function getOidcConfigFromEnv(): UiOidcConfig {
     clientId: process.env.UI_OIDC_CLIENT_ID || process.env.OIDC_CLIENT_ID || '',
     clientSecret: process.env.UI_OIDC_CLIENT_SECRET || process.env.OIDC_CLIENT_SECRET || '',
     redirectUri: process.env.UI_OIDC_REDIRECT_URI || '',
-    scopes: process.env.UI_OIDC_SCOPES || 'openid email profile',
+    scopes: process.env.UI_OIDC_SCOPES || process.env.OIDC_SCOPES || 'openid email profile',
   };
 }
 

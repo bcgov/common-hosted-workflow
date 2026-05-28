@@ -63,15 +63,15 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 
 ### Discovery mode
 
-- `OIDC_ISSUER_URL`
+- `OIDC_ISSUER`
 
-If `OIDC_ISSUER_URL` is set, the hook resolves provider metadata from:
+If `OIDC_ISSUER` is set, the hook resolves provider metadata from:
 
 - `/.well-known/openid-configuration`
 
 ### Manual endpoint mode
 
-When `OIDC_ISSUER_URL` is not set, all of the following must be provided:
+When `OIDC_ISSUER` is not set, all of the following must be provided:
 
 - `OIDC_AUTHORIZATION_ENDPOINT`
 - `OIDC_TOKEN_ENDPOINT`
