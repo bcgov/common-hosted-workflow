@@ -2,13 +2,12 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-RUN python -m pip install --upgrade pip --no-cache-dir
-
 COPY ./requirements.txt /tmp/
 
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN python -m pip install --upgrade pip --no-cache-dir \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && addgroup -S appgroup \
+    && adduser -S appuser -G appgroup
 
 COPY ./src /app/src
 
