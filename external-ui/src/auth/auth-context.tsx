@@ -1,10 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { User } from 'oidc-client-ts';
-import { userManager } from './config';
-import { clearStoredAppToken, setStoredAppToken } from '../services/backend/axios';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { getSession, type AuthSessionUser } from '../services/backend/auth';
+import { buildApiUrl, clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../services/backend/axios';
 
 interface AuthState {
-  user: User | null;
+  user: AuthSessionUser | null;
   isLoading: boolean;
   login: () => void;
   logout: () => void;
@@ -17,63 +16,83 @@ const AuthContext = createContext<AuthState>({
   logout: () => {},
 });
 
+function getCurrentUiPath() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('token');
+  return url.toString();
+}
+
+function buildAuthRouteUrl(path: string, params: Record<string, string>) {
+  const url = new URL(buildApiUrl(path));
+
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+
+  return url.toString();
+}
+
+function consumeTokenFromUrl() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('token');
+  if (!token) return null;
+
+  url.searchParams.delete('token');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  return token;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthSessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const handleUserLoaded = (u: User) => {
-      setStoredAppToken(u.access_token);
-      setUser(u);
-      setIsLoading(false);
-    };
-    const handleUserUnloaded = () => {
-      clearStoredAppToken();
-      setUser(null);
-      setIsLoading(false);
-    };
-    const handleSilentRenewError = () => {
-      setIsLoading(false);
-    };
+    let cancelled = false;
 
-    userManager.events.addUserLoaded(handleUserLoaded);
-    userManager.events.addUserUnloaded(handleUserUnloaded);
-    userManager.events.addSilentRenewError(handleSilentRenewError);
+    const tokenFromUrl = consumeTokenFromUrl();
+    if (tokenFromUrl) {
+      setStoredAppToken(tokenFromUrl);
+    }
 
-    userManager
-      .signinRedirectCallback()
-      .then((u) => {
-        setUser(u);
-        window.history.replaceState({}, '', userManager.settings.redirect_uri?.replace('/auth/callback', '') ?? '/ui');
-      })
-      .catch(() => {
-        return userManager.getUser();
-      })
-      .then((u) => {
-        if (u && !u.expired) {
-          setStoredAppToken(u.access_token);
-        } else {
+    if (!tokenFromUrl && !getStoredAppToken()) {
+      setIsLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getSession()
+      .then((response) => {
+        if (cancelled) return;
+        if (!response.authenticated) {
           clearStoredAppToken();
         }
-        if (u && !u.expired) {
-          setUser(u);
+        setUser(response.authenticated ? response.user : null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearStoredAppToken();
+          setUser(null);
         }
-        setIsLoading(false);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       });
 
     return () => {
-      userManager.events.removeUserLoaded(handleUserLoaded);
-      userManager.events.removeUserUnloaded(handleUserUnloaded);
-      userManager.events.removeSilentRenewError(handleSilentRenewError);
+      cancelled = true;
     };
   }, []);
 
   const login = useCallback(() => {
-    userManager.signinRedirect();
+    window.location.assign(buildAuthRouteUrl('/ui-api/auth/login', { returnTo: getCurrentUiPath() }));
   }, []);
 
   const logout = useCallback(() => {
-    userManager.signoutRedirect();
+    clearStoredAppToken();
+    window.location.assign(buildAuthRouteUrl('/ui-api/auth/logout', { returnTo: getCurrentUiPath() }));
   }, []);
 
   return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>;

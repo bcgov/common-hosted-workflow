@@ -28,9 +28,9 @@ export function Workflows() {
   const [shareEmail, setShareEmail] = useState('');
 
   const workflowsQuery = useQuery({
-    queryKey: ['workflows', user?.access_token ?? ''],
+    queryKey: ['workflows', user?.email ?? ''],
     queryFn: ({ signal }) => getWorkflows({ signal }),
-    enabled: Boolean(user?.access_token),
+    enabled: Boolean(user),
   });
 
   const shareMutation = useMutation({
@@ -38,7 +38,7 @@ export function Workflows() {
     onSuccess: async () => {
       setSharingWorkflowId(null);
       setShareEmail('');
-      await queryClient.invalidateQueries({ queryKey: ['workflows', user?.access_token ?? ''] });
+      await queryClient.invalidateQueries({ queryKey: ['workflows', user?.email ?? ''] });
     },
   });
 
@@ -46,7 +46,7 @@ export function Workflows() {
     mutationFn: ({ workflowId, projectId }: { workflowId: string; projectId: string }) =>
       unshareWorkflow(workflowId, projectId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workflows', user?.access_token ?? ''] });
+      await queryClient.invalidateQueries({ queryKey: ['workflows', user?.email ?? ''] });
     },
   });
 

@@ -1,8 +1,6 @@
-import { Router, type Request } from 'express';
-import { createOidcJwtMiddleware } from '../middlewares';
-import { wrapAsyncRoute } from '../utils/errors';
+import { Router, type Request, type Response } from 'express';
 import type { ApiRouteContext } from '../types/routes';
-import type { OidcTokenDetails } from '../types/oidc';
+import { wrapAsyncRoute } from '../utils/errors';
 import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
 import {
   shareWorkflowResponseSchema,
@@ -10,87 +8,133 @@ import {
   unshareWorkflowResponseSchema,
   unshareWorkflowSchema,
 } from '../schemas/ui';
+import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
+import { getUiSession, getUiSessionSummary, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
+import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
 
-function getRequestOrigin(req: Request) {
-  return req.get('origin') ?? `${req.protocol}://${req.get('host')}`;
+function appendTokenToReturnTo(returnTo: string, token: string) {
+  return appendQueryParam(returnTo, 'token', token);
 }
 
-function serializeRole(role: { slug: string; displayName: string } | null | undefined) {
-  return role ? { slug: role.slug, displayName: role.displayName } : null;
+function appendQueryParam(returnTo: string, key: string, value: string) {
+  try {
+    const url = new URL(returnTo);
+    url.searchParams.set(key, value);
+    return url.toString();
+  } catch {
+    const separator = returnTo.includes('?') ? '&' : '?';
+    return `${returnTo}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+  }
 }
 
-function serializeN8nUser(
-  user: { id: string; email: string; role: { slug: string; displayName: string } | null } | null,
-) {
-  return user ? { id: user.id, email: user.email, role: serializeRole(user.role) } : null;
+function buildUnauthorizedResponse(route: string, method: string, userAgent: string | null) {
+  return { ok: false, route, method, userAgent };
 }
 
-function serializeOidcDetails(details: OidcTokenDetails | undefined) {
-  if (!details) return null;
-  return {
-    issuer: details.issuer,
-    subject: details.subject,
-    audience: details.audience,
-    azp: details.azp,
-    email: details.email,
-    preferredUsername: details.preferredUsername,
-    name: details.name,
-    scope: details.scope,
-    expiresAt: details.expiresAt,
-    issuedAt: details.issuedAt,
-    notBefore: details.notBefore,
-    claims: details.claims,
-  };
+function getRequestUserAgent(req: Request) {
+  return req.get('user-agent') ?? null;
+}
+
+async function requireUiSession(req: Request, res: Response, route: string): Promise<UiAuthenticatedSession | null> {
+  const session = await getUiSession(req);
+  if (session) {
+    return session;
+  }
+
+  res.status(401).json(buildUnauthorizedResponse(route, req.method, getRequestUserAgent(req)));
+  return null;
 }
 
 export function buildUiApiRouter({ services }: ApiRouteContext) {
   const router = Router();
-  const oidcJwtMiddleware = createOidcJwtMiddleware({
-    issuer: process.env.UI_OIDC_EXPECTED_ISSUER || '',
-    jwksUri: process.env.UI_OIDC_JWKS_URI || '',
-    expectedAzp: process.env.UI_OIDC_EXPECTED_AZP,
-    expectedAudience: process.env.UI_OIDC_EXPECTED_AUDIENCE,
-  });
 
   router.get(
-    '/runtime-config',
+    '/session',
     wrapAsyncRoute(async (req, res) => {
-      const origin = getRequestOrigin(req);
+      res.json(await getUiSessionSummary(req));
+    }),
+  );
 
-      res.json({
-        issuer: process.env.UI_OIDC_ISSUER,
-        clientId: process.env.UI_OIDC_CLIENT_ID || 'external-ui',
-        redirectUri: process.env.UI_OIDC_REDIRECT_URI || `${origin}/ui/auth/callback`,
-        postLogoutRedirectUri: process.env.UI_OIDC_POST_LOGOUT_URI || `${origin}/ui/`,
-        scopes: process.env.UI_OIDC_SCOPES || 'openid email profile',
+  router.get(
+    '/auth/login',
+    wrapAsyncRoute(async (req, res) => {
+      const redirectUrl = await buildUiLoginRedirect(req);
+      res.redirect(redirectUrl);
+    }),
+  );
+
+  router.get(
+    '/auth/callback',
+    wrapAsyncRoute(async (req, res) => {
+      const result = await completeUiLogin(req);
+      if (!result.ok) {
+        res.redirect(appendQueryParam(result.returnTo, 'error', result.errorMessage));
+        return;
+      }
+
+      const n8nUser = await services.uiApi.getWhoami(result.email);
+      const token = await createUiAuthToken({
+        oidc: {
+          subject: result.subject,
+          email: result.email,
+          preferredUsername: result.preferredUsername,
+          name: result.name,
+          issuer: result.issuer,
+          audience: result.audience,
+          claims: result.claims,
+        },
+        n8nUser: serializeN8nUser(n8nUser) ?? { id: result.subject, email: result.email, role: null },
       });
+
+      res.redirect(appendTokenToReturnTo(result.returnTo, token));
+    }),
+  );
+
+  router.get(
+    '/auth/logout',
+    wrapAsyncRoute(async (req, res) => {
+      const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/ui/';
+      res.redirect(returnTo);
     }),
   );
 
   router.get(
     '/whoami',
-    oidcJwtMiddleware,
     wrapAsyncRoute(async (req, res) => {
-      const details = res.locals.oidcTokenDetails;
-      const n8nUser = await services.uiApi.getWhoami(details.email);
+      const session = await requireUiSession(req, res, '/ui-api/whoami');
+      if (!session) {
+        return;
+      }
 
       res.json({
         ok: true,
         route: '/ui-api/whoami',
         method: req.method,
-        oidc: serializeOidcDetails(details),
-        n8nUser: serializeN8nUser(n8nUser),
-        userAgent: req.get('user-agent') ?? null,
+        oidc: {
+          issuer: session.issuer,
+          subject: session.subject,
+          audience: session.audience,
+          email: session.email,
+          preferredUsername: session.preferredUsername,
+          name: session.name,
+          expiresAt: session.expiresAt,
+          claims: session.claims,
+        },
+        n8nUser: session.n8nUser,
+        userAgent: getRequestUserAgent(req),
       });
     }),
   );
 
   router.get(
     '/workflows',
-    oidcJwtMiddleware,
     wrapAsyncRoute(async (req, res) => {
-      const details = res.locals.oidcTokenDetails;
-      const context = await services.uiApi.getWorkflows(details.email);
+      const session = await requireUiSession(req, res, '/ui-api/workflows');
+      if (!session) {
+        return;
+      }
+
+      const context = await services.uiApi.getWorkflows(session.email);
 
       res.json({
         ok: true,
@@ -105,12 +149,15 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
 
   router.post(
     '/workflows/:workflowId/share',
-    oidcJwtMiddleware,
     createRequestSchemaValidator(shareWorkflowSchema),
     wrapAsyncRoute(async (req, res) => {
-      const details = res.locals.oidcTokenDetails;
+      const session = await requireUiSession(req, res, '/ui-api/workflows/:workflowId/share');
+      if (!session) {
+        return;
+      }
+
       const parsed = parseValidatedRequest(shareWorkflowSchema, req);
-      const result = await services.uiApi.shareWorkflow(details.email, parsed.params.workflowId, parsed.body.email);
+      const result = await services.uiApi.shareWorkflow(session.email, parsed.params.workflowId, parsed.body.email);
 
       const payload = parseValidatedResponse(shareWorkflowResponseSchema, {
         success: true as const,
@@ -125,13 +172,16 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
 
   router.delete(
     '/workflows/:workflowId/projects/:projectId',
-    oidcJwtMiddleware,
     createRequestSchemaValidator(unshareWorkflowSchema),
     wrapAsyncRoute(async (req, res) => {
-      const details = res.locals.oidcTokenDetails;
+      const session = await requireUiSession(req, res, '/ui-api/workflows/:workflowId/projects/:projectId');
+      if (!session) {
+        return;
+      }
+
       const parsed = parseValidatedRequest(unshareWorkflowSchema, req);
       const result = await services.uiApi.unshareWorkflow(
-        details.email,
+        session.email,
         parsed.params.workflowId,
         parsed.params.projectId,
       );

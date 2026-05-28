@@ -10,7 +10,7 @@
  * - Frontend customization to show OIDC login button
  *
  * Environment Variables Required:
- * - OIDC_ISSUER_URL: The OIDC provider's issuer URL (e.g., https://auth.example.com)
+ * - OIDC_ISSUER: The OIDC provider's issuer URL (e.g., https://auth.example.com)
  * - OIDC_CLIENT_ID: OAuth2 client ID
  * - OIDC_CLIENT_SECRET: OAuth2 client secret
  * - OIDC_REDIRECT_URI: The callback URL (e.g., https://n8n.example.com/auth/oidc/callback)
@@ -29,7 +29,7 @@ const log = createLogger('OIDCHook');
 
 // Configuration from environment
 const config = {
-  issuerUrl: process.env.OIDC_ISSUER_URL,
+  issuerUrl: process.env.OIDC_ISSUER,
   authorizationEndpoint: process.env.OIDC_AUTHORIZATION_ENDPOINT,
   tokenEndpoint: process.env.OIDC_TOKEN_ENDPOINT,
   userinfoEndpoint: process.env.OIDC_USERINFO_ENDPOINT,
@@ -46,7 +46,7 @@ function validateConfig() {
   const missing = [];
   if (!config.issuerUrl) {
     if (!config.authorizationEndpoint && !config.tokenEndpoint && !config.userinfoEndpoint) {
-      missing.push('OIDC_ISSUER_URL');
+      missing.push('OIDC_ISSUER');
     }
   }
   if (!config.clientId) missing.push('OIDC_CLIENT_ID');
