@@ -10,14 +10,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from clients.dns import DnsState, classify_ip, dns_lookup
 
-PRIMARY_IP = "142.34.229.4"
-SECONDARY_IP = "142.34.64.4"
-UNKNOWN_IP = "8.8.8.8"
-PRIVATE_IP_1 = "10.0.0.1"
-PRIVATE_IP_2 = "10.0.0.2"
-PRIVATE_SECONDARY = "192.168.1.1"
-TEST_IP_A = "1.2.3.4"
-TEST_IP_B = "5.6.7.8"
+PRIMARY_IP = "142.34.229.4"  # NOSONAR
+SECONDARY_IP = "142.34.64.4"  # NOSONAR
+UNKNOWN_IP = "8.8.8.8"  # NOSONAR
+PRIVATE_IP_1 = "10.0.0.1"  # NOSONAR
+PRIVATE_IP_2 = "10.0.0.2"  # NOSONAR
+PRIVATE_SECONDARY = "192.168.1.1"  # NOSONAR
+TEST_IP_A = "1.2.3.4"  # NOSONAR
+TEST_IP_B = "5.6.7.8"  # NOSONAR
 
 # ---------------------------------------------------------------------------
 # classify_ip
