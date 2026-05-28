@@ -14,5 +14,8 @@ dependencies:
 - name: sdg-mock-app
   repository: file://../_sdg-mock-app
   version: 0.1.0
-digest: sha256:b6084f4acce2f1a1c6c27a0cb6f5bbe007ddb59345f2025b3bf5ced3f2e7cfb3
-generated: "2026-05-21T17:00:14.401065412Z"
+- name: dns-probe
+  repository: file://../_dns-probe
+  version: 0.1.0
+digest: sha256:567e176d1f8629fbba634979d5898afe31359a38adf21d7f921855113ea43d0e
+generated: "2026-05-28T09:42:38.765553-07:00"

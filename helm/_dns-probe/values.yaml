@@ -1,0 +1,75 @@
+image:
+  repository: ghcr.io/bcgov/chwf-dns-probe
+  tag: main
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: dns-probe
+fullnameOverride: dns-probe
+
+serviceAccountName: ""
+
+replicaCount: 1
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+deploymentStrategy:
+  type: Recreate
+
+service:
+  type: ClusterIP
+  port: 8000
+
+env:
+  APP_ENV: "production"
+  DOMAIN_NAME: ""
+  PRIMARY_IPS: ""
+  SECONDARY_IPS: ""
+  ALERT_EMAIL_RECIPIENTS: ""
+  SMTP_HOST: "apps.smtp.gov.bc.ca"
+  SMTP_PORT: "25"
+  SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+  POLL_INTERVAL: "5"
+  ALERT_ON_STARTUP: "false"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 20
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
