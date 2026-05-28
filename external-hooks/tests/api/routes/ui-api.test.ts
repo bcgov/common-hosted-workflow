@@ -28,7 +28,7 @@ describe('GET /ui-api/whoami', () => {
         email: 'person@example.com',
         issuer: 'https://issuer.example.com',
         subject: 'sub-1',
-        audience: ['external-ui'],
+        audience: ['app'],
         claims: {},
       },
     });
@@ -76,7 +76,7 @@ describe('GET /ui-api/workflows', () => {
         email: 'person@example.com',
         issuer: 'https://issuer.example.com',
         subject: 'sub-1',
-        audience: ['external-ui'],
+        audience: ['app'],
         claims: {},
       },
     });
@@ -119,7 +119,7 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
         email: 'person@example.com',
         issuer: 'https://issuer.example.com',
         subject: 'sub-1',
-        audience: ['external-ui'],
+        audience: ['app'],
         claims: {},
       },
     });
@@ -156,7 +156,7 @@ describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
         email: 'person@example.com',
         issuer: 'https://issuer.example.com',
         subject: 'sub-1',
-        audience: ['external-ui'],
+        audience: ['app'],
         claims: {},
       },
     });

@@ -40,17 +40,20 @@ x-n8n-env: &n8n-env
   N8N_TRUST_PROXY: 'true'
   N8N_PROXY_HOPS: '1'
   # OIDC
-  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-app}
   OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
-  # Runtime config for /ui-api/runtime-config
-  UI_OIDC_ISSUER: ${UI_OIDC_ISSUER:-http://localhost:8080/realms/starter}
-  UI_OIDC_CLIENT_ID: ${UI_OIDC_CLIENT_ID:-external-ui}
-  UI_OIDC_REDIRECT_URI: ${UI_OIDC_REDIRECT_URI:-http://localhost:5173/ui/auth/callback}
-  UI_OIDC_POST_LOGOUT_URI: ${UI_OIDC_POST_LOGOUT_URI:-http://localhost:5173}
-  UI_OIDC_SCOPES: ${UI_OIDC_SCOPES:-openid email profile}
+  # UI_OIDC_ISSUER: ${UI_OIDC_ISSUER:-http://keycloak:8080/realms/starter}
+  UI_OIDC_AUTHORIZATION_ENDPOINT: ${UI_OIDC_AUTHORIZATION_ENDPOINT:-http://localhost:8080/realms/starter/protocol/openid-connect/auth}
+  UI_OIDC_TOKEN_ENDPOINT: ${UI_OIDC_TOKEN_ENDPOINT:-http://keycloak:8080/realms/starter/protocol/openid-connect/token}
+  UI_OIDC_USERINFO_ENDPOINT: ${UI_OIDC_USERINFO_ENDPOINT:-http://keycloak:8080/realms/starter/protocol/openid-connect/userinfo}
   UI_OIDC_JWKS_URI: ${UI_OIDC_JWKS_URI:-http://keycloak:8080/realms/starter/protocol/openid-connect/certs}
-  UI_OIDC_EXPECTED_ISSUER: ${UI_OIDC_EXPECTED_ISSUER:-http://localhost:8080/realms/starter}
-  UI_OIDC_EXPECTED_AZP: ${UI_OIDC_EXPECTED_AZP:-external-ui}
+  UI_OIDC_CLIENT_ID: ${UI_OIDC_CLIENT_ID:-app}
+  UI_OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+  UI_AUTH_JWT_SECRET: ${UI_AUTH_JWT_SECRET}
+  UI_OIDC_REDIS_URL: redis://redis:6379
+  UI_OIDC_REDIS_PREFIX: ${UI_OIDC_REDIS_PREFIX:-chwf:ui-oidc:}
+  UI_OIDC_REDIRECT_URI: ${UI_OIDC_REDIRECT_URI}
+  UI_OIDC_SCOPES: ${UI_OIDC_SCOPES:-openid email profile}
   # OIDC_ISSUER_URL: http://keycloak:8080/realms/starter
   OIDC_AUTHORIZATION_ENDPOINT: http://localhost:8080/realms/starter/protocol/openid-connect/auth
   OIDC_TOKEN_ENDPOINT: http://keycloak:8080/realms/starter/protocol/openid-connect/token
@@ -102,6 +105,13 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    <<: *common-props
+    container_name: redis
+    image: redis:8.0-alpine
+    ports:
+    - 6379:6379
+
   keycloak:
     <<: *common-props
     container_name: keycloak
@@ -150,9 +160,7 @@ services:
       AUTH_REALM_NAME: starter
       AUTH_CLIENT_ID: ${OIDC_CLIENT_ID}
       AUTH_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
-      SPA_CLIENT_ID: ${SPA_CLIENT_ID:-external-ui}
-      SPA_REDIRECT_URIS: ${SPA_REDIRECT_URIS:-http://localhost:5173/*,http://localhost:5678/ui/*}
-      SPA_WEB_ORIGINS: ${SPA_WEB_ORIGINS:-http://localhost:5173,http://localhost:5678}
+      AUTH_REDIRECT_URIS: ${AUTH_REDIRECT_URIS:-http://localhost:5678/rest/auth/oidc/callback,http://localhost:5173/ui-api/auth/callback,http://localhost:5678/ui-api/auth/callback,http://127.0.0.1:5678/ui-api/auth/callback,http://keycloak:5678/ui-api/auth/callback}
     depends_on:
       keycloak:
         condition: service_started

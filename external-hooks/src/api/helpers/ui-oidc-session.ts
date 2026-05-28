@@ -1,0 +1,117 @@
+import { createSecretKey } from 'crypto';
+import type { Request } from 'express';
+import { SignJWT, jwtVerify } from 'jose';
+import {
+  type UiAuthenticatedSession,
+  type UiAuthTokenPayload,
+  type UiSerializedN8nUser,
+  type UiOidcIdentity,
+} from './ui-oidc';
+
+const UI_AUTH_JWT_TTL_MS = 8 * 60 * 60 * 1000;
+
+function getJwtSecret() {
+  return process.env.UI_AUTH_JWT_SECRET || process.env.N8N_USER_MANAGEMENT_JWT_SECRET || '';
+}
+
+function getJwtIssuer() {
+  return process.env.UI_AUTH_JWT_ISSUER || 'chwf-ui-api';
+}
+
+function getJwtAudience() {
+  return process.env.UI_AUTH_JWT_AUDIENCE || 'chwf-ui';
+}
+
+function getBearerToken(req: Request) {
+  const header = req.header('authorization');
+  if (!header) return null;
+
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+  return token;
+}
+
+export function serializeN8nUser(
+  user: { id: string; email: string; role: { slug: string; displayName: string } | null } | null,
+): UiSerializedN8nUser | null {
+  return user
+    ? {
+        id: user.id,
+        email: user.email,
+        role: user.role ? { slug: user.role.slug, displayName: user.role.displayName } : null,
+      }
+    : null;
+}
+
+export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser: UiSerializedN8nUser }) {
+  const secret = getJwtSecret();
+  if (!secret) {
+    throw new Error('UI auth JWT secret is not configured');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({
+    email: params.oidc.email,
+    preferredUsername: params.oidc.preferredUsername,
+    name: params.oidc.name,
+    oidc: {
+      ...params.oidc,
+      claims: params.oidc.claims,
+    },
+    n8nUser: params.n8nUser,
+  } satisfies Omit<UiAuthTokenPayload, 'iss' | 'aud' | 'sub'>)
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuer(getJwtIssuer())
+    .setAudience(getJwtAudience())
+    .setSubject(params.oidc.subject)
+    .setIssuedAt(now)
+    .setExpirationTime(now + Math.floor(UI_AUTH_JWT_TTL_MS / 1000))
+    .sign(createSecretKey(Buffer.from(secret)));
+}
+
+export async function getUiSession(req: Request) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+
+  try {
+    const secret = getJwtSecret();
+    if (!secret) return null;
+
+    const verification = await jwtVerify(token, createSecretKey(Buffer.from(secret)), {
+      issuer: getJwtIssuer(),
+      audience: getJwtAudience(),
+    });
+
+    const payload = verification.payload as Partial<UiAuthTokenPayload>;
+    if (!payload.sub || !payload.email || !payload.oidc || !payload.n8nUser) return null;
+
+    return {
+      subject: payload.sub,
+      email: payload.email,
+      preferredUsername: payload.preferredUsername,
+      name: payload.name,
+      issuer: payload.oidc.issuer,
+      audience: payload.oidc.audience,
+      claims: payload.oidc.claims,
+      expiresAt: verification.payload.exp ? verification.payload.exp * 1000 : undefined,
+      n8nUser: payload.n8nUser,
+    } as UiAuthenticatedSession;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUiSessionSummary(req: Request) {
+  const session = await getUiSession(req);
+  return session
+    ? {
+        authenticated: true,
+        user: {
+          subject: session.subject,
+          email: session.email,
+          preferredUsername: session.preferredUsername,
+          name: session.name,
+        },
+      }
+    : { authenticated: false, user: null };
+}
