@@ -72,7 +72,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <span className="text-sm text-white/70">Loading...</span>
             ) : user ? (
               <>
-                <span className="text-sm text-white/85">{user.profile.email}</span>
+                <span className="text-sm text-white/85">{user.email}</span>
                 <Button onClick={logout} variant="secondary" size="sm">
                   <IconLogout size={16} aria-hidden="true" />
                   Logout

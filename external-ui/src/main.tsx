@@ -2,11 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import { getAppBasePath } from './config/base-path';
-import { loadOidcRuntimeConfig } from './services/backend/oidc';
 
 async function bootstrap() {
-  await loadOidcRuntimeConfig();
-
   const [{ BrowserRouter }, { QueryClientProvider }, { AuthProvider }, { queryClient }, { App }] = await Promise.all([
     import('react-router'),
     import('@tanstack/react-query'),
