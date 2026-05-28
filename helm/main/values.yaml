@@ -79,7 +79,7 @@ n8n:
     N8N_AI_ENABLED: "false"
     N8N_ADDITIONAL_NON_UI_ROUTES: "ui"
     SSO_RESTRICT_NO_ROLE: "false"
-    UI_OIDC_REDIS_URL: chwf-redis-master
+    UI_OIDC_REDIS_URL: redis://chwf-redis-master:6379
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
