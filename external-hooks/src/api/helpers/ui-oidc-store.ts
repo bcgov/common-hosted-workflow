@@ -13,6 +13,10 @@ function getRedisUrl() {
   return process.env.UI_OIDC_REDIS_URL || 'redis://localhost:6379';
 }
 
+function getRedisPassword() {
+  return process.env.UI_OIDC_REDIS_PASSWORD || '';
+}
+
 function getRedisPrefix() {
   return process.env.UI_OIDC_REDIS_PREFIX || 'chwf:ui-oidc:';
 }
@@ -23,7 +27,11 @@ function getStateKey(state: string) {
 
 async function getRedisClient() {
   if (!redisClientPromise) {
-    const client = createClient({ url: getRedisUrl() });
+    const password = getRedisPassword();
+    const client = createClient({
+      url: getRedisUrl(),
+      ...(password ? { password } : {}),
+    });
     client.on('error', () => {});
     redisClientPromise = client.connect().then(() => client);
   }
