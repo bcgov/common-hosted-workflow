@@ -1,5 +1,17 @@
 import { instance } from './axios';
 
+export type AuthSessionUser = {
+  subject: string;
+  email: string;
+  preferredUsername?: string;
+  name?: string;
+};
+
+export type AuthSessionResponse = {
+  authenticated: boolean;
+  user: AuthSessionUser | null;
+};
+
 export type WhoamiResponse = {
   ok: boolean;
   route: string;
@@ -9,14 +21,10 @@ export type WhoamiResponse = {
     issuer: string;
     subject: string;
     audience: string[];
-    azp?: string;
-    email?: string;
+    email: string;
     preferredUsername?: string;
     name?: string;
-    scope?: string;
     expiresAt?: number;
-    issuedAt?: number;
-    notBefore?: number;
     claims: Record<string, unknown>;
   } | null;
   n8nUser: {
@@ -31,4 +39,8 @@ export type WhoamiResponse = {
 
 export async function getWhoami(params?: { signal?: AbortSignal }) {
   return instance.get<WhoamiResponse>('/ui-api/whoami', { signal: params?.signal }).then((res) => res.data);
+}
+
+export async function getSession(params?: { signal?: AbortSignal }) {
+  return instance.get<AuthSessionResponse>('/ui-api/session', { signal: params?.signal }).then((res) => res.data);
 }

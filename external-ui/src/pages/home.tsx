@@ -12,9 +12,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 export function Home() {
   const { user, login } = useAuth();
   const whoamiQuery = useQuery({
-    queryKey: ['whoami', user?.access_token ?? ''],
+    queryKey: ['whoami', user?.email ?? ''],
     queryFn: ({ signal }) => getWhoami({ signal }),
-    enabled: Boolean(user?.access_token),
+    enabled: Boolean(user),
   });
 
   const whoami = whoamiQuery.data;
@@ -44,7 +44,7 @@ export function Home() {
             {user ? (
               <Alert>
                 <AlertTitle className="flex flex-wrap items-center gap-2">
-                  Signed in as <span className="font-semibold">{user.profile.email}</span>
+                  Signed in as <span className="font-semibold">{user.email}</span>
                   {whoami?.n8nUser?.role ? <Badge variant="secondary">{whoami.n8nUser.role.slug}</Badge> : null}
                 </AlertTitle>
                 <AlertDescription>Authenticated session active.</AlertDescription>
