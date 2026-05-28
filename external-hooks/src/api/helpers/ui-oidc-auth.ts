@@ -179,6 +179,8 @@ export async function buildUiLoginRedirect(req: Request) {
     throw new Error('OIDC authorization endpoint is not configured');
   }
 
+  logger.info('Initiating OIDC login flow', { returnTo: req.query.returnTo, redirectUri: config.redirectUri });
+
   const state = randomBytes(32).toString('hex');
   const nonce = randomBytes(32).toString('hex');
   const codeVerifier = toBase64Url(randomBytes(32));
