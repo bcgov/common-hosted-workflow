@@ -18,8 +18,8 @@ define arguments
     -n "${NAMESPACE}" \
     -f values.yaml \
     -f "values-${NAMESPACE}-${CLUSTER}.yaml" \
-	--set n8n.image.tag="main" \
-	--set sdg-mock-app.image.tag="main" \
+	--set n8n.image.tag="${IMAGE_TAG}" \
+	--set sdg-mock-app.image.tag="${IMAGE_TAG}" \
 	--set dns-probe.image.tag="${IMAGE_TAG}"
 endef
 

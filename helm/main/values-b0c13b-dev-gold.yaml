@@ -85,12 +85,3 @@ pgo:
         endpoint: commonservices.objectstore.gov.bc.ca
         region: ca-central-1
         uriStyle: path
-
-dns-probe:
-  enabled: true
-  env:
-    APP_ENV: "dev"
-    DOMAIN_NAME: ""
-    PRIMARY_IPS: ""
-    SECONDARY_IPS: ""
-    ALERT_EMAIL_RECIPIENTS: ""
