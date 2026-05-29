@@ -77,7 +77,7 @@ n8n:
     N8N_HIDE_ACTIVATION_ALERT: "true"
     N8N_HIDE_HIDE_GITHUB_STAR_BUTTON: "true"
     N8N_AI_ENABLED: "false"
-    N8N_ADDITIONAL_NON_UI_ROUTES: "ui"
+    N8N_ADDITIONAL_NON_UI_ROUTES: "ui:assets"
     SSO_RESTRICT_NO_ROLE: "false"
     UI_OIDC_REDIS_URL: redis://chwf-redis-master:6379
 
