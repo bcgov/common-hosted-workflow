@@ -3,6 +3,7 @@ import { workflowInteractionInternalPostPathPattern } from '../constants/route-p
 import { tenantUuidRegex } from '../constants/regex';
 import { extractBearerToken } from '../helpers/bearer';
 import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
+import type { N8nProjectRelationRepository, N8nProjectRepository } from '../types/n8n-adapters';
 import type { AuthRequest, AuthResponse, ExpressNext } from '../types/auth';
 import type { CustomRepositories, N8nRepositories } from '../types/repositories';
 import { AppError } from '../utils/errors';
@@ -20,7 +21,10 @@ const log = createLogger('CustomAPIs');
  * when `INTERNAL_AUTH_TOKEN` is set (`workflowInteractionInternalPostPathPattern`).
  */
 export function createWorkflowInteractionTenantMiddleware(config: {
-  n8nRepositories: Pick<N8nRepositories, 'project' | 'projectRelation'>;
+  n8nRepositories: {
+    project: N8nProjectRepository;
+    projectRelation: N8nProjectRelationRepository;
+  };
   customRepositories: Pick<CustomRepositories, 'tenantProjectRelation'>;
 }) {
   const { project: projectRepository, projectRelation: projectRelationRepository } = config.n8nRepositories;

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { AppError, wrapAsyncRoute, handleErrorResponse } from '../../../src/api/utils/errors';
+import { describe, expect, it } from 'vitest';
+import { AppError, handleErrorResponse } from '../../../src/api/utils/errors';
 import { createMockRequest, createMockResponse, createMockNext } from '../../helpers/mocks';
 
 describe('AppError', () => {
@@ -18,35 +18,6 @@ describe('AppError', () => {
   it('is an instance of Error', () => {
     const err = new AppError(500, 'Server error');
     expect(err).toBeInstanceOf(Error);
-  });
-});
-
-describe('wrapAsyncRoute', () => {
-  it('calls next with error when async handler rejects', async () => {
-    const error = new Error('boom');
-    const handler = vi.fn().mockRejectedValue(error);
-    const wrapped = wrapAsyncRoute(handler);
-
-    const req = createMockRequest();
-    const res = createMockResponse();
-    const next = createMockNext();
-
-    await wrapped(req, res as any, next);
-
-    expect(next).toHaveBeenCalledWith(error);
-  });
-
-  it('does not call next when handler resolves', async () => {
-    const handler = vi.fn().mockResolvedValue(undefined);
-    const wrapped = wrapAsyncRoute(handler);
-
-    const req = createMockRequest();
-    const res = createMockResponse();
-    const next = createMockNext();
-
-    await wrapped(req, res as any, next);
-
-    expect(next).not.toHaveBeenCalled();
   });
 });
 
