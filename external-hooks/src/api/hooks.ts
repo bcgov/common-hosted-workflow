@@ -1,4 +1,4 @@
-import { Router, static as serveStatic } from 'express';
+import { Router, type Express, type Request, type Response, static as serveStatic } from 'express';
 import path from 'node:path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../db/repository/workflow-interaction-layer/action-request';
@@ -6,12 +6,18 @@ import { MessageRepository } from '../db/repository/workflow-interaction-layer/m
 import { TenantProjectRelationRepository } from '../db/repository/workflow-interaction-layer/tenant-project-relation';
 import { ApiKeyService } from './services/api-key';
 import { UiApiService } from './services/ui-api';
-import { N8N_DB_PATH, N8N_DI_PATH } from './constants/n8n-paths';
+import { N8N_DB_PATH, N8N_DI_PATH, N8N_JWT_SERVICE_PATH, N8N_USER_SERVICE_PATH } from './constants/n8n-paths';
 import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from './middlewares';
 import { buildActionRouter } from './routes/actions';
 import { buildActorRouter } from './routes/actors';
 import { buildAdminRouter } from './routes/admin';
 import { buildMessageRouter } from './routes/messages';
+import {
+  buildOidcRouter,
+  type N8nOidcDbCollections,
+  type N8nOidcJwtService,
+  type N8nOidcUserService,
+} from './routes/oidc';
 import { buildUiApiRouter } from './routes/ui-api';
 import type { CustomRepositories, N8nRepositories } from './types/repositories';
 import type { ApiRouteContext } from './types/routes';
@@ -19,6 +25,7 @@ import type { ApiServices } from './types/services';
 import { handleErrorResponse } from './utils/errors';
 import { createLogger } from './utils/logger';
 import { mountSwaggerUi } from './swagger-ui';
+import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from './helpers/n8n-oidc';
 
 const log = createLogger('CustomAPIs');
 const assetsPath = process.env.EXTERNAL_HOOK_ASSETS_PATH || 'api/assets';
@@ -27,7 +34,7 @@ function createHookConfig() {
   return {
     n8n: {
       ready: [
-        async function (server: { app: any }) {
+        async function (this: { dbCollections: N8nOidcDbCollections }, server: { app: Express }) {
           log.info('Initializing Custom Endpoints...');
 
           const { Container } = require(N8N_DI_PATH);
@@ -56,6 +63,7 @@ function createHookConfig() {
             withTransaction,
             execution: Container.get(ExecutionRepository),
           };
+
           const services: ApiServices = {
             apiKey: new ApiKeyService(n8nRepositories.user),
             uiApi: new UiApiService(n8nRepositories),
@@ -73,6 +81,7 @@ function createHookConfig() {
           }
           const db = drizzle(databaseUrl);
           const { app } = server;
+          const hookContext = this;
 
           const customRepositories: CustomRepositories = {
             tenantProjectRelation: new TenantProjectRelationRepository(db),
@@ -116,7 +125,7 @@ function createHookConfig() {
             const indexPath = path.resolve(uiPath, 'index.html');
 
             app.use('/ui', serveStatic(uiPath, { index: 'index.html' }));
-            app.get(/^\/ui\/.*$/, (req, res) => {
+            app.get(/^\/ui\/.*$/, (req: Request, res: Response) => {
               res.sendFile(indexPath, (err) => {
                 if (err) {
                   res.status(404).send('UI asset not found');
@@ -125,6 +134,27 @@ function createHookConfig() {
             });
 
             app.use('/ui-api', buildUiApiRouter(routeContext));
+          }
+
+          const oidcConfig = getN8nOidcConfigFromEnv();
+          const missingOidcConfig = validateN8nOidcConfig(oidcConfig);
+          if (missingOidcConfig.length === 0) {
+            const { JwtService } = require(N8N_JWT_SERVICE_PATH);
+            const { UserService } = require(N8N_USER_SERVICE_PATH);
+            const jwtService = Container.get(JwtService) as N8nOidcJwtService;
+            const userService = Container.get(UserService) as N8nOidcUserService;
+
+            app.use(
+              '/rest/auth/oidc',
+              buildOidcRouter({
+                dbCollections: hookContext.dbCollections,
+                jwtService,
+                userService,
+                config: oidcConfig,
+              }),
+            );
+          } else {
+            log.warn('Missing configuration — OIDC disabled', { missing: missingOidcConfig.join(', ') });
           }
 
           app.use(
@@ -140,6 +170,39 @@ function createHookConfig() {
 
           app.use(handleErrorResponse);
           log.info('Custom Routes Active.');
+        },
+      ],
+    },
+    frontend: {
+      /**
+       * Modify frontend settings to configure SSO display
+       */
+      settings: [
+        async function (frontendSettings) {
+          const config = getN8nOidcConfigFromEnv();
+          const missing = validateN8nOidcConfig(config);
+          if (missing.length > 0) {
+            return; // OIDC not configured, don't modify settings
+          }
+
+          // Enable OIDC login button by setting these properties
+          // This tells the frontend that OIDC is available
+          frontendSettings.sso = frontendSettings.sso || {};
+          frontendSettings.sso.oidc = {
+            loginEnabled: true,
+            loginUrl: '/rest/auth/oidc/login',
+            callbackUrl: config.redirectUri,
+          };
+
+          // Set authentication method to OIDC so the frontend knows SSO is primary
+          frontendSettings.userManagement = frontendSettings.userManagement || {};
+          frontendSettings.userManagement.authenticationMethod = 'oidc';
+
+          // Enable enterprise OIDC feature flag so the SSO button shows
+          frontendSettings.enterprise = frontendSettings.enterprise || {};
+          frontendSettings.enterprise.oidc = true;
+
+          log.info('Frontend settings configured for OIDC');
         },
       ],
     },
