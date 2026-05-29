@@ -38,6 +38,7 @@
       "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
       "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.js",
       "dist/nodes/OidcToken/OidcToken.node.js",
+      "dist/nodes/MultiWebhookWait/MultiWebhookWait.node.js",
       "dist/nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node.js"
     ]
   },

@@ -7,6 +7,7 @@ import { ChefsService } from '../services/chefs.service';
 import { CstarService } from '../services/cstar.service';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { MessageService } from '../services/message.service';
+import { MultiWebhookWaitService } from '../services/multi-webhook-wait.service';
 import { ProjectTenantService } from '../services/project-tenant.service';
 import { TenantService } from '../services/tenant.service';
 import { TenantProjectSyncService } from '../services/tenant-project-sync.service';
@@ -84,5 +85,6 @@ export async function buildApiServices(
       globalOwnerRoleSlug,
     ),
     projectTenant: new ProjectTenantService(n8nRepositories, customRepositories, tenantService, cstarService),
+    multiWebhookWait: new MultiWebhookWaitService(customRepositories),
   };
 }
