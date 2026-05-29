@@ -317,8 +317,19 @@ function createUserHash(user) {
  * @returns {boolean}
  */
 function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  for (const char of email) {
+    if (char.trim() === '') {
+      return false;
+    }
+  }
+
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 0 || atIndex !== email.lastIndexOf('@') || atIndex >= email.length - 1) {
+    return false;
+  }
+
+  const dotIndex = email.indexOf('.', atIndex + 2);
+  return dotIndex > atIndex + 1 && dotIndex < email.length - 1;
 }
 
 // Export the hooks

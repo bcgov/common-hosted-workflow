@@ -136,7 +136,19 @@ export function createUserHash(user: Pick<N8nOidcUser, 'email' | 'password' | 'm
 }
 
 export function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  for (const char of email) {
+    if (char.trim() === '') {
+      return false;
+    }
+  }
+
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 0 || atIndex !== email.lastIndexOf('@') || atIndex >= email.length - 1) {
+    return false;
+  }
+
+  const dotIndex = email.indexOf('.', atIndex + 2);
+  return dotIndex > atIndex + 1 && dotIndex < email.length - 1;
 }
 
 export function parseN8nOidcRole(value: unknown): N8nOidcRoleSlug | '' {

@@ -96,7 +96,11 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
 }
 
 function toBase64Url(value: Buffer) {
-  return value.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  let encoded = value.toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+  while (encoded.endsWith('=')) {
+    encoded = encoded.slice(0, -1);
+  }
+  return encoded;
 }
 
 export function createOidcCodeVerifier() {
