@@ -1,11 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import {
-  requireChwfAllowedProjectIds,
-  requireExecutionInTenantScope,
-  resolveProjectIdForCreate,
-} from '../helpers/n8n-validation';
-import { AppError, wrapAsyncRoute } from '../utils/errors';
+import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
+import { sendValidatedJson } from './helpers/responses';
+import { getTenantScopedProjectIds } from './helpers/tenant-scope';
+import { AppError } from '../utils/errors';
 import { formatDbErrorForLog } from '../helpers/db-helper';
 import { shortenIdForLog } from '../utils/string';
 import {
@@ -16,7 +14,7 @@ import {
   mapMessageRowToResponse,
 } from '../schemas/message';
 import type { ApiRouteContext } from '../types/routes';
-import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('CustomAPIs');
@@ -36,9 +34,9 @@ export function buildMessageRouter({
     apiKeyAuthMiddleware,
     workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(listMessagesSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(listMessagesSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/messages/', 'messages');
+      const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/messages/', 'messages');
       const { workflowInstanceId } = parsed.query;
       await requireExecutionInTenantScope({
         executionRepository: execution,
@@ -57,9 +55,8 @@ export function buildMessageRouter({
       const items = rows.map(mapMessageRowToResponse);
 
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
-      const payload = parseValidatedResponse(listMessagesResponseSchema, { items, nextCursor });
-      res.status(200).json(payload);
-    }),
+      sendValidatedJson(res, 200, listMessagesResponseSchema, { items, nextCursor });
+    },
   );
 
   router.post(
@@ -67,10 +64,10 @@ export function buildMessageRouter({
     apiKeyAuthMiddleware,
     workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(createMessageSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(createMessageSchema, req);
       const { title, body, actorId, actorType, workflowInstanceId, workflowId, metadata, status } = parsed.body;
-      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'POST /v1/messages/', 'messages');
+      const allowedProjectIds = getTenantScopedProjectIds(res, 'POST /v1/messages/', 'messages');
 
       const projectId = await resolveProjectIdForCreate({
         executionRepository: execution,
@@ -93,8 +90,7 @@ export function buildMessageRouter({
           metadata: metadata ?? null,
           status: status || 'active',
         });
-        const payload = parseValidatedResponse(createMessageResponseSchema, mapMessageRowToResponse(created));
-        res.status(201).json(payload);
+        sendValidatedJson(res, 201, createMessageResponseSchema, mapMessageRowToResponse(created));
       } catch (error) {
         const dbDetail = formatDbErrorForLog(error);
         log.error('Create message error', {
@@ -106,7 +102,7 @@ export function buildMessageRouter({
         });
         throw new AppError(500, 'Internal Server Error');
       }
-    }),
+    },
   );
 
   return router;
