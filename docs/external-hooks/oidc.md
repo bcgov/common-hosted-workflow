@@ -1,6 +1,6 @@
 # OIDC external hook
 
-Custom OIDC authentication for n8n is implemented in `external-hooks/src/oidc.ts`.
+Custom OIDC authentication for n8n is implemented in `external-hooks/src/api/hooks.ts` and related helpers/routes.
 
 This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 
@@ -16,10 +16,10 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 
 | Path                                                  | Role                                                            |
 | ----------------------------------------------------- | --------------------------------------------------------------- |
-| `external-hooks/src/oidc.ts`                          | Sets frontend OIDC login visibility/configuration.              |
 | `external-hooks/src/api/hooks.ts`                     | Serves the OIDC frontend assets under `/assets`.                |
 | `external-hooks/src/api/routes/oidc.ts`               | Registers the OIDC login and callback routes.                   |
 | `external-hooks/src/api/helpers/oidc-provider.ts`     | Shared OIDC discovery, PKCE, token exchange, and identity flow. |
+| `external-hooks/src/api/helpers/n8n-oidc.ts`          | n8n-specific OIDC config, cookies, and role helpers.            |
 | `external-hooks/src/api/assets/oidc-frontend-hook.js` | Standalone browser script for the sign-in page.                 |
 | `external-hooks/src/api/utils/logger.ts`              | Structured request, response, and error logging helpers.        |
 
