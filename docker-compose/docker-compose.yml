@@ -111,7 +111,7 @@ services:
   redis:
     <<: *common-props
     container_name: redis
-    image: redis:8.0-alpine
+    image: redis:8.6-alpine
     ports:
     - 6379:6379
 
