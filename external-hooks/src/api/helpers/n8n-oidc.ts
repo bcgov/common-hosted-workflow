@@ -60,11 +60,11 @@ export function validateN8nOidcConfig(config: N8nOidcConfig) {
 
 function base64UrlEncode(input: Buffer | string) {
   const base64 = Buffer.isBuffer(input) ? input.toString('base64') : Buffer.from(input).toString('base64');
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return base64.replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
 function base64UrlDecode(input: string) {
-  let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  let base64 = input.replaceAll('-', '+').replaceAll('_', '/');
   while (base64.length % 4) {
     base64 += '=';
   }

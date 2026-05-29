@@ -81,7 +81,6 @@ function createHookConfig() {
           }
           const db = drizzle(databaseUrl);
           const { app } = server;
-          const hookContext = this;
 
           const customRepositories: CustomRepositories = {
             tenantProjectRelation: new TenantProjectRelationRepository(db),
@@ -147,7 +146,7 @@ function createHookConfig() {
             app.use(
               '/rest/auth/oidc',
               buildOidcRouter({
-                dbCollections: hookContext.dbCollections,
+                dbCollections: this.dbCollections,
                 jwtService,
                 userService,
                 config: oidcConfig,

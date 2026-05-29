@@ -85,7 +85,8 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
     return cached.document;
   }
 
-  const response = await fetch(`${config.issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`);
+  const issuerUrl = config.issuerUrl.endsWith('/') ? config.issuerUrl.slice(0, -1) : config.issuerUrl;
+  const response = await fetch(`${issuerUrl}/.well-known/openid-configuration`);
   if (!response.ok) {
     throw new Error(`Failed to fetch OIDC discovery document: ${response.status}`);
   }
@@ -96,7 +97,7 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
 }
 
 function toBase64Url(value: Buffer) {
-  let encoded = value.toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+  let encoded = value.toString('base64').replaceAll('+', '-').replaceAll('/', '_');
   while (encoded.endsWith('=')) {
     encoded = encoded.slice(0, -1);
   }
@@ -312,7 +313,7 @@ export function decodeOidcJwt(token: string) {
     throw new Error('Invalid JWT format');
   }
 
-  let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  let base64 = parts[1].replaceAll('-', '+').replaceAll('_', '/');
   while (base64.length % 4) {
     base64 += '=';
   }
