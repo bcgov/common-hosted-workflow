@@ -258,6 +258,38 @@ pgo:
     dataVolumeClaimSpec:
       storage: 1Gi
 
+# dns-probe — disabled by default, enabled only for golddr deployments
+dns-probe:
+  enabled: false
+
+  nameOverride: chwf-dns-probe
+  fullnameOverride: chwf-dns-probe
+
+  image:
+    repository: ghcr.io/bcgov/chwf-dns-probe
+    tag: main
+    pullPolicy: IfNotPresent
+
+  env:
+    APP_ENV: "production"
+    DOMAIN_NAME: ""
+    PRIMARY_IPS: ""
+    SECONDARY_IPS: ""
+    ALERT_EMAIL_RECIPIENTS: ""
+    SMTP_HOST: "apps.smtp.gov.bc.ca"
+    SMTP_PORT: "25"
+    SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+    POLL_INTERVAL: "5"
+    ALERT_ON_STARTUP: "false"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
 # sdg-mock-app (Next.js + SQLite playground)
 sdg-mock-app:
   enabled: false

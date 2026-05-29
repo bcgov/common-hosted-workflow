@@ -19,7 +19,8 @@ define arguments
     -f values.yaml \
     -f "values-${NAMESPACE}-${CLUSTER}.yaml" \
 	--set n8n.image.tag="${IMAGE_TAG}" \
-	--set sdg-mock-app.image.tag="${IMAGE_TAG}"
+	--set sdg-mock-app.image.tag="${IMAGE_TAG}" \
+	--set dns-probe.image.tag="${IMAGE_TAG}"
 endef
 
 .PHONY: helm-dep install upgrade lint uninstall template force-install help

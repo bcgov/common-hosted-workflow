@@ -32,10 +32,16 @@ jobs:
       image-name: bcgov/chwf-sdg-mock-app
       docker-path: docker-compose/sdg-mock-app
 
+  build-push-dns-probe:
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      image-name: bcgov/chwf-dns-probe
+      docker-path: dns-probe
+
   deploy-devx-dev:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx.yml
-    needs: [build-push-n8n]
+    needs: [build-push-n8n, build-push-dns-probe]
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}

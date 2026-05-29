@@ -25,3 +25,7 @@ dependencies:
     version: '0.1.0'
     repository: 'file://../_sdg-mock-app'
     condition: sdg-mock-app.enabled
+  - name: dns-probe
+    version: '0.1.0'
+    repository: 'file://../_dns-probe'
+    condition: dns-probe.enabled

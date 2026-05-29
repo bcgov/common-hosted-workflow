@@ -47,3 +47,12 @@ pgo:
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+
+dns-probe:
+  enabled: false
+  env:
+    APP_ENV: "dev"
+    DOMAIN_NAME: ""
+    PRIMARY_IPS: ""
+    SECONDARY_IPS: ""
+    ALERT_EMAIL_RECIPIENTS: ""
