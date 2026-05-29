@@ -5,7 +5,7 @@ function getRoutePaths(router: { stack: Array<{ route?: { path?: string } }> }) 
   return router.stack
     .map((layer) => layer.route?.path)
     .filter(Boolean)
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
 }
 
 describe('oidc router', () => {
