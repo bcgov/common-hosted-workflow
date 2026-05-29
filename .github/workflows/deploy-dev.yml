@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - main
+    - feat/CCP-4696
     paths-ignore:
     - workflows/merge.yml
     - docs/**
@@ -20,22 +21,28 @@ permissions:
   security-events: write
 
 jobs:
-  build-push-n8n:
-    uses: ./.github/workflows/_build-and-push.yml
-    with:
-      image-name: bcgov/chwf
-      docker-path: .
+  # build-push-n8n:
+  #   uses: ./.github/workflows/_build-and-push.yml
+  #   with:
+  #     image-name: bcgov/chwf
+  #     docker-path: .
 
-  build-push-sdg-mock-app:
+  # build-push-sdg-mock-app:
+  #   uses: ./.github/workflows/_build-and-push.yml
+  #   with:
+  #     image-name: bcgov/chwf-sdg-mock-app
+  #     docker-path: docker-compose/sdg-mock-app
+
+  build-push-dns-probe:
     uses: ./.github/workflows/_build-and-push.yml
     with:
-      image-name: bcgov/chwf-sdg-mock-app
-      docker-path: docker-compose/sdg-mock-app
+      image-name: bcgov/chwf-dns-probe
+      docker-path: dns-probe
 
   deploy-devx-dev:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx.yml
-    needs: [build-push-n8n]
+    needs: [build-push-dns-probe]
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
@@ -43,13 +50,13 @@ jobs:
       environment: dev
       tag: ${{ github.sha }}
 
-  deploy-sdg-dev:
-    name: Deploys SDG (Dev)
-    uses: ./.github/workflows/deploy-sdg.yml
-    needs: [build-push-n8n, build-push-sdg-mock-app]
-    secrets:
-      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
-      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
-    with:
-      environment: dev
-      tag: ${{ github.sha }}
+  # deploy-sdg-dev:
+  #   name: Deploys SDG (Dev)
+  #   uses: ./.github/workflows/deploy-sdg.yml
+  #   needs: [build-push-n8n, build-push-sdg-mock-app]
+  #   secrets:
+  #     OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+  #     OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+  #   with:
+  #     environment: dev
+  #     tag: ${{ github.sha }}

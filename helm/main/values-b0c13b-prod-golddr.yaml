@@ -58,7 +58,7 @@ pgo:
           incremental: 0 0,4,12,16,20 * * *
 
 dns-probe:
-  enabled: true
+  enabled: false
   env:
     APP_ENV: "production"
     DOMAIN_NAME: ""
