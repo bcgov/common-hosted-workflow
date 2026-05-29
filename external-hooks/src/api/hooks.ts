@@ -1,6 +1,5 @@
 import { Router, static as serveStatic } from 'express';
 import path from 'node:path';
-import fs from 'node:fs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../db/repository/workflow-interaction-layer/action-request';
 import { MessageRepository } from '../db/repository/workflow-interaction-layer/message';
@@ -22,6 +21,7 @@ import { createLogger } from './utils/logger';
 import { mountSwaggerUi } from './swagger-ui';
 
 const log = createLogger('CustomAPIs');
+const assetsPath = process.env.EXTERNAL_HOOK_ASSETS_PATH || 'api/assets';
 
 function createHookConfig() {
   return {
@@ -126,6 +126,17 @@ function createHookConfig() {
 
             app.use('/ui-api', buildUiApiRouter(routeContext));
           }
+
+          app.use(
+            '/assets',
+            serveStatic(assetsPath, {
+              index: false,
+              maxAge: '1h',
+              setHeaders(res) {
+                res.setHeader('Cache-Control', 'public, max-age=3600');
+              },
+            }),
+          );
 
           app.use(handleErrorResponse);
           log.info('Custom Routes Active.');

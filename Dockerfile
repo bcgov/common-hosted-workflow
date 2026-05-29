@@ -50,6 +50,7 @@ WORKDIR /home/node
 COPY --from=build-nodes /app/dist /community-nodes/dist
 COPY --from=build-nodes /app/package.json /community-nodes/package.json
 COPY --from=build-hooks /app/dist /external-hooks
+COPY --from=build-hooks /app/src/api/assets /external-hooks/api/assets
 COPY --from=build-ui /app/dist /external-ui/dist
 COPY external-hooks/drizzle /external-hooks/drizzle
 
@@ -62,5 +63,6 @@ ENV N8N_PORT=5678 \
     N8N_COMMUNITY_PACKAGES_ENABLED=true \
     N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/nodes" \
     EXTERNAL_HOOK_FILES=/external-hooks/oidc.cjs:/external-hooks/api/hooks.cjs \
+    EXTERNAL_HOOK_ASSETS_PATH=/external-hooks/api/assets \
     EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js \
     EXTERNAL_UI_PATH=/external-ui/dist

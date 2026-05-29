@@ -14,10 +14,12 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 
 ## Source layout
 
-| Path                                     | Role                                                            |
-| ---------------------------------------- | --------------------------------------------------------------- |
-| `external-hooks/src/oidc.ts`             | Registers OIDC routes, handles callback flow, provisions users. |
-| `external-hooks/src/api/utils/logger.ts` | Structured request, response, and error logging helpers.        |
+| Path                                                  | Role                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------- |
+| `external-hooks/src/oidc.ts`                          | Registers OIDC routes, handles callback flow, provisions users. |
+| `external-hooks/src/api/hooks.ts`                     | Serves the OIDC frontend assets under `/assets`.                |
+| `external-hooks/src/api/assets/oidc-frontend-hook.js` | Standalone browser script for the sign-in page.                 |
+| `external-hooks/src/api/utils/logger.ts`              | Structured request, response, and error logging helpers.        |
 
 ---
 
@@ -50,6 +52,7 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 - Injects an SSO button into the sign-in page.
 - Hides the normal email/password form by default.
 - Allows fallback to the normal form with `?showLogin=true`.
+- **Implementation:** served as a static file from `external-hooks/src/api/assets`.
 
 ---
 
