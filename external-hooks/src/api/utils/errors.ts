@@ -16,12 +16,6 @@ export class AppError extends Error {
   }
 }
 
-/** Wraps an async route so rejections are passed to Express `next` (central error handler). */
-export const wrapAsyncRoute =
-  <T extends Request>(fn: (req: T, res: Response, next: NextFunction) => Promise<unknown>) =>
-  (req: T, res: Response, next: NextFunction) =>
-    Promise.resolve(fn(req, res, next)).catch(next);
-
 export const handleErrorResponse = (err: Error | AppError, _req: Request, res: Response, _next: NextFunction) => {
   const statusCode = err instanceof AppError ? err.statusCode : 500;
   const message = err.message || 'Internal Server Error';

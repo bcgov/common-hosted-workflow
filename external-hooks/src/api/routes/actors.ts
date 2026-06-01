@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import { requireChwfAllowedProjectIds, requireExecutionInTenantScope } from '../helpers/n8n-validation';
+import { requireExecutionInTenantScope } from '../helpers/n8n-validation';
+import { sendValidatedJson } from './helpers/responses';
+import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
   createActionRequestResponseSchema,
   getActorActionByIdSchema,
@@ -13,8 +15,8 @@ import {
 } from '../schemas/action-request';
 import { listActorMessagesResponseSchema, listActorMessagesSchema, mapMessageRowToResponse } from '../schemas/message';
 import type { ApiRouteContext } from '../types/routes';
-import { AppError, wrapAsyncRoute } from '../utils/errors';
-import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import { AppError } from '../utils/errors';
+import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 
 export function buildActorRouter({
   apiKeyAuthMiddleware,
@@ -31,9 +33,9 @@ export function buildActorRouter({
     apiKeyAuthMiddleware,
     workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(listActorMessagesSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(listActorMessagesSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
+      const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
       const { workflowInstanceId } = parsed.query;
       await requireExecutionInTenantScope({
         executionRepository: execution,
@@ -48,9 +50,8 @@ export function buildActorRouter({
         workflowInstanceId,
         limit: parsed.query.limit ?? 50,
       });
-      const payload = parseValidatedResponse(listActorMessagesResponseSchema, rows.map(mapMessageRowToResponse));
-      res.status(200).json(payload);
-    }),
+      sendValidatedJson(res, 200, listActorMessagesResponseSchema, rows.map(mapMessageRowToResponse));
+    },
   );
 
   router.get(
@@ -58,22 +59,17 @@ export function buildActorRouter({
     apiKeyAuthMiddleware,
     workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(getActorActionByIdSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(getActorActionByIdSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(
-        res,
-        'GET /v1/actors/:actorId/actions/:actionId',
-        'actions',
-      );
+      const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/actions/:actionId', 'actions');
       const row = await actionRequestRepository.getById({
         allowedProjectIds,
         actionId: parsed.params.actionId,
         actorId: parsed.params.actorId,
       });
       if (!row) throw new AppError(404, 'Action not found');
-      const payload = parseValidatedResponse(createActionRequestResponseSchema, mapActionRequestRowToResponse(row));
-      res.status(200).json(payload);
-    }),
+      sendValidatedJson(res, 200, createActionRequestResponseSchema, mapActionRequestRowToResponse(row));
+    },
   );
 
   router.get(
@@ -81,9 +77,9 @@ export function buildActorRouter({
     apiKeyAuthMiddleware,
     workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(listActorActionsSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(listActorActionsSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(res, 'GET /v1/actors/:actorId/actions', 'actions');
+      const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/actions', 'actions');
       const { since, limit, workflowInstanceId } = parsed.query;
 
       await requireExecutionInTenantScope({
@@ -102,9 +98,8 @@ export function buildActorRouter({
       });
       const items = rows.map(mapActionRequestRowToResponse);
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
-      const payload = parseValidatedResponse(listActionsResponseSchema, { items, nextCursor });
-      res.status(200).json(payload);
-    }),
+      sendValidatedJson(res, 200, listActionsResponseSchema, { items, nextCursor });
+    },
   );
 
   router.patch(
@@ -112,9 +107,9 @@ export function buildActorRouter({
     apiKeyAuthMiddleware,
     workflowInteractionTenantMiddleware,
     createRequestSchemaValidator(patchActorActionStatusSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(patchActorActionStatusSchema, req);
-      const allowedProjectIds = requireChwfAllowedProjectIds(
+      const allowedProjectIds = getTenantScopedProjectIds(
         res,
         'PATCH /v1/actors/:actorId/actions/:actionId',
         'actions',
@@ -127,12 +122,11 @@ export function buildActorRouter({
         status: patchStatus,
       });
       if (!updated) throw new AppError(404, 'Action not found');
-      const payload = parseValidatedResponse(patchActionStatusResponseSchema, {
+      sendValidatedJson(res, 200, patchActionStatusResponseSchema, {
         status: patchStatus,
         message: formatPatchActionStatusMessage(patchStatus),
       });
-      res.status(200).json(payload);
-    }),
+    },
   );
 
   return router;

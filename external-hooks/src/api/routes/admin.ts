@@ -11,9 +11,11 @@ import {
   tenantProjectExistsResponseSchema,
   tenantProjectRelationSchema,
 } from '../schemas/admin';
+import { sendValidatedJson } from './helpers/responses';
+import type { N8nEntityRecord } from '../types/n8n-adapters';
 import type { ApiRouteContext } from '../types/routes';
-import { AppError, wrapAsyncRoute } from '../utils/errors';
-import { createRequestSchemaValidator, parseValidatedRequest, parseValidatedResponse } from '../utils/validation';
+import { AppError } from '../utils/errors';
+import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('CustomAPIs');
@@ -27,7 +29,7 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
     '/users/:email/project',
     adminAuthMiddleware,
     createRequestSchemaValidator(getUserProjectSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(getUserProjectSchema, req);
       const { email } = parsed.params;
 
@@ -38,19 +40,18 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
       }
 
       const personalProject = await project.getPersonalProjectForUserOrFail(foundUser.id);
-      const payload = parseValidatedResponse(getUserProjectResponseSchema, {
+      sendValidatedJson(res, 200, getUserProjectResponseSchema, {
         user: foundUser,
         project: personalProject,
       });
-      res.json(payload);
-    }),
+    },
   );
 
   router.post(
     '/associate-workflow',
     adminAuthMiddleware,
     createRequestSchemaValidator(associateWorkflowSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(associateWorkflowSchema, req);
       const { workflowId, projectId, singleOwner } = parsed.body;
 
@@ -69,26 +70,28 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         throw new AppError(404, 'Project not found.');
       }
 
-      await withTransaction(sharedWorkflow.manager, null, async (em: any) => {
+      await withTransaction(sharedWorkflow.manager, null, async (em) => {
         if (singleOwner) await em.delete('SharedWorkflow', { workflow: wf });
-        const newShare = em.create('SharedWorkflow', { project: proj, workflow: wf, role: 'workflow:owner' });
+        const newShare = em.create('SharedWorkflow', {
+          project: proj as N8nEntityRecord,
+          workflow: wf as N8nEntityRecord,
+          role: 'workflow:owner',
+        });
         await em.save(newShare);
       });
 
-      const payload = parseValidatedResponse(associateWorkflowResponseSchema, {
+      sendValidatedJson(res, 200, associateWorkflowResponseSchema, {
         success: true as const,
         message: `Workflow '${workflowId}' successfully associated with project '${projectId}'`,
       });
-
-      res.json(payload);
-    }),
+    },
   );
 
   router.post(
     '/associate-credential',
     adminAuthMiddleware,
     createRequestSchemaValidator(associateCredentialSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(associateCredentialSchema, req);
       const { credentialId, projectId, singleOwner } = parsed.body;
 
@@ -107,25 +110,28 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         throw new AppError(404, 'Project not found.');
       }
 
-      await withTransaction(sharedCredential.manager, null, async (em: any) => {
+      await withTransaction(sharedCredential.manager, null, async (em) => {
         if (singleOwner) await em.delete('SharedCredentials', { credentials: cred });
-        const newShare = em.create('SharedCredentials', { project: proj, credentials: cred, role: 'credential:owner' });
+        const newShare = em.create('SharedCredentials', {
+          project: proj as N8nEntityRecord,
+          credentials: cred as N8nEntityRecord,
+          role: 'credential:owner',
+        });
         await em.save(newShare);
       });
 
-      const payload = parseValidatedResponse(associateCredentialResponseSchema, {
+      sendValidatedJson(res, 200, associateCredentialResponseSchema, {
         success: true as const,
         message: `Credential '${credentialId}' successfully associated with project '${projectId}'`,
       });
-      res.json(payload);
-    }),
+    },
   );
 
   router.post(
     '/tenant-project-relation',
     adminAuthMiddleware,
     createRequestSchemaValidator(tenantProjectRelationSchema),
-    wrapAsyncRoute(async (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(tenantProjectRelationSchema, req);
       const { tenantId, projectId } = parsed.body;
 
@@ -141,11 +147,11 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
 
       const result = await tenantProjectRelation.insertTenantProjectRelation({ tenantId, projectId });
       if (result.created) {
-        const payload = parseValidatedResponse(tenantProjectCreatedResponseSchema, {
+        sendValidatedJson(res, 201, tenantProjectCreatedResponseSchema, {
           success: true as const,
           message: `Inserted tenant/project relation tenantId=${tenantId} projectId=${projectId}`,
         });
-        return res.status(201).json(payload);
+        return;
       }
 
       if (result.conflictProjectId) {
@@ -160,12 +166,11 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         });
       }
 
-      const payload = parseValidatedResponse(tenantProjectExistsResponseSchema, {
+      sendValidatedJson(res, 200, tenantProjectExistsResponseSchema, {
         success: true as const,
         message: 'Relation already exists.',
       });
-      res.status(200).json(payload);
-    }),
+    },
   );
 
   return router;
