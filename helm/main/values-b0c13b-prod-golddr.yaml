@@ -61,7 +61,9 @@ dns-probe:
   enabled: false
   env:
     APP_ENV: "production"
-    DOMAIN_NAME: ""
-    PRIMARY_IPS: ""
-    SECONDARY_IPS: ""
-    ALERT_EMAIL_RECIPIENTS: ""
+  secret:
+    env:
+      DOMAIN_NAME: ""
+      PRIMARY_IPS: ""
+      SECONDARY_IPS: ""
+      ALERT_EMAIL_RECIPIENTS: ""
