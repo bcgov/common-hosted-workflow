@@ -31,16 +31,18 @@ affinity: {}
 deploymentStrategy:
   type: Recreate
 
+route:
+  enabled: false
+  host: ""
+
 service:
   type: ClusterIP
   port: 8000
 
+envSecretName: ""
+
 env:
   APP_ENV: "production"
-  DOMAIN_NAME: ""
-  PRIMARY_IPS: ""
-  SECONDARY_IPS: ""
-  ALERT_EMAIL_RECIPIENTS: ""
   SMTP_HOST: "apps.smtp.gov.bc.ca"
   SMTP_PORT: "25"
   SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
