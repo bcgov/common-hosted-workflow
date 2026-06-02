@@ -50,9 +50,3 @@ dns-probe:
   enabled: false
   env:
     APP_ENV: "test"
-  secret:
-    env:
-      DOMAIN_NAME: ""
-      PRIMARY_IPS: ""
-      SECONDARY_IPS: ""
-      ALERT_EMAIL_RECIPIENTS: ""

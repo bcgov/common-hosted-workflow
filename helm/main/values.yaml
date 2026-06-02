@@ -270,22 +270,15 @@ dns-probe:
     tag: main
     pullPolicy: IfNotPresent
 
+  envSecretName: chwf-dns-probe # pragma: allowlist secret
+
   env:
     APP_ENV: "production"
+    SMTP_HOST: "apps.smtp.gov.bc.ca"
+    SMTP_PORT: "25"
+    SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
     POLL_INTERVAL: "5"
     ALERT_ON_STARTUP: "false"
-
-  secret:
-    create: true
-    name: "chwf-dns-probe"
-    env:
-      DOMAIN_NAME: ""
-      PRIMARY_IPS: ""
-      SECONDARY_IPS: ""
-      ALERT_EMAIL_RECIPIENTS: ""
-      SMTP_HOST: "apps.smtp.gov.bc.ca"
-      SMTP_PORT: "25"
-      SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
 
   resources:
     requests:

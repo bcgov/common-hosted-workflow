@@ -45,9 +45,11 @@ spec:
           {{- end }}
           image: "{{ $imageRepository }}:{{ $deploymentTag }}"
           imagePullPolicy: {{ $imagePullPolicy }}
+          {{- if .Values.envSecretName }}
           envFrom:
             - secretRef:
-                name: {{ .Values.secret.name }}
+                name: {{ .Values.envSecretName }}
+          {{- end }}
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key | quote }}
