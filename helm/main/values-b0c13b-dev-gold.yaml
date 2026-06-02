@@ -52,8 +52,8 @@ pgo:
           storageClassName: netapp-file-standard
 
         schedules:
-          full: 0 8 * * *
-          incremental: 0 0,4,12,16,20 * * *
+          full: "0 7 * * 1-5"             # Environment reset/cleanup at 7:00 AM before work starts (Mon-Fri)
+          incremental: "0 9-17/2 * * 1-5" # Fast sync every 2 hours during working hours (Mon-Fri)
 
       - name: repo2
         enabled: true
@@ -61,27 +61,17 @@ pgo:
         secretName: objectstorage-creds # pragma: allowlist secret
         retention: "30"
         retentionType: time
-
         s3:
           bucket: workflow-dev
           endpoint: commonservices.objectstore.gov.bc.ca
           region: ca-central-1
           path: /backups/pgo
           uriStyle: path
-
         schedules:
-          full: 0 8 * * *
-          incremental: 0 0,4,12,16,20 * * *
-
+          full: "0 7 * * 1-5"             # Environment reset/cleanup at 7:00 AM before work starts (Mon-Fri)
+          incremental: "0 9-17/2 * * 1-5" # Fast sync every 2 hours during working hours (Mon-Fri)
   dataSource:
     enabled: false
-    secretName: objectstorage-creds # pragma: allowlist secret
     repo:
-      name: repo2
-      provider: s3
-      path: /backups/pgo
       s3:
         bucket: workflow-dev
-        endpoint: commonservices.objectstore.gov.bc.ca
-        region: ca-central-1
-        uriStyle: path

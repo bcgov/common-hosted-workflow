@@ -56,6 +56,11 @@ pgo:
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+  dataSource:
+    enabled: false
+    repo:
+      s3:
+        bucket: workflow-prod
 
 dns-probe:
   enabled: false

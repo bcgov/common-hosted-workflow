@@ -258,6 +258,18 @@ pgo:
     dataVolumeClaimSpec:
       storage: 1Gi
 
+  dataSource:
+    enabled: false
+    secretName: objectstorage-creds # pragma: allowlist secret
+    repo:
+      name: repo2
+      provider: s3
+      path: /backups/pgo
+      s3:
+        endpoint: commonservices.objectstore.gov.bc.ca
+        region: ca-central-1
+        uriStyle: path
+
 # dns-probe — disabled by default, enabled only for golddr deployments
 dns-probe:
   enabled: false

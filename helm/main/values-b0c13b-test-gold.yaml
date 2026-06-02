@@ -45,5 +45,25 @@ pgo:
           accessModes: ReadWriteOnce
           storageClassName: netapp-file-standard
         schedules:
-          full: 0 8 * * *
-          incremental: 0 0,4,12,16,20 * * *
+          full: "0 3 * * 1-5"             # Full database refresh and log purge at 3:00 AM (Mon-Fri)
+          incremental: "30 22 * * 1-5"    # Nightly automation/test sweep at 10:30 PM (Mon-Fri)
+      - name: repo2
+        enabled: true
+        type: s3
+        secretName: objectstorage-creds # pragma: allowlist secret
+        retention: "30"
+        retentionType: time
+        s3:
+          bucket: workflow-test
+          endpoint: commonservices.objectstore.gov.bc.ca
+          region: ca-central-1
+          path: /backups/pgo
+          uriStyle: path
+        schedules:
+          full: "0 3 * * 1-5"             # Full database refresh and log purge at 3:00 AM (Mon-Fri)
+          incremental: "30 22 * * 1-5"    # Nightly automation/test sweep at 10:30 PM (Mon-Fri)
+  dataSource:
+    enabled: false
+    repo:
+      s3:
+        bucket: workflow-test
