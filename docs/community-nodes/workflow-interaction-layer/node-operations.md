@@ -82,8 +82,58 @@ Creates a new action in the WIL-API Layer.
 **Action Type Guidance:**
 
 - `getapproval` — Use when a human needs to approve or reject something. The `payload` is free-form (e.g. `{ "applicationId": 42, "applicant": "alice@example.com" }`).
-- `showform` — Use when a user needs to fill out a form. Include `formId`, `formVersion`, and `returnUrl` in the payload.
+- `showform` — Use when a user needs to fill out a form. See the **showform Payload Reference** section below for all supported fields.
 - `waitonevent` — Use when the workflow should pause until an external event occurs. Include `eventName` in the payload.
+
+#### showform Payload Reference
+
+When `actionType` is `showform`, the `payload` JSON object supports the following fields:
+
+| Field                                   | Type   | Required | Description                                                                                                                                                                   |
+| --------------------------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `formId` / `FormID`                     | string | Yes      | The CHEFS form UUID to render                                                                                                                                                 |
+| `FormName` / `formName`                 | string | No       | Display name shown to the user in the action card                                                                                                                             |
+| `FormAPIKey` / `formApiKey`             | string | Yes      | CHEFS API key used server-side to obtain a short-lived JWT. **Never exposed to the browser** — the SDG backend strips it before returning actions to the frontend.            |
+| `FormPreFillData` / `formPreFillData`   | object | No       | Key-value pairs matching CHEFS form field API names. When present, the form opens with these fields pre-populated. See [Pre-Filling Form Data](#pre-filling-form-data) below. |
+| `FormSubmissionId` / `formSubmissionId` | string | No       | An existing CHEFS submission ID. When provided, the form loads that submission for editing instead of rendering a blank form. Takes precedence over `FormPreFillData`.        |
+| `formVersion`                           | string | No       | CHEFS form version to render (optional)                                                                                                                                       |
+| `returnUrl`                             | string | No       | URL to redirect to after submission (optional, not currently used by the SDG mock app)                                                                                        |
+
+> Both PascalCase (`FormPreFillData`) and camelCase (`formPreFillData`) are accepted. The frontend checks both casings.
+
+#### Pre-Filling Form Data
+
+`FormPreFillData` allows a workflow to pre-populate CHEFS form fields when presenting a `showform` action to a user. This is useful when the workflow already has data (from a previous form submission, a database lookup, or computed values) that should appear as defaults in the form.
+
+**How it works:**
+
+1. The n8n workflow creates a `showform` action with `FormPreFillData` in the payload.
+2. The SDG frontend receives the action (with `FormAPIKey` stripped) and extracts `FormPreFillData`.
+3. When the user clicks "Fill Form", the frontend opens the CHEFS form viewer.
+4. Once the `<chefs-form-viewer>` web component fires its `formio:ready` event, the frontend calls `setSubmission(prefillData)` on the web component to inject the values.
+5. The user sees the form with fields already filled in and can modify or submit as-is.
+
+**Example payload:**
+
+```json
+{
+  "formId": "abc123-def456-ghi789",
+  "FormName": "Employee Onboarding",
+  "FormAPIKey": "<your-form-api-key>",
+  "FormPreFillData": {
+    "firstName": "Alice",
+    "lastName": "Smith",
+    "department": "Engineering",
+    "startDate": "2026-06-01"
+  }
+}
+```
+
+**Important notes:**
+
+- The keys in `FormPreFillData` must match the CHEFS form field **API names** (the `key` property in the form.io schema), not the display labels.
+- If `FormSubmissionId` is also present, it takes precedence — the form loads the existing submission and `FormPreFillData` is ignored.
+- `FormPreFillData` is not sensitive and is passed through to the browser (unlike `FormAPIKey` which is stripped).
 
 ### Get
 

@@ -187,7 +187,8 @@ export const actionCreateProperties: INodeProperties[] = [
     type: 'json',
     default: '{}',
     required: true,
-    description: 'For "showform": include formId, formVersion, returnUrl. For "getapproval": free-form JSON.',
+    description:
+      'For "showform": include formId (required), FormAPIKey (required), FormName, FormPreFillData (object of field keys to pre-populate), FormSubmissionId (to load existing submission). For "getapproval": include option (array of choices). For "waitonevent": include eventName.',
     displayOptions: { show: { resource: ['action'], operation: ['create'] } },
   },
   {
