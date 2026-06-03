@@ -22,11 +22,15 @@ export const handleErrorResponse = (err: Error | AppError, _req: Request, res: R
 
   log.error(message, { statusCode, stack: process.env.NODE_ENV === 'development' ? err.stack : undefined });
 
-  res.status(statusCode).json({
-    status: 'error',
-    statusCode,
-    message,
-    ...(err instanceof AppError && err.details ? err.details : {}),
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-  });
+  const error: Record<string, unknown> = { message };
+
+  if (err instanceof AppError && err.details) {
+    error.details = err.details;
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    error.stack = err.stack;
+  }
+
+  res.status(statusCode).json({ error });
 };

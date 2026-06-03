@@ -15,6 +15,7 @@ import {
   verifySignedCookie,
 } from '../helpers/n8n-oidc';
 import { createLogger, logError } from '../utils/logger';
+import { InternalServerErrorResponse } from './responses';
 
 const log = createLogger('OIDCHook');
 
@@ -101,7 +102,7 @@ export function buildOidcRouter({ dbCollections, jwtService, userService, config
       res.redirect(authRequest.authorizationUrl);
     } catch (error) {
       logError(log, error, { context: 'OIDC login' });
-      res.status(500).send('OIDC configuration error. Please check the logs.');
+      InternalServerErrorResponse(res, { context: 'OIDC login' });
     }
   });
 

@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { sendValidatedJson } from './helpers/responses';
+import { OkResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 import {
@@ -38,28 +39,6 @@ function appendQueryParam(returnTo: string, key: string, value: string) {
   }
 }
 
-function buildUnauthorizedResponse(route: string, method: string, userAgent: string | null) {
-  return { ok: false, route, method, userAgent };
-}
-
-function getRequestUserAgent(req: Request) {
-  return req.get('user-agent') ?? null;
-}
-
-async function requireUiSession(
-  req: UiApiMutableRequest,
-  res: Response,
-  route: string,
-): Promise<UiAuthenticatedSession | null> {
-  const session = req.session ?? (await getUiSession(req));
-  if (session) {
-    return session;
-  }
-
-  res.status(401).json(buildUnauthorizedResponse(route, req.method, getRequestUserAgent(req)));
-  return null;
-}
-
 function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
   return async (req: UiApiMutableRequest, _res: Response, next: NextFunction) => {
     try {
@@ -87,7 +66,7 @@ function requireUiRequestContextMiddleware(services: ApiRouteContext['services']
     });
 
     if (!req.session || !req.context) {
-      res.status(401).json(buildUnauthorizedResponse(req.path, req.method, getRequestUserAgent(req)));
+      UnauthorizedResponse(res);
       return;
     }
 
@@ -142,7 +121,7 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
   router.get('/whoami', requireUiRequestContext, async (req, res) => {
     const { session } = req as UiApiRequest;
 
-    res.json({
+    OkResponse(res, {
       ok: true,
       route: '/ui-api/whoami',
       method: req.method,
@@ -157,14 +136,14 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
         claims: session.claims,
       },
       n8nUser: session.n8nUser,
-      userAgent: getRequestUserAgent(req),
+      userAgent: req.get('user-agent'),
     });
   });
 
   router.get('/workflows', requireUiRequestContext, async (req, res) => {
     const { context } = req as UiApiRequest;
 
-    res.json({
+    OkResponse(res, {
       ok: true,
       route: '/ui-api/workflows',
       method: req.method,
