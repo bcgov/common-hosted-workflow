@@ -15,16 +15,46 @@ vi.mock('../../../src/api/helpers/ui-oidc-session', async () => {
   };
 });
 
-import { buildUiApiRouter } from '../../../src/api/routes/ui-api';
+import { buildUiApiRouter, createUiRequestContextMiddleware } from '../../../src/api/routes/ui-api';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 
-function getRouteHandler(router: any, method: string, path: string) {
+function getRouteHandlers(router: any, method: string, path: string) {
   for (const layer of router.stack) {
     if (layer.route && layer.route.path === path && layer.route.methods[method.toLowerCase()]) {
-      return layer.route.stack[layer.route.stack.length - 1].handle;
+      return layer.route.stack.map((stackLayer: { handle: (...args: any[]) => unknown }) => stackLayer.handle);
     }
   }
-  return null;
+  return [];
+}
+
+async function runRoute(router: any, method: string, path: string, req: any, res: any) {
+  const handlers = getRouteHandlers(router, method, path);
+  let index = 0;
+
+  const next = async (error?: unknown) => {
+    if (error) {
+      throw error;
+    }
+
+    const handler = handlers[index++];
+    if (handler) {
+      await handler(req, res, next);
+    }
+  };
+
+  await next();
+}
+
+async function runProtectedRoute(services: any, method: string, path: string, req: any, res: any) {
+  const middleware = createUiRequestContextMiddleware(services);
+  await middleware(req, res, (error?: unknown) => {
+    if (error) {
+      throw error;
+    }
+  });
+
+  const router = buildUiApiRouter({ services } as any);
+  await runRoute(router, method, path, req, res);
 }
 
 beforeEach(() => {
@@ -45,15 +75,25 @@ beforeEach(() => {
 
 describe('GET /ui-api/whoami', () => {
   it('delegates to the ui api service', async () => {
-    const uiApi = {};
-    const router = buildUiApiRouter({ services: { uiApi } } as any);
-    const handler = getRouteHandler(router, 'get', '/whoami');
+    const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        accessibleProjectIds: ['proj-1'],
+        projects: [],
+        workflows: [],
+      }),
+    };
     const req = createMockRequest({ get: vi.fn(() => undefined) as any });
     const res = createMockResponse();
 
-    await handler(req as any, res as any, vi.fn());
+    await runProtectedRoute({ uiApi }, 'get', '/whoami', req as any, res as any);
 
     expect(getUiSessionMock).toHaveBeenCalledWith(req);
+    expect(uiApi.loadUserContext).toHaveBeenCalledWith('person@example.com');
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         n8nUser: {
@@ -69,13 +109,25 @@ describe('GET /ui-api/whoami', () => {
 describe('GET /ui-api/workflows', () => {
   it('delegates to the ui api service', async () => {
     const uiApi = {
-      getWorkflows: vi.fn().mockResolvedValue({
+      loadUserContext: vi.fn().mockResolvedValue({
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
           role: { slug: 'global:member', displayName: 'Member' },
         },
         accessibleProjectIds: ['proj-1'],
+        projects: [
+          {
+            id: 'proj-1',
+            name: 'Project One',
+            type: 'personal',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-01T00:00:00.000Z',
+            icon: null,
+            description: null,
+            creatorId: 'user-123',
+          },
+        ],
         workflows: [
           {
             workflowId: 'wf-1',
@@ -86,16 +138,20 @@ describe('GET /ui-api/workflows', () => {
         ],
       }),
     };
-    const router = buildUiApiRouter({ services: { uiApi } } as any);
-    const handler = getRouteHandler(router, 'get', '/workflows');
     const req = createMockRequest({ get: vi.fn(() => undefined) as any });
     const res = createMockResponse();
 
-    await handler(req as any, res as any, vi.fn());
+    await runProtectedRoute({ uiApi }, 'get', '/workflows', req as any, res as any);
 
-    expect(uiApi.getWorkflows).toHaveBeenCalledWith('person@example.com');
+    expect(uiApi.loadUserContext).toHaveBeenCalledWith('person@example.com');
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
+        projects: [
+          expect.objectContaining({
+            id: 'proj-1',
+            name: 'Project One',
+          }),
+        ],
         workflows: [
           {
             workflowId: 'wf-1',
@@ -112,13 +168,21 @@ describe('GET /ui-api/workflows', () => {
 describe('POST /ui-api/workflows/:workflowId/share', () => {
   it('delegates to the ui api service', async () => {
     const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        accessibleProjectIds: ['proj-1'],
+        projects: [],
+        workflows: [],
+      }),
       shareWorkflow: vi.fn().mockResolvedValue({
         workflowId: 'wf-1',
         sharedWithEmail: 'new@example.com',
       }),
     };
-    const router = buildUiApiRouter({ services: { uiApi } } as any);
-    const handler = getRouteHandler(router, 'post', '/workflows/:workflowId/share');
     const req = createMockRequest({
       params: { workflowId: 'wf-1' },
       body: { email: 'new@example.com' },
@@ -126,8 +190,9 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
     });
     const res = createMockResponse();
 
-    await handler(req as any, res as any, vi.fn());
+    await runProtectedRoute({ uiApi }, 'post', '/workflows/:workflowId/share', req as any, res as any);
 
+    expect(uiApi.loadUserContext).toHaveBeenCalledWith('person@example.com');
     expect(uiApi.shareWorkflow).toHaveBeenCalledWith('person@example.com', 'wf-1', 'new@example.com');
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(
@@ -142,21 +207,30 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
 describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
   it('delegates to the ui api service', async () => {
     const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        accessibleProjectIds: ['proj-1'],
+        projects: [],
+        workflows: [],
+      }),
       unshareWorkflow: vi.fn().mockResolvedValue({
         workflowId: 'wf-1',
         projectId: 'proj-1',
       }),
     };
-    const router = buildUiApiRouter({ services: { uiApi } } as any);
-    const handler = getRouteHandler(router, 'delete', '/workflows/:workflowId/projects/:projectId');
     const req = createMockRequest({
       params: { workflowId: 'wf-1', projectId: 'proj-1' },
       get: vi.fn(() => undefined) as any,
     });
     const res = createMockResponse();
 
-    await handler(req as any, res as any, vi.fn());
+    await runProtectedRoute({ uiApi }, 'delete', '/workflows/:workflowId/projects/:projectId', req as any, res as any);
 
+    expect(uiApi.loadUserContext).toHaveBeenCalledWith('person@example.com');
     expect(uiApi.unshareWorkflow).toHaveBeenCalledWith('person@example.com', 'wf-1', 'proj-1');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(

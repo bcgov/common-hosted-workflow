@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { sendValidatedJson } from './helpers/responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
@@ -11,6 +11,17 @@ import {
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
 import { getUiSession, getUiSessionSummary, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
 import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
+import type { UiApiContext } from '../types/ui-api';
+
+type UiApiRequest = Request & {
+  session: UiAuthenticatedSession;
+  context: UiApiContext;
+};
+
+type UiApiMutableRequest = Request & {
+  session?: UiAuthenticatedSession;
+  context?: UiApiContext;
+};
 
 function appendTokenToReturnTo(returnTo: string, token: string) {
   return appendQueryParam(returnTo, 'token', token);
@@ -35,14 +46,47 @@ function getRequestUserAgent(req: Request) {
   return req.get('user-agent') ?? null;
 }
 
-async function requireUiSession(req: Request, res: Response, route: string): Promise<UiAuthenticatedSession | null> {
-  const session = await getUiSession(req);
+async function requireUiSession(
+  req: UiApiMutableRequest,
+  res: Response,
+  route: string,
+): Promise<UiAuthenticatedSession | null> {
+  const session = req.session ?? (await getUiSession(req));
   if (session) {
     return session;
   }
 
   res.status(401).json(buildUnauthorizedResponse(route, req.method, getRequestUserAgent(req)));
   return null;
+}
+
+function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
+  return async (req: UiApiMutableRequest, _res: Response, next: NextFunction) => {
+    try {
+      const session = await getUiSession(req);
+      if (session) {
+        req.session = session;
+        req.context = await services.uiApi.loadUserContext(session.email);
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+export { createUiRequestContextMiddleware };
+
+function requireUiRequestContext(req: UiApiMutableRequest, res: Response, route: string): UiApiRequest | null {
+  const session = req.session;
+  const context = req.context;
+  if (!session || !context) {
+    res.status(401).json(buildUnauthorizedResponse(route, req.method, getRequestUserAgent(req)));
+    return null;
+  }
+
+  return req as UiApiRequest;
 }
 
 export function buildUiApiRouter({ services }: ApiRouteContext) {
@@ -87,10 +131,12 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
   });
 
   router.get('/whoami', async (req, res) => {
-    const session = await requireUiSession(req, res, '/ui-api/whoami');
-    if (!session) {
+    const uiReq = requireUiRequestContext(req, res, '/ui-api/whoami');
+    if (!uiReq) {
       return;
     }
+
+    const { session } = uiReq;
 
     res.json({
       ok: true,
@@ -112,12 +158,12 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
   });
 
   router.get('/workflows', async (req, res) => {
-    const session = await requireUiSession(req, res, '/ui-api/workflows');
-    if (!session) {
+    const uiReq = requireUiRequestContext(req, res, '/ui-api/workflows');
+    if (!uiReq) {
       return;
     }
 
-    const context = await services.uiApi.getWorkflows(session.email);
+    const { context } = uiReq;
 
     res.json({
       ok: true,
@@ -125,18 +171,19 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
       method: req.method,
       n8nUser: serializeN8nUser(context.n8nUser),
       accessibleProjectIds: context.accessibleProjectIds,
+      projects: context.projects,
       workflows: context.workflows,
     });
   });
 
   router.post('/workflows/:workflowId/share', createRequestSchemaValidator(shareWorkflowSchema), async (req, res) => {
-    const session = await requireUiSession(req, res, '/ui-api/workflows/:workflowId/share');
-    if (!session) {
+    const uiReq = requireUiRequestContext(req, res, '/ui-api/workflows/:workflowId/share');
+    if (!uiReq) {
       return;
     }
 
     const parsed = parseValidatedRequest(shareWorkflowSchema, req);
-    const result = await services.uiApi.shareWorkflow(session.email, parsed.params.workflowId, parsed.body.email);
+    const result = await services.uiApi.shareWorkflow(uiReq.session.email, parsed.params.workflowId, parsed.body.email);
 
     sendValidatedJson(res, 201, shareWorkflowResponseSchema, {
       success: true as const,
@@ -150,14 +197,14 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     '/workflows/:workflowId/projects/:projectId',
     createRequestSchemaValidator(unshareWorkflowSchema),
     async (req, res) => {
-      const session = await requireUiSession(req, res, '/ui-api/workflows/:workflowId/projects/:projectId');
-      if (!session) {
+      const uiReq = requireUiRequestContext(req, res, '/ui-api/workflows/:workflowId/projects/:projectId');
+      if (!uiReq) {
         return;
       }
 
       const parsed = parseValidatedRequest(unshareWorkflowSchema, req);
       const result = await services.uiApi.unshareWorkflow(
-        session.email,
+        uiReq.session.email,
         parsed.params.workflowId,
         parsed.params.projectId,
       );
