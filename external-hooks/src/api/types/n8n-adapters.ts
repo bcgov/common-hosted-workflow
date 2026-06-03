@@ -5,6 +5,15 @@ import type { User } from './user';
 
 export type N8nEntityRecord = Record<string, unknown> & { id: string };
 export type N8nUserRecord = Record<string, unknown> & { id: string; email: string };
+export type N8nProjectRecord = N8nEntityRecord & {
+  name: string;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
+  icon: string | null;
+  description: string | null;
+  creatorId: string | null;
+};
 
 export type N8nApiKeyUserLookup = {
   findOne: (options: {
@@ -30,9 +39,9 @@ export type N8nAdminUserLookup = {
 export type N8nUserRepository = N8nApiKeyUserLookup & N8nUiUserLookup & N8nAdminUserLookup;
 
 export type N8nProjectRepository = {
-  findOneBy: (where: { id: string }) => Promise<N8nEntityRecord | null>;
-  getPersonalProjectForUser: (userId: string) => Promise<N8nEntityRecord | null>;
-  getPersonalProjectForUserOrFail: (userId: string) => Promise<N8nEntityRecord>;
+  findOneBy: (where: { id: string }) => Promise<N8nProjectRecord | null>;
+  getPersonalProjectForUser: (userId: string) => Promise<N8nProjectRecord | null>;
+  getPersonalProjectForUserOrFail: (userId: string) => Promise<N8nProjectRecord>;
 };
 
 export type N8nProjectRelationRepository = {

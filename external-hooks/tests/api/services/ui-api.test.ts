@@ -32,7 +32,16 @@ describe('UiApiService', () => {
       email: 'owner@example.com',
       role: { slug: 'global:owner', displayName: 'Owner' },
     });
-    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({ id: VALID_PROJECT_ID });
+    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({
+      id: VALID_PROJECT_ID,
+      name: 'Default project',
+      type: 'personal',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      icon: null,
+      description: null,
+      creatorId: 'user-123',
+    });
     n8nRepos.projectRelation.findAllByUser.mockResolvedValue([{ projectId: VALID_PROJECT_ID }]);
     n8nRepos.sharedWorkflow.manager.query.mockResolvedValue([
       { workflowId: 'wf-1', workflowName: 'First workflow', projectId: VALID_PROJECT_ID },
@@ -48,6 +57,18 @@ describe('UiApiService', () => {
 
     expect(n8nRepos.sharedWorkflow.manager.query).toHaveBeenCalledTimes(1);
     expect(n8nRepos.sharedWorkflow.manager.query.mock.calls[0][1]).toBeUndefined();
+    expect(result.projects).toEqual([
+      {
+        id: VALID_PROJECT_ID,
+        name: 'Default project',
+        type: 'personal',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+        icon: null,
+        description: null,
+        creatorId: 'user-123',
+      },
+    ]);
     expect(result.workflows).toEqual([
       {
         workflowId: 'wf-1',
@@ -86,8 +107,8 @@ describe('UiApiService', () => {
       return null;
     });
     n8nRepos.project.getPersonalProjectForUser.mockImplementation(async (userId: string) => {
-      if (userId === 'user-123') return { id: VALID_PROJECT_ID };
-      if (userId === 'user-456') return { id: 'target-proj' };
+      if (userId === 'user-123') return { id: VALID_PROJECT_ID, name: 'Default project' } as any;
+      if (userId === 'user-456') return { id: 'target-proj', name: 'Target project' } as any;
       return null;
     });
     n8nRepos.projectRelation.findAllByUser.mockResolvedValue([
@@ -135,7 +156,10 @@ describe('UiApiService', () => {
       }
       return null;
     });
-    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({ id: VALID_PROJECT_ID });
+    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({
+      id: VALID_PROJECT_ID,
+      name: 'Default project',
+    } as any);
     n8nRepos.projectRelation.findAllByUser.mockResolvedValue([
       { projectId: VALID_PROJECT_ID },
       { projectId: 'team-proj' },
@@ -180,10 +204,13 @@ describe('UiApiService', () => {
       }
       return null;
     });
-    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({ id: VALID_PROJECT_ID });
+    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({
+      id: VALID_PROJECT_ID,
+      name: 'Default project',
+    } as any);
     n8nRepos.project.getPersonalProjectForUser.mockImplementation(async (userId: string) => {
-      if (userId === 'user-123') return { id: VALID_PROJECT_ID };
-      if (userId === 'user-456') return { id: 'target-proj' };
+      if (userId === 'user-123') return { id: VALID_PROJECT_ID, name: 'Default project' } as any;
+      if (userId === 'user-456') return { id: 'target-proj', name: 'Target project' } as any;
       return null;
     });
     n8nRepos.projectRelation.findAllByUser.mockResolvedValue([{ projectId: VALID_PROJECT_ID }]);
@@ -212,7 +239,10 @@ describe('UiApiService', () => {
       email: 'member@example.com',
       role: { slug: 'global:member', displayName: 'Member' },
     });
-    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({ id: VALID_PROJECT_ID });
+    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({
+      id: VALID_PROJECT_ID,
+      name: 'Default project',
+    } as any);
     n8nRepos.projectRelation.findAllByUser.mockResolvedValue([
       { projectId: VALID_PROJECT_ID },
       { projectId: 'team-proj' },
@@ -237,7 +267,10 @@ describe('UiApiService', () => {
       }
       return null;
     });
-    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({ id: VALID_PROJECT_ID });
+    n8nRepos.project.getPersonalProjectForUser.mockResolvedValue({
+      id: VALID_PROJECT_ID,
+      name: 'Default project',
+    } as any);
     n8nRepos.projectRelation.findAllByUser.mockResolvedValue([
       { projectId: VALID_PROJECT_ID },
       { projectId: 'team-proj' },

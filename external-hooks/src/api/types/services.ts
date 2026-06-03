@@ -1,6 +1,7 @@
 import type { User } from './user';
 import type { N8nUiUser } from '../../db/repository/n8n/user';
-import type { UiWorkflowSummary } from './ui-api';
+import type { N8nProjectRecord } from './n8n-adapters';
+import type { UiApiContext, UiWorkflowSummary } from './ui-api';
 
 export type ApiKeyLookupService = {
   getUserForApiKey: (token: string) => Promise<User | null>;
@@ -8,9 +9,11 @@ export type ApiKeyLookupService = {
 
 export type UiApiServiceContract = {
   getWhoami: (email?: string) => Promise<N8nUiUser | null>;
+  loadUserContext: (email?: string) => Promise<UiApiContext>;
   getWorkflows: (email?: string) => Promise<{
     n8nUser: N8nUiUser | null;
     accessibleProjectIds: string[];
+    projects: N8nProjectRecord[];
     workflows: UiWorkflowSummary[];
   }>;
   shareWorkflow: (
