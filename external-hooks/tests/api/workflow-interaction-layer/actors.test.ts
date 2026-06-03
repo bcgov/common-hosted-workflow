@@ -11,6 +11,8 @@ import {
   createMockActionRequestRepository,
   createMockMessageRepository,
   createMockN8nRepositories,
+  createMockActionService,
+  createMockMessageService,
   makeActionRequestRow,
   makeMessageRow,
   VALID_PROJECT_ID,
@@ -64,6 +66,12 @@ function createTestRouter() {
       tenantProjectRelation: {} as any,
       message: messageRepo as any,
       actionRequest: actionRequestRepo as any,
+    },
+    services: {
+      apiKey: {} as any,
+      uiApi: {} as any,
+      action: createMockActionService(actionRequestRepo, n8nRepos),
+      message: createMockMessageService(messageRepo, n8nRepos),
     },
   };
 

@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import { requireExecutionInTenantScope } from '../helpers/n8n-validation';
 import { sendValidatedJson } from './helpers/responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
@@ -15,17 +14,13 @@ import {
 } from '../schemas/action-request';
 import { listActorMessagesResponseSchema, listActorMessagesSchema, mapMessageRowToResponse } from '../schemas/message';
 import type { ApiRouteContext } from '../types/routes';
-import { AppError } from '../utils/errors';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 
 export function buildActorRouter({
   apiKeyAuthMiddleware,
   workflowInteractionTenantMiddleware,
-  n8nRepositories,
-  customRepositories,
+  services,
 }: ApiRouteContext) {
-  const { sharedWorkflow, execution } = n8nRepositories;
-  const { message: messageRepository, actionRequest: actionRequestRepository } = customRepositories;
   const router = Router();
 
   router.get(
@@ -37,18 +32,13 @@ export function buildActorRouter({
       const parsed = parseValidatedRequest(listActorMessagesSchema, req);
       const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
       const { workflowInstanceId } = parsed.query;
-      await requireExecutionInTenantScope({
-        executionRepository: execution,
-        workflowInstanceId,
-        allowedProjectIds,
-        sharedWorkflowRepository: sharedWorkflow,
-      });
-      const rows = await messageRepository.list({
+
+      const rows = await services.message.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
-        paginationSince: parsed.query.since,
         workflowInstanceId,
         limit: parsed.query.limit ?? 50,
+        since: parsed.query.since,
       });
       sendValidatedJson(res, 200, listActorMessagesResponseSchema, rows.map(mapMessageRowToResponse));
     },
@@ -62,12 +52,11 @@ export function buildActorRouter({
     async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(getActorActionByIdSchema, req);
       const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/actions/:actionId', 'actions');
-      const row = await actionRequestRepository.getById({
+      const row = await services.action.getById({
         allowedProjectIds,
         actionId: parsed.params.actionId,
         actorId: parsed.params.actorId,
       });
-      if (!row) throw new AppError(404, 'Action not found');
       sendValidatedJson(res, 200, createActionRequestResponseSchema, mapActionRequestRowToResponse(row));
     },
   );
@@ -82,19 +71,13 @@ export function buildActorRouter({
       const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/actions', 'actions');
       const { since, limit, workflowInstanceId } = parsed.query;
 
-      await requireExecutionInTenantScope({
-        executionRepository: execution,
-        workflowInstanceId,
-        allowedProjectIds,
-        sharedWorkflowRepository: sharedWorkflow,
-      });
       const pageLimit = limit ?? 50;
-      const rows = await actionRequestRepository.list({
+      const rows = await services.action.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
-        paginationSince: since,
         workflowInstanceId,
         limit: pageLimit,
+        since,
       });
       const items = rows.map(mapActionRequestRowToResponse);
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
@@ -115,13 +98,12 @@ export function buildActorRouter({
         'actions',
       );
       const patchStatus = parsed.body.status;
-      const updated = await actionRequestRepository.updateStatus({
+      await services.action.updateStatus({
         allowedProjectIds,
         actionId: parsed.params.actionId,
         actorId: parsed.params.actorId,
         status: patchStatus,
       });
-      if (!updated) throw new AppError(404, 'Action not found');
       sendValidatedJson(res, 200, patchActionStatusResponseSchema, {
         status: patchStatus,
         message: formatPatchActionStatusMessage(patchStatus),

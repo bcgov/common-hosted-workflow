@@ -1,0 +1,150 @@
+import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
+import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
+import type { N8nExecutionLookup } from '../helpers/n8n-validation';
+import type { N8nSharedWorkflowRepository } from '../types/n8n-adapters';
+import type { ActionRequestRepository } from '../../db/repository/workflow-interaction-layer/action-request';
+import { AppError } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+import { shortenIdForLog } from '../utils/string';
+
+const log = createLogger('CustomAPIs');
+
+export type ActionServiceDependencies = {
+  actionRequestRepository: ActionRequestRepository;
+  executionRepository: N8nExecutionLookup;
+  sharedWorkflowRepository: N8nSharedWorkflowRepository;
+};
+
+export type CreateActionParams = {
+  allowedProjectIds: string[];
+  actionType: string;
+  payload: Record<string, unknown>;
+  callbackUrl?: string;
+  callbackMethod?: string;
+  callbackPayloadSpec?: Record<string, unknown> | null;
+  actorId: string;
+  actorType: string;
+  workflowInstanceId: string;
+  workflowId: string;
+  status?: string;
+  priority?: string;
+  dueDate?: string | null;
+  checkIn?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type ListActionsParams = {
+  allowedProjectIds: string[];
+  actorId?: string;
+  workflowInstanceId?: string;
+  limit: number;
+  since?: import('../../types/list-pagination').ListPaginationSince;
+};
+
+export type GetActionByIdParams = {
+  allowedProjectIds: string[];
+  actionId: string;
+  actorId?: string;
+};
+
+export type UpdateActionStatusParams = {
+  allowedProjectIds: string[];
+  actionId: string;
+  actorId?: string;
+  status: string;
+};
+
+export class ActionService {
+  private readonly actionRequestRepository: ActionRequestRepository;
+  private readonly executionRepository: N8nExecutionLookup;
+  private readonly sharedWorkflowRepository: N8nSharedWorkflowRepository;
+
+  constructor(deps: ActionServiceDependencies) {
+    this.actionRequestRepository = deps.actionRequestRepository;
+    this.executionRepository = deps.executionRepository;
+    this.sharedWorkflowRepository = deps.sharedWorkflowRepository;
+  }
+
+  async create(params: CreateActionParams) {
+    const { dueDate, checkIn } = normalizeCreateActionTimestamps(params);
+    const callbackMethod = params.callbackMethod ?? 'POST';
+    const callbackUrl = callbackMethod === 'NONE' ? '' : (params.callbackUrl ?? '');
+
+    const projectId = await resolveProjectIdForCreate({
+      executionRepository: this.executionRepository,
+      sharedWorkflowRepository: this.sharedWorkflowRepository,
+      workflowInstanceId: params.workflowInstanceId,
+      workflowId: params.workflowId,
+      allowedProjectIds: params.allowedProjectIds,
+      logLabel: 'Create action',
+    });
+
+    try {
+      return await this.actionRequestRepository.create({
+        actionType: params.actionType,
+        payload: params.payload,
+        callbackUrl,
+        callbackMethod,
+        callbackPayloadSpec: params.callbackPayloadSpec ?? null,
+        actorId: params.actorId,
+        actorType: params.actorType,
+        workflowInstanceId: params.workflowInstanceId,
+        workflowId: params.workflowId,
+        projectId,
+        status: params.status ?? 'pending',
+        priority: params.priority ?? 'normal',
+        dueDate,
+        checkIn,
+        metadata: params.metadata ?? null,
+      });
+    } catch (error) {
+      const dbDetail = formatDbErrorForLog(error);
+      log.error('Create action error', {
+        statusCode: 500,
+        projectId: shortenIdForLog(projectId),
+        workflowId: shortenIdForLog(params.workflowId),
+        dbDetail,
+        error: String(error),
+      });
+      throw new AppError(500, 'Internal Server Error');
+    }
+  }
+
+  async list(params: ListActionsParams) {
+    await requireExecutionInTenantScope({
+      executionRepository: this.executionRepository,
+      workflowInstanceId: params.workflowInstanceId,
+      allowedProjectIds: params.allowedProjectIds,
+      sharedWorkflowRepository: this.sharedWorkflowRepository,
+    });
+
+    return await this.actionRequestRepository.list({
+      allowedProjectIds: params.allowedProjectIds,
+      actorId: params.actorId,
+      paginationSince: params.since,
+      workflowInstanceId: params.workflowInstanceId,
+      limit: params.limit,
+    });
+  }
+
+  async getById(params: GetActionByIdParams) {
+    const row = await this.actionRequestRepository.getById({
+      allowedProjectIds: params.allowedProjectIds,
+      actionId: params.actionId,
+      actorId: params.actorId,
+    });
+    if (!row) throw new AppError(404, 'Action not found');
+    return row;
+  }
+
+  async updateStatus(params: UpdateActionStatusParams) {
+    const updated = await this.actionRequestRepository.updateStatus({
+      allowedProjectIds: params.allowedProjectIds,
+      actionId: params.actionId,
+      actorId: params.actorId,
+      status: params.status,
+    });
+    if (!updated) throw new AppError(404, 'Action not found');
+    return params.status;
+  }
+}

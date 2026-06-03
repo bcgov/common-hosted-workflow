@@ -28,7 +28,7 @@ function createHookConfig() {
           }
           const { app } = server;
           const customRepositories = buildCustomRepositories(databaseUrl);
-          const services = buildApiServices(n8nRuntime.repositories);
+          const services = buildApiServices(n8nRuntime.repositories, customRepositories);
           const routeContext = buildRouteContext({
             services,
             n8nRepositories: n8nRuntime.repositories,
