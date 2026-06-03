@@ -166,6 +166,16 @@ export function createMockTenantProjectRelationRepository() {
 /* ------------------------------------------------------------------ */
 
 export function createMockN8nRepositories() {
+  const defaultProject = {
+    id: VALID_PROJECT_ID,
+    name: 'Default project',
+    type: 'personal',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+    icon: null,
+    description: null,
+    creatorId: 'user-123',
+  };
   const metadata = {
     SharedWorkflow: {
       tableName: 'shared_workflow',
@@ -214,9 +224,9 @@ export function createMockN8nRepositories() {
   return {
     user: { findOne: vi.fn(), findOneBy: vi.fn(), metadata: metadata.User },
     project: {
-      findOneBy: vi.fn(),
-      getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: VALID_PROJECT_ID }),
-      getPersonalProjectForUserOrFail: vi.fn().mockResolvedValue({ id: VALID_PROJECT_ID }),
+      findOneBy: vi.fn().mockImplementation(async ({ id }) => (id === VALID_PROJECT_ID ? defaultProject : null)),
+      getPersonalProjectForUser: vi.fn().mockResolvedValue(defaultProject),
+      getPersonalProjectForUserOrFail: vi.fn().mockResolvedValue(defaultProject),
     },
     projectRelation: {
       findProjectRole: vi.fn().mockResolvedValue(null),

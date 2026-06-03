@@ -18,6 +18,10 @@ export class UiApiService implements UiApiServiceContract {
     return await this.queryService.getWhoami(email);
   }
 
+  async loadUserContext(email?: string) {
+    return await this.queryService.loadUserContext(email);
+  }
+
   async getWorkflows(email?: string) {
     return await this.queryService.getWorkflows(email);
   }
