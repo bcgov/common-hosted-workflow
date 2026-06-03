@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { type Express, type Request, type Response, static as serveStatic } from 'express';
-import { buildUiApiRouter, createUiRequestContextMiddleware } from '../routes/ui-api';
+import { buildUiApiRouter } from '../routes/ui-api';
 import type { ApiRouteContext } from '../types/routes';
 
 export function mountUi(
@@ -24,5 +24,5 @@ export function mountUi(
     });
   });
 
-  app.use('/ui-api', createUiRequestContextMiddleware(routeContext.services), buildUiApiRouter(routeContext));
+  app.use('/ui-api', buildUiApiRouter(routeContext));
 }

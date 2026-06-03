@@ -15,7 +15,7 @@ vi.mock('../../../src/api/helpers/ui-oidc-session', async () => {
   };
 });
 
-import { buildUiApiRouter, createUiRequestContextMiddleware } from '../../../src/api/routes/ui-api';
+import { buildUiApiRouter } from '../../../src/api/routes/ui-api';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 
 function getRouteHandlers(router: any, method: string, path: string) {
@@ -46,13 +46,6 @@ async function runRoute(router: any, method: string, path: string, req: any, res
 }
 
 async function runProtectedRoute(services: any, method: string, path: string, req: any, res: any) {
-  const middleware = createUiRequestContextMiddleware(services);
-  await middleware(req, res, (error?: unknown) => {
-    if (error) {
-      throw error;
-    }
-  });
-
   const router = buildUiApiRouter({ services } as any);
   await runRoute(router, method, path, req, res);
 }
