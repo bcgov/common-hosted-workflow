@@ -15,7 +15,10 @@ import {
   createMockResponse,
   createMockNext,
   createMockMessageRepository,
+  createMockActionRequestRepository,
   createMockN8nRepositories,
+  createMockMessageService,
+  createMockActionService,
   makeMessageRow,
   VALID_PROJECT_ID,
   VALID_WORKFLOW_ID,
@@ -75,6 +78,7 @@ async function runHandlerChain(handlers: Array<(req: any, res: any, next: any) =
 
 function createTestRouter() {
   const messageRepo = createMockMessageRepository();
+  const actionRequestRepo = createMockActionRequestRepository();
   const n8nRepos = createMockN8nRepositories();
   const routeContext: ApiRouteContext = {
     apiKeyAuthMiddleware: (_req: any, _res: any, next: any) => next(),
@@ -84,7 +88,13 @@ function createTestRouter() {
     customRepositories: {
       tenantProjectRelation: {} as any,
       message: messageRepo as any,
-      actionRequest: {} as any,
+      actionRequest: actionRequestRepo as any,
+    },
+    services: {
+      apiKey: {} as any,
+      uiApi: {} as any,
+      action: createMockActionService(actionRequestRepo, n8nRepos),
+      message: createMockMessageService(messageRepo, n8nRepos),
     },
   };
   const router = buildMessageRouter(routeContext);

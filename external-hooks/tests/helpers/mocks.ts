@@ -262,3 +262,32 @@ export function createMockApiKeyService() {
     getUserForApiKey: vi.fn().mockResolvedValue(makeCaller()),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Service mocks (using real service classes with mocked repos)       */
+/* ------------------------------------------------------------------ */
+
+import { ActionService } from '../../src/api/services/action.service';
+import { MessageService } from '../../src/api/services/message.service';
+
+export function createMockActionService(
+  actionRequestRepo: ReturnType<typeof createMockActionRequestRepository>,
+  n8nRepos: ReturnType<typeof createMockN8nRepositories>,
+) {
+  return new ActionService({
+    actionRequestRepository: actionRequestRepo as any,
+    executionRepository: n8nRepos.execution,
+    sharedWorkflowRepository: n8nRepos.sharedWorkflow as any,
+  });
+}
+
+export function createMockMessageService(
+  messageRepo: ReturnType<typeof createMockMessageRepository>,
+  n8nRepos: ReturnType<typeof createMockN8nRepositories>,
+) {
+  return new MessageService({
+    messageRepository: messageRepo as any,
+    executionRepository: n8nRepos.execution,
+    sharedWorkflowRepository: n8nRepos.sharedWorkflow as any,
+  });
+}
