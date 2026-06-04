@@ -4,7 +4,7 @@ import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
 import type { N8nExecutionLookup } from '../helpers/n8n-validation';
-import type { N8nSharedWorkflowRepository } from '../types/n8n-adapters';
+import type { BaseN8nSharedWorkflowRepository } from '../types/n8n-adapters';
 import type { ActionRequestRepository } from '../../db/repository/custom/action-request';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
@@ -15,7 +15,7 @@ const log = createLogger('CustomAPIs');
 export type ActionServiceDependencies = {
   actionRequestRepository: ActionRequestRepository;
   executionRepository: N8nExecutionLookup;
-  sharedWorkflowRepository: N8nSharedWorkflowRepository;
+  sharedWorkflowRepository: BaseN8nSharedWorkflowRepository;
 };
 
 export type CreateActionParams = {

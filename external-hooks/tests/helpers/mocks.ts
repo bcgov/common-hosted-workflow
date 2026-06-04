@@ -264,6 +264,35 @@ export function createMockApiKeyService() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Repository object mocks                                            */
+/* ------------------------------------------------------------------ */
+
+import { UserRepository } from '../../src/db/repository/n8n/user';
+import { ProjectRepository } from '../../src/db/repository/n8n/project';
+import { ProjectRelationRepository } from '../../src/db/repository/n8n/project-relation';
+import { SharedWorkflowRepository } from '../../src/db/repository/n8n/shared-workflow';
+import { WorkflowRepository } from '../../src/db/repository/n8n/workflow';
+import { CredentialRepository } from '../../src/db/repository/n8n/credential';
+import { SharedCredentialRepository } from '../../src/db/repository/n8n/shared-credential';
+import { ExecutionRepository } from '../../src/db/repository/n8n/execution';
+import type { N8nRepositories } from '../../src/api/bootstrap/n8n-repositories';
+
+export function createMockN8nRepositories(n8nRepos: ReturnType<typeof createMockN8nRepositories>): N8nRepositories {
+  return {
+    user: new UserRepository(n8nRepos.user as any),
+    project: new ProjectRepository(n8nRepos.project as any),
+    projectRelation: new ProjectRelationRepository(n8nRepos.projectRelation as any, n8nRepos.user.metadata),
+    workflow: new WorkflowRepository(n8nRepos.workflow as any),
+    sharedWorkflow: new SharedWorkflowRepository(n8nRepos.sharedWorkflow as any, n8nRepos.workflow.metadata),
+    credential: new CredentialRepository(n8nRepos.credential as any),
+    sharedCredential: new SharedCredentialRepository(n8nRepos.sharedCredential as any),
+    execution: new ExecutionRepository(n8nRepos.execution as any),
+    withTransaction: n8nRepos.withTransaction as any,
+    raw: n8nRepos as any,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Service mocks (using real service classes with mocked repos)       */
 /* ------------------------------------------------------------------ */
 

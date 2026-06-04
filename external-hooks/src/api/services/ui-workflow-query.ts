@@ -1,6 +1,6 @@
 import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
 import { buildWorkflowSummaries } from '../mappers/ui-workflows';
-import type { N8nRepositoryService } from './n8n-repository';
+import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { UiApiContext, WorkflowRow } from '../types/ui-api';
 import type { UserRepository } from '../../db/repository/n8n/user';
 import type { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
@@ -15,10 +15,10 @@ export class UiWorkflowQueryService {
   private readonly projectRelationRepository: ProjectRelationRepository;
   private readonly sharedWorkflowRepository: SharedWorkflowRepository;
 
-  constructor(private readonly repositoryService: N8nRepositoryService) {
-    this.userRepository = repositoryService.user;
-    this.projectRelationRepository = repositoryService.projectRelation;
-    this.sharedWorkflowRepository = repositoryService.sharedWorkflow;
+  constructor(private readonly n8nRepositories: N8nRepositories) {
+    this.userRepository = n8nRepositories.user;
+    this.projectRelationRepository = n8nRepositories.projectRelation;
+    this.sharedWorkflowRepository = n8nRepositories.sharedWorkflow;
   }
 
   async getWhoami(email?: string) {
@@ -50,12 +50,8 @@ export class UiWorkflowQueryService {
     }
 
     const [personalProject, accessibleProjectIds] = await Promise.all([
-      this.repositoryService.project.getPersonalProjectForUser(n8nUser.id),
-      listN8nProjectIdsAccessibleToUser(
-        this.repositoryService.project,
-        this.repositoryService.projectRelation,
-        n8nUser.id,
-      ),
+      this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
+      listN8nProjectIdsAccessibleToUser(this.n8nRepositories.project, this.n8nRepositories.projectRelation, n8nUser.id),
     ]);
     const projects = await this.loadAccessibleProjects(accessibleProjectIds);
 
@@ -78,7 +74,7 @@ export class UiWorkflowQueryService {
 
   private async loadAccessibleProjects(projectIds: string[]) {
     const projects = await Promise.all(
-      projectIds.map(async (projectId) => await this.repositoryService.project.findOneBy({ id: projectId })),
+      projectIds.map(async (projectId) => await this.n8nRepositories.project.findOneBy({ id: projectId })),
     );
     return projects.filter((project) => project !== null);
   }

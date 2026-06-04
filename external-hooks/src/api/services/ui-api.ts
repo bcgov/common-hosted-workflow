@@ -1,4 +1,4 @@
-import type { N8nRepositoryService } from './n8n-repository';
+import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { UiApiServiceContract } from '../types/services';
 import { UiWorkflowQueryService } from './ui-workflow-query';
 import { UiWorkflowSharingService } from './ui-workflow-sharing';
@@ -9,9 +9,9 @@ export class UiApiService implements UiApiServiceContract {
   private readonly queryService: UiWorkflowQueryService;
   private readonly sharingService: UiWorkflowSharingService;
 
-  constructor(repositoryService: N8nRepositoryService) {
-    this.queryService = new UiWorkflowQueryService(repositoryService);
-    this.sharingService = new UiWorkflowSharingService(this.queryService, repositoryService);
+  constructor(n8nRepositories: N8nRepositories) {
+    this.queryService = new UiWorkflowQueryService(n8nRepositories);
+    this.sharingService = new UiWorkflowSharingService(this.queryService, n8nRepositories);
   }
 
   async getWhoami(email?: string) {

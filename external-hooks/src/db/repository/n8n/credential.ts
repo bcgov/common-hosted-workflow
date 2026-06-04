@@ -1,7 +1,7 @@
-import type { N8nCredentialRepository } from '../../../api/types/n8n-adapters';
+import type { BaseN8nCredentialRepository } from '../../../api/types/n8n-adapters';
 
 export class CredentialRepository {
-  constructor(private readonly credentialRepository: N8nCredentialRepository) {}
+  constructor(private readonly credentialRepository: BaseN8nCredentialRepository) {}
 
   get metadata() {
     return this.credentialRepository.metadata;

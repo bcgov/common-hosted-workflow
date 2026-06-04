@@ -36,5 +36,3 @@ export type ApiServices = {
   action: ActionService;
   message: MessageService;
 };
-
-export type { N8nRepositoryServiceContract } from '../services/n8n-repository';

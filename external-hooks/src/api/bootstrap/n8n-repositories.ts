@@ -1,16 +1,23 @@
 import { N8N_DB_PATH, N8N_DI_PATH } from '../constants/n8n-paths';
-import { N8nRepositoryService } from '../services/n8n-repository';
+import { UserRepository } from '../../db/repository/n8n/user';
+import { ProjectRepository } from '../../db/repository/n8n/project';
+import { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
+import { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
+import { WorkflowRepository } from '../../db/repository/n8n/workflow';
+import { CredentialRepository } from '../../db/repository/n8n/credential';
+import { SharedCredentialRepository } from '../../db/repository/n8n/shared-credential';
+import { ExecutionRepository } from '../../db/repository/n8n/execution';
 import type {
-  N8nCredentialRepository,
-  N8nExecutionRepository,
-  N8nProjectRelationRepository,
-  N8nProjectRepository,
-  N8nRepositories,
-  N8nSharedCredentialRepository,
-  N8nSharedWorkflowRepository,
-  N8nUserRepository,
+  BaseN8nCredentialRepository,
+  BaseN8nExecutionRepository,
+  BaseN8nProjectRelationRepository,
+  BaseN8nProjectRepository,
+  BaseN8nRepositories,
+  BaseN8nSharedCredentialRepository,
+  BaseN8nSharedWorkflowRepository,
+  BaseN8nUserRepository,
   N8nWithTransaction,
-  N8nWorkflowRepository,
+  BaseN8nWorkflowRepository,
 } from '../types/n8n-adapters';
 
 export type N8nContainer = {
@@ -31,9 +38,22 @@ type N8nDbModule = {
   GLOBAL_ADMIN_ROLE: { slug: string };
 };
 
+export type N8nRepositories = {
+  readonly user: UserRepository;
+  readonly project: ProjectRepository;
+  readonly projectRelation: ProjectRelationRepository;
+  readonly sharedWorkflow: SharedWorkflowRepository;
+  readonly workflow: WorkflowRepository;
+  readonly credential: CredentialRepository;
+  readonly sharedCredential: SharedCredentialRepository;
+  readonly execution: ExecutionRepository;
+  readonly withTransaction: N8nWithTransaction;
+  readonly raw: BaseN8nRepositories;
+};
+
 export type N8nRuntimeContext = {
   container: N8nContainer;
-  repositoryService: N8nRepositoryService;
+  n8nRepositories: N8nRepositories;
   globalOwnerRoleSlug: string;
   globalAdminRoleSlug: string;
 };
@@ -42,35 +62,46 @@ export function buildN8nRuntimeContext(): N8nRuntimeContext {
   const { Container } = require(N8N_DI_PATH) as { Container: N8nContainer };
   const {
     withTransaction,
-    UserRepository,
-    ProjectRepository,
-    ProjectRelationRepository,
-    WorkflowRepository,
-    SharedWorkflowRepository,
-    CredentialsRepository,
-    SharedCredentialsRepository,
-    ExecutionRepository,
+    UserRepository: BaseUserRepository,
+    ProjectRepository: BaseProjectRepository,
+    ProjectRelationRepository: BaseProjectRelationRepository,
+    WorkflowRepository: BaseWorkflowRepository,
+    SharedWorkflowRepository: BaseSharedWorkflowRepository,
+    CredentialsRepository: BaseCredentialsRepository,
+    SharedCredentialsRepository: BaseSharedCredentialsRepository,
+    ExecutionRepository: BaseExecutionRepository,
     GLOBAL_OWNER_ROLE,
     GLOBAL_ADMIN_ROLE,
   } = require(N8N_DB_PATH) as N8nDbModule;
 
-  const repositories: N8nRepositories = {
-    user: Container.get(UserRepository) as N8nUserRepository,
-    project: Container.get(ProjectRepository) as N8nProjectRepository,
-    projectRelation: Container.get(ProjectRelationRepository) as N8nProjectRelationRepository,
-    workflow: Container.get(WorkflowRepository) as N8nWorkflowRepository,
-    sharedWorkflow: Container.get(SharedWorkflowRepository) as N8nSharedWorkflowRepository,
-    credential: Container.get(CredentialsRepository) as N8nCredentialRepository,
-    sharedCredential: Container.get(SharedCredentialsRepository) as N8nSharedCredentialRepository,
-    execution: Container.get(ExecutionRepository) as N8nExecutionRepository,
+  const raw: BaseN8nRepositories = {
+    user: Container.get(BaseUserRepository) as BaseN8nUserRepository,
+    project: Container.get(BaseProjectRepository) as BaseN8nProjectRepository,
+    projectRelation: Container.get(BaseProjectRelationRepository) as BaseN8nProjectRelationRepository,
+    workflow: Container.get(BaseWorkflowRepository) as BaseN8nWorkflowRepository,
+    sharedWorkflow: Container.get(BaseSharedWorkflowRepository) as BaseN8nSharedWorkflowRepository,
+    credential: Container.get(BaseCredentialsRepository) as BaseN8nCredentialRepository,
+    sharedCredential: Container.get(BaseSharedCredentialsRepository) as BaseN8nSharedCredentialRepository,
+    execution: Container.get(BaseExecutionRepository) as BaseN8nExecutionRepository,
     withTransaction,
   };
 
-  const repositoryService = new N8nRepositoryService(repositories);
+  const n8nRepositories: N8nRepositories = {
+    user: new UserRepository(raw.user),
+    project: new ProjectRepository(raw.project),
+    projectRelation: new ProjectRelationRepository(raw.projectRelation, raw.user.metadata),
+    workflow: new WorkflowRepository(raw.workflow),
+    sharedWorkflow: new SharedWorkflowRepository(raw.sharedWorkflow, raw.workflow.metadata),
+    credential: new CredentialRepository(raw.credential),
+    sharedCredential: new SharedCredentialRepository(raw.sharedCredential),
+    execution: new ExecutionRepository(raw.execution),
+    withTransaction: raw.withTransaction,
+    raw,
+  };
 
   return {
     container: Container,
-    repositoryService,
+    n8nRepositories,
     globalOwnerRoleSlug: GLOBAL_OWNER_ROLE.slug,
     globalAdminRoleSlug: GLOBAL_ADMIN_ROLE.slug,
   };

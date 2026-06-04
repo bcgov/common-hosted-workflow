@@ -1,7 +1,7 @@
-import type { N8nExecutionRepository } from '../../../api/types/n8n-adapters';
+import type { BaseN8nExecutionRepository } from '../../../api/types/n8n-adapters';
 
 export class ExecutionRepository {
-  constructor(private readonly executionRepository: N8nExecutionRepository) {}
+  constructor(private readonly executionRepository: BaseN8nExecutionRepository) {}
 
   get metadata() {
     return this.executionRepository.metadata;

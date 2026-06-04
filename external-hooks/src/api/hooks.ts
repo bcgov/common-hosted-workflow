@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { mountAssets } from './bootstrap/assets';
-import { buildCustomRepositoryService } from './bootstrap/custom-repositories';
+import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
 import { applyOidcFrontendSettings, type FrontendSettings } from './bootstrap/frontend-settings';
 import { buildN8nRuntimeContext } from './bootstrap/n8n-repositories';
@@ -27,12 +27,12 @@ function createHookConfig() {
             throw new Error('CUSTOM_DATABASE_URL is not set');
           }
           const { app } = server;
-          const customRepositoryService = buildCustomRepositoryService(databaseUrl);
-          const services = buildApiServices(n8nRuntime.repositoryService, customRepositoryService);
+          const customRepositories = buildCustomRepositories(databaseUrl);
+          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories);
           const routeContext = buildRouteContext({
             services,
-            repositoryService: n8nRuntime.repositoryService,
-            customRepositoryService,
+            n8nRepositories: n8nRuntime.n8nRepositories,
+            customRepositories,
             globalOwnerRoleSlug: n8nRuntime.globalOwnerRoleSlug,
             globalAdminRoleSlug: n8nRuntime.globalAdminRoleSlug,
           });

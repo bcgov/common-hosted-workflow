@@ -1,21 +1,21 @@
 import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from '../middlewares';
-import type { N8nRepositoryService } from '../services/n8n-repository';
-import type { CustomRepositoryService } from '../services/custom-repository';
+import type { N8nRepositories } from './n8n-repositories';
+import type { CustomRepositories } from './custom-repositories';
 import type { ApiRouteContext } from '../types/routes';
 import type { ApiServices } from '../types/services';
 
 type BuildRouteContextParams = {
   services: ApiServices;
-  repositoryService: N8nRepositoryService;
-  customRepositoryService: CustomRepositoryService;
+  n8nRepositories: N8nRepositories;
+  customRepositories: CustomRepositoryObject;
   globalOwnerRoleSlug: string;
   globalAdminRoleSlug: string;
 };
 
 export function buildRouteContext({
   services,
-  repositoryService,
-  customRepositoryService,
+  n8nRepositories,
+  customRepositories,
   globalOwnerRoleSlug,
   globalAdminRoleSlug,
 }: BuildRouteContextParams): ApiRouteContext {
@@ -27,11 +27,11 @@ export function buildRouteContext({
 
   const workflowInteractionTenantMiddleware = createWorkflowInteractionTenantMiddleware({
     n8nRepositories: {
-      project: repositoryService.raw.project,
-      projectRelation: repositoryService.raw.projectRelation,
+      project: n8nRepositories.raw.project,
+      projectRelation: n8nRepositories.raw.projectRelation,
     },
     customRepositories: {
-      tenantProjectRelation: customRepositoryService.tenantProjectRelation,
+      tenantProjectRelation: customRepositories.tenantProjectRelation,
     },
   });
 
@@ -39,8 +39,8 @@ export function buildRouteContext({
     apiKeyAuthMiddleware,
     adminAuthMiddleware,
     workflowInteractionTenantMiddleware,
-    repositoryService,
-    customRepositoryService,
+    n8nRepositories,
+    customRepositories,
     services,
   };
 }
