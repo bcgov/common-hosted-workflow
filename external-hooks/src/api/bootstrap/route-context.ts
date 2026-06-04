@@ -20,7 +20,7 @@ export function buildRouteContext({
   globalAdminRoleSlug,
 }: BuildRouteContextParams): ApiRouteContext {
   const { apiKeyAuthMiddleware, adminAuthMiddleware } = createAuthMiddleware({
-    services,
+    userRepository: n8nRepositories.user,
     globalOwnerRoleSlug,
     globalAdminRoleSlug,
   });

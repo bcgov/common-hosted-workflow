@@ -1,4 +1,3 @@
-import { ApiKeyService } from '../services/api-key';
 import { UiApiService } from '../services/ui-api';
 import { ActionService } from '../services/action.service';
 import { MessageService } from '../services/message.service';
@@ -16,7 +15,6 @@ export function buildApiServices(
   };
 
   return {
-    apiKey: new ApiKeyService(n8nRepositories.user),
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService({
       actionRequestRepository: customRepositories.actionRequest,

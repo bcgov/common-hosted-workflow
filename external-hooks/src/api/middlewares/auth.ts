@@ -21,7 +21,7 @@ function runMiddleware(
 }
 
 export function createAuthMiddleware(config: AuthMiddlewareConfig) {
-  const { services, globalOwnerRoleSlug, globalAdminRoleSlug } = config;
+  const { userRepository, globalOwnerRoleSlug, globalAdminRoleSlug } = config;
 
   /** Validates X-N8N-API-KEY and hydrates `res.locals.caller` for downstream handlers. */
   const apiKeyAuthMiddleware = async (req: AuthRequest, res: AuthResponse, next: ExpressNext) => {
@@ -33,7 +33,7 @@ export function createAuthMiddleware(config: AuthMiddlewareConfig) {
         return next(new AppError(401, 'No API key provided'));
       }
 
-      const caller = await services.apiKey.getUserForApiKey(token);
+      const caller = await userRepository.getUserForApiKey(token);
 
       if (!caller || caller.disabled) {
         log.warn('Rejecting: missing caller or disabled', { handler: 'apiKeyAuth' });
