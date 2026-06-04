@@ -165,12 +165,16 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
         parsed.body.email,
       );
 
-      CreatedResponse(res, {
-        success: true as const,
-        message: `Workflow '${result.workflowId}' shared with '${result.sharedWithEmail}'.`,
-        workflowId: result.workflowId,
-        sharedWithEmail: result.sharedWithEmail,
-      }, shareWorkflowResponseSchema);
+      CreatedResponse(
+        res,
+        {
+          success: true as const,
+          message: `Workflow '${result.workflowId}' shared with '${result.sharedWithEmail}'.`,
+          workflowId: result.workflowId,
+          sharedWithEmail: result.sharedWithEmail,
+        },
+        shareWorkflowResponseSchema,
+      );
     },
   );
 
@@ -186,12 +190,16 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
         parsed.params.projectId,
       );
 
-      OkResponse(res, {
-        success: true as const,
-        message: `Workflow '${result.workflowId}' unshared from project '${result.projectId}'.`,
-        workflowId: result.workflowId,
-        projectId: result.projectId,
-      }, unshareWorkflowResponseSchema);
+      OkResponse(
+        res,
+        {
+          success: true as const,
+          message: `Workflow '${result.workflowId}' unshared from project '${result.projectId}'.`,
+          workflowId: result.workflowId,
+          projectId: result.projectId,
+        },
+        unshareWorkflowResponseSchema,
+      );
     },
   );
 

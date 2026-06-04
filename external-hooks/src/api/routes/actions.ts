@@ -109,10 +109,14 @@ export function buildActionRouter({
         actionId: parsed.params.actionId,
         status: patchStatus,
       });
-      OkResponse(res, {
-        status: patchStatus,
-        message: formatPatchActionStatusMessage(patchStatus),
-      }, patchActionStatusResponseSchema);
+      OkResponse(
+        res,
+        {
+          status: patchStatus,
+          message: formatPatchActionStatusMessage(patchStatus),
+        },
+        patchActionStatusResponseSchema,
+      );
     },
   );
 

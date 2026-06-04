@@ -104,10 +104,14 @@ export function buildActorRouter({
         actorId: parsed.params.actorId,
         status: patchStatus,
       });
-      OkResponse(res, {
-        status: patchStatus,
-        message: formatPatchActionStatusMessage(patchStatus),
-      }, patchActionStatusResponseSchema);
+      OkResponse(
+        res,
+        {
+          status: patchStatus,
+          message: formatPatchActionStatusMessage(patchStatus),
+        },
+        patchActionStatusResponseSchema,
+      );
     },
   );
 
