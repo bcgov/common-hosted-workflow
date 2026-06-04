@@ -277,7 +277,7 @@ import { SharedCredentialRepository } from '../../src/db/repository/n8n/shared-c
 import { ExecutionRepository } from '../../src/db/repository/n8n/execution';
 import type { N8nRepositories } from '../../src/api/bootstrap/n8n-repositories';
 
-export function createMockN8nRepositories(n8nRepos: ReturnType<typeof createMockN8nRepositories>): N8nRepositories {
+export function createMockN8nRepositoryObject(n8nRepos: ReturnType<typeof createMockN8nRepositories>): N8nRepositories {
   return {
     user: new UserRepository(n8nRepos.user as any),
     project: new ProjectRepository(n8nRepos.project as any),
