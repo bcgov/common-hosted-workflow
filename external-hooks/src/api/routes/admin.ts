@@ -157,38 +157,44 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         throw new AppError(404, 'Project not found.');
       }
 
-      const result = await tenantProjectRelation.insertTenantProjectRelation({ tenantId, projectId });
-      if (result.created) {
-        CreatedResponse(
-          res,
-          {
-            success: true as const,
-            message: `Inserted tenant/project relation tenantId=${tenantId} projectId=${projectId}`,
-          },
-          tenantProjectCreatedResponseSchema,
-        );
-        return;
-      }
-
-      if (result.conflictProjectId) {
+      const existingTenantProjects = await tenantProjectRelation.getProjectIdsByTenantId(tenantId);
+      if (existingTenantProjects.length > 0) {
+        if (existingTenantProjects.includes(projectId)) {
+          OkResponse(
+            res,
+            { success: true as const, message: 'Relation already exists.' },
+            tenantProjectExistsResponseSchema,
+          );
+          return;
+        }
         throw new AppError(409, 'tenant already has a project mapping', {
-          conflictProjectId: result.conflictProjectId,
+          conflictProjectId: existingTenantProjects[0],
         });
       }
 
-      if (result.conflictTenantId) {
+      const existingTenantForProject = await tenantProjectRelation.getTenantIdByProjectId(projectId);
+      if (existingTenantForProject) {
+        if (existingTenantForProject === tenantId) {
+          OkResponse(
+            res,
+            { success: true as const, message: 'Relation already exists.' },
+            tenantProjectExistsResponseSchema,
+          );
+          return;
+        }
         throw new AppError(409, 'projectId is already mapped to a different tenant', {
-          conflictTenantId: result.conflictTenantId,
+          conflictTenantId: existingTenantForProject,
         });
       }
 
-      OkResponse(
+      await tenantProjectRelation.insert({ tenantId, projectId });
+      CreatedResponse(
         res,
         {
           success: true as const,
-          message: 'Relation already exists.',
+          message: `Inserted tenant/project relation tenantId=${tenantId} projectId=${projectId}`,
         },
-        tenantProjectExistsResponseSchema,
+        tenantProjectCreatedResponseSchema,
       );
     },
   );

@@ -149,15 +149,15 @@ export function createMockActionRequestRepository() {
     list: vi.fn().mockResolvedValue([]),
     getById: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(makeActionRequestRow()),
-    updateStatus: vi.fn().mockResolvedValue(true),
+    updateStatus: vi.fn().mockResolvedValue(makeActionRequestRow()),
   };
 }
 
 export function createMockTenantProjectRelationRepository() {
   return {
     getProjectIdsByTenantId: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
-    hasProjectId: vi.fn().mockResolvedValue(true),
-    insertTenantProjectRelation: vi.fn().mockResolvedValue({ created: true }),
+    getTenantIdByProjectId: vi.fn().mockResolvedValue(null),
+    insert: vi.fn().mockResolvedValue(undefined),
   };
 }
 

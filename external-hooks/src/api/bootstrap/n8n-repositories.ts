@@ -1,6 +1,7 @@
 import { N8N_DB_PATH, N8N_DI_PATH } from '../constants/n8n-paths';
 import type {
   N8nCredentialRepository,
+  N8nExecutionRepository,
   N8nProjectRelationRepository,
   N8nProjectRepository,
   N8nRepositories,
@@ -62,8 +63,8 @@ export function buildN8nRuntimeContext(): N8nRuntimeContext {
       sharedWorkflow: Container.get(SharedWorkflowRepository) as N8nSharedWorkflowRepository,
       credential: Container.get(CredentialsRepository) as N8nCredentialRepository,
       sharedCredential: Container.get(SharedCredentialsRepository) as N8nSharedCredentialRepository,
+      execution: Container.get(ExecutionRepository) as N8nExecutionRepository,
       withTransaction,
-      execution: Container.get(ExecutionRepository),
     },
     globalOwnerRoleSlug: GLOBAL_OWNER_ROLE.slug,
     globalAdminRoleSlug: GLOBAL_ADMIN_ROLE.slug,

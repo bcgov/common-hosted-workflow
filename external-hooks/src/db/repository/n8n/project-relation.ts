@@ -1,11 +1,10 @@
-import { getColumnName, quoteIdentifier, type EntityMetadataLike } from './sql';
+import { getColumnName, quoteIdentifier } from './sql';
+import type { EntityMetadataLike, N8nProjectRelationRepository } from '../../../api/types/n8n-adapters';
+
 export class ProjectRelationRepository {
   constructor(
-    private readonly projectRelationRepository: {
-      metadata: EntityMetadataLike;
-      manager: { query: (sql: string, params?: unknown[]) => Promise<Array<Record<string, unknown>>> };
-    },
-    private readonly userRepository: { metadata: EntityMetadataLike },
+    private readonly projectRelationRepository: N8nProjectRelationRepository,
+    private readonly userMetadata: EntityMetadataLike,
   ) {}
 
   get metadata() {
@@ -14,7 +13,7 @@ export class ProjectRelationRepository {
 
   private buildUserEmailLookup() {
     const projectRelationMetadata = this.projectRelationRepository.metadata;
-    const userMetadata = this.userRepository.metadata;
+    const userMetadata = this.userMetadata;
 
     const projectRelationTable = quoteIdentifier(projectRelationMetadata.tableName);
     const userTable = quoteIdentifier(userMetadata.tableName);
@@ -40,9 +39,7 @@ export class ProjectRelationRepository {
     return await this.projectRelationRepository.manager.query(sql, params);
   }
 
-  async listUserEmailsByProjectIds(projectIds: string[]) {
-    if (!projectIds.length) return [] as Array<{ projectId: string; email: string }>;
-
+  async listUserEmailsByProjectIds(projectIds: string[]): Promise<Array<{ projectId: string; email: string }>> {
     const { projectRelationProjectColumn, selectSql } = this.buildUserEmailLookup();
     const rows = await this.queryUserEmails(`${selectSql} WHERE pr.${projectRelationProjectColumn} = ANY($1)`, [
       projectIds,

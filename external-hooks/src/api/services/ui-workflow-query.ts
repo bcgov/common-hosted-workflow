@@ -1,7 +1,6 @@
 import { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
 import { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
 import { UserRepository } from '../../db/repository/n8n/user';
-import { WorkflowRepository } from '../../db/repository/n8n/workflow';
 import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
 import { buildWorkflowSummaries } from '../mappers/ui-workflows';
 import type { UiApiContext, UiApiRepositories, WorkflowRow } from '../types/ui-api';
@@ -19,11 +18,11 @@ export class UiWorkflowQueryService {
     this.userRepository = new UserRepository(n8nRepositories.user);
     this.projectRelationRepository = new ProjectRelationRepository(
       n8nRepositories.projectRelation,
-      n8nRepositories.user,
+      n8nRepositories.user.metadata,
     );
     this.sharedWorkflowRepository = new SharedWorkflowRepository(
       n8nRepositories.sharedWorkflow,
-      new WorkflowRepository(n8nRepositories.workflow),
+      n8nRepositories.workflow.metadata,
     );
   }
 

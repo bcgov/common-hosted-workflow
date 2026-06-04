@@ -1,6 +1,6 @@
-import type { EntityMetadataLike } from './sql';
+import type { N8nUserRepository } from '../../../api/types/n8n-adapters';
 
-export type N8nUiUser = {
+export type N8nUser = {
   id: string;
   email: string;
   role: {
@@ -10,18 +10,13 @@ export type N8nUiUser = {
 };
 
 export class UserRepository {
-  constructor(
-    private readonly userRepository: {
-      metadata: EntityMetadataLike;
-      findOne: (options: { where: { email: string }; relations: string[] }) => Promise<N8nUiUser | null>;
-    },
-  ) {}
+  constructor(private readonly userRepository: N8nUserRepository) {}
 
   get metadata() {
     return this.userRepository.metadata;
   }
 
-  async findByEmail(email: string) {
-    return await this.userRepository.findOne({ where: { email }, relations: ['role'] });
+  async findByEmail(email: string, relations?: string[]) {
+    return await this.userRepository.findOne({ where: { email }, relations });
   }
 }

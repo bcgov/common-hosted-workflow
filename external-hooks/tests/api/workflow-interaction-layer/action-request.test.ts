@@ -211,7 +211,10 @@ describe('GET /actions', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(actionRequestRepo.list).toHaveBeenCalledWith(expect.objectContaining({ actorId: 'specific-actor' }));
+    expect(actionRequestRepo.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
+    const callArg = actionRequestRepo.list.mock.calls[0][0];
+    expect(callArg.where).toBeInstanceOf(Array);
+    expect(callArg.where.length).toBeGreaterThanOrEqual(2);
   });
 
   it('uses default limit of 50', async () => {
@@ -284,7 +287,7 @@ describe('GET /actions/:actionId', () => {
 describe('PATCH /actions/:actionId', () => {
   it('returns 200 with updated status', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(true);
+    actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
 
     const handlers = getRouteHandler(router, 'patch', '/actions/:actionId');
     const req = createMockRequest({
@@ -305,7 +308,7 @@ describe('PATCH /actions/:actionId', () => {
 
   it('throws 404 when action not found', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(false);
+    actionRequestRepo.updateStatus.mockResolvedValue(null);
 
     const handlers = getRouteHandler(router, 'patch', '/actions/:actionId');
     const req = createMockRequest({
@@ -323,7 +326,7 @@ describe('PATCH /actions/:actionId', () => {
 
   it('formats "deleted" status message correctly', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(true);
+    actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
 
     const handlers = getRouteHandler(router, 'patch', '/actions/:actionId');
     const req = createMockRequest({

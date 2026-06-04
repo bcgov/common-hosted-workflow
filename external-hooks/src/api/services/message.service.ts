@@ -1,3 +1,6 @@
+import { and, eq, inArray } from 'drizzle-orm';
+import { messages } from '../../db/schema/workflow-interaction-layer';
+import { buildPaginationClauses } from '../../db/repository/workflow-interaction-layer/pagination';
 import { formatDbErrorForLog } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
 import type { N8nExecutionLookup } from '../helpers/n8n-validation';
@@ -46,6 +49,19 @@ export class MessageService {
     this.sharedWorkflowRepository = deps.sharedWorkflowRepository;
   }
 
+  private buildListWhere(params: {
+    allowedProjectIds: string[];
+    actorId?: string;
+    workflowInstanceId?: string;
+    since?: import('../../types/list-pagination').ListPaginationSince;
+  }): any[] {
+    const clauses: any[] = [inArray(messages.projectId, params.allowedProjectIds)];
+    if (params.actorId) clauses.push(eq(messages.actorId, params.actorId));
+    if (params.workflowInstanceId) clauses.push(eq(messages.workflowInstanceId, params.workflowInstanceId));
+    clauses.push(...buildPaginationClauses(messages, params.since));
+    return clauses;
+  }
+
   async create(params: CreateMessageParams) {
     const projectId = await resolveProjectIdForCreate({
       executionRepository: this.executionRepository,
@@ -90,10 +106,7 @@ export class MessageService {
     });
 
     return await this.messageRepository.list({
-      allowedProjectIds: params.allowedProjectIds,
-      actorId: params.actorId,
-      paginationSince: params.since,
-      workflowInstanceId: params.workflowInstanceId,
+      where: this.buildListWhere(params),
       limit: params.limit,
     });
   }

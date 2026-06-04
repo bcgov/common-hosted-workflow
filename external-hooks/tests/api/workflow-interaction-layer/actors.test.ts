@@ -118,7 +118,10 @@ describe('GET /actors/:actorId/messages', () => {
     await runHandlerChain(handlers!, req, res);
 
     expect(n8nRepos.execution.findSingleExecution).toHaveBeenCalled();
-    expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ workflowInstanceId: VALID_EXECUTION_ID }));
+    expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
+    const callArg = messageRepo.list.mock.calls[0][0];
+    expect(callArg.where).toBeInstanceOf(Array);
+    expect(callArg.where.length).toBeGreaterThanOrEqual(3);
   });
 
   it('uses default limit of 50 when not specified', async () => {
@@ -169,7 +172,10 @@ describe('GET /actors/:actorId/actions/:actionId', () => {
 
     expect(error).toBeNull();
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(actionRequestRepo.getById).toHaveBeenCalledWith(expect.objectContaining({ actorId: VALID_ACTOR_ID }));
+    expect(actionRequestRepo.getById).toHaveBeenCalledWith(expect.objectContaining({ actionId: VALID_ACTION_ID }));
+    const callArg = actionRequestRepo.getById.mock.calls[0][0];
+    expect(callArg.where).toBeInstanceOf(Array);
+    expect(callArg.where.length).toBeGreaterThanOrEqual(2);
   });
 
   it('throws 404 when not found for that actor', async () => {
@@ -224,14 +230,17 @@ describe('GET /actors/:actorId/actions', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(actionRequestRepo.list).toHaveBeenCalledWith(expect.objectContaining({ actorId: VALID_ACTOR_ID }));
+    expect(actionRequestRepo.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
+    const callArg = actionRequestRepo.list.mock.calls[0][0];
+    expect(callArg.where).toBeInstanceOf(Array);
+    expect(callArg.where.length).toBeGreaterThanOrEqual(2);
   });
 });
 
 describe('PATCH /actors/:actorId/actions/:actionId', () => {
   it('returns 200 scoped to actor', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(true);
+    actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
 
     const handlers = getRouteHandler(router, 'patch', '/actors/:actorId/actions/:actionId');
     const req = createMockRequest({
@@ -245,7 +254,12 @@ describe('PATCH /actors/:actorId/actions/:actionId', () => {
 
     expect(error).toBeNull();
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(actionRequestRepo.updateStatus).toHaveBeenCalledWith(expect.objectContaining({ actorId: VALID_ACTOR_ID }));
+    expect(actionRequestRepo.updateStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ actionId: VALID_ACTION_ID, status: 'completed' }),
+    );
+    const callArg = actionRequestRepo.updateStatus.mock.calls[0][0];
+    expect(callArg.where).toBeInstanceOf(Array);
+    expect(callArg.where.length).toBeGreaterThanOrEqual(2);
   });
 
   it('throws 404 when not found for that actor', async () => {
