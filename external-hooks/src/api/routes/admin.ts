@@ -11,7 +11,7 @@ import {
   tenantProjectExistsResponseSchema,
   tenantProjectRelationSchema,
 } from '../schemas/admin';
-import { sendValidatedJson } from './helpers/responses';
+import { OkResponse, CreatedResponse } from './responses';
 import type { N8nEntityRecord } from '../types/n8n-adapters';
 import type { ApiRouteContext } from '../types/routes';
 import { AppError } from '../utils/errors';
@@ -40,10 +40,14 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
       }
 
       const personalProject = await project.getPersonalProjectForUserOrFail(foundUser.id);
-      sendValidatedJson(res, 200, getUserProjectResponseSchema, {
-        user: foundUser,
-        project: personalProject,
-      });
+      OkResponse(
+        res,
+        {
+          user: foundUser,
+          project: personalProject,
+        },
+        getUserProjectResponseSchema,
+      );
     },
   );
 
@@ -80,10 +84,14 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         await em.save(newShare);
       });
 
-      sendValidatedJson(res, 200, associateWorkflowResponseSchema, {
-        success: true as const,
-        message: `Workflow '${workflowId}' successfully associated with project '${projectId}'`,
-      });
+      OkResponse(
+        res,
+        {
+          success: true as const,
+          message: `Workflow '${workflowId}' successfully associated with project '${projectId}'`,
+        },
+        associateWorkflowResponseSchema,
+      );
     },
   );
 
@@ -120,10 +128,14 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         await em.save(newShare);
       });
 
-      sendValidatedJson(res, 200, associateCredentialResponseSchema, {
-        success: true as const,
-        message: `Credential '${credentialId}' successfully associated with project '${projectId}'`,
-      });
+      OkResponse(
+        res,
+        {
+          success: true as const,
+          message: `Credential '${credentialId}' successfully associated with project '${projectId}'`,
+        },
+        associateCredentialResponseSchema,
+      );
     },
   );
 
@@ -147,10 +159,14 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
 
       const result = await tenantProjectRelation.insertTenantProjectRelation({ tenantId, projectId });
       if (result.created) {
-        sendValidatedJson(res, 201, tenantProjectCreatedResponseSchema, {
-          success: true as const,
-          message: `Inserted tenant/project relation tenantId=${tenantId} projectId=${projectId}`,
-        });
+        CreatedResponse(
+          res,
+          {
+            success: true as const,
+            message: `Inserted tenant/project relation tenantId=${tenantId} projectId=${projectId}`,
+          },
+          tenantProjectCreatedResponseSchema,
+        );
         return;
       }
 
@@ -166,10 +182,14 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
         });
       }
 
-      sendValidatedJson(res, 200, tenantProjectExistsResponseSchema, {
-        success: true as const,
-        message: 'Relation already exists.',
-      });
+      OkResponse(
+        res,
+        {
+          success: true as const,
+          message: 'Relation already exists.',
+        },
+        tenantProjectExistsResponseSchema,
+      );
     },
   );
 

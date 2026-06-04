@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import { sendValidatedJson } from './helpers/responses';
+import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
   createActionRequestResponseSchema,
@@ -50,7 +50,7 @@ export function buildActionRouter({
         checkIn: body.checkIn,
         metadata: body.metadata,
       });
-      sendValidatedJson(res, 201, createActionRequestResponseSchema, mapActionRequestRowToResponse(created));
+      CreatedResponse(res, mapActionRequestRowToResponse(created), createActionRequestResponseSchema);
     },
   );
 
@@ -75,7 +75,7 @@ export function buildActionRouter({
       const items = rows.map(mapActionRequestRowToResponse);
 
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
-      sendValidatedJson(res, 200, listActionsResponseSchema, { items, nextCursor });
+      OkResponse(res, { items, nextCursor }, listActionsResponseSchema);
     },
   );
 
@@ -91,7 +91,7 @@ export function buildActionRouter({
         allowedProjectIds,
         actionId: parsed.params.actionId,
       });
-      sendValidatedJson(res, 200, createActionRequestResponseSchema, mapActionRequestRowToResponse(row));
+      OkResponse(res, mapActionRequestRowToResponse(row), createActionRequestResponseSchema);
     },
   );
 
@@ -109,10 +109,14 @@ export function buildActionRouter({
         actionId: parsed.params.actionId,
         status: patchStatus,
       });
-      sendValidatedJson(res, 200, patchActionStatusResponseSchema, {
-        status: patchStatus,
-        message: formatPatchActionStatusMessage(patchStatus),
-      });
+      OkResponse(
+        res,
+        {
+          status: patchStatus,
+          message: formatPatchActionStatusMessage(patchStatus),
+        },
+        patchActionStatusResponseSchema,
+      );
     },
   );
 

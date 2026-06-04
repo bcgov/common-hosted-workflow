@@ -1,4 +1,6 @@
 import type { Response } from 'express';
+import type { ZodTypeAny } from 'zod';
+import { parseValidatedResponse } from '../../utils/validation';
 
 interface ErrorResponseBody {
   error: {
@@ -39,12 +41,20 @@ export function InternalServerErrorResponse(res: Response, details?: unknown): v
   errorJson(res, 500, 'Internal Server Error', details);
 }
 
-export function OkResponse<T>(res: Response, data: T): void {
-  res.status(200).json(data);
+export function OkResponse<T>(res: Response, data: T, schema?: ZodTypeAny): void {
+  if (schema) {
+    res.status(200).json(parseValidatedResponse(schema, data));
+  } else {
+    res.status(200).json(data);
+  }
 }
 
-export function CreatedResponse<T>(res: Response, data: T): void {
-  res.status(201).json(data);
+export function CreatedResponse<T>(res: Response, data: T, schema?: ZodTypeAny): void {
+  if (schema) {
+    res.status(201).json(parseValidatedResponse(schema, data));
+  } else {
+    res.status(201).json(data);
+  }
 }
 
 export function NoContentResponse(res: Response): void {
