@@ -61,12 +61,12 @@ function createTestRouter() {
     apiKeyAuthMiddleware: (_req: any, _res: any, next: any) => next(),
     adminAuthMiddleware: (_req: any, _res: any, next: any) => next(),
     workflowInteractionTenantMiddleware: (_req: any, _res: any, next: any) => next(),
-    n8nRepositories: n8nRepos as any,
-    customRepositories: {
+    repositoryService: { raw: n8nRepos } as any,
+    customRepositoryService: {
       tenantProjectRelation: {} as any,
       message: messageRepo as any,
       actionRequest: actionRequestRepo as any,
-    },
+    } as any,
     services: {
       apiKey: {} as any,
       uiApi: {} as any,

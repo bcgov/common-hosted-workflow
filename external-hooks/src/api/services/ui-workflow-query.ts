@@ -1,9 +1,10 @@
-import { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
-import { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
-import { UserRepository } from '../../db/repository/n8n/user';
 import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
 import { buildWorkflowSummaries } from '../mappers/ui-workflows';
-import type { UiApiContext, UiApiRepositories, WorkflowRow } from '../types/ui-api';
+import type { N8nRepositoryService } from './n8n-repository';
+import type { UiApiContext, WorkflowRow } from '../types/ui-api';
+import type { UserRepository } from '../../db/repository/n8n/user';
+import type { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
+import type { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
 
 function canViewAllWorkflows(roleSlug?: string | null) {
   return roleSlug === 'global:owner' || roleSlug === 'global:admin';
@@ -14,16 +15,10 @@ export class UiWorkflowQueryService {
   private readonly projectRelationRepository: ProjectRelationRepository;
   private readonly sharedWorkflowRepository: SharedWorkflowRepository;
 
-  constructor(private readonly n8nRepositories: UiApiRepositories) {
-    this.userRepository = new UserRepository(n8nRepositories.user);
-    this.projectRelationRepository = new ProjectRelationRepository(
-      n8nRepositories.projectRelation,
-      n8nRepositories.user.metadata,
-    );
-    this.sharedWorkflowRepository = new SharedWorkflowRepository(
-      n8nRepositories.sharedWorkflow,
-      n8nRepositories.workflow.metadata,
-    );
+  constructor(private readonly repositoryService: N8nRepositoryService) {
+    this.userRepository = repositoryService.user;
+    this.projectRelationRepository = repositoryService.projectRelation;
+    this.sharedWorkflowRepository = repositoryService.sharedWorkflow;
   }
 
   async getWhoami(email?: string) {
@@ -55,8 +50,12 @@ export class UiWorkflowQueryService {
     }
 
     const [personalProject, accessibleProjectIds] = await Promise.all([
-      this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
-      listN8nProjectIdsAccessibleToUser(this.n8nRepositories.project, this.n8nRepositories.projectRelation, n8nUser.id),
+      this.repositoryService.project.getPersonalProjectForUser(n8nUser.id),
+      listN8nProjectIdsAccessibleToUser(
+        this.repositoryService.project,
+        this.repositoryService.projectRelation,
+        n8nUser.id,
+      ),
     ]);
     const projects = await this.loadAccessibleProjects(accessibleProjectIds);
 
@@ -79,7 +78,7 @@ export class UiWorkflowQueryService {
 
   private async loadAccessibleProjects(projectIds: string[]) {
     const projects = await Promise.all(
-      projectIds.map(async (projectId) => await this.n8nRepositories.project.findOneBy({ id: projectId })),
+      projectIds.map(async (projectId) => await this.repositoryService.project.findOneBy({ id: projectId })),
     );
     return projects.filter((project) => project !== null);
   }

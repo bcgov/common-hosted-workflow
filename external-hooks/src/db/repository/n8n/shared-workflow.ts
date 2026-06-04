@@ -19,6 +19,18 @@ export class SharedWorkflowRepository {
     return this.sharedWorkflowRepository.metadata;
   }
 
+  create(value: Record<string, unknown>) {
+    return this.sharedWorkflowRepository.create(value);
+  }
+
+  async save(value: Record<string, unknown>) {
+    return await this.sharedWorkflowRepository.save(value);
+  }
+
+  async delete(criteria: Record<string, unknown>) {
+    return await this.sharedWorkflowRepository.delete(criteria);
+  }
+
   private buildWorkflowRowSelect() {
     const sharedWorkflowMetadata = this.sharedWorkflowRepository.metadata;
     const workflowMetadata = this.workflowMetadata;

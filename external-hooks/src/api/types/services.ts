@@ -4,6 +4,7 @@ import type { N8nProjectRecord } from './n8n-adapters';
 import type { UiApiContext, UiWorkflowSummary } from './ui-api';
 import type { ActionService } from '../services/action.service';
 import type { MessageService } from '../services/message.service';
+import type { N8nRepositoryServiceContract } from '../services/n8n-repository';
 
 export type ApiKeyLookupService = {
   getUserForApiKey: (token: string) => Promise<User | null>;
@@ -36,3 +37,5 @@ export type ApiServices = {
   action: ActionService;
   message: MessageService;
 };
+
+export type { N8nRepositoryServiceContract };

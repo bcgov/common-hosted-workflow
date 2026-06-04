@@ -2,14 +2,14 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../../db/repository/custom/action-request';
 import { MessageRepository } from '../../db/repository/custom/message';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
-import type { CustomRepositories } from '../types/repositories';
+import { CustomRepositoryService } from '../services/custom-repository';
 
-export function buildCustomRepositories(databaseUrl: string): CustomRepositories {
+export function buildCustomRepositoryService(databaseUrl: string): CustomRepositoryService {
   const db = drizzle(databaseUrl);
 
-  return {
+  return new CustomRepositoryService({
     tenantProjectRelation: new TenantProjectRelationRepository(db),
     message: new MessageRepository(db),
     actionRequest: new ActionRequestRepository(db),
-  };
+  });
 }

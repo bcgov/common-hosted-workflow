@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiApiService } from '../../../src/api/services/ui-api';
+import { N8nRepositoryService } from '../../../src/api/services/n8n-repository';
 import { createMockN8nRepositories, VALID_PROJECT_ID } from '../../helpers/mocks';
 
 describe('UiApiService', () => {
@@ -11,7 +12,7 @@ describe('UiApiService', () => {
       role: { slug: 'global:member', displayName: 'Member' },
     });
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     const result = await service.getWhoami('person@example.com');
 
     expect(n8nRepos.user.findOne).toHaveBeenCalledWith({
@@ -52,7 +53,7 @@ describe('UiApiService', () => {
       { projectId: 'team-proj', email: 'teammate@example.com' },
     ]);
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     const result = await service.getWorkflows('owner@example.com');
 
     expect(n8nRepos.sharedWorkflow.manager.query).toHaveBeenCalledTimes(1);
@@ -130,7 +131,7 @@ describe('UiApiService', () => {
     ]);
     n8nRepos.workflow.findOneBy.mockResolvedValue({ id: 'wf-1' });
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     const result = await service.shareWorkflow('owner@example.com', 'wf-1', 'new@example.com');
 
     expect(n8nRepos.sharedWorkflow.save).toHaveBeenCalled();
@@ -178,7 +179,7 @@ describe('UiApiService', () => {
       { projectId: 'team-proj', email: 'teammate@example.com' },
     ]);
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     await expect(service.shareWorkflow('owner@example.com', 'wf-1', 'teammate@example.com')).rejects.toMatchObject({
       message: 'Email is already associated with this workflow.',
     });
@@ -225,7 +226,7 @@ describe('UiApiService', () => {
     ]);
     n8nRepos.workflow.findOneBy.mockResolvedValue({ id: 'wf-1' });
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     const result = await service.shareWorkflow('owner@example.com', 'wf-1', 'new@example.com');
 
     expect(n8nRepos.sharedWorkflow.save).toHaveBeenCalled();
@@ -248,7 +249,7 @@ describe('UiApiService', () => {
       { projectId: 'team-proj' },
     ]);
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     await expect(service.shareWorkflow('member@example.com', 'wf-1', 'new@example.com')).rejects.toMatchObject({
       message: 'Sharing workflows is restricted to owner and admin users.',
     });
@@ -280,7 +281,7 @@ describe('UiApiService', () => {
       { workflowId: 'wf-1', workflowName: 'First workflow', projectId: 'team-proj' },
     ]);
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     await expect(service.shareWorkflow('owner@example.com', 'wf-1', 'missing@example.com')).rejects.toMatchObject({
       message: 'Target user not found.',
     });
@@ -304,7 +305,7 @@ describe('UiApiService', () => {
       { workflowId: 'wf-1', workflowName: 'First workflow', projectId: 'team-proj' },
     ]);
 
-    const service = new UiApiService(n8nRepos as any);
+    const service = new UiApiService(new N8nRepositoryService(n8nRepos as any));
     const result = await service.unshareWorkflow('owner@example.com', 'wf-1', 'team-proj');
 
     expect(n8nRepos.sharedWorkflow.delete).toHaveBeenCalledWith({

@@ -11,6 +11,10 @@ export class ProjectRelationRepository {
     return this.projectRelationRepository.metadata;
   }
 
+  async findAllByUser(userId: string) {
+    return await this.projectRelationRepository.findAllByUser(userId);
+  }
+
   private buildUserEmailLookup() {
     const projectRelationMetadata = this.projectRelationRepository.metadata;
     const userMetadata = this.userMetadata;

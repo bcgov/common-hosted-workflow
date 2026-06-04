@@ -1,5 +1,6 @@
 import { AppError } from '../utils/errors';
-import type { UiApiRepositories, WorkflowRow } from '../types/ui-api';
+import type { WorkflowRow } from '../types/ui-api';
+import type { N8nRepositoryService } from './n8n-repository';
 import { UiWorkflowQueryService } from './ui-workflow-query';
 
 function canViewAllWorkflows(roleSlug?: string | null) {
@@ -13,7 +14,7 @@ function canShareWorkflows(roleSlug?: string | null) {
 export class UiWorkflowSharingService {
   constructor(
     private readonly queryService: UiWorkflowQueryService,
-    private readonly n8nRepositories: UiApiRepositories,
+    private readonly repositoryService: N8nRepositoryService,
   ) {}
 
   async shareWorkflow(email: string | undefined, workflowId: string, targetEmail: string) {
@@ -27,7 +28,7 @@ export class UiWorkflowSharingService {
       throw new AppError(404, 'Target user not found.');
     }
 
-    const targetProject = await this.n8nRepositories.project.getPersonalProjectForUser(targetUser.id);
+    const targetProject = await this.repositoryService.project.getPersonalProjectForUser(targetUser.id);
     if (!targetProject) {
       throw new AppError(404, 'Target user has no personal project.');
     }
@@ -37,12 +38,12 @@ export class UiWorkflowSharingService {
       throw new AppError(409, 'Email is already associated with this workflow.');
     }
 
-    const newShare = this.n8nRepositories.sharedWorkflow.create({
+    const newShare = this.repositoryService.sharedWorkflow.create({
       project: targetProject,
       workflow: { id: workflowId },
       role: 'workflow:owner',
     });
-    await this.n8nRepositories.sharedWorkflow.save(newShare);
+    await this.repositoryService.sharedWorkflow.save(newShare);
 
     return {
       workflowId,
@@ -65,7 +66,7 @@ export class UiWorkflowSharingService {
       throw new AppError(404, 'Project is not associated with this workflow.');
     }
 
-    await this.n8nRepositories.sharedWorkflow.delete({ workflow: { id: workflowId }, project: { id: projectId } });
+    await this.repositoryService.sharedWorkflow.delete({ workflow: { id: workflowId }, project: { id: projectId } });
 
     return { workflowId, projectId };
   }
