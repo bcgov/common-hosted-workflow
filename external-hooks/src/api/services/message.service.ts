@@ -3,9 +3,8 @@ import { messages } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
-import type { N8nExecutionLookup } from '../helpers/n8n-validation';
-import type { BaseN8nSharedWorkflowRepository } from '../types/n8n-adapters';
-import type { MessageRepository } from '../../db/repository/custom/message';
+import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -13,9 +12,8 @@ import { shortenIdForLog } from '../utils/string';
 const log = createLogger('CustomAPIs');
 
 export type MessageServiceDependencies = {
-  messageRepository: MessageRepository;
-  executionRepository: N8nExecutionLookup;
-  sharedWorkflowRepository: BaseN8nSharedWorkflowRepository;
+  n8nRepositories: N8nRepositories;
+  customRepositories: CustomRepositories;
 };
 
 export type CreateMessageParams = {
@@ -39,15 +37,10 @@ export type ListMessagesParams = {
 };
 
 export class MessageService {
-  private readonly messageRepository: MessageRepository;
-  private readonly executionRepository: N8nExecutionLookup;
-  private readonly sharedWorkflowRepository: N8nSharedWorkflowRepository;
-
-  constructor(deps: MessageServiceDependencies) {
-    this.messageRepository = deps.messageRepository;
-    this.executionRepository = deps.executionRepository;
-    this.sharedWorkflowRepository = deps.sharedWorkflowRepository;
-  }
+  constructor(
+    private readonly n8nRepositories: N8nRepositories,
+    private readonly customRepositories: CustomRepositories,
+  ) {}
 
   private buildListWhere(params: {
     allowedProjectIds: string[];
@@ -64,8 +57,8 @@ export class MessageService {
 
   async create(params: CreateMessageParams) {
     const projectId = await resolveProjectIdForCreate({
-      executionRepository: this.executionRepository,
-      sharedWorkflowRepository: this.sharedWorkflowRepository,
+      executionRepository: this.n8nRepositories.execution,
+      sharedWorkflowRepository: this.n8nRepositories.sharedWorkflow,
       workflowInstanceId: params.workflowInstanceId,
       workflowId: params.workflowId,
       allowedProjectIds: params.allowedProjectIds,
@@ -73,7 +66,7 @@ export class MessageService {
     });
 
     try {
-      return await this.messageRepository.create({
+      return await this.customRepositories.message.create({
         title: params.title,
         body: params.body,
         actorId: params.actorId,
@@ -99,13 +92,13 @@ export class MessageService {
 
   async list(params: ListMessagesParams) {
     await requireExecutionInTenantScope({
-      executionRepository: this.executionRepository,
+      executionRepository: this.n8nRepositories.execution,
       workflowInstanceId: params.workflowInstanceId,
       allowedProjectIds: params.allowedProjectIds,
-      sharedWorkflowRepository: this.sharedWorkflowRepository,
+      sharedWorkflowRepository: this.n8nRepositories.sharedWorkflow,
     });
 
-    return await this.messageRepository.list({
+    return await this.customRepositories.message.list({
       where: this.buildListWhere(params),
       limit: params.limit,
     });

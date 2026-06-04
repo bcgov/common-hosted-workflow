@@ -27,8 +27,8 @@ export function buildRouteContext({
 
   const workflowInteractionTenantMiddleware = createWorkflowInteractionTenantMiddleware({
     n8nRepositories: {
-      project: n8nRepositories.raw.project,
-      projectRelation: n8nRepositories.raw.projectRelation,
+      project: n8nRepositories.project,
+      projectRelation: n8nRepositories.projectRelation,
     },
     customRepositories: {
       tenantProjectRelation: customRepositories.tenantProjectRelation,

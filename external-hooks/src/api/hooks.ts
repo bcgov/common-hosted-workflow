@@ -20,13 +20,14 @@ function createHookConfig() {
       ready: [
         async function (this: { dbCollections: N8nOidcDbCollections }, server: { app: Express }) {
           log.info('Initializing Custom Endpoints...');
-          const n8nRuntime = buildN8nRuntimeContext();
 
           const databaseUrl = process.env.CUSTOM_DATABASE_URL;
           if (!databaseUrl) {
             throw new Error('CUSTOM_DATABASE_URL is not set');
           }
+
           const { app } = server;
+          const n8nRuntime = buildN8nRuntimeContext();
           const customRepositories = buildCustomRepositories(databaseUrl);
           const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories);
           const routeContext = buildRouteContext({

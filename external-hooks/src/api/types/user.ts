@@ -1,10 +1,10 @@
-export interface Scope {
+export interface N8nScope {
   slug: string;
   displayName: string;
   description: string | null;
 }
 
-export interface Role {
+export interface N8nRole {
   updatedAt: string;
   createdAt: string;
   slug: string;
@@ -12,10 +12,10 @@ export interface Role {
   description: string;
   systemRole: boolean;
   roleType: string;
-  scopes: Scope[];
+  scopes: N8nScope[];
 }
 
-export interface User {
+export interface N8nUser {
   updatedAt: string;
   createdAt: string;
   id: string;
@@ -30,6 +30,6 @@ export interface User {
   disabled: boolean;
   mfaEnabled: boolean;
   lastActiveAt: string;
-  role: Role;
+  role: N8nRole;
   isPending: boolean;
 }

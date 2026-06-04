@@ -1,4 +1,4 @@
-import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
+import { listProjectIdsAccessibleToUser } from './project-access';
 import { buildWorkflowSummaries } from '../mappers/ui-workflows';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { UiApiContext, WorkflowRow } from '../types/ui-api';
@@ -51,7 +51,7 @@ export class UiWorkflowQueryService {
 
     const [personalProject, accessibleProjectIds] = await Promise.all([
       this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
-      listN8nProjectIdsAccessibleToUser(this.n8nRepositories.project, this.n8nRepositories.projectRelation, n8nUser.id),
+      listProjectIdsAccessibleToUser(this.n8nRepositories.projectRelation, this.n8nRepositories.project, n8nUser.id),
     ]);
     const projects = await this.loadAccessibleProjects(accessibleProjectIds);
 

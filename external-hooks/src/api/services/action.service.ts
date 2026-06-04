@@ -3,9 +3,8 @@ import { actionRequests } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
-import type { N8nExecutionLookup } from '../helpers/n8n-validation';
-import type { BaseN8nSharedWorkflowRepository } from '../types/n8n-adapters';
-import type { ActionRequestRepository } from '../../db/repository/custom/action-request';
+import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -13,9 +12,8 @@ import { shortenIdForLog } from '../utils/string';
 const log = createLogger('CustomAPIs');
 
 export type ActionServiceDependencies = {
-  actionRequestRepository: ActionRequestRepository;
-  executionRepository: N8nExecutionLookup;
-  sharedWorkflowRepository: BaseN8nSharedWorkflowRepository;
+  n8nRepositories: N8nRepositories;
+  customRepositories: CustomRepositories;
 };
 
 export type CreateActionParams = {
@@ -58,15 +56,10 @@ export type UpdateActionStatusParams = {
 };
 
 export class ActionService {
-  private readonly actionRequestRepository: ActionRequestRepository;
-  private readonly executionRepository: N8nExecutionLookup;
-  private readonly sharedWorkflowRepository: N8nSharedWorkflowRepository;
-
-  constructor(deps: ActionServiceDependencies) {
-    this.actionRequestRepository = deps.actionRequestRepository;
-    this.executionRepository = deps.executionRepository;
-    this.sharedWorkflowRepository = deps.sharedWorkflowRepository;
-  }
+  constructor(
+    private readonly n8nRepositories: N8nRepositories,
+    private readonly customRepositories: CustomRepositories,
+  ) {}
 
   private buildListWhere(params: {
     allowedProjectIds: string[];
@@ -87,8 +80,8 @@ export class ActionService {
     const callbackUrl = callbackMethod === 'NONE' ? '' : (params.callbackUrl ?? '');
 
     const projectId = await resolveProjectIdForCreate({
-      executionRepository: this.executionRepository,
-      sharedWorkflowRepository: this.sharedWorkflowRepository,
+      executionRepository: this.n8nRepositories.execution,
+      sharedWorkflowRepository: this.n8nRepositories.sharedWorkflow,
       workflowInstanceId: params.workflowInstanceId,
       workflowId: params.workflowId,
       allowedProjectIds: params.allowedProjectIds,
@@ -96,7 +89,7 @@ export class ActionService {
     });
 
     try {
-      return await this.actionRequestRepository.create({
+      return await this.customRepositories.actionRequest.create({
         actionType: params.actionType,
         payload: params.payload,
         callbackUrl,
@@ -128,20 +121,20 @@ export class ActionService {
 
   async list(params: ListActionsParams) {
     await requireExecutionInTenantScope({
-      executionRepository: this.executionRepository,
+      executionRepository: this.n8nRepositories.execution,
       workflowInstanceId: params.workflowInstanceId,
       allowedProjectIds: params.allowedProjectIds,
-      sharedWorkflowRepository: this.sharedWorkflowRepository,
+      sharedWorkflowRepository: this.n8nRepositories.sharedWorkflow,
     });
 
-    return await this.actionRequestRepository.list({
+    return await this.customRepositories.actionRequest.list({
       where: this.buildListWhere(params),
       limit: params.limit,
     });
   }
 
   async getById(params: GetActionByIdParams) {
-    const row = await this.actionRequestRepository.getById({
+    const row = await this.customRepositories.actionRequest.getById({
       actionId: params.actionId,
       where: [
         inArray(actionRequests.projectId, params.allowedProjectIds),
@@ -153,7 +146,7 @@ export class ActionService {
   }
 
   async updateStatus(params: UpdateActionStatusParams) {
-    const row = await this.actionRequestRepository.updateStatus({
+    const row = await this.customRepositories.actionRequest.updateStatus({
       actionId: params.actionId,
       status: params.status,
       where: [

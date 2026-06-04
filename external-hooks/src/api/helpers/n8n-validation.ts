@@ -59,19 +59,6 @@ export async function verifyCallerHasN8nProjectAccess(
   return personal?.id === projectId;
 }
 
-/** Lists all project IDs the user can access in n8n (personal + project relations). */
-export async function listN8nProjectIdsAccessibleToUser(
-  projectRepository: { getPersonalProjectForUser: (userId: string) => Promise<{ id: string } | null> },
-  projectRelationRepository: { findAllByUser: (userId: string) => Promise<Array<{ projectId: string }>> },
-  userId: string,
-): Promise<string[]> {
-  const relations = await projectRelationRepository.findAllByUser(userId);
-  const ids = new Set<string>(relations.map((r) => r.projectId));
-  const personal = await projectRepository.getPersonalProjectForUser(userId);
-  if (personal?.id) ids.add(personal.id);
-  return [...ids];
-}
-
 /**
  * Projects that own the workflow in n8n (`SharedWorkflow`), filtered to those also allowed for this
  * tenant/user. Create handlers use the first id in the result as `projectId`.
