@@ -131,11 +131,22 @@ POST /rest/custom/v1/actions
 
 **Payload by Action Type:**
 
-| Action Type   | Recommended Payload Fields                      |
-| ------------- | ----------------------------------------------- |
-| `getapproval` | Free-form JSON (e.g. `{ "applicationId": 42 }`) |
-| `showform`    | `formId`, `formVersion`, `returnUrl`            |
-| `waitonevent` | `eventName`                                     |
+| Action Type   | Recommended Payload Fields                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
+| `getapproval` | Free-form JSON (e.g. `{ "applicationId": 42 }`)                                                                |
+| `showform`    | `formId` (required), `FormAPIKey` (required), `FormName`, `FormPreFillData`, `FormSubmissionId`, `formVersion` |
+| `waitonevent` | `eventName`                                                                                                    |
+
+**showform Payload Details:**
+
+For `showform` actions, the payload controls which CHEFS form is rendered and how it is pre-populated:
+
+- `formId` / `FormID` — (required) The CHEFS form UUID.
+- `FormAPIKey` / `formApiKey` — (required) API key for server-side JWT exchange. Stripped before reaching the browser.
+- `FormName` / `formName` — Display name for the action card UI.
+- `FormPreFillData` / `formPreFillData` — Object of key-value pairs matching CHEFS form field API names. Pre-populates the form when opened.
+- `FormSubmissionId` / `formSubmissionId` — Existing submission ID to load for editing. When present, `FormPreFillData` is ignored.
+- `formVersion` — Optional form version string.
 
 **Response (201):**
 

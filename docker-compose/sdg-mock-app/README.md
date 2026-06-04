@@ -94,6 +94,40 @@ sequenceDiagram
 
 > The frontend never sees CHEFS API keys. The backend reads them from the playground's form configuration (or from the action's payload for `showform` actions), exchanges them for short-lived JWTs via the CHEFS gateway, and returns only the JWT to the browser. The `<chefs-form-viewer>` web component handles automatic token refresh.
 
+### Form Pre-Fill via FormPreFillData
+
+When an n8n workflow creates a `showform` action, it can include a `FormPreFillData` object in the action payload to pre-populate form fields. This is useful for passing data from earlier workflow steps (previous submissions, database lookups, computed values) into the form as defaults.
+
+**Data flow:**
+
+1. n8n workflow creates action with `payload.FormPreFillData = { fieldKey: value, ... }`
+2. SDG backend strips `FormAPIKey` but passes `FormPreFillData` through to the browser (it's not sensitive)
+3. `ActionsPanel` extracts `payload.FormPreFillData` (or `payload.formPreFillData`) from the action
+4. When the user clicks "Fill Form", `ChefsFormModal` receives `prefillData` as a prop
+5. `ChefsFormViewer` waits for the `formio:ready` event, then calls `setSubmission(prefillData)` on the `<chefs-form-viewer>` web component
+6. The form renders with the specified fields pre-populated
+
+**Example action payload from n8n:**
+
+```json
+{
+  "formId": "abc123-def456",
+  "FormName": "Intake Form",
+  "FormAPIKey": "<your-form-api-key>",
+  "FormPreFillData": {
+    "applicantName": "Alice Smith",
+    "email": "alice@example.com",
+    "department": "Engineering"
+  }
+}
+```
+
+**Notes:**
+
+- Keys in `FormPreFillData` must match the CHEFS form field **API names** (the `key` property in the form.io schema)
+- If `FormSubmissionId` is also present, the form loads that existing submission instead — `FormPreFillData` is ignored
+- Both `FormPreFillData` (PascalCase) and `formPreFillData` (camelCase) are accepted
+
 ## Security — Sensitive Data Never Reaches the Browser
 
 The SDG backend proxy is designed so that secrets and internal URLs stay server-side. Two categories of data are protected:
