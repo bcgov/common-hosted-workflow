@@ -1,4 +1,6 @@
-import type { N8nUserRepository } from '../../../api/types/n8n-adapters';
+import type { BaseN8nUserRepository } from '../../../api/types/n8n-adapters';
+
+const API_KEY_AUDIENCE = 'public-api'; // pragma: allowlist secret
 
 export type N8nUser = {
   id: string;
@@ -10,7 +12,7 @@ export type N8nUser = {
 };
 
 export class UserRepository {
-  constructor(private readonly userRepository: N8nUserRepository) {}
+  constructor(private readonly userRepository: BaseN8nUserRepository) {}
 
   get metadata() {
     return this.userRepository.metadata;
@@ -18,5 +20,17 @@ export class UserRepository {
 
   async findByEmail(email: string, relations?: string[]) {
     return await this.userRepository.findOne({ where: { email }, relations });
+  }
+
+  async getUserForApiKey(apiKey: string) {
+    return await this.userRepository.findOne({
+      where: {
+        apiKeys: {
+          apiKey,
+          audience: API_KEY_AUDIENCE,
+        },
+      },
+      relations: ['role'],
+    });
   }
 }

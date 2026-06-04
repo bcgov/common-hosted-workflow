@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
-import type { CustomRepositories, N8nRepositories } from './repositories';
+import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { ApiServices } from './services';
 
 export type ApiRouteContext = {

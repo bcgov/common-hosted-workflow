@@ -1,12 +1,5 @@
 import type { N8nUser } from '../../db/repository/n8n/user';
-import type {
-  N8nProjectRecord,
-  N8nProjectRepository,
-  N8nProjectRelationRepository,
-  N8nSharedWorkflowRepository,
-  N8nUserRepository,
-  N8nWorkflowRepository,
-} from './n8n-adapters';
+import type { N8nProjectRecord } from './n8n-adapters';
 
 type UiWorkflowProjectShare = {
   projectId: string;
@@ -26,14 +19,6 @@ export type UiApiContext = {
   accessibleProjectIds: string[];
   projects: N8nProjectRecord[];
   workflows: UiWorkflowSummary[];
-};
-
-export type UiApiRepositories = {
-  user: N8nUserRepository;
-  project: N8nProjectRepository;
-  projectRelation: N8nProjectRelationRepository;
-  workflow: N8nWorkflowRepository;
-  sharedWorkflow: N8nSharedWorkflowRepository;
 };
 
 export type WorkflowRow = {

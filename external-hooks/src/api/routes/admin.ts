@@ -21,7 +21,8 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('CustomAPIs');
 
 export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customRepositories }: ApiRouteContext) {
-  const { user, project, workflow, credential, sharedWorkflow, sharedCredential, withTransaction } = n8nRepositories;
+  const { user, project, workflow, credential, sharedWorkflow, sharedCredential, withTransaction } =
+    n8nRepositories.raw;
   const { tenantProjectRelation } = customRepositories;
   const router = Router();
 

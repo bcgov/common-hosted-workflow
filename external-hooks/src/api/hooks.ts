@@ -28,10 +28,10 @@ function createHookConfig() {
           }
           const { app } = server;
           const customRepositories = buildCustomRepositories(databaseUrl);
-          const services = buildApiServices(n8nRuntime.repositories, customRepositories);
+          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories);
           const routeContext = buildRouteContext({
             services,
-            n8nRepositories: n8nRuntime.repositories,
+            n8nRepositories: n8nRuntime.n8nRepositories,
             customRepositories,
             globalOwnerRoleSlug: n8nRuntime.globalOwnerRoleSlug,
             globalAdminRoleSlug: n8nRuntime.globalAdminRoleSlug,

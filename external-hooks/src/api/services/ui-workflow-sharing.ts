@@ -1,5 +1,6 @@
 import { AppError } from '../utils/errors';
-import type { UiApiRepositories, WorkflowRow } from '../types/ui-api';
+import type { WorkflowRow } from '../types/ui-api';
+import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import { UiWorkflowQueryService } from './ui-workflow-query';
 
 function canViewAllWorkflows(roleSlug?: string | null) {
@@ -13,7 +14,7 @@ function canShareWorkflows(roleSlug?: string | null) {
 export class UiWorkflowSharingService {
   constructor(
     private readonly queryService: UiWorkflowQueryService,
-    private readonly n8nRepositories: UiApiRepositories,
+    private readonly n8nRepositories: N8nRepositories,
   ) {}
 
   async shareWorkflow(email: string | undefined, workflowId: string, targetEmail: string) {

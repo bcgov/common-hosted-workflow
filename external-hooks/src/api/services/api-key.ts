@@ -1,20 +1,10 @@
 import type { ApiKeyLookupService } from '../types/services';
-import type { N8nUserRepository } from '../types/n8n-adapters';
-
-const API_KEY_AUDIENCE = 'public-api'; // pragma: allowlist secret
+import type { UserRepository } from '../../db/repository/n8n/user';
 
 export class ApiKeyService implements ApiKeyLookupService {
-  constructor(private readonly userRepository: N8nUserRepository) {}
+  constructor(private readonly userRepository: UserRepository) {}
 
   async getUserForApiKey(apiKey: string) {
-    return await this.userRepository.findOne({
-      where: {
-        apiKeys: {
-          apiKey,
-          audience: API_KEY_AUDIENCE,
-        },
-      },
-      relations: ['role'],
-    });
+    return await this.userRepository.getUserForApiKey(apiKey);
   }
 }

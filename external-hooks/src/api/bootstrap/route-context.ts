@@ -1,5 +1,6 @@
 import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from '../middlewares';
-import type { CustomRepositories, N8nRepositories } from '../types/repositories';
+import type { N8nRepositories } from './n8n-repositories';
+import type { CustomRepositories } from './custom-repositories';
 import type { ApiRouteContext } from '../types/routes';
 import type { ApiServices } from '../types/services';
 
@@ -26,8 +27,8 @@ export function buildRouteContext({
 
   const workflowInteractionTenantMiddleware = createWorkflowInteractionTenantMiddleware({
     n8nRepositories: {
-      project: n8nRepositories.project,
-      projectRelation: n8nRepositories.projectRelation,
+      project: n8nRepositories.raw.project,
+      projectRelation: n8nRepositories.raw.projectRelation,
     },
     customRepositories: {
       tenantProjectRelation: customRepositories.tenantProjectRelation,

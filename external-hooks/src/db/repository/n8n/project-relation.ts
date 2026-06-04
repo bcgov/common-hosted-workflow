@@ -1,14 +1,18 @@
 import { getColumnName, quoteIdentifier } from './sql';
-import type { EntityMetadataLike, N8nProjectRelationRepository } from '../../../api/types/n8n-adapters';
+import type { EntityMetadataLike, BaseN8nProjectRelationRepository } from '../../../api/types/n8n-adapters';
 
 export class ProjectRelationRepository {
   constructor(
-    private readonly projectRelationRepository: N8nProjectRelationRepository,
+    private readonly projectRelationRepository: BaseN8nProjectRelationRepository,
     private readonly userMetadata: EntityMetadataLike,
   ) {}
 
   get metadata() {
     return this.projectRelationRepository.metadata;
+  }
+
+  async findAllByUser(userId: string) {
+    return await this.projectRelationRepository.findAllByUser(userId);
   }
 
   private buildUserEmailLookup() {

@@ -1,5 +1,5 @@
 import { getColumnName, quoteIdentifier } from './sql';
-import type { EntityMetadataLike, N8nSharedWorkflowRepository } from '../../../api/types/n8n-adapters';
+import type { EntityMetadataLike, BaseN8nSharedWorkflowRepository } from '../../../api/types/n8n-adapters';
 
 export type SharedWorkflowRow = {
   workflowId: string;
@@ -11,12 +11,24 @@ type SharedWorkflowQueryResult = Array<Record<string, unknown>>;
 
 export class SharedWorkflowRepository {
   constructor(
-    private readonly sharedWorkflowRepository: N8nSharedWorkflowRepository,
+    private readonly sharedWorkflowRepository: BaseN8nSharedWorkflowRepository,
     private readonly workflowMetadata: EntityMetadataLike,
   ) {}
 
   get metadata() {
     return this.sharedWorkflowRepository.metadata;
+  }
+
+  create(value: Record<string, unknown>) {
+    return this.sharedWorkflowRepository.create(value);
+  }
+
+  async save(value: Record<string, unknown>) {
+    return await this.sharedWorkflowRepository.save(value);
+  }
+
+  async delete(criteria: Record<string, unknown>) {
+    return await this.sharedWorkflowRepository.delete(criteria);
   }
 
   private buildWorkflowRowSelect() {

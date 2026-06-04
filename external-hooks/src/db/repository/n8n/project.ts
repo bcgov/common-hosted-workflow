@@ -1,7 +1,7 @@
-import type { N8nProjectRepository } from '../../../api/types/n8n-adapters';
+import type { BaseN8nProjectRepository } from '../../../api/types/n8n-adapters';
 
 export class ProjectRepository {
-  constructor(private readonly projectRepository: N8nProjectRepository) {}
+  constructor(private readonly projectRepository: BaseN8nProjectRepository) {}
 
   get metadata() {
     return this.projectRepository.metadata;

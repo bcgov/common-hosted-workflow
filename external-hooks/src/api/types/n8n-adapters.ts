@@ -21,16 +21,16 @@ export type EntityMetadataLike = {
   }>;
 };
 
-export type N8nRepositoryManager = {
+export type BaseN8nRepositoryManager = {
   query: (sql: string, params?: unknown[]) => Promise<Array<Record<string, unknown>>>;
 } & Record<string, unknown>;
 
-export type N8nRepository = {
+export type BaseN8nRepository = {
   metadata: EntityMetadataLike;
-  manager: N8nRepositoryManager;
+  manager: BaseN8nRepositoryManager;
 };
 
-export type N8nUserRepository = N8nRepository & {
+export type BaseN8nUserRepository = BaseN8nRepository & {
   findOne: (options: {
     where:
       | {
@@ -45,26 +45,26 @@ export type N8nUserRepository = N8nRepository & {
   findOneBy: (where: { email: string }) => Promise<N8nUserRecord | null>;
 };
 
-export type N8nProjectRepository = N8nRepository & {
+export type BaseN8nProjectRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nProjectRecord | null>;
   getPersonalProjectForUser: (userId: string) => Promise<N8nProjectRecord | null>;
   getPersonalProjectForUserOrFail: (userId: string) => Promise<N8nProjectRecord>;
 };
 
-export type N8nProjectRelationRepository = N8nRepository & {
+export type BaseN8nProjectRelationRepository = BaseN8nRepository & {
   findProjectRole: (args: { userId: string; projectId: string }) => Promise<unknown>;
   findAllByUser: (userId: string) => Promise<Array<{ projectId: string }>>;
 };
 
-export type N8nWorkflowRepository = N8nRepository & {
+export type BaseN8nWorkflowRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nEntityRecord | null>;
 };
 
-export type N8nCredentialRepository = N8nRepository & {
+export type BaseN8nCredentialRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nEntityRecord | null>;
 };
 
-export type N8nRepositoryEntityManager = {
+export type BaseN8nRepositoryEntityManager = {
   delete: (entityName: string, criteria: unknown) => Promise<unknown>;
   create: (entityName: string, payload: Record<string, unknown>) => Record<string, unknown>;
   save: (value: unknown) => Promise<unknown>;
@@ -73,33 +73,33 @@ export type N8nRepositoryEntityManager = {
 export type N8nWithTransaction = (
   manager: Record<string, unknown>,
   context: unknown,
-  handler: (entityManager: N8nRepositoryEntityManager) => Promise<void>,
+  handler: (entityManager: BaseN8nRepositoryEntityManager) => Promise<void>,
 ) => Promise<void>;
 
-export type N8nSharedWorkflowRepository = N8nRepository & {
+export type BaseN8nSharedWorkflowRepository = BaseN8nRepository & {
   findProjectIds: (workflowId: string) => Promise<string[]>;
   create: (value: Record<string, unknown>) => Record<string, unknown>;
   save: (value: Record<string, unknown>) => Promise<unknown>;
   delete: (criteria: Record<string, unknown>) => Promise<unknown>;
 };
 
-export type N8nExecutionRepository = N8nRepository & {
+export type BaseN8nExecutionRepository = BaseN8nRepository & {
   findSingleExecution: (
     id: string,
     options?: { includeData?: boolean; unflattenData?: boolean },
   ) => Promise<{ workflowId: string } | null | undefined>;
 };
 
-export type N8nSharedCredentialRepository = N8nRepository;
+export type BaseN8nSharedCredentialRepository = BaseN8nRepository;
 
-export type N8nRepositories = {
-  user: N8nUserRepository;
-  project: N8nProjectRepository;
-  projectRelation: N8nProjectRelationRepository;
-  workflow: N8nWorkflowRepository;
-  credential: N8nCredentialRepository;
-  sharedWorkflow: N8nSharedWorkflowRepository;
-  sharedCredential: N8nSharedCredentialRepository;
-  execution: N8nExecutionRepository;
+export type BaseN8nRepositories = {
+  user: BaseN8nUserRepository;
+  project: BaseN8nProjectRepository;
+  projectRelation: BaseN8nProjectRelationRepository;
+  workflow: BaseN8nWorkflowRepository;
+  credential: BaseN8nCredentialRepository;
+  sharedWorkflow: BaseN8nSharedWorkflowRepository;
+  sharedCredential: BaseN8nSharedCredentialRepository;
+  execution: BaseN8nExecutionRepository;
   withTransaction: N8nWithTransaction;
 };

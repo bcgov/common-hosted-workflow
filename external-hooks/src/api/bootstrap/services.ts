@@ -2,16 +2,17 @@ import { ApiKeyService } from '../services/api-key';
 import { UiApiService } from '../services/ui-api';
 import { ActionService } from '../services/action.service';
 import { MessageService } from '../services/message.service';
+import type { N8nRepositories } from './n8n-repositories';
+import type { CustomRepositories } from './custom-repositories';
 import type { ApiServices } from '../types/services';
-import type { N8nRepositories, CustomRepositories } from '../types/repositories';
 
 export function buildApiServices(
   n8nRepositories: N8nRepositories,
   customRepositories: CustomRepositories,
 ): ApiServices {
   const sharedDeps = {
-    executionRepository: n8nRepositories.execution,
-    sharedWorkflowRepository: n8nRepositories.sharedWorkflow,
+    executionRepository: n8nRepositories.raw.execution,
+    sharedWorkflowRepository: n8nRepositories.raw.sharedWorkflow,
   };
 
   return {

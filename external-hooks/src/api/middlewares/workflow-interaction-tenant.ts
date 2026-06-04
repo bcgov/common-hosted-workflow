@@ -3,9 +3,9 @@ import { workflowInteractionInternalPostPathPattern } from '../constants/route-p
 import { tenantUuidRegex } from '../constants/regex';
 import { extractBearerToken } from '../helpers/bearer';
 import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
-import type { N8nProjectRelationRepository, N8nProjectRepository } from '../types/n8n-adapters';
+import type { BaseN8nProjectRelationRepository, BaseN8nProjectRepository } from '../types/n8n-adapters';
 import type { AuthRequest, AuthResponse, ExpressNext } from '../types/auth';
-import type { CustomRepositories, N8nRepositories } from '../types/repositories';
+import type { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -22,10 +22,12 @@ const log = createLogger('CustomAPIs');
  */
 export function createWorkflowInteractionTenantMiddleware(config: {
   n8nRepositories: {
-    project: N8nProjectRepository;
-    projectRelation: N8nProjectRelationRepository;
+    project: BaseN8nProjectRepository;
+    projectRelation: BaseN8nProjectRelationRepository;
   };
-  customRepositories: Pick<CustomRepositories, 'tenantProjectRelation'>;
+  customRepositories: {
+    tenantProjectRelation: TenantProjectRelationRepository;
+  };
 }) {
   const { project: projectRepository, projectRelation: projectRelationRepository } = config.n8nRepositories;
   const { tenantProjectRelation: tenantProjectRelationRepository } = config.customRepositories;
