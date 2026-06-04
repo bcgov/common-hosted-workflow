@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import { OkResponse, CreatedResponse } from './responses';
+import { OkResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
   createActionRequestResponseSchema,
