@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import { sendValidatedJson } from './helpers/responses';
+import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
   createActionRequestResponseSchema,
@@ -40,7 +40,7 @@ export function buildActorRouter({
         limit: parsed.query.limit ?? 50,
         since: parsed.query.since,
       });
-      sendValidatedJson(res, 200, listActorMessagesResponseSchema, rows.map(mapMessageRowToResponse));
+      OkResponse(res, rows.map(mapMessageRowToResponse), listActorMessagesResponseSchema);
     },
   );
 
@@ -57,7 +57,7 @@ export function buildActorRouter({
         actionId: parsed.params.actionId,
         actorId: parsed.params.actorId,
       });
-      sendValidatedJson(res, 200, createActionRequestResponseSchema, mapActionRequestRowToResponse(row));
+      OkResponse(res, mapActionRequestRowToResponse(row), createActionRequestResponseSchema);
     },
   );
 
@@ -81,7 +81,7 @@ export function buildActorRouter({
       });
       const items = rows.map(mapActionRequestRowToResponse);
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
-      sendValidatedJson(res, 200, listActionsResponseSchema, { items, nextCursor });
+      OkResponse(res, { items, nextCursor }, listActionsResponseSchema);
     },
   );
 
@@ -104,10 +104,10 @@ export function buildActorRouter({
         actorId: parsed.params.actorId,
         status: patchStatus,
       });
-      sendValidatedJson(res, 200, patchActionStatusResponseSchema, {
+      OkResponse(res, {
         status: patchStatus,
         message: formatPatchActionStatusMessage(patchStatus),
-      });
+      }, patchActionStatusResponseSchema);
     },
   );
 

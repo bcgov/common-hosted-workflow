@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
-import { sendValidatedJson } from './helpers/responses';
+import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
   createMessageSchema,
@@ -40,7 +40,7 @@ export function buildMessageRouter({
       const items = rows.map(mapMessageRowToResponse);
 
       const nextCursor = nextCursorFromPagedItems(items, pageLimit);
-      sendValidatedJson(res, 200, listMessagesResponseSchema, { items, nextCursor });
+      OkResponse(res, { items, nextCursor }, listMessagesResponseSchema);
     },
   );
 
@@ -65,7 +65,7 @@ export function buildMessageRouter({
         metadata,
         status,
       });
-      sendValidatedJson(res, 201, createMessageResponseSchema, mapMessageRowToResponse(created));
+      CreatedResponse(res, mapMessageRowToResponse(created), createMessageResponseSchema);
     },
   );
 

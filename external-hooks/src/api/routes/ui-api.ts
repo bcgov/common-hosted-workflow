@@ -1,6 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { sendValidatedJson } from './helpers/responses';
-import { OkResponse, UnauthorizedResponse } from './responses';
+import { OkResponse, CreatedResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 import {
@@ -166,12 +165,12 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
         parsed.body.email,
       );
 
-      sendValidatedJson(res, 201, shareWorkflowResponseSchema, {
+      CreatedResponse(res, {
         success: true as const,
         message: `Workflow '${result.workflowId}' shared with '${result.sharedWithEmail}'.`,
         workflowId: result.workflowId,
         sharedWithEmail: result.sharedWithEmail,
-      });
+      }, shareWorkflowResponseSchema);
     },
   );
 
@@ -187,12 +186,12 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
         parsed.params.projectId,
       );
 
-      sendValidatedJson(res, 200, unshareWorkflowResponseSchema, {
+      OkResponse(res, {
         success: true as const,
         message: `Workflow '${result.workflowId}' unshared from project '${result.projectId}'.`,
         workflowId: result.workflowId,
         projectId: result.projectId,
-      });
+      }, unshareWorkflowResponseSchema);
     },
   );
 
