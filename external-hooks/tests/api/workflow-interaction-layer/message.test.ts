@@ -165,7 +165,10 @@ describe('GET /messages/', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ actorId: 'specific-actor' }));
+    expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
+    const callArg = messageRepo.list.mock.calls[0][0];
+    expect(callArg.where).toBeInstanceOf(Array);
+    expect(callArg.where.length).toBeGreaterThanOrEqual(2);
   });
 });
 

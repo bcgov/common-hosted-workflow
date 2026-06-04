@@ -1,3 +1,6 @@
+import { and, eq, inArray } from 'drizzle-orm';
+import { actionRequests } from '../../db/schema/workflow-interaction-layer';
+import { buildPaginationClauses } from '../../db/repository/workflow-interaction-layer/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
 import type { N8nExecutionLookup } from '../helpers/n8n-validation';
@@ -65,6 +68,19 @@ export class ActionService {
     this.sharedWorkflowRepository = deps.sharedWorkflowRepository;
   }
 
+  private buildListWhere(params: {
+    allowedProjectIds: string[];
+    actorId?: string;
+    workflowInstanceId?: string;
+    since?: import('../../types/list-pagination').ListPaginationSince;
+  }): any[] {
+    const clauses: any[] = [inArray(actionRequests.projectId, params.allowedProjectIds)];
+    if (params.actorId) clauses.push(eq(actionRequests.actorId, params.actorId));
+    if (params.workflowInstanceId) clauses.push(eq(actionRequests.workflowInstanceId, params.workflowInstanceId));
+    clauses.push(...buildPaginationClauses(actionRequests, params.since));
+    return clauses;
+  }
+
   async create(params: CreateActionParams) {
     const { dueDate, checkIn } = normalizeCreateActionTimestamps(params);
     const callbackMethod = params.callbackMethod ?? 'POST';
@@ -119,32 +135,33 @@ export class ActionService {
     });
 
     return await this.actionRequestRepository.list({
-      allowedProjectIds: params.allowedProjectIds,
-      actorId: params.actorId,
-      paginationSince: params.since,
-      workflowInstanceId: params.workflowInstanceId,
+      where: this.buildListWhere(params),
       limit: params.limit,
     });
   }
 
   async getById(params: GetActionByIdParams) {
     const row = await this.actionRequestRepository.getById({
-      allowedProjectIds: params.allowedProjectIds,
       actionId: params.actionId,
-      actorId: params.actorId,
+      where: [
+        inArray(actionRequests.projectId, params.allowedProjectIds),
+        ...(params.actorId ? [eq(actionRequests.actorId, params.actorId)] : []),
+      ],
     });
     if (!row) throw new AppError(404, 'Action not found');
     return row;
   }
 
   async updateStatus(params: UpdateActionStatusParams) {
-    const updated = await this.actionRequestRepository.updateStatus({
-      allowedProjectIds: params.allowedProjectIds,
+    const row = await this.actionRequestRepository.updateStatus({
       actionId: params.actionId,
-      actorId: params.actorId,
       status: params.status,
+      where: [
+        inArray(actionRequests.projectId, params.allowedProjectIds),
+        ...(params.actorId ? [eq(actionRequests.actorId, params.actorId)] : []),
+      ],
     });
-    if (!updated) throw new AppError(404, 'Action not found');
+    if (!row) throw new AppError(404, 'Action not found');
     return params.status;
   }
 }

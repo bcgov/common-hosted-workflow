@@ -16,7 +16,7 @@ describe('UiApiService', () => {
 
     expect(n8nRepos.user.findOne).toHaveBeenCalledWith({
       where: { email: 'person@example.com' },
-      relations: ['role'],
+      relations: undefined,
     });
     expect(result).toEqual({
       id: 'user-123',

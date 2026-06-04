@@ -1,7 +1,7 @@
-import { getColumnName, quoteIdentifier, type EntityMetadataLike } from './sql';
-import type { WorkflowRepository } from './workflow';
+import { getColumnName, quoteIdentifier } from './sql';
+import type { EntityMetadataLike, N8nSharedWorkflowRepository } from '../../../api/types/n8n-adapters';
 
-type SharedWorkflowRow = {
+export type SharedWorkflowRow = {
   workflowId: string;
   workflowName: string;
   projectId: string;
@@ -11,11 +11,8 @@ type SharedWorkflowQueryResult = Array<Record<string, unknown>>;
 
 export class SharedWorkflowRepository {
   constructor(
-    private readonly sharedWorkflowRepository: {
-      metadata: EntityMetadataLike;
-      manager: { query: (sql: string, params?: unknown[]) => Promise<Array<Record<string, unknown>>> };
-    },
-    private readonly workflowRepository: WorkflowRepository,
+    private readonly sharedWorkflowRepository: N8nSharedWorkflowRepository,
+    private readonly workflowMetadata: EntityMetadataLike,
   ) {}
 
   get metadata() {
@@ -24,7 +21,7 @@ export class SharedWorkflowRepository {
 
   private buildWorkflowRowSelect() {
     const sharedWorkflowMetadata = this.sharedWorkflowRepository.metadata;
-    const workflowMetadata = this.workflowRepository.metadata;
+    const workflowMetadata = this.workflowMetadata;
 
     const sharedWorkflowTable = quoteIdentifier(sharedWorkflowMetadata.tableName);
     const workflowTable = quoteIdentifier(workflowMetadata.tableName);
@@ -70,7 +67,7 @@ export class SharedWorkflowRepository {
     return rows.map((row) => String(row.projectId));
   }
 
-  async findRowsByWorkflowId(workflowId: string) {
+  async findRowsByWorkflowId(workflowId: string): Promise<SharedWorkflowRow[]> {
     const { sharedWorkflowWorkflowColumn, selectSql } = this.buildWorkflowRowSelect();
     const rows = await this.queryWorkflowRows(`${selectSql} WHERE sw.${sharedWorkflowWorkflowColumn} = $1`, [
       workflowId,
@@ -79,7 +76,7 @@ export class SharedWorkflowRepository {
     return rows as SharedWorkflowRow[];
   }
 
-  async findWorkflowRowsByProjectIds(projectIds?: string[]) {
+  async findWorkflowRowsByProjectIds(projectIds?: string[]): Promise<SharedWorkflowRow[]> {
     const { sharedWorkflowProjectColumn, selectSql } = this.buildWorkflowRowSelect();
     const rows = projectIds?.length
       ? await this.queryWorkflowRows(`${selectSql} WHERE sw.${sharedWorkflowProjectColumn} = ANY($1)`, [projectIds])

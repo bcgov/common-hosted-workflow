@@ -1,4 +1,4 @@
-import type { N8nUiUser } from '../../db/repository/n8n/user';
+import type { N8nUser } from '../../db/repository/n8n/user';
 import type {
   N8nProjectRecord,
   N8nProjectRepository,
@@ -22,7 +22,7 @@ export type UiWorkflowSummary = {
 };
 
 export type UiApiContext = {
-  n8nUser: N8nUiUser | null;
+  n8nUser: N8nUser | null;
   accessibleProjectIds: string[];
   projects: N8nProjectRecord[];
   workflows: UiWorkflowSummary[];

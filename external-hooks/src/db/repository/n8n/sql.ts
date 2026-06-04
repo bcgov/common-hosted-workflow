@@ -1,10 +1,4 @@
-export type EntityMetadataLike = {
-  tableName: string;
-  columns: Array<{
-    propertyName: string;
-    databaseName: string;
-  }>;
-};
+import type { EntityMetadataLike } from '../../../api/types/n8n-adapters';
 
 export function getColumnName(metadata: EntityMetadataLike, propertyName: string) {
   const column = metadata.columns.find((item) => item.propertyName === propertyName);
