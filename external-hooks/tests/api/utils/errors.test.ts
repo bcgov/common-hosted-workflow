@@ -31,13 +31,11 @@ describe('handleErrorResponse', () => {
     handleErrorResponse(err, req, res as any, next);
 
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'error',
-        statusCode: 403,
+    expect(res.json).toHaveBeenCalledWith({
+      error: expect.objectContaining({
         message: 'Forbidden',
       }),
-    );
+    });
   });
 
   it('includes details from AppError', () => {
@@ -48,7 +46,12 @@ describe('handleErrorResponse', () => {
 
     handleErrorResponse(err, req, res as any, next);
 
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ conflictId: 'x' }));
+    expect(res.json).toHaveBeenCalledWith({
+      error: expect.objectContaining({
+        message: 'Conflict',
+        details: { conflictId: 'x' },
+      }),
+    });
   });
 
   it('defaults to 500 for plain Error', () => {
@@ -60,5 +63,10 @@ describe('handleErrorResponse', () => {
     handleErrorResponse(err, req, res as any, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      error: expect.objectContaining({
+        message: 'unexpected',
+      }),
+    });
   });
 });
