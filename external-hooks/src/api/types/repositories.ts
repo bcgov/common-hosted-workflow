@@ -1,6 +1,6 @@
-import type { MessageRepository } from '../../db/repository/workflow-interaction-layer/message';
-import type { TenantProjectRelationRepository } from '../../db/repository/workflow-interaction-layer/tenant-project-relation';
-import type { ActionRequestRepository } from '../../db/repository/workflow-interaction-layer/action-request';
+import type { MessageRepository } from '../../db/repository/custom/message';
+import type { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
+import type { ActionRequestRepository } from '../../db/repository/custom/action-request';
 import type { N8nRepositories } from './n8n-adapters';
 
 /** n8n DI-backed repositories and helpers (from Container / TypeORM). */

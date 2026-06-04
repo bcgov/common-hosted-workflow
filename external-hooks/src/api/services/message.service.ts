@@ -1,11 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { messages } from '../../db/schema/workflow-interaction-layer';
-import { buildPaginationClauses } from '../../db/repository/workflow-interaction-layer/pagination';
+import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
 import type { N8nExecutionLookup } from '../helpers/n8n-validation';
 import type { N8nSharedWorkflowRepository } from '../types/n8n-adapters';
-import type { MessageRepository } from '../../db/repository/workflow-interaction-layer/message';
+import type { MessageRepository } from '../../db/repository/custom/message';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
