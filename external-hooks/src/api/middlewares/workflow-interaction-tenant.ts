@@ -45,7 +45,7 @@ export function createWorkflowInteractionTenantMiddleware(config: {
       return next(new AppError(403, 'No projects linked to this tenant'));
     }
 
-    const userProjectIds = await listProjectIdsAccessibleToUser(projectRelationRepository, projectRepository, callerId);
+    const userProjectIds = await listProjectIdsAccessibleToUser(projectRepository, projectRelationRepository, callerId);
 
     const userSet = new Set(userProjectIds);
     const allowed = tenantProjectIds.filter((id) => userSet.has(id));

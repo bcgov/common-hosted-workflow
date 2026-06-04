@@ -85,7 +85,7 @@ describe('GET /actors/:actorId/messages', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(n8nRepos.execution.findSingleExecution).toHaveBeenCalled();
+    expect(n8nRepos.execution.loadMetadataOrNull).toHaveBeenCalled();
     expect(messageRepo.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }));
     const callArg = messageRepo.list.mock.calls[0][0];
     expect(callArg.where).toBeInstanceOf(Array);

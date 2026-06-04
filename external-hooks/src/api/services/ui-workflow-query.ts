@@ -51,7 +51,7 @@ export class UiWorkflowQueryService {
 
     const [personalProject, accessibleProjectIds] = await Promise.all([
       this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
-      listProjectIdsAccessibleToUser(this.n8nRepositories.projectRelation, this.n8nRepositories.project, n8nUser.id),
+      listProjectIdsAccessibleToUser(this.n8nRepositories.project, this.n8nRepositories.projectRelation, n8nUser.id),
     ]);
     const projects = await this.loadAccessibleProjects(accessibleProjectIds);
 

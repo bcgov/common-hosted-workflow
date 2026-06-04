@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { actionRequests } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
-import { requireExecutionInTenantScope, resolveProjectIdForCreate } from '../helpers/n8n-validation';
+import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import { AppError } from '../utils/errors';

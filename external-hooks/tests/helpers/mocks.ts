@@ -251,9 +251,23 @@ export function createMockN8nRepositories() {
     },
     sharedCredential: { manager: {} },
     withTransaction: vi.fn(),
-    execution: {
-      findSingleExecution: vi.fn().mockResolvedValue({ workflowId: VALID_WORKFLOW_ID }),
-    },
+    execution: (() => {
+      const findSingleExecution = vi.fn().mockResolvedValue({ workflowId: VALID_WORKFLOW_ID });
+      return {
+        findSingleExecution,
+        loadMetadataOrNull: vi.fn().mockImplementation(async (id: string) => {
+          try {
+            const execution = await findSingleExecution(id, {
+              includeData: false,
+              unflattenData: false,
+            });
+            return execution ?? null;
+          } catch {
+            return null;
+          }
+        }),
+      };
+    })(),
   };
 }
 
@@ -324,10 +338,22 @@ export function createMockMessageService(
 /* ------------------------------------------------------------------ */
 
 export function createMockExecutionRepo(overrides: Record<string, unknown> = {}) {
-  return {
+  const repo: Record<string, unknown> = {
     findSingleExecution: vi.fn().mockResolvedValue({ workflowId: VALID_WORKFLOW_ID }),
+    loadMetadataOrNull: vi.fn().mockImplementation(async (id: string) => {
+      try {
+        const execution = await (repo.findSingleExecution as ReturnType<typeof vi.fn>)(id, {
+          includeData: false,
+          unflattenData: false,
+        });
+        return execution ?? null;
+      } catch {
+        return null;
+      }
+    }),
     ...overrides,
   };
+  return repo;
 }
 
 export function createMockSharedWorkflowRepo(overrides: Record<string, unknown> = {}) {
