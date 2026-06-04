@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ListPaginationSince } from '../../types/list-pagination';
+import type { ListPaginationSince } from '../types/list-pagination';
 import { listPaginationCursorUuidRegex } from '../constants/regex';
 
 /**

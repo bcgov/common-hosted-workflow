@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, lt, or } from 'drizzle-orm';
-import type { ListPaginationSince } from '../../types/list-pagination';
+import type { ListPaginationSince } from '../../../api/types/list-pagination';
 
 /**
  * Builds Drizzle WHERE clauses for time-based or cursor-based pagination.
