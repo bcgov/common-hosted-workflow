@@ -68,7 +68,6 @@ function createTestRouter() {
       actionRequest: actionRequestRepo as any,
     } as any,
     services: {
-      apiKey: {} as any,
       uiApi: {} as any,
       action: createMockActionService(actionRequestRepo, n8nRepos),
       message: createMockMessageService(messageRepo, n8nRepos),

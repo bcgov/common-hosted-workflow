@@ -257,10 +257,10 @@ export function createMockN8nRepositories() {
   };
 }
 
-export function createMockApiKeyService() {
+export function createMockUserRepository() {
   return {
     getUserForApiKey: vi.fn().mockResolvedValue(makeCaller()),
-  };
+  } as any;
 }
 
 /* ------------------------------------------------------------------ */

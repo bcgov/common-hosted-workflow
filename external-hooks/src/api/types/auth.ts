@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { ApiServices } from './services';
+import type { UserRepository } from '../../db/repository/n8n/user';
 
 /** Express `next`; pass `AppError` (or any `err`) to invoke the centralized error handler. */
 export type ExpressNext = NextFunction;
@@ -11,7 +11,7 @@ export type AuthRequest = Request;
 export type AuthResponse = Response;
 
 export interface AuthMiddlewareConfig {
-  services: Pick<ApiServices, 'apiKey'>;
+  userRepository: UserRepository;
   globalOwnerRoleSlug: string;
   globalAdminRoleSlug: string;
 }

@@ -5,7 +5,7 @@ import {
   createMockRequest,
   createMockResponse,
   createMockNext,
-  createMockApiKeyService,
+  createMockUserRepository,
   makeCaller,
   makeAdminCaller,
   VALID_TENANT_ID,
@@ -23,9 +23,9 @@ const GLOBAL_ADMIN_SLUG = 'global:admin';
 
 describe('apiKeyAuthMiddleware', () => {
   it('sets res.locals.caller and calls next on valid API key', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     const { apiKeyAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -41,9 +41,9 @@ describe('apiKeyAuthMiddleware', () => {
   });
 
   it('returns 401 when no API key header', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     const { apiKeyAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -59,10 +59,10 @@ describe('apiKeyAuthMiddleware', () => {
   });
 
   it('returns 401 when getUserForApiKey returns null', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     apiKeyService.getUserForApiKey.mockResolvedValue(null);
     const { apiKeyAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -78,10 +78,10 @@ describe('apiKeyAuthMiddleware', () => {
   });
 
   it('returns 401 when user is disabled', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     apiKeyService.getUserForApiKey.mockResolvedValue(makeCaller({ disabled: true }));
     const { apiKeyAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -97,10 +97,10 @@ describe('apiKeyAuthMiddleware', () => {
   });
 
   it('returns 401 when getUserForApiKey throws', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     apiKeyService.getUserForApiKey.mockRejectedValue(new Error('DB down'));
     const { apiKeyAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -122,10 +122,10 @@ describe('apiKeyAuthMiddleware', () => {
 
 describe('adminAuthMiddleware', () => {
   it('calls next for global owner role', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     apiKeyService.getUserForApiKey.mockResolvedValue(makeAdminCaller(GLOBAL_OWNER_SLUG));
     const { adminAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -142,10 +142,10 @@ describe('adminAuthMiddleware', () => {
   });
 
   it('calls next for global admin role', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     apiKeyService.getUserForApiKey.mockResolvedValue(makeAdminCaller(GLOBAL_ADMIN_SLUG));
     const { adminAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
@@ -161,10 +161,10 @@ describe('adminAuthMiddleware', () => {
   });
 
   it('returns 403 for non-admin role', async () => {
-    const apiKeyService = createMockApiKeyService();
+    const apiKeyService = createMockUserRepository();
     apiKeyService.getUserForApiKey.mockResolvedValue(makeCaller({ role: { slug: 'global:member' } }));
     const { adminAuthMiddleware } = createAuthMiddleware({
-      services: { apiKey: apiKeyService },
+      userRepository: apiKeyService,
       globalOwnerRoleSlug: GLOBAL_OWNER_SLUG,
       globalAdminRoleSlug: GLOBAL_ADMIN_SLUG,
     });
