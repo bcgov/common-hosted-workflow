@@ -17,18 +17,10 @@ vi.mock('../../../src/api/helpers/ui-oidc-session', async () => {
 
 import { buildUiApiRouter } from '../../../src/api/routes/ui-api';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
-
-function getRouteHandlers(router: any, method: string, path: string) {
-  for (const layer of router.stack) {
-    if (layer.route && layer.route.path === path && layer.route.methods[method.toLowerCase()]) {
-      return layer.route.stack.map((stackLayer: { handle: (...args: any[]) => unknown }) => stackLayer.handle);
-    }
-  }
-  return [];
-}
+import { getRouteHandlers } from '../../helpers/test-utils';
 
 async function runRoute(router: any, method: string, path: string, req: any, res: any) {
-  const handlers = getRouteHandlers(router, method, path);
+  const handlers = getRouteHandlers(router, method, path) ?? [];
   let index = 0;
 
   const next = async (error?: unknown) => {

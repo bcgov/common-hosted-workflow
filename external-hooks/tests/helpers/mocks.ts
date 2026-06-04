@@ -303,20 +303,54 @@ export function createMockActionService(
   actionRequestRepo: ReturnType<typeof createMockActionRequestRepository>,
   n8nRepos: ReturnType<typeof createMockN8nRepositories>,
 ) {
-  return new ActionService({
-    actionRequestRepository: actionRequestRepo as any,
-    executionRepository: n8nRepos.execution,
-    sharedWorkflowRepository: n8nRepos.sharedWorkflow as any,
-  });
+  return new ActionService(
+    { execution: n8nRepos.execution, sharedWorkflow: n8nRepos.sharedWorkflow } as any,
+    { actionRequest: actionRequestRepo as any } as any,
+  );
 }
 
 export function createMockMessageService(
   messageRepo: ReturnType<typeof createMockMessageRepository>,
   n8nRepos: ReturnType<typeof createMockN8nRepositories>,
 ) {
-  return new MessageService({
-    messageRepository: messageRepo as any,
-    executionRepository: n8nRepos.execution,
-    sharedWorkflowRepository: n8nRepos.sharedWorkflow as any,
-  });
+  return new MessageService(
+    { execution: n8nRepos.execution, sharedWorkflow: n8nRepos.sharedWorkflow } as any,
+    { message: messageRepo as any } as any,
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Execution / shared-workflow repo factories                         */
+/* ------------------------------------------------------------------ */
+
+export function createMockExecutionRepo(overrides: Record<string, unknown> = {}) {
+  return {
+    findSingleExecution: vi.fn().mockResolvedValue({ workflowId: VALID_WORKFLOW_ID }),
+    ...overrides,
+  };
+}
+
+export function createMockSharedWorkflowRepo(overrides: Record<string, unknown> = {}) {
+  return {
+    findProjectIds: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
+    ...overrides,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Route context factory                                              */
+/* ------------------------------------------------------------------ */
+
+import type { ApiRouteContext } from '../../src/api/types/routes';
+
+export function createMockRouteContext(overrides: Partial<ApiRouteContext> = {}): ApiRouteContext {
+  return {
+    apiKeyAuthMiddleware: (_req: any, _res: any, next: any) => next(),
+    adminAuthMiddleware: (_req: any, _res: any, next: any) => next(),
+    workflowInteractionTenantMiddleware: (_req: any, _res: any, next: any) => next(),
+    n8nRepositories: {} as any,
+    customRepositories: {} as any,
+    services: {} as any,
+    ...overrides,
+  };
 }

@@ -2,9 +2,8 @@
  * Unit tests for the actor-prefixed route handlers in
  * `src/api/routes/actors.ts`.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildActorRouter } from '../../../src/api/routes/actors';
-import type { ApiRouteContext } from '../../../src/api/types/routes';
 import {
   createMockRequest,
   createMockResponse,
@@ -13,6 +12,7 @@ import {
   createMockN8nRepositories,
   createMockActionService,
   createMockMessageService,
+  createMockRouteContext,
   makeActionRequestRow,
   makeMessageRow,
   VALID_PROJECT_ID,
@@ -20,47 +20,17 @@ import {
   VALID_ACTOR_ID,
   VALID_ACTION_ID,
 } from '../../helpers/mocks';
+import { getRouteHandlers, runHandlerChain } from '../../helpers/test-utils';
 
-function getRouteHandler(router: any, method: string, path: string) {
-  for (const layer of router.stack) {
-    if (layer.route && layer.route.path === path && layer.route.methods[method.toLowerCase()]) {
-      return layer.route.stack.map((s: any) => s.handle);
-    }
-  }
-  return null;
-}
-
-async function runHandlerChain(handlers: Array<(req: any, res: any, next: any) => any>, req: any, res: any) {
-  let error: unknown = null;
-  for (const handler of handlers) {
-    if (error) break;
-    await new Promise<void>((resolve) => {
-      const next = (err?: unknown) => {
-        if (err) error = err;
-        resolve();
-      };
-      const result = handler(req, res, next);
-      if (result && typeof result.then === 'function') {
-        result
-          .then(() => resolve())
-          .catch((err: unknown) => {
-            error = err;
-            resolve();
-          });
-      }
-    });
-  }
-  return error;
-}
+/* ------------------------------------------------------------------ */
+/*  Setup                                                              */
+/* ------------------------------------------------------------------ */
 
 function createTestRouter() {
   const messageRepo = createMockMessageRepository();
   const actionRequestRepo = createMockActionRequestRepository();
   const n8nRepos = createMockN8nRepositories();
-  const routeContext: ApiRouteContext = {
-    apiKeyAuthMiddleware: (_req: any, _res: any, next: any) => next(),
-    adminAuthMiddleware: (_req: any, _res: any, next: any) => next(),
-    workflowInteractionTenantMiddleware: (_req: any, _res: any, next: any) => next(),
+  const routeContext = createMockRouteContext({
     n8nRepositories: { raw: n8nRepos } as any,
     customRepositories: {
       tenantProjectRelation: {} as any,
@@ -72,26 +42,26 @@ function createTestRouter() {
       action: createMockActionService(actionRequestRepo, n8nRepos),
       message: createMockMessageService(messageRepo, n8nRepos),
     },
-  };
+  });
 
   const router = buildActorRouter(routeContext);
 
   return { router, messageRepo, actionRequestRepo, n8nRepos };
 }
 
+/* ================================================================== */
+/*  GET /actors/:actorId/messages                                      */
+/* ================================================================== */
+
 describe('GET /actors/:actorId/messages', () => {
   it('returns 200 with messages for a valid request', async () => {
     const { router, messageRepo } = createTestRouter();
-    const rows = [makeMessageRow(), makeMessageRow({ id: 'msg-002' })];
-    messageRepo.list.mockResolvedValue(rows);
+    messageRepo.list.mockResolvedValue([makeMessageRow(), makeMessageRow({ id: 'msg-002' })]);
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/messages');
     expect(handlers).not.toBeNull();
 
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: {},
-    });
+    const req = createMockRequest({ params: { actorId: VALID_ACTOR_ID }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     const error = await runHandlerChain(handlers!, req, res);
@@ -99,15 +69,14 @@ describe('GET /actors/:actorId/messages', () => {
     expect(error).toBeNull();
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalled();
-    const payload = res.json.mock.calls[0][0];
-    expect(payload).toHaveLength(2);
+    expect(res.json.mock.calls[0][0]).toHaveLength(2);
   });
 
   it('passes workflowInstanceId filter to repository', async () => {
     const { router, messageRepo, n8nRepos } = createTestRouter();
     messageRepo.list.mockResolvedValue([]);
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/messages');
     const req = createMockRequest({
       params: { actorId: VALID_ACTOR_ID },
       query: { workflowInstanceId: VALID_EXECUTION_ID },
@@ -127,11 +96,8 @@ describe('GET /actors/:actorId/messages', () => {
     const { router, messageRepo } = createTestRouter();
     messageRepo.list.mockResolvedValue([]);
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: {},
-    });
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/messages');
+    const req = createMockRequest({ params: { actorId: VALID_ACTOR_ID }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     await runHandlerChain(handlers!, req, res);
@@ -141,11 +107,8 @@ describe('GET /actors/:actorId/messages', () => {
 
   it('returns validation error for empty actorId', async () => {
     const { router } = createTestRouter();
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/messages');
-    const req = createMockRequest({
-      params: { actorId: '' },
-      query: {},
-    });
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/messages');
+    const req = createMockRequest({ params: { actorId: '' }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     const error = await runHandlerChain(handlers!, req, res);
@@ -155,16 +118,17 @@ describe('GET /actors/:actorId/messages', () => {
   });
 });
 
+/* ================================================================== */
+/*  GET /actors/:actorId/actions/:actionId                             */
+/* ================================================================== */
+
 describe('GET /actors/:actorId/actions/:actionId', () => {
   it('returns 200 scoped to actor', async () => {
     const { router, actionRequestRepo } = createTestRouter();
     actionRequestRepo.getById.mockResolvedValue(makeActionRequestRow());
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/actions/:actionId');
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID, actionId: VALID_ACTION_ID },
-      query: {},
-    });
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/actions/:actionId');
+    const req = createMockRequest({ params: { actorId: VALID_ACTOR_ID, actionId: VALID_ACTION_ID }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     const error = await runHandlerChain(handlers!, req, res);
@@ -181,11 +145,8 @@ describe('GET /actors/:actorId/actions/:actionId', () => {
     const { router, actionRequestRepo } = createTestRouter();
     actionRequestRepo.getById.mockResolvedValue(null);
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/actions/:actionId');
-    const req = createMockRequest({
-      params: { actorId: 'other-actor', actionId: VALID_ACTION_ID },
-      query: {},
-    });
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/actions/:actionId');
+    const req = createMockRequest({ params: { actorId: 'other-actor', actionId: VALID_ACTION_ID }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     const error = await runHandlerChain(handlers!, req, res);
@@ -195,16 +156,17 @@ describe('GET /actors/:actorId/actions/:actionId', () => {
   });
 });
 
+/* ================================================================== */
+/*  GET /actors/:actorId/actions                                       */
+/* ================================================================== */
+
 describe('GET /actors/:actorId/actions', () => {
   it('returns 200 with paginated list scoped to actor', async () => {
     const { router, actionRequestRepo } = createTestRouter();
     actionRequestRepo.list.mockResolvedValue([makeActionRequestRow()]);
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/actions');
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: {},
-    });
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/actions');
+    const req = createMockRequest({ params: { actorId: VALID_ACTOR_ID }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     const error = await runHandlerChain(handlers!, req, res);
@@ -220,11 +182,8 @@ describe('GET /actors/:actorId/actions', () => {
     const { router, actionRequestRepo } = createTestRouter();
     actionRequestRepo.list.mockResolvedValue([]);
 
-    const handlers = getRouteHandler(router, 'get', '/actors/:actorId/actions');
-    const req = createMockRequest({
-      params: { actorId: VALID_ACTOR_ID },
-      query: {},
-    });
+    const handlers = getRouteHandlers(router, 'get', '/actors/:actorId/actions');
+    const req = createMockRequest({ params: { actorId: VALID_ACTOR_ID }, query: {} });
     const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
 
     await runHandlerChain(handlers!, req, res);
@@ -236,12 +195,16 @@ describe('GET /actors/:actorId/actions', () => {
   });
 });
 
+/* ================================================================== */
+/*  PATCH /actors/:actorId/actions/:actionId                           */
+/* ================================================================== */
+
 describe('PATCH /actors/:actorId/actions/:actionId', () => {
   it('returns 200 scoped to actor', async () => {
     const { router, actionRequestRepo } = createTestRouter();
     actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
 
-    const handlers = getRouteHandler(router, 'patch', '/actors/:actorId/actions/:actionId');
+    const handlers = getRouteHandlers(router, 'patch', '/actors/:actorId/actions/:actionId');
     const req = createMockRequest({
       params: { actorId: VALID_ACTOR_ID, actionId: VALID_ACTION_ID },
       query: {},
@@ -265,7 +228,7 @@ describe('PATCH /actors/:actorId/actions/:actionId', () => {
     const { router, actionRequestRepo } = createTestRouter();
     actionRequestRepo.updateStatus.mockResolvedValue(false);
 
-    const handlers = getRouteHandler(router, 'patch', '/actors/:actorId/actions/:actionId');
+    const handlers = getRouteHandlers(router, 'patch', '/actors/:actorId/actions/:actionId');
     const req = createMockRequest({
       params: { actorId: 'other-actor', actionId: VALID_ACTION_ID },
       query: {},
