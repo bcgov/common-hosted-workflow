@@ -1,5 +1,5 @@
 import type { Response } from 'express';
-import { requireChwfAllowedProjectIds } from '../../helpers/n8n-validation';
+import { requireChwfAllowedProjectIds } from '../../services/project-access';
 
 export function getTenantScopedProjectIds(
   res: Response,

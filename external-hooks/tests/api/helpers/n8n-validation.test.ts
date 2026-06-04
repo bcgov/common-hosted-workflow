@@ -5,11 +5,11 @@ import {
   requireExecutionInTenantScope,
   validateN8nExecutionMatchesWorkflow,
   validateN8nExecutionInTenantScope,
+  listProjectIdsAccessibleToUser,
   verifyCallerHasN8nProjectAccess,
   resolveWorkflowProjectScope,
-} from '../../../src/api/helpers/n8n-validation';
+} from '../../../src/api/services/project-access';
 import { AppError } from '../../../src/api/utils/errors';
-import { listProjectIdsAccessibleToUser } from '../../../src/api/services/project-access';
 import {
   createMockResponse,
   createMockExecutionRepo,
@@ -289,7 +289,7 @@ describe('listProjectIdsAccessibleToUser', () => {
     const projectRelationRepo = {
       findAllByUser: vi.fn().mockResolvedValue([{ projectId: 'team-proj-1' }, { projectId: 'team-proj-2' }]),
     };
-    const result = await listProjectIdsAccessibleToUser(projectRelationRepo as any, projectRepo as any, 'user-1');
+    const result = await listProjectIdsAccessibleToUser(projectRepo as any, projectRelationRepo as any, 'user-1');
     expect(result).toContain('personal-proj');
     expect(result).toContain('team-proj-1');
     expect(result).toContain('team-proj-2');
@@ -298,14 +298,14 @@ describe('listProjectIdsAccessibleToUser', () => {
   it('deduplicates when personal project is also in relations', async () => {
     const projectRepo = { getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: 'proj-1' }) };
     const projectRelationRepo = { findAllByUser: vi.fn().mockResolvedValue([{ projectId: 'proj-1' }]) };
-    const result = await listProjectIdsAccessibleToUser(projectRelationRepo as any, projectRepo as any, 'user-1');
+    const result = await listProjectIdsAccessibleToUser(projectRepo as any, projectRelationRepo as any, 'user-1');
     expect(result).toEqual(['proj-1']);
   });
 
   it('handles null personal project', async () => {
     const projectRepo = { getPersonalProjectForUser: vi.fn().mockResolvedValue(null) };
     const projectRelationRepo = { findAllByUser: vi.fn().mockResolvedValue([{ projectId: 'proj-1' }]) };
-    const result = await listProjectIdsAccessibleToUser(projectRelationRepo as any, projectRepo as any, 'user-1');
+    const result = await listProjectIdsAccessibleToUser(projectRepo as any, projectRelationRepo as any, 'user-1');
     expect(result).toEqual(['proj-1']);
   });
 });

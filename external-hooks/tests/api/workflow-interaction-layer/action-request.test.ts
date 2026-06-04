@@ -196,7 +196,7 @@ describe('GET /actions', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(n8nRepos.execution.findSingleExecution).toHaveBeenCalled();
+    expect(n8nRepos.execution.loadMetadataOrNull).toHaveBeenCalled();
   });
 });
 
