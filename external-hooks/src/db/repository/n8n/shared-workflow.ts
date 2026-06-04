@@ -19,6 +19,10 @@ export class SharedWorkflowRepository {
     return this.sharedWorkflowRepository.metadata;
   }
 
+  get manager() {
+    return this.sharedWorkflowRepository.manager;
+  }
+
   create(value: Record<string, unknown>) {
     return this.sharedWorkflowRepository.create(value);
   }

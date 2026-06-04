@@ -21,8 +21,7 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('CustomAPIs');
 
 export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customRepositories }: ApiRouteContext) {
-  const { user, project, workflow, credential, sharedWorkflow, sharedCredential, withTransaction } =
-    n8nRepositories.raw;
+  const { user, project, workflow, credential, sharedWorkflow, sharedCredential, withTransaction } = n8nRepositories;
   const { tenantProjectRelation } = customRepositories;
   const router = Router();
 
@@ -34,7 +33,7 @@ export function buildAdminRouter({ adminAuthMiddleware, n8nRepositories, customR
       const parsed = parseValidatedRequest(getUserProjectSchema, req);
       const { email } = parsed.params;
 
-      const foundUser = await user.findOneBy({ email });
+      const foundUser = await user.findByEmail(email);
       if (!foundUser) {
         log.warn('Target user not found', { statusCode: 404, email });
         throw new AppError(404, 'Target user does not exist.');

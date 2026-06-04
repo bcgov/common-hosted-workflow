@@ -6,4 +6,8 @@ export class WorkflowRepository {
   get metadata() {
     return this.workflowRepository.metadata;
   }
+
+  async findOneBy(where: { id: string }) {
+    return await this.workflowRepository.findOneBy(where);
+  }
 }

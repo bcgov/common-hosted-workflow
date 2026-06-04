@@ -13,6 +13,15 @@ import {
   VALID_API_KEY,
   VALID_INTERNAL_TOKEN,
 } from '../helpers/mocks';
+import { expectNextAppError } from '../helpers/test-utils';
+
+vi.mock('../../src/api/services/project-access', () => ({
+  listProjectIdsAccessibleToUser: vi.fn(),
+}));
+
+import { listProjectIdsAccessibleToUser } from '../../src/api/services/project-access';
+
+const mockedlistProjectIdsAccessibleToUser = vi.mocked(listProjectIdsAccessibleToUser);
 
 const GLOBAL_OWNER_SLUG = 'global:owner';
 const GLOBAL_ADMIN_SLUG = 'global:admin';
@@ -54,8 +63,7 @@ describe('apiKeyAuthMiddleware', () => {
 
     await apiKeyAuthMiddleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+    expectNextAppError(next, 401);
   });
 
   it('returns 401 when getUserForApiKey returns null', async () => {
@@ -73,8 +81,7 @@ describe('apiKeyAuthMiddleware', () => {
 
     await apiKeyAuthMiddleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+    expectNextAppError(next, 401);
   });
 
   it('returns 401 when user is disabled', async () => {
@@ -92,8 +99,7 @@ describe('apiKeyAuthMiddleware', () => {
 
     await apiKeyAuthMiddleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+    expectNextAppError(next, 401);
   });
 
   it('returns 401 when getUserForApiKey throws', async () => {
@@ -111,8 +117,7 @@ describe('apiKeyAuthMiddleware', () => {
 
     await apiKeyAuthMiddleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+    expectNextAppError(next, 401);
   });
 });
 
@@ -175,9 +180,7 @@ describe('adminAuthMiddleware', () => {
 
     await adminAuthMiddleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    const error = next.mock.calls[next.mock.calls.length - 1][0] as AppError;
-    expect(error.statusCode).toBe(403);
+    expectNextAppError(next, 403);
   });
 });
 
@@ -199,6 +202,8 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
       getProjectIdsByTenantId: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
       ...((overrides.tenantProjectRelationRepo as Record<string, unknown>) ?? {}),
     };
+
+    mockedlistProjectIdsAccessibleToUser.mockResolvedValue([VALID_PROJECT_ID]);
 
     return createWorkflowInteractionTenantMiddleware({
       n8nRepositories: { project: projectRepo, projectRelation: projectRelationRepo },
@@ -231,8 +236,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
     await middleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(400);
+    expectNextAppError(next, 400);
   });
 
   it('returns 400 when tenant ID is not a valid UUID', async () => {
@@ -247,8 +251,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
     await middleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(400);
+    expectNextAppError(next, 400);
   });
 
   it('returns 403 when tenant has no projects', async () => {
@@ -267,19 +270,12 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
     await middleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(403);
+    expectNextAppError(next, 403);
   });
 
   it('returns 403 when intersection of tenant and user projects is empty', async () => {
-    const middleware = createMiddleware({
-      projectRepo: {
-        getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: 'other-proj' }),
-      },
-      projectRelationRepo: {
-        findAllByUser: vi.fn().mockResolvedValue([{ projectId: 'other-proj' }]),
-      },
-    });
+    const middleware = createMiddleware();
+    mockedlistProjectIdsAccessibleToUser.mockResolvedValue(['other-proj']);
     const req = createMockRequest({
       headers: { 'X-TENANT-ID': VALID_TENANT_ID },
       method: 'GET',
@@ -290,8 +286,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
     await middleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(403);
+    expectNextAppError(next, 403);
   });
 
   it('returns 401 when caller.id is missing', async () => {
@@ -306,8 +301,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
     await middleware(req, res as any, next);
 
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+    expectNextAppError(next, 401);
   });
 
   describe('internal POST bearer validation', () => {
@@ -334,8 +328,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
       await middleware(req, res as any, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(AppError));
-      expect((next.mock.calls[0][0] as AppError).statusCode).toBe(500);
+      expectNextAppError(next, 500);
     });
 
     it('returns 401 when bearer token does not match INTERNAL_AUTH_TOKEN', async () => {
@@ -351,8 +344,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
       await middleware(req, res as any, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(AppError));
-      expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+      expectNextAppError(next, 401);
     });
 
     it('allows internal POST when bearer matches INTERNAL_AUTH_TOKEN', async () => {
@@ -388,8 +380,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
 
       await middleware(req, res as any, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(AppError));
-      expect((next.mock.calls[0][0] as AppError).statusCode).toBe(401);
+      expectNextAppError(next, 401);
     });
   });
 });

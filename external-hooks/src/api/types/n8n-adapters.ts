@@ -1,5 +1,4 @@
-import type { N8nUser } from '../../db/repository/n8n/user';
-import type { User } from './user';
+import type { N8nUser } from './user';
 
 export type N8nEntityRecord = Record<string, unknown> & { id: string };
 export type N8nUserRecord = Record<string, unknown> & { id: string; email: string };
@@ -41,7 +40,7 @@ export type BaseN8nUserRepository = BaseN8nRepository & {
         }
       | { email: string };
     relations?: string[];
-  }) => Promise<N8nUser | User | null>;
+  }) => Promise<N8nUser | null>;
   findOneBy: (where: { email: string }) => Promise<N8nUserRecord | null>;
 };
 

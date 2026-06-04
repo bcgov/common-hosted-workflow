@@ -9,20 +9,9 @@ export function buildApiServices(
   n8nRepositories: N8nRepositories,
   customRepositories: CustomRepositories,
 ): ApiServices {
-  const sharedDeps = {
-    executionRepository: n8nRepositories.raw.execution,
-    sharedWorkflowRepository: n8nRepositories.raw.sharedWorkflow,
-  };
-
   return {
     uiApi: new UiApiService(n8nRepositories),
-    action: new ActionService({
-      actionRequestRepository: customRepositories.actionRequest,
-      ...sharedDeps,
-    }),
-    message: new MessageService({
-      messageRepository: customRepositories.message,
-      ...sharedDeps,
-    }),
+    action: new ActionService(n8nRepositories, customRepositories),
+    message: new MessageService(n8nRepositories, customRepositories),
   };
 }

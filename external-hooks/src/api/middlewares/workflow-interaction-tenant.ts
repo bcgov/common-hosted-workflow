@@ -2,8 +2,9 @@ import { AUTHORIZATION_HEADER, X_TENANT_ID_HEADER } from '../constants/headers';
 import { workflowInteractionInternalPostPathPattern } from '../constants/route-patterns';
 import { tenantUuidRegex } from '../constants/regex';
 import { extractBearerToken } from '../helpers/bearer';
-import { listN8nProjectIdsAccessibleToUser } from '../helpers/n8n-validation';
-import type { BaseN8nProjectRelationRepository, BaseN8nProjectRepository } from '../types/n8n-adapters';
+import { listProjectIdsAccessibleToUser } from '../services/project-access';
+import type { ProjectRepository } from '../../db/repository/n8n/project';
+import type { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
 import type { AuthRequest, AuthResponse, ExpressNext } from '../types/auth';
 import type { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
 import { AppError } from '../utils/errors';
@@ -22,8 +23,8 @@ const log = createLogger('CustomAPIs');
  */
 export function createWorkflowInteractionTenantMiddleware(config: {
   n8nRepositories: {
-    project: BaseN8nProjectRepository;
-    projectRelation: BaseN8nProjectRelationRepository;
+    project: ProjectRepository;
+    projectRelation: ProjectRelationRepository;
   };
   customRepositories: {
     tenantProjectRelation: TenantProjectRelationRepository;
@@ -44,11 +45,7 @@ export function createWorkflowInteractionTenantMiddleware(config: {
       return next(new AppError(403, 'No projects linked to this tenant'));
     }
 
-    const userProjectIds = await listN8nProjectIdsAccessibleToUser(
-      projectRepository,
-      projectRelationRepository,
-      callerId,
-    );
+    const userProjectIds = await listProjectIdsAccessibleToUser(projectRelationRepository, projectRepository, callerId);
 
     const userSet = new Set(userProjectIds);
     const allowed = tenantProjectIds.filter((id) => userSet.has(id));
