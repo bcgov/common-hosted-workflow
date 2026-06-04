@@ -7,7 +7,7 @@ import type { ApiServices } from '../types/services';
 type BuildRouteContextParams = {
   services: ApiServices;
   n8nRepositories: N8nRepositories;
-  customRepositories: CustomRepositoryObject;
+  customRepositories: CustomRepositories;
   globalOwnerRoleSlug: string;
   globalAdminRoleSlug: string;
 };

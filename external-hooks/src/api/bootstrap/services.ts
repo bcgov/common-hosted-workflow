@@ -8,7 +8,7 @@ import type { ApiServices } from '../types/services';
 
 export function buildApiServices(
   n8nRepositories: N8nRepositories,
-  customRepositories: CustomRepositoryObject,
+  customRepositories: CustomRepositories,
 ): ApiServices {
   const sharedDeps = {
     executionRepository: n8nRepositories.raw.execution,
