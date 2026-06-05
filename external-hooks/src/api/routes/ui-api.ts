@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { z, type infer as zInfer } from 'zod';
+import { type infer as zInfer } from 'zod';
 import { OkResponse, CreatedResponse, ForbiddenResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestParser } from '../utils/validation';
@@ -22,6 +22,7 @@ import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
 import { getUiSession, getUiSessionSummary, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
 import { appendQueryParam, appendTokenToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
+import { buildWilRouter } from './wil';
 
 type UiApiMutableRequest = Request & {
   session?: UiApiRequest['session'];
@@ -74,7 +75,8 @@ function requireGlobalAdminRole(req: Request, res: Response, next: NextFunction)
   next();
 }
 
-export function buildUiApiRouter({ services }: ApiRouteContext) {
+export function buildUiApiRouter(routeContext: ApiRouteContext) {
+  const { services } = routeContext;
   const router = Router();
   const requireUiRequestContext = requireUiRequestContextMiddleware(services);
 
@@ -279,6 +281,9 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
       );
     },
   );
+
+  // Mount WIL sub-router (protected by requireUiRequestContext)
+  router.use('/wil', requireUiRequestContext, buildWilRouter(routeContext));
 
   return router;
 }
