@@ -1,0 +1,123 @@
+name: Sysdig Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action to run
+        required: true
+        type: choice
+        options:
+        - plan
+        - apply
+  pull_request:
+    branches:
+    - main
+    paths:
+    - terraform/sysdig/**
+  push:
+    branches:
+    - main
+    paths:
+    - terraform/sysdig/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform-plan:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan')
+    name: Terraform Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: sysdig
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Authenticate to OpenShift
+      uses: redhat-actions/oc-login@dfbd9912672664f9df2023c1c16e07bcf306043c
+      with:
+        openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+        openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+        namespace: b0c13b-tools
+        insecure_skip_tls_verify: true
+
+    - name: Terraform Init
+      working-directory: terraform/sysdig/b0c13b
+      env:
+        TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
+        TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+      run: terraform init
+
+    - name: Terraform Plan
+      id: plan
+      working-directory: terraform/sysdig/b0c13b
+      env:
+        TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
+        TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+      run: terraform plan -no-color 2>&1 | tee /tmp/plan.txt
+
+    - name: Post Plan as PR Comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+      with:
+        script: |
+          const fs = require('fs');
+          const plan = fs.readFileSync('/tmp/plan.txt', 'utf8');
+          const body = [
+            '## Sysdig Terraform Plan',
+            '```',
+            plan.substring(0, 65000),
+            '```'
+          ].join('\n');
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body
+          });
+
+  terraform-apply:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+    name: Terraform Apply
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: sysdig
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Authenticate to OpenShift
+      uses: redhat-actions/oc-login@dfbd9912672664f9df2023c1c16e07bcf306043c
+      with:
+        openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+        openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+        namespace: b0c13b-tools
+        insecure_skip_tls_verify: true
+
+    - name: Terraform Init
+      working-directory: terraform/sysdig/b0c13b
+      env:
+        TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
+        TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+      run: terraform init
+
+    - name: Terraform Apply
+      working-directory: terraform/sysdig/b0c13b
+      env:
+        TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
+        TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+      run: terraform apply -auto-approve
