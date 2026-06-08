@@ -7,7 +7,7 @@ dependencies:
   version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 18.6.7
+  version: 18.6.10
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 25.5.3
@@ -17,5 +17,5 @@ dependencies:
 - name: dns-probe
   repository: file://../_dns-probe
   version: 0.1.0
-digest: sha256:791940d52a7ec7f5e4f960ab431beb8b1142b010a37ce7a2b46d75c82d550f33
-generated: "2026-05-29T12:42:33.5635099-07:00"
+digest: sha256:98b414fc9d9393ea97299c4d03a854eea84ee222796ca1a9d18f22fbfd00c768
+generated: "2026-06-08T12:06:46.831573435Z"
