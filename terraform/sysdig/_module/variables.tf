@@ -8,3 +8,9 @@ variable "cpu_alert_threshold" {
   type        = number
   default     = 85
 }
+
+variable "memory_alert_threshold" {
+  description = "Memory utilization percentage threshold to trigger the alert"
+  type        = number
+  default     = 85
+}

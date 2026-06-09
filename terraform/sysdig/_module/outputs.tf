@@ -7,3 +7,8 @@ output "alert_id" {
   description = "Sysdig Monitor CPU alert ID"
   value       = sysdig_monitor_alert_v2_prometheus.high_cpu.id
 }
+
+output "memory_alert_id" {
+  description = "Sysdig Monitor memory alert ID"
+  value       = sysdig_monitor_alert_v2_prometheus.high_memory.id
+}
