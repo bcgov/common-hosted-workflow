@@ -73,3 +73,17 @@ resource "sysdig_monitor_alert_v2_prometheus" "high_cpu" {
     id = sysdig_monitor_notification_channel_email.alerts.id
   }
 }
+
+resource "sysdig_monitor_alert_v2_prometheus" "high_memory" {
+  name        = "High Memory Utilization - b0c13b"
+  description = "Memory utilization has exceeded 80% for more than 5 minutes in a b0c13b namespace"
+  severity    = "high"
+
+  query = "avg(sysdig_container_memory_used_percent) by (kube_namespace_label_environment, kubernetes_cluster_name) > ${var.memory_alert_threshold}"
+
+  duration_seconds = 300
+
+  notification_channels {
+    id = sysdig_monitor_notification_channel_email.alerts.id
+  }
+}
