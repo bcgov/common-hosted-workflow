@@ -53,26 +53,23 @@ function getAuthCookieOptions() {
   };
 }
 
+async function redirectToAccessRequest(params: { user: N8nOidcUser | null; identity: UiOidcIdentity }, res: Response) {
+  const uiToken = await createUiAuthToken({
+    oidc: params.identity,
+    n8nUser: serializeN8nUser(params.user) ?? {
+      id: params.identity.subject,
+      email: params.identity.email,
+      role: null,
+    },
+  });
+
+  return res.redirect(appendQueryParam(buildUiAppUrl('/access-request'), 'token', uiToken));
+}
+
 export function buildOidcRouter({ n8nRepositories, jwtService, userService, config }: BuildOidcRouterParams) {
   const { user: userRepository } = n8nRepositories;
   const router = Router();
   const cookieSecret = getCookieSecret();
-
-  async function redirectToAccessRequest(
-    params: { user: N8nOidcUser | null; identity: UiOidcIdentity },
-    res: Response,
-  ) {
-    const uiToken = await createUiAuthToken({
-      oidc: params.identity,
-      n8nUser: serializeN8nUser(params.user) ?? {
-        id: params.identity.subject,
-        email: params.identity.email,
-        role: null,
-      },
-    });
-
-    return res.redirect(appendQueryParam(buildUiAppUrl('/access-request'), 'token', uiToken));
-  }
 
   router.get('/login', async (req: Request, res: Response) => {
     try {

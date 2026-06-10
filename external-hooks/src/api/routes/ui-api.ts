@@ -1,4 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import { z, type infer as zInfer } from 'zod';
 import { OkResponse, CreatedResponse, ForbiddenResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestParser } from '../utils/validation';
@@ -155,7 +156,7 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     '/workflows/:workflowId/share',
     requireUiRequestContext,
     createRequestParser(shareWorkflowSchema),
-    async (req: UiApiTypedRequest<import('zod').infer<typeof shareWorkflowSchema>>, res) => {
+    async (req: UiApiTypedRequest<zInfer<typeof shareWorkflowSchema>>, res) => {
       const result = await services.uiApi.shareWorkflow(
         req.session.email,
         req.parsed.params.workflowId,
@@ -179,7 +180,7 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     '/workflows/:workflowId/projects/:projectId',
     requireUiRequestContext,
     createRequestParser(unshareWorkflowSchema),
-    async (req: UiApiTypedRequest<import('zod').infer<typeof unshareWorkflowSchema>>, res) => {
+    async (req: UiApiTypedRequest<zInfer<typeof unshareWorkflowSchema>>, res) => {
       const result = await services.uiApi.unshareWorkflow(
         req.session.email,
         req.parsed.params.workflowId,
@@ -203,7 +204,7 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     '/access-requests',
     requireUiRequestContext,
     createRequestParser(createAccessRequestSchema),
-    async (req: UiApiTypedRequest<import('zod').infer<typeof createAccessRequestSchema>>, res) => {
+    async (req: UiApiTypedRequest<zInfer<typeof createAccessRequestSchema>>, res) => {
       const accessRequest = await services.accessRequest.createAccessRequest({
         requesterEmail: req.session.email,
         justification: req.parsed.body.justification,
@@ -240,7 +241,7 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     requireUiRequestContext,
     requireGlobalAdminRole,
     createRequestParser(listAccessRequestsSchema),
-    async (req: UiApiTypedRequest<import('zod').infer<typeof listAccessRequestsSchema>>, res) => {
+    async (req: UiApiTypedRequest<zInfer<typeof listAccessRequestsSchema>>, res) => {
       const { status, limit, offset } = req.parsed.query ?? {};
 
       const result = await services.accessRequest.listAccessRequests({
@@ -258,7 +259,7 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     requireUiRequestContext,
     requireGlobalAdminRole,
     createRequestParser(reviewAccessRequestSchema),
-    async (req: UiApiTypedRequest<import('zod').infer<typeof reviewAccessRequestSchema>>, res) => {
+    async (req: UiApiTypedRequest<zInfer<typeof reviewAccessRequestSchema>>, res) => {
       const result = await services.accessRequest.reviewAccessRequest({
         accessRequestId: req.parsed.params.id,
         action: req.parsed.body.action,
