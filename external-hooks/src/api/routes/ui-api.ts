@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { OkResponse, CreatedResponse, ForbiddenResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
-import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
+import { createRequestParser } from '../utils/validation';
 import {
   shareWorkflowResponseSchema,
   shareWorkflowSchema,
@@ -20,17 +20,11 @@ import {
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
 import { getUiSession, getUiSessionSummary, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
 import { appendQueryParam, appendTokenToReturnTo } from '../helpers/url';
-import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
-import type { UiApiContext } from '../types/ui-api';
-
-type UiApiRequest = Request & {
-  session: UiAuthenticatedSession;
-  context: UiApiContext;
-};
+import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 
 type UiApiMutableRequest = Request & {
-  session?: UiAuthenticatedSession;
-  context?: UiApiContext;
+  session?: UiApiRequest['session'];
+  context?: UiApiRequest['context'];
 };
 
 function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
@@ -160,13 +154,12 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
   router.post(
     '/workflows/:workflowId/share',
     requireUiRequestContext,
-    createRequestSchemaValidator(shareWorkflowSchema),
-    async (req, res) => {
-      const parsed = parseValidatedRequest(shareWorkflowSchema, req);
+    createRequestParser(shareWorkflowSchema),
+    async (req: UiApiTypedRequest<import('zod').infer<typeof shareWorkflowSchema>>, res) => {
       const result = await services.uiApi.shareWorkflow(
-        (req as UiApiRequest).session.email,
-        parsed.params.workflowId,
-        parsed.body.email,
+        req.session.email,
+        req.parsed.params.workflowId,
+        req.parsed.body.email,
       );
 
       CreatedResponse(
@@ -185,13 +178,12 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
   router.delete(
     '/workflows/:workflowId/projects/:projectId',
     requireUiRequestContext,
-    createRequestSchemaValidator(unshareWorkflowSchema),
-    async (req, res) => {
-      const parsed = parseValidatedRequest(unshareWorkflowSchema, req);
+    createRequestParser(unshareWorkflowSchema),
+    async (req: UiApiTypedRequest<import('zod').infer<typeof unshareWorkflowSchema>>, res) => {
       const result = await services.uiApi.unshareWorkflow(
-        (req as UiApiRequest).session.email,
-        parsed.params.workflowId,
-        parsed.params.projectId,
+        req.session.email,
+        req.parsed.params.workflowId,
+        req.parsed.params.projectId,
       );
 
       OkResponse(
@@ -210,14 +202,11 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
   router.post(
     '/access-requests',
     requireUiRequestContext,
-    createRequestSchemaValidator(createAccessRequestSchema),
-    async (req, res) => {
-      const parsed = parseValidatedRequest(createAccessRequestSchema, req);
-      const session = (req as UiApiRequest).session;
-
+    createRequestParser(createAccessRequestSchema),
+    async (req: UiApiTypedRequest<import('zod').infer<typeof createAccessRequestSchema>>, res) => {
       const accessRequest = await services.accessRequest.createAccessRequest({
-        requesterEmail: session.email,
-        justification: parsed.body.justification,
+        requesterEmail: req.session.email,
+        justification: req.parsed.body.justification,
       });
 
       CreatedResponse(
@@ -250,14 +239,15 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     '/access-requests',
     requireUiRequestContext,
     requireGlobalAdminRole,
-    createRequestSchemaValidator(listAccessRequestsSchema),
-    async (req, res) => {
-      const parsed = parseValidatedRequest(listAccessRequestsSchema, req);
-      const status = parsed.query?.status;
-      const limit = parsed.query?.limit ?? 50;
-      const offset = parsed.query?.offset ?? 0;
+    createRequestParser(listAccessRequestsSchema),
+    async (req: UiApiTypedRequest<import('zod').infer<typeof listAccessRequestsSchema>>, res) => {
+      const { status, limit, offset } = req.parsed.query ?? {};
 
-      const result = await services.accessRequest.listAccessRequests({ status, limit, offset });
+      const result = await services.accessRequest.listAccessRequests({
+        status,
+        limit: limit ?? 50,
+        offset: offset ?? 0,
+      });
 
       OkResponse(res, result, accessRequestListResponseSchema);
     },
@@ -267,24 +257,21 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
     '/access-requests/:id/review',
     requireUiRequestContext,
     requireGlobalAdminRole,
-    createRequestSchemaValidator(reviewAccessRequestSchema),
-    async (req, res) => {
-      const parsed = parseValidatedRequest(reviewAccessRequestSchema, req);
-      const session = (req as UiApiRequest).session;
-
+    createRequestParser(reviewAccessRequestSchema),
+    async (req: UiApiTypedRequest<import('zod').infer<typeof reviewAccessRequestSchema>>, res) => {
       const result = await services.accessRequest.reviewAccessRequest({
-        accessRequestId: parsed.params.id,
-        action: parsed.body.action,
-        reviewerEmail: session.email,
-        reviewerN8nUserId: session.n8nUser?.id ?? '',
-        denyReason: parsed.body.denyReason,
+        accessRequestId: req.parsed.params.id,
+        action: req.parsed.body.action,
+        reviewerEmail: req.session.email,
+        reviewerN8nUserId: req.session.n8nUser?.id ?? '',
+        denyReason: req.parsed.body.denyReason,
       });
 
       OkResponse(
         res,
         {
           success: true as const,
-          message: `Access request ${parsed.body.action}d successfully.`,
+          message: `Access request ${req.parsed.body.action}d successfully.`,
           accessRequest: result,
         },
         reviewAccessRequestResponseSchema,

@@ -1,5 +1,7 @@
+import type { Request } from 'express';
 import type { N8nUser } from './user';
 import type { N8nProjectRecord } from './n8n-adapters';
+import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
 
 type UiWorkflowProjectShare = {
   projectId: string;
@@ -25,4 +27,13 @@ export type WorkflowRow = {
   workflowId: string;
   workflowName: string;
   projectId: string;
+};
+
+export type UiApiRequest = Request & {
+  session: UiAuthenticatedSession;
+  context: UiApiContext;
+};
+
+export type UiApiTypedRequest<T> = UiApiRequest & {
+  parsed: T;
 };
