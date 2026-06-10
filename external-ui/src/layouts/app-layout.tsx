@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/auth-context';
+import { getWhoami } from '../services/backend/auth';
+import { getMyAccessRequest } from '../services/backend/access-requests';
+import { getStoredAppToken } from '../services/backend/axios';
+import { isAdminRole } from '../lib/roles';
 import { withAppBasePath } from '../config/base-path';
 import { IconLogin2, IconLogout } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +22,23 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, isLoading, login, logout } = useAuth();
+  const hasToken = Boolean(getStoredAppToken());
+  const canQueryMyRequest = !isLoading && (Boolean(user) || hasToken);
+
+  const whoamiQuery = useQuery({
+    queryKey: ['whoami', user?.email ?? ''],
+    queryFn: ({ signal }) => getWhoami({ signal }),
+    enabled: Boolean(user),
+  });
+
+  const myAccessRequestQuery = useQuery({
+    queryKey: ['access-requests', 'my', user?.email ?? ''],
+    queryFn: ({ signal }) => getMyAccessRequest({ signal }),
+    enabled: canQueryMyRequest,
+  });
+
+  const isAdmin = isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug);
+  const hasPendingAccessRequest = myAccessRequestQuery.data?.accessRequest?.status === 'pending';
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
@@ -64,6 +86,38 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
+              {hasPendingAccessRequest && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/access-request"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Access Request
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
+              {isAdmin && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/access-requests"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Review Requests
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
             </NavigationMenuList>
           </NavigationMenu>
 

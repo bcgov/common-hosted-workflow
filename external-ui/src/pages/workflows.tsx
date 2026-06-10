@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../auth/auth-context';
 import { getWorkflows, shareWorkflow, unshareWorkflow } from '../services/backend/workflows';
+import { isAdminRole } from '../lib/roles';
 import { IconLogin2, IconShare, IconTrash, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,7 +53,7 @@ export function Workflows() {
 
   const workflows = workflowsQuery.data?.workflows ?? [];
   const currentRoleSlug = workflowsQuery.data?.n8nUser?.role?.slug ?? null;
-  const canShareWorkflows = currentRoleSlug === 'global:owner' || currentRoleSlug === 'global:admin';
+  const canShareWorkflows = isAdminRole(currentRoleSlug);
   const workflowsError = workflowsQuery.error instanceof Error ? workflowsQuery.error.message : null;
   const sharingWorkflow = workflows.find((workflow) => workflow.workflowId === sharingWorkflowId) ?? null;
 
