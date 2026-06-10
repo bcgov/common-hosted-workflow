@@ -4,6 +4,7 @@ import { useAuth } from '../auth/auth-context';
 import { createAccessRequest, getMyAccessRequest } from '../services/backend/access-requests';
 import { getStoredAppToken } from '../services/backend/axios';
 import { AccessRequestStatusBadge } from '../components/access-request-status-badge';
+import type { AccessRequestListItem } from '../services/backend/access-requests';
 import { IconSend, IconPlus, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,114 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 const JUSTIFICATION_MIN_LENGTH = 10;
+
+function ExistingRequestCard({ request, onNewRequest }: { request: AccessRequestListItem; onNewRequest: () => void }) {
+  const isPending = request.status === 'pending';
+  const statusLabel = isPending
+    ? 'Access Request Pending'
+    : `Access Request ${request.status === 'approved' ? 'Approved' : 'Denied'}`;
+  const description = isPending
+    ? 'Your request is being reviewed by an administrator.'
+    : request.status === 'approved'
+      ? 'Your request has been approved. You can now access n8n workflows.'
+      : 'Your request was not approved.';
+  const reviewedDate = isPending ? request.createdAt : request.updatedAt;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-lg">{statusLabel}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+          <AccessRequestStatusBadge status={request.status} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Justification</Label>
+          <p className="text-sm text-[var(--bc-muted)]">{request.justification}</p>
+        </div>
+        {request.denyReason && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Reason</Label>
+            <p className="text-sm text-[var(--bc-muted)]">{request.denyReason}</p>
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">{isPending ? 'Submitted' : 'Reviewed'}</Label>
+          <p className="text-sm text-[var(--bc-muted)]">{new Date(reviewedDate).toLocaleDateString()}</p>
+        </div>
+        {!isPending && (
+          <Button type="button" onClick={onNewRequest} variant="outline">
+            <IconPlus size={16} aria-hidden="true" />
+            New Request
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function NewRequestForm({
+  justification,
+  onJustificationChange,
+  onSubmit,
+  mutation,
+}: {
+  justification: string;
+  onJustificationChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+  mutation: { isPending: boolean; isSuccess: boolean; error: Error | null; reset: () => void };
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">New Access Request</CardTitle>
+        <CardDescription>Please provide a justification for why you need access.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="justification">Justification</Label>
+            <Textarea
+              id="justification"
+              value={justification}
+              onChange={(event) => onJustificationChange(event.target.value)}
+              placeholder="Explain why you need access to the workflow system..."
+              rows={4}
+              required
+              minLength={JUSTIFICATION_MIN_LENGTH}
+            />
+            <p className="text-xs text-[var(--bc-muted)]">
+              Please provide at least {JUSTIFICATION_MIN_LENGTH} characters explaining why you need access.
+            </p>
+          </div>
+
+          {mutation.error instanceof Error && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{mutation.error.message}</AlertDescription>
+            </Alert>
+          )}
+
+          {mutation.isSuccess && (
+            <Alert className="border-green-600 bg-green-50 text-green-800">
+              <AlertTitle>Request Submitted</AlertTitle>
+              <AlertDescription>Your access request has been submitted successfully.</AlertDescription>
+            </Alert>
+          )}
+
+          <Button type="submit" disabled={mutation.isPending || !justification.trim()}>
+            <IconSend size={16} aria-hidden="true" />
+            {mutation.isPending ? 'Submitting...' : 'Submit Request'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function AccessRequest() {
   const { user, isLoading: authLoading } = useAuth();
@@ -43,17 +152,13 @@ export function AccessRequest() {
     }
   }, [createMutation.isSuccess, createMutation]);
 
-  const myRequest = myRequestQuery.data?.accessRequest;
-
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!justification.trim()) return;
     createMutation.mutate({ justification: justification.trim() });
   }
 
-  function handleNewRequest() {
-    createMutation.reset();
-  }
+  const myRequest = myRequestQuery.data?.accessRequest;
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
@@ -65,115 +170,27 @@ export function AccessRequest() {
           </p>
         </div>
 
-        {redirectError ? (
+        {redirectError && (
           <Alert className="border-amber-300 bg-amber-50 text-amber-800">
             <IconAlertTriangle size={16} aria-hidden="true" />
             <AlertTitle>Attention</AlertTitle>
             <AlertDescription>{redirectError}</AlertDescription>
           </Alert>
-        ) : null}
+        )}
 
-        {myRequestQuery.isLoading ? (
-          <p className="text-sm text-[var(--bc-muted)]">Loading...</p>
-        ) : myRequest ? (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">
-                    {myRequest.status === 'pending'
-                      ? 'Access Request Pending'
-                      : `Access Request ${myRequest.status === 'approved' ? 'Approved' : 'Denied'}`}
-                  </CardTitle>
-                  <CardDescription>
-                    {myRequest.status === 'pending'
-                      ? 'Your request is being reviewed by an administrator.'
-                      : myRequest.status === 'approved'
-                        ? 'Your request has been approved. You can now access n8n workflows.'
-                        : 'Your request was not approved.'}
-                  </CardDescription>
-                </div>
-                <AccessRequestStatusBadge status={myRequest.status} />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Submitted</Label>
-                <p className="text-sm text-[var(--bc-muted)]">{new Date(myRequest.createdAt).toLocaleDateString()}</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Justification</Label>
-                <p className="text-sm text-[var(--bc-muted)]">{myRequest.justification}</p>
-              </div>
-              {myRequest.denyReason && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Reason</Label>
-                  <p className="text-sm text-[var(--bc-muted)]">{myRequest.denyReason}</p>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  {myRequest.status === 'pending' ? 'Submitted' : 'Reviewed'}
-                </Label>
-                <p className="text-sm text-[var(--bc-muted)]">
-                  {new Date(
-                    myRequest.status === 'pending' ? myRequest.createdAt : myRequest.updatedAt,
-                  ).toLocaleDateString()}
-                </p>
-              </div>
-              {myRequest.status !== 'pending' && (
-                <Button type="button" onClick={handleNewRequest} variant="outline">
-                  <IconPlus size={16} aria-hidden="true" />
-                  New Request
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">New Access Request</CardTitle>
-              <CardDescription>Please provide a justification for why you need access.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="justification">Justification</Label>
-                  <Textarea
-                    id="justification"
-                    value={justification}
-                    onChange={(event) => setJustification(event.target.value)}
-                    placeholder="Explain why you need access to the workflow system..."
-                    rows={4}
-                    required
-                    minLength={JUSTIFICATION_MIN_LENGTH}
-                  />
-                  <p className="text-xs text-[var(--bc-muted)]">
-                    Please provide at least {JUSTIFICATION_MIN_LENGTH} characters explaining why you need access.
-                  </p>
-                </div>
+        {myRequestQuery.isLoading && <p className="text-sm text-[var(--bc-muted)]">Loading...</p>}
 
-                {createMutation.error instanceof Error ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{createMutation.error.message}</AlertDescription>
-                  </Alert>
-                ) : null}
+        {!myRequestQuery.isLoading && myRequest && (
+          <ExistingRequestCard request={myRequest} onNewRequest={() => createMutation.reset()} />
+        )}
 
-                {createMutation.isSuccess ? (
-                  <Alert className="border-green-600 bg-green-50 text-green-800">
-                    <AlertTitle>Request Submitted</AlertTitle>
-                    <AlertDescription>Your access request has been submitted successfully.</AlertDescription>
-                  </Alert>
-                ) : null}
-
-                <Button type="submit" disabled={createMutation.isPending || !justification.trim()}>
-                  <IconSend size={16} aria-hidden="true" />
-                  {createMutation.isPending ? 'Submitting...' : 'Submit Request'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+        {!myRequestQuery.isLoading && !myRequest && (
+          <NewRequestForm
+            justification={justification}
+            onJustificationChange={setJustification}
+            onSubmit={handleSubmit}
+            mutation={createMutation}
+          />
         )}
       </section>
     </div>
