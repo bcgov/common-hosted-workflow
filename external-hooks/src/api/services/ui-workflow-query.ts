@@ -26,7 +26,7 @@ export class UiWorkflowQueryService {
       return null;
     }
 
-    return await this.userRepository.findByEmail(email);
+    return await this.userRepository.findByEmail(email, ['role']);
   }
 
   async getWorkflows(email?: string) {

@@ -15,6 +15,10 @@ export class ProjectRelationRepository {
     return await this.projectRelationRepository.findAllByUser(userId);
   }
 
+  async findProjectRole(args: { userId: string; projectId: string }) {
+    return await this.projectRelationRepository.findProjectRole(args);
+  }
+
   private buildUserEmailLookup() {
     const projectRelationMetadata = this.projectRelationRepository.metadata;
     const userMetadata = this.userMetadata;

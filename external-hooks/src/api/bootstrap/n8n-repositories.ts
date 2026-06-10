@@ -1,12 +1,12 @@
 import { N8N_DB_PATH, N8N_DI_PATH } from '../constants/n8n-paths';
-import { UserRepository } from '../../db/repository/n8n/user';
-import { ProjectRepository } from '../../db/repository/n8n/project';
-import { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
-import { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
-import { WorkflowRepository } from '../../db/repository/n8n/workflow';
 import { CredentialRepository } from '../../db/repository/n8n/credential';
-import { SharedCredentialRepository } from '../../db/repository/n8n/shared-credential';
 import { ExecutionRepository } from '../../db/repository/n8n/execution';
+import { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
+import { ProjectRepository } from '../../db/repository/n8n/project';
+import { SharedCredentialRepository } from '../../db/repository/n8n/shared-credential';
+import { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
+import { UserRepository } from '../../db/repository/n8n/user';
+import { WorkflowRepository } from '../../db/repository/n8n/workflow';
 import type {
   BaseN8nCredentialRepository,
   BaseN8nExecutionRepository,

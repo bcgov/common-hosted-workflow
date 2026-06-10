@@ -30,6 +30,6 @@ export interface N8nUser {
   disabled: boolean;
   mfaEnabled: boolean;
   lastActiveAt: string;
-  role: N8nRole;
+  role: N8nRole | null;
   isPending: boolean;
 }

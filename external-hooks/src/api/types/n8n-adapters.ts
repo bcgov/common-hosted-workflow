@@ -14,7 +14,7 @@ export type N8nProjectRecord = N8nEntityRecord & {
 
 export type EntityMetadataLike = {
   tableName: string;
-  columns: Array<{
+  columns: ReadonlyArray<{
     propertyName: string;
     databaseName: string;
   }>;
@@ -42,6 +42,23 @@ export type BaseN8nUserRepository = BaseN8nRepository & {
     relations?: string[];
   }) => Promise<N8nUser | null>;
   findOneBy: (where: { email: string }) => Promise<N8nUserRecord | null>;
+  count: () => Promise<number>;
+  createQueryBuilder: (alias: string) => QueryBuilderLike;
+  createUserWithProject: (userData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+    disabled?: boolean;
+    role?: { slug: string };
+  }) => Promise<{ user: N8nUser }>;
+};
+
+export type QueryBuilderLike = {
+  innerJoin: (join: string, alias: string) => QueryBuilderLike;
+  where: (query: string, params: Record<string, unknown>) => QueryBuilderLike;
+  andWhere: (query: string, params: Record<string, unknown>) => QueryBuilderLike;
+  getCount: () => Promise<number>;
 };
 
 export type BaseN8nProjectRepository = BaseN8nRepository & {

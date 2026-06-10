@@ -44,6 +44,7 @@ function createTestRouter() {
       uiApi: {} as any,
       action: createMockActionService(actionRequestRepo, n8nRepos),
       message: createMockMessageService(messageRepo, n8nRepos),
+      accessRequest: {} as any,
     },
   });
   const router = buildActionRouter(routeContext);

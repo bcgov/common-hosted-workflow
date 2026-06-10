@@ -1,8 +1,11 @@
-import type { N8nUiUser } from '../../db/repository/n8n/user';
+import type { N8nUser } from './user';
 import type { N8nProjectRecord } from './n8n-adapters';
 import type { UiApiContext, UiWorkflowSummary } from './ui-api';
+import type { AccessRequestService } from '../services/access-request';
 import type { ActionService } from '../services/action.service';
 import type { MessageService } from '../services/message.service';
+
+export type N8nUiUser = N8nUser;
 
 export type UiApiServiceContract = {
   getWhoami: (email?: string) => Promise<N8nUiUser | null>;
@@ -29,4 +32,5 @@ export type ApiServices = {
   uiApi: UiApiServiceContract;
   action: ActionService;
   message: MessageService;
+  accessRequest: AccessRequestService;
 };

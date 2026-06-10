@@ -10,20 +10,35 @@ function createMockUserQueryBuilder() {
         }),
       }),
     }),
+    where: () => ({}),
+    andWhere: () => ({}),
+    getCount: async () => 0,
   };
 }
 
 function createMockParams(): BuildOidcRouterParams {
   return {
-    dbCollections: {
-      User: {
-        findOne: async () => null,
+    n8nRepositories: {
+      user: {
+        findByEmail: async () => null,
         count: async () => 0,
         createQueryBuilder: createMockUserQueryBuilder,
         createUserWithProject: async (userData) => ({
           user: { id: 'user-1', email: userData.email, role: { slug: 'global:owner' } },
         }),
+        getUserForApiKey: async () => null,
+        metadata: { tableName: 'user', columns: [] },
       },
+      project: {} as any,
+      projectRelation: {} as any,
+      sharedWorkflow: {} as any,
+      workflow: {} as any,
+      credential: {} as any,
+      sharedCredential: {} as any,
+      execution: {} as any,
+      role: {} as any,
+      withTransaction: {} as any,
+      raw: {} as any,
     },
     jwtService: {
       sign: () => 'token',
@@ -50,7 +65,7 @@ function createMockParams(): BuildOidcRouterParams {
 function getRoutePaths(router: { stack: Array<{ route?: { path?: string } }> }) {
   return router.stack
     .map((layer) => layer.route?.path)
-    .filter(Boolean)
+    .filter((x): x is string => Boolean(x))
     .sort((left, right) => left.localeCompare(right));
 }
 

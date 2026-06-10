@@ -39,7 +39,7 @@ export type ListActionsParams = {
   actorId?: string;
   workflowInstanceId?: string;
   limit: number;
-  since?: import('../../types/list-pagination').ListPaginationSince;
+  since?: import('../types/list-pagination').ListPaginationSince;
 };
 
 export type GetActionByIdParams = {
@@ -65,7 +65,7 @@ export class ActionService {
     allowedProjectIds: string[];
     actorId?: string;
     workflowInstanceId?: string;
-    since?: import('../../types/list-pagination').ListPaginationSince;
+    since?: import('../types/list-pagination').ListPaginationSince;
   }): any[] {
     const clauses: any[] = [inArray(actionRequests.projectId, params.allowedProjectIds)];
     if (params.actorId) clauses.push(eq(actionRequests.actorId, params.actorId));

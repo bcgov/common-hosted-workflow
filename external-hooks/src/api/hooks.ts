@@ -3,12 +3,13 @@ import { mountAssets } from './bootstrap/assets';
 import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
 import { applyOidcFrontendSettings, type FrontendSettings } from './bootstrap/frontend-settings';
+import { N8N_USER_SERVICE_PATH } from './constants/n8n-paths';
 import { buildN8nRuntimeContext } from './bootstrap/n8n-repositories';
 import { mountOidc } from './bootstrap/oidc';
 import { buildRouteContext } from './bootstrap/route-context';
 import { buildApiServices } from './bootstrap/services';
 import { mountUi } from './bootstrap/ui';
-import type { N8nOidcDbCollections } from './routes/oidc';
+import type { N8nUserRoleService } from './types/n8n-services';
 import { handleErrorResponse } from './utils/errors';
 import { createLogger } from './utils/logger';
 
@@ -18,7 +19,7 @@ function createHookConfig() {
   return {
     n8n: {
       ready: [
-        async function (this: { dbCollections: N8nOidcDbCollections }, server: { app: Express }) {
+        async function (this: Record<string, unknown>, server: { app: Express }) {
           log.info('Initializing Custom Endpoints...');
 
           const databaseUrl = process.env.CUSTOM_DATABASE_URL;
@@ -28,8 +29,10 @@ function createHookConfig() {
 
           const { app } = server;
           const n8nRuntime = buildN8nRuntimeContext();
+          const { UserService } = require(N8N_USER_SERVICE_PATH) as { UserService: unknown };
+          const userRoleService = n8nRuntime.container.get(UserService) as N8nUserRoleService;
           const customRepositories = buildCustomRepositories(databaseUrl);
-          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories);
+          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories, userRoleService);
           const routeContext = buildRouteContext({
             services,
             n8nRepositories: n8nRuntime.n8nRepositories,
@@ -42,7 +45,7 @@ function createHookConfig() {
           mountUi(app, routeContext, process.env.EXTERNAL_UI_PATH, process.env.EXTERNAL_UI_ENABLED === 'true');
           mountOidc({
             app,
-            dbCollections: this.dbCollections,
+            n8nRepositories: n8nRuntime.n8nRepositories,
             container: n8nRuntime.container,
           });
           mountAssets(app);

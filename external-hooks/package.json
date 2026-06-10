@@ -6,7 +6,7 @@
     "external-hooks"
   ],
   "scripts": {
-    "dev": "tsc -w",
+    "notused_dev": "tsc -w",
     "notused_build": "rimraf ./build && tsc",
     "bundle": "tsup",
     "lint-fix": "eslint --fix .",

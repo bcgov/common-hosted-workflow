@@ -1,4 +1,4 @@
-import type { N8nUser } from '../../db/repository/n8n/user';
+import type { N8nUser } from './user';
 import type { N8nProjectRecord } from './n8n-adapters';
 
 type UiWorkflowProjectShare = {

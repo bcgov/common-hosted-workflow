@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { OkResponse, CreatedResponse, UnauthorizedResponse } from './responses';
+import { OkResponse, CreatedResponse, ForbiddenResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
 import {
@@ -8,8 +8,18 @@ import {
   unshareWorkflowResponseSchema,
   unshareWorkflowSchema,
 } from '../schemas/ui';
+import {
+  createAccessRequestSchema,
+  createAccessRequestResponseSchema,
+  getMyAccessRequestResponseSchema,
+  listAccessRequestsSchema,
+  reviewAccessRequestSchema,
+  accessRequestListResponseSchema,
+  reviewAccessRequestResponseSchema,
+} from '../schemas/access-request';
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
 import { getUiSession, getUiSessionSummary, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
+import { appendQueryParam, appendTokenToReturnTo } from '../helpers/url';
 import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
 import type { UiApiContext } from '../types/ui-api';
 
@@ -22,21 +32,6 @@ type UiApiMutableRequest = Request & {
   session?: UiAuthenticatedSession;
   context?: UiApiContext;
 };
-
-function appendTokenToReturnTo(returnTo: string, token: string) {
-  return appendQueryParam(returnTo, 'token', token);
-}
-
-function appendQueryParam(returnTo: string, key: string, value: string) {
-  try {
-    const url = new URL(returnTo);
-    url.searchParams.set(key, value);
-    return url.toString();
-  } catch {
-    const separator = returnTo.includes('?') ? '&' : '?';
-    return `${returnTo}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-  }
-}
 
 function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
   return async (req: UiApiMutableRequest, _res: Response, next: NextFunction) => {
@@ -74,6 +69,15 @@ function requireUiRequestContextMiddleware(services: ApiRouteContext['services']
 }
 
 export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware };
+
+function requireGlobalAdminRole(req: Request, res: Response, next: NextFunction) {
+  const roleSlug = (req as UiApiRequest).session?.n8nUser?.role?.slug;
+  if (roleSlug !== 'global:owner' && roleSlug !== 'global:admin') {
+    ForbiddenResponse(res);
+    return;
+  }
+  next();
+}
 
 export function buildUiApiRouter({ services }: ApiRouteContext) {
   const router = Router();
@@ -199,6 +203,91 @@ export function buildUiApiRouter({ services }: ApiRouteContext) {
           projectId: result.projectId,
         },
         unshareWorkflowResponseSchema,
+      );
+    },
+  );
+
+  router.post(
+    '/access-requests',
+    requireUiRequestContext,
+    createRequestSchemaValidator(createAccessRequestSchema),
+    async (req, res) => {
+      const parsed = parseValidatedRequest(createAccessRequestSchema, req);
+      const session = (req as UiApiRequest).session;
+
+      const accessRequest = await services.accessRequest.createAccessRequest({
+        requesterEmail: session.email,
+        justification: parsed.body.justification,
+      });
+
+      CreatedResponse(
+        res,
+        {
+          success: true as const,
+          message: 'Access request submitted successfully.',
+          accessRequest,
+        },
+        createAccessRequestResponseSchema,
+      );
+    },
+  );
+
+  router.get('/access-requests/my', requireUiRequestContext, async (req, res) => {
+    const session = (req as UiApiRequest).session;
+
+    const accessRequest = await services.accessRequest.getMyAccessRequest(session.email);
+
+    OkResponse(
+      res,
+      {
+        accessRequest,
+      },
+      getMyAccessRequestResponseSchema,
+    );
+  });
+
+  router.get(
+    '/access-requests',
+    requireUiRequestContext,
+    requireGlobalAdminRole,
+    createRequestSchemaValidator(listAccessRequestsSchema),
+    async (req, res) => {
+      const parsed = parseValidatedRequest(listAccessRequestsSchema, req);
+      const status = parsed.query?.status;
+      const limit = parsed.query?.limit ?? 50;
+      const offset = parsed.query?.offset ?? 0;
+
+      const result = await services.accessRequest.listAccessRequests({ status, limit, offset });
+
+      OkResponse(res, result, accessRequestListResponseSchema);
+    },
+  );
+
+  router.post(
+    '/access-requests/:id/review',
+    requireUiRequestContext,
+    requireGlobalAdminRole,
+    createRequestSchemaValidator(reviewAccessRequestSchema),
+    async (req, res) => {
+      const parsed = parseValidatedRequest(reviewAccessRequestSchema, req);
+      const session = (req as UiApiRequest).session;
+
+      const result = await services.accessRequest.reviewAccessRequest({
+        accessRequestId: parsed.params.id,
+        action: parsed.body.action,
+        reviewerEmail: session.email,
+        reviewerN8nUserId: session.n8nUser?.id ?? '',
+        denyReason: parsed.body.denyReason,
+      });
+
+      OkResponse(
+        res,
+        {
+          success: true as const,
+          message: `Access request ${parsed.body.action}d successfully.`,
+          accessRequest: result,
+        },
+        reviewAccessRequestResponseSchema,
       );
     },
   );
