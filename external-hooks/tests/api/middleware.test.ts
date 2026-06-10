@@ -206,8 +206,8 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
     mockedlistProjectIdsAccessibleToUser.mockResolvedValue([VALID_PROJECT_ID]);
 
     return createWorkflowInteractionTenantMiddleware({
-      n8nRepositories: { project: projectRepo, projectRelation: projectRelationRepo },
-      customRepositories: { tenantProjectRelation: tenantProjectRelationRepo },
+      n8nRepositories: { project: projectRepo, projectRelation: projectRelationRepo } as any,
+      customRepositories: { tenantProjectRelation: tenantProjectRelationRepo } as any,
     });
   }
 

@@ -33,7 +33,7 @@ export type ListMessagesParams = {
   actorId?: string;
   workflowInstanceId?: string;
   limit: number;
-  since?: import('../../types/list-pagination').ListPaginationSince;
+  since?: import('../types/list-pagination').ListPaginationSince;
 };
 
 export class MessageService {
@@ -46,7 +46,7 @@ export class MessageService {
     allowedProjectIds: string[];
     actorId?: string;
     workflowInstanceId?: string;
-    since?: import('../../types/list-pagination').ListPaginationSince;
+    since?: import('../types/list-pagination').ListPaginationSince;
   }): any[] {
     const clauses: any[] = [inArray(messages.projectId, params.allowedProjectIds)];
     if (params.actorId) clauses.push(eq(messages.actorId, params.actorId));

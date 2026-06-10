@@ -1,4 +1,4 @@
-import { createClient, type RedisClientType } from 'redis';
+import { createClient } from 'redis';
 
 type UiOidcStateRecord = {
   nonce: string;
@@ -7,7 +7,9 @@ type UiOidcStateRecord = {
   redirectUri: string;
 };
 
-let redisClientPromise: Promise<RedisClientType> | null = null;
+type RedisClient = Awaited<ReturnType<typeof createClient>>;
+
+let redisClientPromise: Promise<RedisClient> | null = null;
 
 function getRedisUrl() {
   return process.env.UI_OIDC_REDIS_URL || 'redis://localhost:6379';
@@ -25,7 +27,7 @@ function getStateKey(state: string) {
   return `${getRedisPrefix()}state:${state}`;
 }
 
-async function getRedisClient() {
+async function getRedisClient(): Promise<RedisClient> {
   if (!redisClientPromise) {
     const password = getRedisPassword();
     const client = createClient({
@@ -33,7 +35,7 @@ async function getRedisClient() {
       ...(password ? { password } : {}),
     });
     client.on('error', () => {});
-    redisClientPromise = client.connect().then(() => client);
+    redisClientPromise = client.connect().then(() => client) as Promise<RedisClient>;
   }
 
   return redisClientPromise;

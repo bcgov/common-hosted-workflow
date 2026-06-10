@@ -1,5 +1,6 @@
 node_modules
 .wip
+.n8n
 /.claude
 /.kiro
 .next/

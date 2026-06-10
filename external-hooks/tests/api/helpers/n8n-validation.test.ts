@@ -318,21 +318,36 @@ describe('verifyCallerHasN8nProjectAccess', () => {
   it('returns true when user has project relation role', async () => {
     const projectRepo = { getPersonalProjectForUser: vi.fn() };
     const projectRelationRepo = { findProjectRole: vi.fn().mockResolvedValue({ role: 'editor' }) };
-    const result = await verifyCallerHasN8nProjectAccess(projectRepo, projectRelationRepo, 'user-1', 'proj-1');
+    const result = await verifyCallerHasN8nProjectAccess(
+      projectRepo as any,
+      projectRelationRepo as any,
+      'user-1',
+      'proj-1',
+    );
     expect(result).toBe(true);
   });
 
   it('returns true when project is the personal project', async () => {
     const projectRepo = { getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: 'proj-1' }) };
     const projectRelationRepo = { findProjectRole: vi.fn().mockResolvedValue(null) };
-    const result = await verifyCallerHasN8nProjectAccess(projectRepo, projectRelationRepo, 'user-1', 'proj-1');
+    const result = await verifyCallerHasN8nProjectAccess(
+      projectRepo as any,
+      projectRelationRepo as any,
+      'user-1',
+      'proj-1',
+    );
     expect(result).toBe(true);
   });
 
   it('returns false when no relation and not personal project', async () => {
     const projectRepo = { getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: 'other-proj' }) };
     const projectRelationRepo = { findProjectRole: vi.fn().mockResolvedValue(null) };
-    const result = await verifyCallerHasN8nProjectAccess(projectRepo, projectRelationRepo, 'user-1', 'proj-1');
+    const result = await verifyCallerHasN8nProjectAccess(
+      projectRepo as any,
+      projectRelationRepo as any,
+      'user-1',
+      'proj-1',
+    );
     expect(result).toBe(false);
   });
 });

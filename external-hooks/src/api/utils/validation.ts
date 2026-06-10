@@ -2,12 +2,36 @@ import { NextFunction, Request, Response } from 'express';
 import { z, ZodError, ZodTypeAny } from 'zod';
 import { AppError } from './errors';
 
+export interface ValidatedRequest<T> extends Request {
+  parsed: T;
+}
+
 /** Returns Express middleware that validates `body`, `query`, and `params` against a Zod schema. */
 export const createRequestSchemaValidator =
   <T extends ZodTypeAny>(schema: T) =>
   (req: Request, _res: Response, next: NextFunction) => {
     try {
       schema.parse({
+        body: req.body,
+        query: req.query,
+        params: req.params,
+      });
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const message = error.issues.map((i) => `${i.path.join('.')} is ${i.message}`).join(', ');
+        return next(new AppError(400, message));
+      }
+      return next(error);
+    }
+  };
+
+/** Middleware that validates `body`, `query`, `params` and attaches the typed result to `req.parsed`. */
+export const createRequestParser =
+  <T extends ZodTypeAny>(schema: T) =>
+  (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      (req as ValidatedRequest<z.infer<T>>).parsed = schema.parse({
         body: req.body,
         query: req.query,
         params: req.params,

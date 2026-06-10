@@ -30,6 +30,7 @@ export interface MockResponse extends Partial<Response> {
   json: ReturnType<typeof vi.fn>;
   locals: Record<string, unknown>;
   header: ReturnType<typeof vi.fn>;
+  redirect: ReturnType<typeof vi.fn>;
 }
 
 export function createMockRequest(overrides: Partial<Request> = {}): Request {
@@ -57,6 +58,7 @@ export function createMockResponse(localsOverrides: Record<string, unknown> = {}
     json: vi.fn().mockReturnThis(),
     locals: { ...localsOverrides },
     header: vi.fn(),
+    redirect: vi.fn(),
   };
   return res;
 }
@@ -337,28 +339,30 @@ export function createMockMessageService(
 /*  Execution / shared-workflow repo factories                         */
 /* ------------------------------------------------------------------ */
 
-export function createMockExecutionRepo(overrides: Record<string, unknown> = {}) {
+export function createMockExecutionRepo(overrides: Record<string, unknown> = {}): any {
   const repo: Record<string, unknown> = {
     findSingleExecution: vi.fn().mockResolvedValue({ workflowId: VALID_WORKFLOW_ID }),
     loadMetadataOrNull: vi.fn().mockImplementation(async (id: string) => {
       try {
-        const execution = await (repo.findSingleExecution as ReturnType<typeof vi.fn>)(id, {
-          includeData: false,
-          unflattenData: false,
-        });
+        const fn = repo.findSingleExecution as (id: string, opts?: unknown) => Promise<unknown>;
+        const execution = await fn(id, { includeData: false, unflattenData: false });
         return execution ?? null;
       } catch {
         return null;
       }
     }),
+    metadata: { tableName: 'execution_entity', columns: [{ propertyName: 'id', databaseName: 'id' }] },
+    manager: { query: vi.fn().mockResolvedValue([]) },
     ...overrides,
   };
   return repo;
 }
 
-export function createMockSharedWorkflowRepo(overrides: Record<string, unknown> = {}) {
+export function createMockSharedWorkflowRepo(overrides: Record<string, unknown> = {}): any {
   return {
     findProjectIds: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
+    metadata: { tableName: 'shared_workflow', columns: [{ propertyName: 'id', databaseName: 'id' }] },
+    manager: { query: vi.fn().mockResolvedValue([]) },
     ...overrides,
   };
 }

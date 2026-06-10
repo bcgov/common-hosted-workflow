@@ -226,3 +226,47 @@ describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
     );
   });
 });
+
+describe('GET /ui-api/access-requests/my', () => {
+  it('returns the wrapped access request response shape', async () => {
+    const accessRequest = {
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      requesterEmail: 'person@example.com',
+      justification: 'Need access to manage workflows.',
+      status: 'pending',
+      reviewerEmail: null,
+      reviewerN8nUserId: null,
+      denyReason: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+    const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          role: null,
+        },
+        accessibleProjectIds: [],
+        projects: [],
+        workflows: [],
+      }),
+    };
+    const accessRequestService = {
+      getMyAccessRequest: vi.fn().mockResolvedValue(accessRequest),
+    };
+    const req = createMockRequest({ get: vi.fn(() => undefined) as any });
+    const res = createMockResponse();
+
+    await runProtectedRoute(
+      { uiApi, accessRequest: accessRequestService },
+      'get',
+      '/access-requests/my',
+      req as any,
+      res as any,
+    );
+
+    expect(accessRequestService.getMyAccessRequest).toHaveBeenCalledWith('person@example.com');
+    expect(res.json).toHaveBeenCalledWith({ accessRequest });
+  });
+});
