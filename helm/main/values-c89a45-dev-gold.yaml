@@ -13,7 +13,7 @@ n8n:
     OIDC_REDIRECT_URI: https://dev-chwf-sdg.apps.gold.devops.gov.bc.ca/rest/auth/oidc/callback
     EXTERNAL_UI_ENABLED: 'true'
     UI_OIDC_REDIRECT_URI: https://dev-chwf-sdg.apps.gold.devops.gov.bc.ca/ui-api/auth/callback
-    UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev
+    UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
 
   route:
     enabled: true
