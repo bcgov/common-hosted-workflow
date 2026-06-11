@@ -4,6 +4,7 @@ import type { UiApiContext, UiWorkflowSummary } from './ui-api';
 import type { AccessRequestService } from '../services/access-request';
 import type { ActionService } from '../services/action.service';
 import type { MessageService } from '../services/message.service';
+import type { TenantService } from '../services/tenant.service';
 
 export type N8nUiUser = N8nUser;
 
@@ -33,4 +34,5 @@ export type ApiServices = {
   action: ActionService;
   message: MessageService;
   accessRequest: AccessRequestService;
+  tenant: TenantService;
 };

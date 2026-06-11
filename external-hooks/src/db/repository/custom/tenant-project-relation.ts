@@ -23,6 +23,12 @@ export class TenantProjectRelationRepository {
     return row?.tenantId ?? null;
   }
 
+  /** Returns all distinct tenant IDs from the relation table. */
+  async listDistinctTenantIds(): Promise<string[]> {
+    const rows = await this.db.selectDistinct({ tenantId: tenantProjectRelation.tenantId }).from(tenantProjectRelation);
+    return rows.map((r: { tenantId: string }) => r.tenantId);
+  }
+
   /** Inserts a tenant/project mapping. Caller must handle unique constraint violations. */
   async insert(params: { tenantId: string; projectId: string }): Promise<void> {
     await this.db.insert(tenantProjectRelation).values(params);

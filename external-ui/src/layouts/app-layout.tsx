@@ -86,6 +86,20 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <NavLink
+                    to="/workflow-interaction"
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                        : '!text-white hover:!text-white'
+                    }
+                  >
+                    Workflow Interaction
+                  </NavLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
               {hasPendingAccessRequest && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>

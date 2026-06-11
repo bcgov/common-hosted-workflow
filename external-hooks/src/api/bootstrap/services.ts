@@ -1,6 +1,7 @@
 import { AccessRequestService } from '../services/access-request';
 import { ActionService } from '../services/action.service';
 import { MessageService } from '../services/message.service';
+import { TenantService } from '../services/tenant.service';
 import { UiApiService } from '../services/ui-api';
 import type { N8nRepositories } from './n8n-repositories';
 import type { CustomRepositories } from './custom-repositories';
@@ -17,5 +18,6 @@ export function buildApiServices(
     action: new ActionService(n8nRepositories, customRepositories),
     message: new MessageService(n8nRepositories, customRepositories),
     accessRequest: new AccessRequestService(n8nRepositories, customRepositories, userRoleService),
+    tenant: new TenantService(customRepositories),
   };
 }

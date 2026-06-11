@@ -100,11 +100,11 @@ Standalone repository classes that query the project's own PostgreSQL tables usi
 
 ### Repositories
 
-| Class                             | Table                     | Key Methods                                                   |
-| --------------------------------- | ------------------------- | ------------------------------------------------------------- |
-| `MessageRepository`               | `messages`                | `list`, `create`                                              |
-| `ActionRequestRepository`         | `action_requests`         | `list`, `getById`, `create`, `updateStatus`                   |
-| `TenantProjectRelationRepository` | `tenant_project_relation` | `getProjectIdsByTenantId`, `getTenantIdByProjectId`, `insert` |
+| Class                             | Table                     | Key Methods                                                                            |
+| --------------------------------- | ------------------------- | -------------------------------------------------------------------------------------- |
+| `MessageRepository`               | `messages`                | `list`, `create`                                                                       |
+| `ActionRequestRepository`         | `action_requests`         | `list`, `getById`, `create`, `updateStatus`                                            |
+| `TenantProjectRelationRepository` | `tenant_project_relation` | `getProjectIdsByTenantId`, `getTenantIdByProjectId`, `listDistinctTenantIds`, `insert` |
 
 ### Patterns
 
