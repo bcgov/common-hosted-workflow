@@ -195,6 +195,35 @@ apiKeyAuthMiddleware → tenantMiddleware → Zod schema validation → handler
 
 For admin routes: `adminAuthMiddleware` (includes API key check + role verification) replaces `apiKeyAuthMiddleware`.
 
+### Async Error Handling
+
+Route handlers should NOT use try/catch. There are two reasons:
+
+1. **Centralized error middleware** — `handleErrorResponse` already handles all errors uniformly; duplicating that logic per-handler is pointless.
+2. **Reduced codebase and nesting** — Removing try/catch eliminates boilerplate and keeps handlers flat and readable.
+
+Existing routes (`/messages`, `/actions`, etc.) follow this pattern — no try/catch.
+
+```typescript
+// ✅ Correct — bare async handler
+router.get('/resource', async (_req, res) => {
+  const data = await services.domain.list();
+  OkResponse(res, { data });
+});
+
+// ❌ Wrong — redundant try/catch
+router.get('/resource', async (_req, res, next) => {
+  try {
+    const data = await services.domain.list();
+    OkResponse(res, { data });
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+The only place `next(error)` is needed is inside **middleware** where you intentionally pass control to the error middleware.
+
 ### Response Format
 
 All error responses use a standardized shape:
