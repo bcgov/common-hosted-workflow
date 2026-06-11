@@ -12,6 +12,16 @@ import { OkResponse } from './responses';
 export function buildWilRouter({ services, customRepositories }: ApiRouteContext) {
   const router = Router();
 
+  /**
+   * GET /tenants — Returns available tenants for the logged-in user.
+   * Currently resolves distinct tenants from the tenant_project_relation table.
+   * TODO: Replace with CSTAR API integration to resolve tenants and real names per user.
+   */
+  router.get('/tenants', async (_req, res) => {
+    const tenants = await services.tenant.listTenants();
+    OkResponse(res, { tenants });
+  });
+
   router.get(
     '/messages',
     createRequestParser(wilListQuerySchema),
