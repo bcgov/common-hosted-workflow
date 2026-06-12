@@ -2,6 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { getSession, type AuthSessionUser } from '../services/backend/auth';
 import { buildApiUrl, clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../services/backend/axios';
 
+// Context files legitimately export both provider component and hook
+// eslint-disable-next-line react-refresh/only-export-components
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
 interface AuthState {
   user: AuthSessionUser | null;
   isLoading: boolean;
@@ -44,22 +50,23 @@ function consumeTokenFromUrl() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthSessionUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    // If no token in URL and nothing stored, nothing to load
+    const url = new URL(window.location.href);
+    return !!(url.searchParams.get('token') || getStoredAppToken());
+  });
 
   useEffect(() => {
-    let cancelled = false;
-
     const tokenFromUrl = consumeTokenFromUrl();
     if (tokenFromUrl) {
       setStoredAppToken(tokenFromUrl);
     }
 
     if (!tokenFromUrl && !getStoredAppToken()) {
-      setIsLoading(false);
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
+
+    let cancelled = false;
 
     getSession()
       .then((response) => {
@@ -96,8 +103,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return <AuthContext.Provider value={{ user, isLoading, login, logout }}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
 }

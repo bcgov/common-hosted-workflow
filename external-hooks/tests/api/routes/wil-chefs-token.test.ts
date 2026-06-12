@@ -118,6 +118,7 @@ describe('POST /wil/chefs-token', () => {
       authToken: 'jwt-token-123',
       formId: 'form-123',
       formName: 'Test Form',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app',
     });
   });
 

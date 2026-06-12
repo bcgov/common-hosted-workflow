@@ -77,6 +77,8 @@ x-n8n-env: &n8n-env
   AUTHZ_TOKEN_ENDPOINT: ${AUTHZ_TOKEN_ENDPOINT}
   AUTHZ_CLIENT_ID: ${AUTHZ_CLIENT_ID}
   AUTHZ_CLIENT_SECRET: ${AUTHZ_CLIENT_SECRET}
+  # CHEFS gateway URL for token exchange
+  CHEFS_GATEWAY_URL: ${CHEFS_GATEWAY_URL}
 
 services:
   sdg-mock-app:
