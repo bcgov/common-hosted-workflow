@@ -39,6 +39,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const isAdmin = isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug);
   const hasPendingAccessRequest = myAccessRequestQuery.data?.accessRequest?.status === 'pending';
+  const showAccessRequestLink = hasPendingAccessRequest && !isAdmin;
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
@@ -100,7 +101,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
-              {hasPendingAccessRequest && (
+              {showAccessRequestLink && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <NavLink

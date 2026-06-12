@@ -126,6 +126,7 @@ export function AccessRequest() {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [justification, setJustification] = useState('');
+  const [showNewRequest, setShowNewRequest] = useState(false);
   const redirectError = new URLSearchParams(window.location.search).get('error');
 
   const hasToken = Boolean(getStoredAppToken());
@@ -141,6 +142,7 @@ export function AccessRequest() {
     mutationFn: ({ justification }: { justification: string }) => createAccessRequest(justification),
     onSuccess: async () => {
       setJustification('');
+      setShowNewRequest(false);
       await queryClient.invalidateQueries({ queryKey: ['access-requests', 'my', user?.email ?? ''] });
     },
   });
@@ -159,6 +161,7 @@ export function AccessRequest() {
   }
 
   const myRequest = myRequestQuery.data?.accessRequest;
+  const showForm = !myRequestQuery.isLoading && (!myRequest || showNewRequest);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
@@ -180,11 +183,11 @@ export function AccessRequest() {
 
         {myRequestQuery.isLoading && <p className="text-sm text-[var(--bc-muted)]">Loading...</p>}
 
-        {!myRequestQuery.isLoading && myRequest && (
-          <ExistingRequestCard request={myRequest} onNewRequest={() => createMutation.reset()} />
+        {!myRequestQuery.isLoading && myRequest && !showNewRequest && (
+          <ExistingRequestCard request={myRequest} onNewRequest={() => setShowNewRequest(true)} />
         )}
 
-        {!myRequestQuery.isLoading && !myRequest && (
+        {showForm && (
           <NewRequestForm
             justification={justification}
             onJustificationChange={setJustification}
