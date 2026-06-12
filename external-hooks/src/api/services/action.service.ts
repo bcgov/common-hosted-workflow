@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { actionRequests } from '../../db/schema/workflow-interaction-layer';
+import { actionRequest } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
@@ -67,10 +67,10 @@ export class ActionService {
     workflowInstanceId?: string;
     since?: import('../types/list-pagination').ListPaginationSince;
   }): any[] {
-    const clauses: any[] = [inArray(actionRequests.projectId, params.allowedProjectIds)];
-    if (params.actorId) clauses.push(eq(actionRequests.actorId, params.actorId));
-    if (params.workflowInstanceId) clauses.push(eq(actionRequests.workflowInstanceId, params.workflowInstanceId));
-    clauses.push(...buildPaginationClauses(actionRequests, params.since));
+    const clauses: any[] = [inArray(actionRequest.projectId, params.allowedProjectIds)];
+    if (params.actorId) clauses.push(eq(actionRequest.actorId, params.actorId));
+    if (params.workflowInstanceId) clauses.push(eq(actionRequest.workflowInstanceId, params.workflowInstanceId));
+    clauses.push(...buildPaginationClauses(actionRequest, params.since));
     return clauses;
   }
 
@@ -137,8 +137,8 @@ export class ActionService {
     const row = await this.customRepositories.actionRequest.getById({
       actionId: params.actionId,
       where: [
-        inArray(actionRequests.projectId, params.allowedProjectIds),
-        ...(params.actorId ? [eq(actionRequests.actorId, params.actorId)] : []),
+        inArray(actionRequest.projectId, params.allowedProjectIds),
+        ...(params.actorId ? [eq(actionRequest.actorId, params.actorId)] : []),
       ],
     });
     if (!row) throw new AppError(404, 'Action not found');
@@ -150,8 +150,8 @@ export class ActionService {
       actionId: params.actionId,
       status: params.status,
       where: [
-        inArray(actionRequests.projectId, params.allowedProjectIds),
-        ...(params.actorId ? [eq(actionRequests.actorId, params.actorId)] : []),
+        inArray(actionRequest.projectId, params.allowedProjectIds),
+        ...(params.actorId ? [eq(actionRequest.actorId, params.actorId)] : []),
       ],
     });
     if (!row) throw new AppError(404, 'Action not found');

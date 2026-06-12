@@ -29,6 +29,13 @@
       "when": 1781212407270,
       "tag": "0003_access_request",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781213943505,
+      "tag": "0004_trigger_workflow_and_rename_tables",
+      "breakpoints": true
     }
   ]
 }

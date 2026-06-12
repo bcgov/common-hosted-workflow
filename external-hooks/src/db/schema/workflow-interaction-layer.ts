@@ -32,10 +32,10 @@ export type TenantProjectRelation = typeof tenantProjectRelation.$inferSelect;
 export type NewTenantProjectRelation = typeof tenantProjectRelation.$inferInsert;
 
 /**
- * messages
+ * message
  */
-export const messages = pgTable(
-  'messages',
+export const message = pgTable(
+  'message',
   {
     id: uuid('id').notNull().primaryKey().defaultRandom(),
     title: varchar('title', { length: 255 }).notNull(),
@@ -57,27 +57,27 @@ export const messages = pgTable(
     metadata: jsonb('metadata'),
   },
   (table) => [
-    check('chk_messages_status', sql`${table.status} IN ('active', 'read')`),
-    check('chk_messages_actor_type', sql`${table.actorType} IN ('user', 'role', 'group', 'system', 'other')`),
-    index('idx_messages_project_created').on(table.projectId, table.createdAt.desc()),
-    index('idx_messages_project_actor_created').on(table.projectId, table.actorId, table.createdAt.desc()),
-    index('idx_messages_project_actor_id').on(table.projectId, table.actorId, table.id),
-    index('idx_messages_instance_created').on(table.workflowInstanceId, table.createdAt.desc()),
-    index('idx_messages_status').on(table.status),
-    index('idx_messages_since')
+    check('chk_message_status', sql`${table.status} IN ('active', 'read')`),
+    check('chk_message_actor_type', sql`${table.actorType} IN ('user', 'role', 'group', 'system', 'other')`),
+    index('idx_message_project_created').on(table.projectId, table.createdAt.desc()),
+    index('idx_message_project_actor_created').on(table.projectId, table.actorId, table.createdAt.desc()),
+    index('idx_message_project_actor_id').on(table.projectId, table.actorId, table.id),
+    index('idx_message_instance_created').on(table.workflowInstanceId, table.createdAt.desc()),
+    index('idx_message_status').on(table.status),
+    index('idx_message_since')
       .on(table.projectId, table.actorId, table.createdAt.desc())
       .where(sql`${table.status} = 'active'`),
   ],
 );
 
-export type Message = typeof messages.$inferSelect;
-export type NewMessage = typeof messages.$inferInsert;
+export type Message = typeof message.$inferSelect;
+export type NewMessage = typeof message.$inferInsert;
 
 /**
- * action_requests
+ * action_request
  */
-export const actionRequests = pgTable(
-  'action_requests',
+export const actionRequest = pgTable(
+  'action_request',
   {
     id: uuid('id').notNull().primaryKey().defaultRandom(),
     actionType: varchar('action_type', { length: 100 }).notNull(),
@@ -106,7 +106,7 @@ export const actionRequests = pgTable(
   },
   (table) => [
     check(
-      'chk_ar_status',
+      'chk_action_request_status',
       sql`${table.status} IN ('pending', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted')`,
     ),
     check('chk_ar_priority', sql`${table.priority} IN ('critical', 'normal')`),
@@ -133,8 +133,8 @@ export const actionRequests = pgTable(
   ],
 );
 
-export type ActionRequest = typeof actionRequests.$inferSelect;
-export type NewActionRequest = typeof actionRequests.$inferInsert;
+export type ActionRequest = typeof actionRequest.$inferSelect;
+export type NewActionRequest = typeof actionRequest.$inferInsert;
 
 /**
  * audit_log

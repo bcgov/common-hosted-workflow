@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { messages } from '../../db/schema/workflow-interaction-layer';
+import { message } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
@@ -48,10 +48,10 @@ export class MessageService {
     workflowInstanceId?: string;
     since?: import('../types/list-pagination').ListPaginationSince;
   }): any[] {
-    const clauses: any[] = [inArray(messages.projectId, params.allowedProjectIds)];
-    if (params.actorId) clauses.push(eq(messages.actorId, params.actorId));
-    if (params.workflowInstanceId) clauses.push(eq(messages.workflowInstanceId, params.workflowInstanceId));
-    clauses.push(...buildPaginationClauses(messages, params.since));
+    const clauses: any[] = [inArray(message.projectId, params.allowedProjectIds)];
+    if (params.actorId) clauses.push(eq(message.actorId, params.actorId));
+    if (params.workflowInstanceId) clauses.push(eq(message.workflowInstanceId, params.workflowInstanceId));
+    clauses.push(...buildPaginationClauses(message, params.since));
     return clauses;
   }
 
