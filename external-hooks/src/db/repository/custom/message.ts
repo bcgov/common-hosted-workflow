@@ -1,16 +1,16 @@
 import { and, desc } from 'drizzle-orm';
-import { messages } from '../../schema/workflow-interaction-layer';
+import { message } from '../../schema/workflow-interaction-layer';
 
 export class MessageRepository {
   constructor(private readonly db: any) {}
 
   /** List messages matching the provided where clauses. */
-  async list(params: { where: any[]; limit: number }): Promise<Array<typeof messages.$inferSelect>> {
+  async list(params: { where: any[]; limit: number }): Promise<Array<typeof message.$inferSelect>> {
     return await this.db
       .select()
-      .from(messages)
+      .from(message)
       .where(and(...params.where))
-      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .orderBy(desc(message.createdAt), desc(message.id))
       .limit(params.limit);
   }
 
@@ -25,10 +25,10 @@ export class MessageRepository {
     projectId: string;
     metadata: Record<string, unknown> | null;
     status: string;
-  }): Promise<typeof messages.$inferSelect> {
+  }): Promise<typeof message.$inferSelect> {
     const now = new Date();
     const [row] = await this.db
-      .insert(messages)
+      .insert(message)
       .values({
         ...input,
         createdAt: now,

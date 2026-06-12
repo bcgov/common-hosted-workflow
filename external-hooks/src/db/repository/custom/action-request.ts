@@ -1,25 +1,25 @@
 import { and, desc, eq } from 'drizzle-orm';
-import { actionRequests } from '../../schema/workflow-interaction-layer';
+import { actionRequest } from '../../schema/workflow-interaction-layer';
 
 export class ActionRequestRepository {
   constructor(private readonly db: any) {}
 
   /** List action requests matching the provided where clauses. */
-  async list(params: { where: any[]; limit: number }): Promise<Array<typeof actionRequests.$inferSelect>> {
+  async list(params: { where: any[]; limit: number }): Promise<Array<typeof actionRequest.$inferSelect>> {
     return await this.db
       .select()
-      .from(actionRequests)
+      .from(actionRequest)
       .where(and(...params.where))
-      .orderBy(desc(actionRequests.createdAt), desc(actionRequests.id))
+      .orderBy(desc(actionRequest.createdAt), desc(actionRequest.id))
       .limit(params.limit);
   }
 
   /** Returns one action request by id, optionally scoped by where clauses. */
-  async getById(params: { actionId: string; where?: any[] }): Promise<typeof actionRequests.$inferSelect | null> {
-    const clauses = [eq(actionRequests.id, params.actionId), ...(params.where ?? [])];
+  async getById(params: { actionId: string; where?: any[] }): Promise<typeof actionRequest.$inferSelect | null> {
+    const clauses = [eq(actionRequest.id, params.actionId), ...(params.where ?? [])];
     const [row] = await this.db
       .select()
-      .from(actionRequests)
+      .from(actionRequest)
       .where(and(...clauses))
       .limit(1);
     return row ?? null;
@@ -42,10 +42,10 @@ export class ActionRequestRepository {
     dueDate: Date | null;
     checkIn: Date | null;
     metadata: Record<string, unknown> | null;
-  }): Promise<typeof actionRequests.$inferSelect> {
+  }): Promise<typeof actionRequest.$inferSelect> {
     const now = new Date();
     const [row] = await this.db
-      .insert(actionRequests)
+      .insert(actionRequest)
       .values({
         ...input,
         createdAt: now,
@@ -60,10 +60,10 @@ export class ActionRequestRepository {
     actionId: string;
     status: string;
     where?: any[];
-  }): Promise<typeof actionRequests.$inferSelect | null> {
-    const clauses = [eq(actionRequests.id, params.actionId), ...(params.where ?? [])];
+  }): Promise<typeof actionRequest.$inferSelect | null> {
+    const clauses = [eq(actionRequest.id, params.actionId), ...(params.where ?? [])];
     const [row] = await this.db
-      .update(actionRequests)
+      .update(actionRequest)
       .set({
         status: params.status,
         updatedAt: new Date(),
