@@ -34,7 +34,17 @@ export function useDashboard(playgroundName?: string) {
   const [lastRefresh, setLastRefresh] = useState('');
 
   // ── Filter state ──
-  const [actorId, setActorId] = useState('amina');
+  const [actorId, setActorId] = useState(() => {
+    if (globalThis.window === undefined) return 'amina';
+    return localStorage.getItem('sdg-mock-actorId') || 'amina';
+  });
+
+  const updateActorId = useCallback((value: string) => {
+    setActorId(value);
+    if (globalThis.window !== undefined) {
+      localStorage.setItem('sdg-mock-actorId', value);
+    }
+  }, []);
   const [since, setSince] = useState('');
   const [limit, setLimit] = useState(50);
 
@@ -129,7 +139,7 @@ export function useDashboard(playgroundName?: string) {
     lastRefresh,
     // Filters
     actorId,
-    setActorId,
+    setActorId: updateActorId,
     since,
     setSince,
     limit,
