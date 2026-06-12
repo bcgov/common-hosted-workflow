@@ -8,6 +8,7 @@ import type { CustomRepositories } from './custom-repositories';
 import type { ApiServices } from '../types/services';
 import type { N8nUserRoleService } from '../types/n8n-services';
 import { getCssSsoConfig } from '../helpers/css-sso-config';
+import { CssSsoService } from '../services/css-sso';
 
 export function buildApiServices(
   n8nRepositories: N8nRepositories,
@@ -15,12 +16,13 @@ export function buildApiServices(
   userRoleService: N8nUserRoleService,
 ): ApiServices {
   const cssSsoConfig = getCssSsoConfig();
+  const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
 
   return {
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
     message: new MessageService(n8nRepositories, customRepositories),
-    accessRequest: new AccessRequestService(n8nRepositories, customRepositories, userRoleService, cssSsoConfig),
+    accessRequest: new AccessRequestService(n8nRepositories, customRepositories, userRoleService, cssSsoService),
     tenant: new TenantService(customRepositories),
   };
 }

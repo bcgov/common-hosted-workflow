@@ -2,23 +2,23 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AccessRequestService } from '../../../src/api/services/access-request';
 import { AppError } from '../../../src/api/utils/errors';
 
-vi.mock('../../../src/api/helpers/css-sso-client', () => ({
-  ensureRequiredRoles: vi.fn(),
-  lookupAzureIdirUser: vi.fn(),
-  assignUserRole: vi.fn(),
-}));
-
-import { ensureRequiredRoles, lookupAzureIdirUser, assignUserRole } from '../../../src/api/helpers/css-sso-client';
-
-const mockEnsureRequiredRoles = vi.mocked(ensureRequiredRoles);
-const mockLookupAzureIdirUser = vi.mocked(lookupAzureIdirUser);
-const mockAssignUserRole = vi.mocked(assignUserRole);
+function createMockCssSsoService(overrides?: {
+  ensureRequiredRoles?: ReturnType<typeof vi.fn>;
+  lookupAzureIdirUser?: ReturnType<typeof vi.fn>;
+  assignUserRole?: ReturnType<typeof vi.fn>;
+}) {
+  return {
+    ensureRequiredRoles: overrides?.ensureRequiredRoles ?? vi.fn().mockResolvedValue(undefined),
+    lookupAzureIdirUser: overrides?.lookupAzureIdirUser ?? vi.fn().mockResolvedValue({ username: 'user@idir' }),
+    assignUserRole: overrides?.assignUserRole ?? vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 function createService(overrides?: {
   accessRequest?: Record<string, unknown>;
   user?: Record<string, unknown>;
   userRoleService?: Record<string, unknown>;
-  cssSsoConfig?: Record<string, unknown> | null;
+  cssSsoService?: ReturnType<typeof createMockCssSsoService> | null;
 }) {
   const accessRequest = {
     getPendingByRequesterEmail: vi.fn(),
@@ -43,37 +43,23 @@ function createService(overrides?: {
     ...overrides?.userRoleService,
   };
 
-  const cssSsoConfig =
-    overrides?.cssSsoConfig === undefined
-      ? {
-          baseUrl: 'https://api.example.com',
-          integrationId: '123',
-          environment: 'dev',
-          clientId: 'id',
-          clientSecret: 'secret', // pragma: allowlist secret
-          tokenEndpoint: 'https://token.example.com',
-        }
-      : overrides?.cssSsoConfig;
+  const cssSsoService = overrides?.cssSsoService === undefined ? createMockCssSsoService() : overrides?.cssSsoService;
 
   return {
     accessRequest,
     user,
     userRoleService,
-    cssSsoConfig,
+    cssSsoService,
     service: new AccessRequestService(
       { user } as any,
       { accessRequest } as any,
       userRoleService as any,
-      cssSsoConfig as any,
+      cssSsoService as any,
     ),
   };
 }
 
 describe('AccessRequestService', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
   it('returns the latest request for the requester, even when reviewed', async () => {
     const latestRequest = {
       id: 'request-1',
@@ -137,9 +123,12 @@ describe('AccessRequestService', () => {
       reviewerN8nUserId: 'admin-1',
       updatedAt: new Date('2024-01-02T00:00:00.000Z'),
     };
-    mockLookupAzureIdirUser.mockResolvedValue({ username: 'person@idir' });
+    const mockCssSso = createMockCssSsoService({
+      lookupAzureIdirUser: vi.fn().mockResolvedValue({ username: 'person@idir' }),
+    });
 
     const { service, user, accessRequest, userRoleService } = createService({
+      cssSsoService: mockCssSso,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(updatedRequest),
@@ -167,9 +156,9 @@ describe('AccessRequestService', () => {
       expect.objectContaining({ accessRequestId: 'request-1', status: 'approved', currentStatus: 'pending' }),
     );
     expect(result.status).toBe('approved');
-    expect(mockEnsureRequiredRoles).toHaveBeenCalled();
-    expect(mockLookupAzureIdirUser).toHaveBeenCalledWith(expect.anything(), 'person@example.com');
-    expect(mockAssignUserRole).toHaveBeenCalledWith(expect.anything(), 'person@idir', 'global:member');
+    expect(mockCssSso.ensureRequiredRoles).toHaveBeenCalled();
+    expect(mockCssSso.lookupAzureIdirUser).toHaveBeenCalledWith('person@example.com');
+    expect(mockCssSso.assignUserRole).toHaveBeenCalledWith('person@idir', 'global:member');
   });
 
   it('does not mutate user access when another review wins the race', async () => {
@@ -184,7 +173,10 @@ describe('AccessRequestService', () => {
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
       updatedAt: new Date('2024-01-01T00:00:00.000Z'),
     };
+    const mockCssSso = createMockCssSsoService();
+
     const { service, user, userRoleService } = createService({
+      cssSsoService: mockCssSso,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(null),
@@ -214,7 +206,7 @@ describe('AccessRequestService', () => {
     expect(user.findByEmail).not.toHaveBeenCalled();
     expect(user.setUserDisabled).not.toHaveBeenCalled();
     expect(userRoleService.changeUserRole).not.toHaveBeenCalled();
-    expect(mockEnsureRequiredRoles).not.toHaveBeenCalled();
+    expect(mockCssSso.ensureRequiredRoles).not.toHaveBeenCalled();
   });
 
   it('returns a conflict when the request stops being pending during review', async () => {
@@ -257,7 +249,7 @@ describe('AccessRequestService', () => {
     });
   });
 
-  it('skips CSS SSO role assignment when config is null', async () => {
+  it('skips CSS SSO role assignment when service is null', async () => {
     const existingRequest = {
       id: 'request-1',
       requesterEmail: 'person@example.com',
@@ -278,7 +270,7 @@ describe('AccessRequestService', () => {
     };
 
     const { service, user, accessRequest } = createService({
-      cssSsoConfig: null,
+      cssSsoService: null,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(updatedRequest),
@@ -301,9 +293,6 @@ describe('AccessRequestService', () => {
     });
 
     expect(result.status).toBe('approved');
-    expect(mockEnsureRequiredRoles).not.toHaveBeenCalled();
-    expect(mockLookupAzureIdirUser).not.toHaveBeenCalled();
-    expect(mockAssignUserRole).not.toHaveBeenCalled();
   });
 
   it('throws when Azure IDIR user is not found', async () => {
@@ -325,11 +314,16 @@ describe('AccessRequestService', () => {
       reviewerN8nUserId: 'admin-1',
       updatedAt: new Date('2024-01-02T00:00:00.000Z'),
     };
-    mockLookupAzureIdirUser.mockRejectedValue(
-      new Error('No Azure IDIR user found with email person@example.com (or user has no IDIR GUID)'),
-    );
+    const mockCssSso = createMockCssSsoService({
+      lookupAzureIdirUser: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('No Azure IDIR user found with email person@example.com (or user has no IDIR GUID)'),
+        ),
+    });
 
     const { service, user } = createService({
+      cssSsoService: mockCssSso,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(updatedRequest),
@@ -373,9 +367,12 @@ describe('AccessRequestService', () => {
       reviewerN8nUserId: 'admin-1',
       updatedAt: new Date('2024-01-02T00:00:00.000Z'),
     };
-    mockEnsureRequiredRoles.mockRejectedValue(new Error('CSS SSO token request failed (401): Unauthorized'));
+    const mockCssSso = createMockCssSsoService({
+      ensureRequiredRoles: vi.fn().mockRejectedValue(new Error('CSS SSO token request failed (401): Unauthorized')),
+    });
 
     const { service, user } = createService({
+      cssSsoService: mockCssSso,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(updatedRequest),
@@ -419,10 +416,13 @@ describe('AccessRequestService', () => {
       reviewerN8nUserId: 'admin-1',
       updatedAt: new Date('2024-01-02T00:00:00.000Z'),
     };
-    mockLookupAzureIdirUser.mockResolvedValue({ username: 'person@idir' });
-    mockAssignUserRole.mockRejectedValue(new Error('CSS SSO POST /users/roles failed (403): Forbidden'));
+    const mockCssSso = createMockCssSsoService({
+      lookupAzureIdirUser: vi.fn().mockResolvedValue({ username: 'person@idir' }),
+      assignUserRole: vi.fn().mockRejectedValue(new Error('CSS SSO POST /users/roles failed (403): Forbidden')),
+    });
 
     const { service, user } = createService({
+      cssSsoService: mockCssSso,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(updatedRequest),
@@ -466,9 +466,12 @@ describe('AccessRequestService', () => {
       reviewerN8nUserId: 'admin-1',
       updatedAt: new Date('2024-01-02T00:00:00.000Z'),
     };
-    mockLookupAzureIdirUser.mockResolvedValue({ username: 'newuser@idir' });
+    const mockCssSso = createMockCssSsoService({
+      lookupAzureIdirUser: vi.fn().mockResolvedValue({ username: 'newuser@idir' }),
+    });
 
     const { service, user, accessRequest } = createService({
+      cssSsoService: mockCssSso,
       accessRequest: {
         getById: vi.fn().mockResolvedValue(existingRequest),
         updateStatus: vi.fn().mockResolvedValue(updatedRequest),
@@ -489,8 +492,8 @@ describe('AccessRequestService', () => {
     expect(user.createUserWithProject).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'newuser@example.com', role: { slug: 'global:member' } }),
     );
-    expect(mockEnsureRequiredRoles).toHaveBeenCalled();
-    expect(mockLookupAzureIdirUser).toHaveBeenCalledWith(expect.anything(), 'newuser@example.com');
-    expect(mockAssignUserRole).toHaveBeenCalledWith(expect.anything(), 'newuser@idir', 'global:member');
+    expect(mockCssSso.ensureRequiredRoles).toHaveBeenCalled();
+    expect(mockCssSso.lookupAzureIdirUser).toHaveBeenCalledWith('newuser@example.com');
+    expect(mockCssSso.assignUserRole).toHaveBeenCalledWith('newuser@idir', 'global:member');
   });
 });
