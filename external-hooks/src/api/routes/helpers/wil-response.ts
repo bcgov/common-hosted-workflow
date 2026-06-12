@@ -1,3 +1,47 @@
+import type { ActionRequest } from '../../../db/schema/workflow-interaction-layer';
+
+export type UiActionResponse = {
+  id: string;
+  actionType: string;
+  payload: Record<string, unknown>;
+  actorId: string;
+  status: string;
+  priority: string;
+  dueDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/**
+ * Maps an action DB row to a UI-safe response shape.
+ *
+ * Strips sensitive fields (callback URLs, internal IDs, metadata) and removes
+ * any key whose lowercase form matches `formapikey` from showform payloads.
+ */
+export function mapActionToUiResponse(action: ActionRequest): UiActionResponse {
+  const payload = { ...(action.payload as Record<string, unknown>) };
+
+  if (action.actionType === 'showform') {
+    for (const key of Object.keys(payload)) {
+      if (key.toLowerCase() === 'formapikey') {
+        delete payload[key];
+      }
+    }
+  }
+
+  return {
+    id: action.id,
+    actionType: action.actionType,
+    payload,
+    actorId: action.actorId,
+    status: action.status,
+    priority: action.priority,
+    dueDate: action.dueDate,
+    createdAt: action.createdAt,
+    updatedAt: action.updatedAt,
+  };
+}
+
 /**
  * Formats a paginated list response with a keyset cursor.
  *
