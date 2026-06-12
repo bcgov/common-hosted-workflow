@@ -16,22 +16,19 @@ import {
 } from '../helpers/n8n-oidc';
 import { createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
-import type { N8nUserRoleService } from '../types/n8n-services';
 import { appendQueryParam, buildUiAppUrl } from '../helpers/url';
 import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { JwtService } from '../services/jwt';
+import type { UserService } from '../services/user';
 
 const log = createLogger('OIDCHook');
 
-export type N8nOidcJwtService = {
-  sign: (payload: { id: string; hash: string; usedMfa: boolean }, options: { expiresIn: string }) => string;
-};
-
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
-  jwtService: N8nOidcJwtService;
-  userService: N8nUserRoleService;
+  jwtService: JwtService;
+  userService: UserService;
   config: N8nOidcConfig;
 };
 

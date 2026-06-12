@@ -3,17 +3,34 @@ import { ActionService } from '../services/action.service';
 import { MessageService } from '../services/message.service';
 import { TenantService } from '../services/tenant.service';
 import { UiApiService } from '../services/ui-api';
-import type { N8nRepositories } from './n8n-repositories';
+import { N8N_JWT_SERVICE_PATH, N8N_USER_SERVICE_PATH } from '../constants/n8n-paths';
+import type { N8nRepositories, N8nContainer } from './n8n-repositories';
 import type { CustomRepositories } from './custom-repositories';
 import type { ApiServices } from '../types/services';
-import type { N8nUserRoleService } from '../types/n8n-services';
 import { getCssSsoConfig } from '../helpers/css-sso-config';
 import { CssSsoService } from '../services/css-sso';
+import { JwtService, type BaseJwtService } from '../services/jwt';
+import { UserService, type BaseUserService } from '../services/user';
+
+export type N8nServices = {
+  jwtService: JwtService;
+  userService: UserService;
+};
+
+export function buildN8nServices(container: N8nContainer): N8nServices {
+  const { JwtService: BaseJwtServiceClass } = require(N8N_JWT_SERVICE_PATH) as { JwtService: unknown };
+  const { UserService: BaseUserServiceClass } = require(N8N_USER_SERVICE_PATH) as { UserService: unknown };
+
+  return {
+    jwtService: new JwtService(container.get<BaseJwtService>(BaseJwtServiceClass)),
+    userService: new UserService(container.get<BaseUserService>(BaseUserServiceClass)),
+  };
+}
 
 export function buildApiServices(
   n8nRepositories: N8nRepositories,
   customRepositories: CustomRepositories,
-  userRoleService: N8nUserRoleService,
+  n8nServices: N8nServices,
 ): ApiServices {
   const cssSsoConfig = getCssSsoConfig();
   const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
@@ -22,7 +39,12 @@ export function buildApiServices(
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
     message: new MessageService(n8nRepositories, customRepositories),
-    accessRequest: new AccessRequestService(n8nRepositories, customRepositories, userRoleService, cssSsoService),
+    accessRequest: new AccessRequestService(
+      n8nRepositories,
+      customRepositories,
+      n8nServices.userService,
+      cssSsoService,
+    ),
     tenant: new TenantService(customRepositories),
   };
 }
