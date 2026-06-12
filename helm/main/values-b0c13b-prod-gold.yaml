@@ -14,6 +14,7 @@ n8n:
     SSO_RESTRICT_NO_ROLE: "true"
     UI_OIDC_REDIRECT_URI: https://n8n.developer.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:prod:"
+    AUTHZ_ENVIRONMENT: prod
 
   route:
     enabled: true

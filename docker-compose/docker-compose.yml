@@ -71,6 +71,13 @@ x-n8n-env: &n8n-env
   DEVX_CONNECTOR_API_KEY: ${DEVX_CONNECTOR_API_KEY}
   # internal auth token for secure communication between n8n and external hooks
   INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
+  # CSS SSO API credentials for role assignment on access request approval
+  AUTHZ_SERVICE_URL: ${AUTHZ_SERVICE_URL}
+  AUTHZ_INTEGRATION_ID: ${AUTHZ_INTEGRATION_ID}
+  AUTHZ_ENVIRONMENT: ${AUTHZ_ENVIRONMENT}
+  AUTHZ_TOKEN_ENDPOINT: ${AUTHZ_TOKEN_ENDPOINT}
+  AUTHZ_CLIENT_ID: ${AUTHZ_CLIENT_ID}
+  AUTHZ_CLIENT_SECRET: ${AUTHZ_CLIENT_SECRET}
 
 services:
   sdg-mock-app:

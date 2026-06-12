@@ -14,6 +14,7 @@ n8n:
     EXTERNAL_UI_ENABLED: 'true'
     UI_OIDC_REDIRECT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
+    AUTHZ_ENVIRONMENT: dev
 
   route:
     enabled: true

@@ -4,8 +4,12 @@ import type { SQL } from 'drizzle-orm';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nUserRoleService } from '../types/n8n-services';
+import type { CssSsoService } from './css-sso';
 import { accessRequest, type AccessRequest } from '../../db/schema/access-request';
 import { AppError } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('AccessRequestService');
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'denied';
 
@@ -61,6 +65,7 @@ export class AccessRequestService {
     private readonly n8nRepositories: N8nRepositories,
     private readonly customRepositories: CustomRepositories,
     private readonly userRoleService: N8nUserRoleService,
+    private readonly cssSsoService: CssSsoService | null,
   ) {}
 
   async createAccessRequest(input: CreateAccessRequestInput): Promise<AccessRequestListItem> {
@@ -146,8 +151,9 @@ export class AccessRequestService {
   }
 
   private async applyApprovalSideEffects(requesterEmail: string): Promise<void> {
-    const { user } = this.n8nRepositories;
+    await this.assignGlobalMemberRole(requesterEmail);
 
+    const { user } = this.n8nRepositories;
     const targetUser = await user.findByEmail(requesterEmail, ['role']);
 
     if (!targetUser) {
@@ -166,6 +172,22 @@ export class AccessRequestService {
         await user.setUserDisabled(targetUser.id, false);
       }
     }
+  }
+
+  private async assignGlobalMemberRole(email: string): Promise<void> {
+    if (!this.cssSsoService) {
+      log.warn('CSS SSO service not available, skipping role assignment', { email });
+      return;
+    }
+
+    log.info('Ensuring required CSS SSO roles exist');
+    await this.cssSsoService.ensureRequiredRoles();
+
+    log.info('Looking up Azure IDIR user', { email });
+    const { username } = await this.cssSsoService.lookupAzureIdirUser(email);
+
+    log.info('Assigning global:member role to user', { username });
+    await this.cssSsoService.assignUserRole(username, 'global:member');
   }
 
   private async claimReviewedRequest(params: ReviewStatusUpdateInput) {
