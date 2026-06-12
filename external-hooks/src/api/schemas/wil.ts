@@ -43,3 +43,22 @@ export const wilListQuerySchema = z.object({
 });
 
 export type WilListQuery = z.infer<typeof wilListQuerySchema>;
+
+/** POST /ui-api/wil/callback */
+export const wilCallbackSchema = z.object({
+  body: z.object({
+    actionId: z.string().min(1, 'actionId is required'),
+    body: z.record(z.string(), z.unknown()),
+  }),
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** POST /ui-api/wil/chefs-token */
+export const wilChefsTokenSchema = z.object({
+  body: z.object({
+    actionId: z.string().min(1, 'actionId is required'),
+  }),
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
