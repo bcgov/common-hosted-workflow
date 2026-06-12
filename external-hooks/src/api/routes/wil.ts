@@ -59,13 +59,14 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
   router.get('/actions', createRequestParser(wilListQuerySchema), async (req: UiApiTypedRequest<WilListQuery>, res) => {
     const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
     const actor = resolveActorIds((req as unknown as { session: UiAuthenticatedSession }).session);
-    const { limit, since } = req.parsed.query;
+    const { limit, since, status } = req.parsed.query;
 
     let items = await services.action.list({
       allowedProjectIds,
       actorId: actor.primary,
       limit,
       since,
+      status,
     });
 
     if (items.length === 0 && actor.primary !== actor.fallback) {
@@ -74,6 +75,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
         actorId: actor.fallback,
         limit,
         since,
+        status,
       });
     }
 
@@ -109,6 +111,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
       }
 
       const chefsGatewayUrl = process.env.CHEFS_GATEWAY_URL || 'https://submit.digital.gov.bc.ca/app/gateway/v1';
+      const chefsBaseUrl = chefsGatewayUrl.replace(/\/gateway\/v\d+\/?$/, '');
       const tokenUrl = `${chefsGatewayUrl}/auth/token/forms/${formId}`;
       const credentials = Buffer.from(`${formId}:${formApiKey}`).toString('base64');
 
@@ -135,6 +138,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
         authToken: tokenData.token,
         formId,
         formName,
+        baseUrl: chefsBaseUrl,
       });
     },
   );
