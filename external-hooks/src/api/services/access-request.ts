@@ -5,6 +5,8 @@ import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { UserService } from './user';
 import type { CssSsoService } from './css-sso';
+import type { NodeMailerService } from './node-mailer';
+import { renderEmail } from './email-templates';
 import { accessRequest, type AccessRequest } from '../../db/schema/access-request';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
@@ -66,6 +68,7 @@ export class AccessRequestService {
     private readonly customRepositories: CustomRepositories,
     private readonly userRoleService: UserService,
     private readonly cssSsoService: CssSsoService | null,
+    private readonly nodeMailerService: NodeMailerService | null,
   ) {}
 
   async createAccessRequest(input: CreateAccessRequestInput): Promise<AccessRequestListItem> {
@@ -91,6 +94,8 @@ export class AccessRequestService {
       }
       throw error;
     }
+
+    await this.notifyAdminsOfNewRequest(input.requesterEmail, input.justification, created.createdAt);
 
     return this.toListItem(created);
   }
@@ -141,6 +146,8 @@ export class AccessRequestService {
     if (action === 'approve') {
       await this.applyApprovalSideEffects(existing.requesterEmail);
     }
+
+    await this.notifyRequesterOfDecision(existing.requesterEmail, action, reviewerEmail, denyReason);
 
     return this.toListItem(updated);
   }
@@ -223,5 +230,72 @@ export class AccessRequestService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  private async notifyAdminsOfNewRequest(
+    requesterEmail: string,
+    justification: string,
+    createdAt: Date,
+  ): Promise<void> {
+    if (!this.nodeMailerService) {
+      log.warn('Node mailer service not available, skipping admin notification');
+      return;
+    }
+
+    try {
+      const adminEmails = await this.n8nRepositories.user.findAdminEmails();
+
+      if (adminEmails.length === 0) {
+        log.warn('No admin users found to notify');
+        return;
+      }
+
+      const html = renderEmail('accessRequestSubmitted', {
+        requesterEmail,
+        justification,
+        createdAt: createdAt.toISOString(),
+      });
+
+      await this.nodeMailerService.sendMail({
+        to: this.nodeMailerService.sender,
+        bcc: adminEmails,
+        subject: 'New Access Request Submitted',
+        html,
+      });
+
+      log.info('Notified admins of new access request', { adminCount: adminEmails.length });
+    } catch (error) {
+      log.error('Failed to notify admins of new access request', { error });
+    }
+  }
+
+  private async notifyRequesterOfDecision(
+    requesterEmail: string,
+    action: 'approve' | 'deny',
+    reviewerEmail: string,
+    denyReason?: string,
+  ): Promise<void> {
+    if (!this.nodeMailerService) {
+      log.warn('Node mailer service not available, skipping requester notification');
+      return;
+    }
+
+    try {
+      const templateName = action === 'approve' ? 'accessRequestApproved' : 'accessRequestDenied';
+      const html = renderEmail(templateName, {
+        reviewerEmail,
+        denyReason: action === 'deny' ? denyReason : undefined,
+      });
+
+      await this.nodeMailerService.sendMail({
+        to: requesterEmail,
+        subject: `Access Request ${action === 'approve' ? 'Approved' : 'Denied'}`,
+        html,
+      });
+
+      log.info('Notified requester of decision', { requesterEmail, action });
+    } catch (error) {
+      log.error('Failed to notify requester of decision', { error, requesterEmail, action });
+    }
   }
 }
