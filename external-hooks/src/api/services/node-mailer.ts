@@ -58,20 +58,4 @@ export class NodeMailerService {
       attachments,
     });
   }
-
-  private htmlToPlainText(html: string): string {
-    return html
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      .replace(/^[\t ]+/gm, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
 }
