@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { type OidcProviderConfig } from './oidc-provider';
+import type { JwtService } from '../services/jwt';
 
 export type N8nOidcRoleSlug = 'global:owner' | 'global:admin' | 'global:member';
 
@@ -112,12 +113,7 @@ export function getCookieSecret() {
     .digest('hex');
 }
 
-export function createAuthToken(
-  user: N8nOidcUser,
-  jwtService: {
-    sign: (payload: { id: string; hash: string; usedMfa: boolean }, options: { expiresIn: string }) => string;
-  },
-) {
+export function createAuthToken(user: N8nOidcUser, jwtService: JwtService) {
   const payload = {
     id: user.id,
     hash: createUserHash(user),

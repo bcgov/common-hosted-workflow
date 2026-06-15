@@ -3,13 +3,11 @@ import { mountAssets } from './bootstrap/assets';
 import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
 import { applyOidcFrontendSettings, type FrontendSettings } from './bootstrap/frontend-settings';
-import { N8N_USER_SERVICE_PATH } from './constants/n8n-paths';
 import { buildN8nRuntimeContext } from './bootstrap/n8n-repositories';
 import { mountOidc } from './bootstrap/oidc';
 import { buildRouteContext } from './bootstrap/route-context';
-import { buildApiServices } from './bootstrap/services';
+import { buildApiServices, buildN8nServices } from './bootstrap/services';
 import { mountUi } from './bootstrap/ui';
-import type { N8nUserRoleService } from './types/n8n-services';
 import { handleErrorResponse } from './utils/errors';
 import { createLogger } from './utils/logger';
 
@@ -29,10 +27,9 @@ function createHookConfig() {
 
           const { app } = server;
           const n8nRuntime = buildN8nRuntimeContext();
-          const { UserService } = require(N8N_USER_SERVICE_PATH) as { UserService: unknown };
-          const userRoleService = n8nRuntime.container.get(UserService) as N8nUserRoleService;
+          const n8nServices = buildN8nServices(n8nRuntime.container);
           const customRepositories = buildCustomRepositories(databaseUrl);
-          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories, userRoleService);
+          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories, n8nServices);
           const routeContext = buildRouteContext({
             services,
             n8nRepositories: n8nRuntime.n8nRepositories,
@@ -46,7 +43,8 @@ function createHookConfig() {
           mountOidc({
             app,
             n8nRepositories: n8nRuntime.n8nRepositories,
-            container: n8nRuntime.container,
+            jwtService: n8nServices.jwtService,
+            userService: n8nServices.userService,
           });
           mountAssets(app);
 
