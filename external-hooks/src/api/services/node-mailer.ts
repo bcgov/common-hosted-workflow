@@ -1,14 +1,5 @@
-const sanitizeHtml = require('sanitize-html') as (
-  dirty: string,
-  options?: {
-    allowedTags?: string[];
-    allowedAttributes?: Record<string, string[]>;
-  },
-) => string;
-
-const { convert } = require('html-to-text') as {
-  convert: (html: string, options?: Record<string, unknown>) => string;
-};
+import sanitizeHtml from 'sanitize-html';
+import { convert } from 'html-to-text';
 
 export type MailAttachment = Record<string, unknown>;
 
