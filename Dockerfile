@@ -62,6 +62,7 @@ ENV N8N_PORT=5678 \
     N8N_PROTOCOL="https" \
     N8N_COMMUNITY_PACKAGES_ENABLED=true \
     N8N_CUSTOM_EXTENSIONS="/home/node/.n8n/nodes" \
+    N8N_ADDITIONAL_NON_UI_ROUTES="ui:assets" \
     EXTERNAL_HOOK_FILES=/external-hooks/api/hooks.cjs \
     EXTERNAL_HOOK_ASSETS_PATH=/external-hooks/api/assets \
     EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js \

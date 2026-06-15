@@ -3,26 +3,30 @@ import { ActionService } from '../services/action.service';
 import { MessageService } from '../services/message.service';
 import { TenantService } from '../services/tenant.service';
 import { UiApiService } from '../services/ui-api';
-import { N8N_JWT_SERVICE_PATH, N8N_USER_SERVICE_PATH } from '../constants/n8n-paths';
+import { N8N_JWT_SERVICE_PATH, N8N_NODE_MAILER_PATH, N8N_USER_SERVICE_PATH } from '../constants/n8n-paths';
 import type { N8nRepositories, N8nContainer } from './n8n-repositories';
 import type { CustomRepositories } from './custom-repositories';
 import type { ApiServices } from '../types/services';
 import { getCssSsoConfig } from '../helpers/css-sso-config';
 import { CssSsoService } from '../services/css-sso';
 import { JwtService, type BaseJwtService } from '../services/jwt';
+import { NodeMailerService, type BaseNodeMailerService } from '../services/node-mailer';
 import { UserService, type BaseUserService } from '../services/user';
 
 export type N8nServices = {
   jwtService: JwtService;
+  nodeMailerService: NodeMailerService;
   userService: UserService;
 };
 
 export function buildN8nServices(container: N8nContainer): N8nServices {
   const { JwtService: BaseJwtServiceClass } = require(N8N_JWT_SERVICE_PATH) as { JwtService: unknown };
+  const { NodeMailer: BaseNodeMailerServiceClass } = require(N8N_NODE_MAILER_PATH) as { NodeMailer: unknown };
   const { UserService: BaseUserServiceClass } = require(N8N_USER_SERVICE_PATH) as { UserService: unknown };
 
   return {
     jwtService: new JwtService(container.get<BaseJwtService>(BaseJwtServiceClass)),
+    nodeMailerService: new NodeMailerService(container.get<BaseNodeMailerService>(BaseNodeMailerServiceClass)),
     userService: new UserService(container.get<BaseUserService>(BaseUserServiceClass)),
   };
 }
