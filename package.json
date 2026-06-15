@@ -5,6 +5,7 @@
   "scripts": {},
   "devDependencies": {
     "@types/node": "^25.6.2",
+    "@types/sanitize-html": "^2.16.1",
     "axios": "^1.16.0",
     "fast-csv": "^5.0.7",
     "pino": "^10.3.1",
