@@ -15,7 +15,15 @@ interface ShowFormHandlerProps {
 type InitState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; authToken: string; formId: string; baseUrl: string; prefillData: Record<string, unknown> };
+  | {
+      status: 'ready';
+      authToken: string;
+      formId: string;
+      baseUrl: string;
+      prefillData: Record<string, unknown>;
+      token: Record<string, unknown>;
+      user: Record<string, unknown>;
+    };
 
 type CallbackState =
   | { status: 'idle' }
@@ -31,6 +39,26 @@ function buildUserProfile(claims: Record<string, unknown>): Record<string, unkno
     lastName: claims.family_name,
     fullName: claims.display_name,
     email: claims.email,
+    idp: claims.identity_provider,
+  };
+}
+
+function buildTokenObject(claims: Record<string, unknown>): Record<string, unknown> {
+  return {
+    sub: claims.sub,
+    roles: claims.client_roles ?? [],
+    email: claims.email,
+    idp: claims.identity_provider,
+  };
+}
+
+function buildUserObject(claims: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name: claims.display_name,
+    firstName: claims.given_name,
+    lastName: claims.family_name,
+    email: claims.email,
+    username: claims.idir_username ?? claims.preferred_username,
     idp: claims.identity_provider,
   };
 }
@@ -59,6 +87,8 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
         }
 
         const userProfile = buildUserProfile(whoamiResponse.oidc.claims);
+        const tokenObject = buildTokenObject(whoamiResponse.oidc.claims);
+        const userObject = buildUserObject(whoamiResponse.oidc.claims);
         const formPreFillData = (action.payload.FormPreFillData as Record<string, unknown>) ?? {};
 
         const prefillData: Record<string, unknown> = {
@@ -72,6 +102,8 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
           formId: tokenResponse.formId,
           baseUrl: tokenResponse.baseUrl,
           prefillData,
+          token: tokenObject,
+          user: userObject,
         });
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -172,6 +204,8 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
         authToken={initState.authToken}
         baseUrl={initState.baseUrl}
         prefillData={initState.prefillData}
+        token={initState.token}
+        user={initState.user}
         onSubmissionComplete={handleSubmissionComplete}
       />
     </div>

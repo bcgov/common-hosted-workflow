@@ -8,6 +8,8 @@ export function ChefsFormViewer({
   formId,
   authToken,
   prefillData,
+  token,
+  user,
   readOnly = false,
   language = 'en',
   baseUrl = DEFAULT_BASE_URL,
@@ -23,8 +25,11 @@ export function ChefsFormViewer({
     `form-id="${formId}"`,
     `base-url="${baseUrl}"`,
     authToken ? `auth-token="${authToken}"` : '',
+    token ? `token='${JSON.stringify(token)}'` : '',
+    user ? `user='${JSON.stringify(user)}'` : '',
     readOnly ? `read-only="true"` : '',
     language ? `language="${language}"` : '',
+    'isolate-styles',
   ]
     .filter(Boolean)
     .join(' ');
