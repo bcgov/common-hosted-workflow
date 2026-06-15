@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@types/html-to-text':
-        specifier: ^9.0.4
-        version: 9.0.4
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.20.0)(pg@8.21.0)
@@ -54,6 +51,9 @@ importers:
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
+      '@types/html-to-text':
+        specifier: ^9.0.4
+        version: 9.0.4
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
