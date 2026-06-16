@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -30,53 +31,41 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 }
 
 export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: Readonly<WaitOnEventHandlerProps>) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const onInteractionSuccessRef = useRef(onInteractionSuccess);
+  onInteractionSuccessRef.current = onInteractionSuccess;
+
+  const eventMutation = useMutation({
+    mutationFn: () => postWilCallback({ tenantId, actionId: action.id, body: { eventName: 'clicked' } }),
+    onSuccess: () => {
+      onInteractionSuccessRef.current?.();
+    },
+  });
 
   const isTerminal = TERMINAL_STATUSES.has(action.status);
-  const isDisabled = isTerminal || isSubmitting || isSuccess;
-
-  async function handleClick() {
-    if (isDisabled) return;
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      await postWilCallback({ tenantId, actionId: action.id, body: { eventName: 'clicked' } });
-      setIsSuccess(true);
-      onInteractionSuccess?.();
-    } catch (err: unknown) {
-      const message = extractErrorMessage(err, 'An unexpected error occurred. Please try again.');
-      setErrorMessage(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+  const isDisabled = isTerminal || eventMutation.isPending || eventMutation.isSuccess;
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
       <p className="text-sm text-[var(--bc-text)]">This action requires your acknowledgement to proceed.</p>
 
-      <Button onClick={handleClick} disabled={isDisabled}>
-        {isSubmitting && <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />}
-        {isSuccess && <IconCheck size={16} aria-hidden="true" />}
+      <Button onClick={() => eventMutation.mutate()} disabled={isDisabled}>
+        {eventMutation.isPending && <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />}
+        {eventMutation.isSuccess && <IconCheck size={16} aria-hidden="true" />}
         Confirm Event
       </Button>
 
       <div aria-live="polite">
-        {isSuccess && (
+        {eventMutation.isSuccess && (
           <p className="flex items-center gap-1.5 text-sm text-green-700">
             <IconCheck size={16} aria-hidden="true" />
             Event acknowledged successfully
           </p>
         )}
 
-        {errorMessage && (
+        {eventMutation.isError && (
           <p className="flex items-center gap-1.5 text-sm text-red-600">
             <IconAlertTriangle size={16} aria-hidden="true" />
-            {errorMessage}
+            {extractErrorMessage(eventMutation.error, 'An unexpected error occurred. Please try again.')}
           </p>
         )}
       </div>

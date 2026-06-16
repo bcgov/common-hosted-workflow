@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
 import { IconLoader2, IconCheck } from '@tabler/icons-react';
@@ -69,30 +70,27 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 }
 
 export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: Readonly<GetApprovalHandlerProps>) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [clickedOption, setClickedOption] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const onInteractionSuccessRef = useRef(onInteractionSuccess);
+  onInteractionSuccessRef.current = onInteractionSuccess;
+
+  const approvalMutation = useMutation({
+    mutationFn: (option: string) => postWilCallback({ tenantId, actionId: action.id, body: { option } }),
+    onSuccess: () => {
+      onInteractionSuccessRef.current?.();
+    },
+    onError: () => {
+      setClickedOption(null);
+    },
+  });
 
   const payload = action.payload as { html?: string; options?: string[] };
   const html = payload.html ?? '';
   const options = payload.options ?? [];
 
-  async function handleOptionClick(option: string) {
-    setIsSubmitting(true);
+  function handleOptionClick(option: string) {
     setClickedOption(option);
-    setErrorMessage(null);
-
-    try {
-      await postWilCallback({ tenantId, actionId: action.id, body: { option } });
-      setIsSuccess(true);
-      onInteractionSuccess?.();
-    } catch (err: unknown) {
-      const message = extractErrorMessage(err, 'An unexpected error occurred. Please try again.');
-      setErrorMessage(message);
-      setIsSubmitting(false);
-      setClickedOption(null);
-    }
+    approvalMutation.mutate(option);
   }
 
   return (
@@ -105,25 +103,30 @@ export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: R
       )}
 
       <div aria-live="polite">
-        {isSuccess && (
+        {approvalMutation.isSuccess && (
           <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
             <IconCheck size={16} aria-hidden="true" />
             <span>Your response has been submitted.</span>
           </div>
         )}
 
-        {errorMessage && (
+        {approvalMutation.isError && (
           <p className="text-sm text-red-600" role="alert">
-            {errorMessage}
+            {extractErrorMessage(approvalMutation.error, 'An unexpected error occurred. Please try again.')}
           </p>
         )}
       </div>
 
-      {!isSuccess && options.length > 0 && (
+      {!approvalMutation.isSuccess && options.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {options.map((option) => (
-            <Button key={option} variant="default" disabled={isSubmitting} onClick={() => handleOptionClick(option)}>
-              {isSubmitting && clickedOption === option && (
+            <Button
+              key={option}
+              variant="default"
+              disabled={approvalMutation.isPending}
+              onClick={() => handleOptionClick(option)}
+            >
+              {approvalMutation.isPending && clickedOption === option && (
                 <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />
               )}
               {option}

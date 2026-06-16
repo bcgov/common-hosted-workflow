@@ -122,14 +122,15 @@ Business logic and access control. Services compose both n8n repositories and cu
 
 ### Services
 
-| Service                    | Purpose                         | Dependencies                            |
-| -------------------------- | ------------------------------- | --------------------------------------- |
-| `ActionService`            | CRUD for action requests        | `N8nRepositories`, `CustomRepositories` |
-| `MessageService`           | CRUD for messages               | `N8nRepositories`, `CustomRepositories` |
-| `UiApiService`             | Facade for UI-facing operations | `N8nRepositories`                       |
-| `UiWorkflowQueryService`   | User context, workflow lists    | `N8nRepositories`                       |
-| `UiWorkflowSharingService` | Share/unshare workflows         | `N8nRepositories`                       |
-| `project-access.ts`        | Pure access-control functions   | Individual repositories                 |
+| Service                    | Purpose                              | Dependencies                            |
+| -------------------------- | ------------------------------------ | --------------------------------------- |
+| `ActionService`            | CRUD for action requests             | `N8nRepositories`, `CustomRepositories` |
+| `ChefsService`             | CHEFS form token exchange (external) | None (reads env vars)                   |
+| `MessageService`           | CRUD for messages                    | `N8nRepositories`, `CustomRepositories` |
+| `UiApiService`             | Facade for UI-facing operations      | `N8nRepositories`                       |
+| `UiWorkflowQueryService`   | User context, workflow lists         | `N8nRepositories`                       |
+| `UiWorkflowSharingService` | Share/unshare workflows              | `N8nRepositories`                       |
+| `project-access.ts`        | Pure access-control functions        | Individual repositories                 |
 
 ### Access Control Pattern
 

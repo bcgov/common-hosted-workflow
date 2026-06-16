@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { IconLoader2, IconCircleCheck, IconAlertTriangle } from '@tabler/icons-react';
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
 import { getWhoami } from '../../services/backend/auth';
 import { getStoredAppToken } from '../../services/backend/axios';
-import { ChefsFormViewer } from '../chefs/ChefsFormViewer';
+import { ChefsFormViewer } from '../chefs/chefs-form-viewer';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface ShowFormHandlerProps {
@@ -14,26 +15,16 @@ interface ShowFormHandlerProps {
   onInteractionSuccess?: () => void;
 }
 
-type InitState =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | {
-      status: 'ready';
-      authToken: string;
-      formId: string;
-      baseUrl: string;
-      submissionId?: string;
-      prefillData: Record<string, unknown>;
-      token: Record<string, unknown>;
-      user: Record<string, unknown>;
-      headers: Record<string, string>;
-    };
-
-type CallbackState =
-  | { status: 'idle' }
-  | { status: 'submitting' }
-  | { status: 'success' }
-  | { status: 'error'; message: string };
+type InitData = {
+  authToken: string;
+  formId: string;
+  baseUrl: string;
+  submissionId?: string;
+  prefillData: Record<string, unknown>;
+  token: Record<string, unknown>;
+  user: Record<string, unknown>;
+  headers: Record<string, string>;
+};
 
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) {
@@ -78,90 +69,79 @@ function buildUserObject(claims: Record<string, unknown>): Record<string, unknow
   };
 }
 
+async function initializeForm(params: {
+  tenantId: string;
+  actionId: string;
+  payload: Record<string, unknown>;
+}): Promise<InitData> {
+  const [tokenResponse, whoamiResponse] = await Promise.all([
+    postWilChefsToken({ tenantId: params.tenantId, actionId: params.actionId }),
+    getWhoami({}),
+  ]);
+
+  if (!whoamiResponse.ok || !whoamiResponse.oidc) {
+    throw new Error('Failed to retrieve user identity.');
+  }
+
+  const userProfile = buildUserProfile(whoamiResponse.oidc.claims);
+  const tokenObject = buildTokenObject(whoamiResponse.oidc.claims);
+  const userObject = buildUserObject(whoamiResponse.oidc.claims);
+  const formPreFillData = (params.payload.formPreFillData as Record<string, unknown>) ?? {};
+  const submissionId = (params.payload.submissionId as string) || undefined;
+
+  const prefillData: Record<string, unknown> = {
+    ...formPreFillData,
+    ...userProfile,
+  };
+
+  const userToken = getStoredAppToken();
+  const headers: Record<string, string> = userToken ? { Authorization: `Bearer ${userToken}` } : {};
+
+  return {
+    authToken: tokenResponse.authToken,
+    formId: tokenResponse.formId,
+    baseUrl: tokenResponse.baseUrl,
+    submissionId,
+    prefillData,
+    token: tokenObject,
+    user: userObject,
+    headers,
+  };
+}
+
 export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Readonly<ShowFormHandlerProps>) {
-  const [initState, setInitState] = useState<InitState>({ status: 'loading' });
-  const [callbackState, setCallbackState] = useState<CallbackState>({ status: 'idle' });
-  const abortRef = useRef<AbortController | null>(null);
-
-  // Stabilize callback identity using refs for values that change frequently
-  const initStateRef = useRef(initState);
-  const callbackStateRef = useRef(callbackState);
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
-
-  useEffect(() => {
-    initStateRef.current = initState;
-  }, [initState]);
-  useEffect(() => {
-    callbackStateRef.current = callbackState;
-  }, [callbackState]);
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
   }, [onInteractionSuccess]);
 
+  const initMutation = useMutation({
+    mutationFn: initializeForm,
+  });
+
+  const callbackMutation = useMutation({
+    mutationFn: (params: { tenantId: string; actionId: string; body: Record<string, unknown> }) =>
+      postWilCallback(params),
+    onSuccess: () => {
+      onInteractionSuccessRef.current?.();
+    },
+  });
+
+  // Trigger initialization when action/tenant changes
   useEffect(() => {
-    const controller = new AbortController();
-    abortRef.current = controller;
+    initMutation.mutate({
+      tenantId,
+      actionId: action.id,
+      payload: action.payload,
+    });
+    // Reset callback state when action changes
+    callbackMutation.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action.id, tenantId]);
 
-    async function initialize() {
-      try {
-        const [tokenResponse, whoamiResponse] = await Promise.all([
-          postWilChefsToken({ tenantId, actionId: action.id }),
-          getWhoami({ signal: controller.signal }),
-        ]);
-
-        if (controller.signal.aborted) return;
-
-        if (!whoamiResponse.ok || !whoamiResponse.oidc) {
-          setInitState({ status: 'error', message: 'Failed to retrieve user identity.' });
-          return;
-        }
-
-        const userProfile = buildUserProfile(whoamiResponse.oidc.claims);
-        const tokenObject = buildTokenObject(whoamiResponse.oidc.claims);
-        const userObject = buildUserObject(whoamiResponse.oidc.claims);
-        const formPreFillData = (action.payload.formPreFillData as Record<string, unknown>) ?? {};
-        const submissionId = (action.payload.submissionId as string) || undefined;
-
-        const prefillData: Record<string, unknown> = {
-          ...formPreFillData,
-          ...userProfile,
-        };
-
-        const userToken = getStoredAppToken();
-        const headers: Record<string, string> = userToken ? { Authorization: `Bearer ${userToken}` } : {};
-
-        setInitState({
-          status: 'ready',
-          authToken: tokenResponse.authToken,
-          formId: tokenResponse.formId,
-          baseUrl: tokenResponse.baseUrl,
-          submissionId,
-          prefillData,
-          token: tokenObject,
-          user: userObject,
-          headers,
-        });
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        const message = extractErrorMessage(err, 'Failed to load form. Please try again.');
-        setInitState({ status: 'error', message });
-      }
-    }
-
-    initialize();
-
-    return () => {
-      controller.abort();
-    };
-  }, [action.id, action.payload.formPreFillData, action.payload.submissionId, tenantId]);
-
-  // Stable callback — only depends on action.id and tenantId (primitives)
   const handleSubmissionComplete = useCallback(
-    async (detail: unknown) => {
-      const currentCallbackState = callbackStateRef.current;
-      if (currentCallbackState.status === 'submitting' || currentCallbackState.status === 'success') return;
-
-      setCallbackState({ status: 'submitting' });
+    (detail: unknown) => {
+      if (callbackMutation.isPending || callbackMutation.isSuccess) return;
 
       const detailObj = detail as Record<string, unknown> | null;
       const submission = detailObj?.submission as Record<string, unknown> | undefined;
@@ -172,26 +152,18 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
         (detailObj?._id as string) ??
         '';
 
-      const currentInitState = initStateRef.current;
-      const formId = currentInitState.status === 'ready' ? currentInitState.formId : '';
+      const formId = initMutation.data?.formId ?? '';
 
-      try {
-        await postWilCallback({
-          tenantId,
-          actionId: action.id,
-          body: { formId, submission_id: submissionId },
-        });
-        setCallbackState({ status: 'success' });
-        onInteractionSuccessRef.current?.();
-      } catch (err) {
-        const message = extractErrorMessage(err, 'Failed to submit form response. Please try again.');
-        setCallbackState({ status: 'error', message });
-      }
+      callbackMutation.mutate({
+        tenantId,
+        actionId: action.id,
+        body: { formId, submission_id: submissionId },
+      });
     },
-    [action.id, tenantId],
+    [action.id, tenantId, callbackMutation, initMutation.data?.formId],
   );
 
-  if (initState.status === 'loading') {
+  if (initMutation.isPending) {
     return (
       <div className="flex items-center justify-center h-full gap-2 text-sm text-[var(--bc-muted)]">
         <IconLoader2 size={20} className="animate-spin" aria-hidden="true" />
@@ -200,19 +172,20 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
     );
   }
 
-  if (initState.status === 'error') {
+  if (initMutation.isError) {
+    const message = extractErrorMessage(initMutation.error, 'Failed to load form. Please try again.');
     return (
       <div className="p-6" aria-live="polite">
         <Alert variant="destructive">
           <IconAlertTriangle size={16} aria-hidden="true" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{initState.message}</AlertDescription>
+          <AlertDescription>{message}</AlertDescription>
         </Alert>
       </div>
     );
   }
 
-  if (callbackState.status === 'success') {
+  if (callbackMutation.isSuccess) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-sm" aria-live="polite">
         <IconCircleCheck size={32} className="text-green-600" aria-hidden="true" />
@@ -222,9 +195,12 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
     );
   }
 
+  const initData = initMutation.data;
+  if (!initData) return null;
+
   return (
     <div className="relative h-full overflow-auto p-4">
-      {callbackState.status === 'submitting' && (
+      {callbackMutation.isPending && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70" aria-live="polite">
           <div className="flex items-center gap-2 text-sm text-[var(--bc-muted)]">
             <IconLoader2 size={20} className="animate-spin" aria-hidden="true" />
@@ -234,26 +210,28 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
       )}
 
       <div aria-live="polite">
-        {callbackState.status === 'error' && (
+        {callbackMutation.isError && (
           <div className="mb-4">
             <Alert variant="destructive">
               <IconAlertTriangle size={16} aria-hidden="true" />
               <AlertTitle>Submission Error</AlertTitle>
-              <AlertDescription>{callbackState.message}</AlertDescription>
+              <AlertDescription>
+                {extractErrorMessage(callbackMutation.error, 'Failed to submit form response. Please try again.')}
+              </AlertDescription>
             </Alert>
           </div>
         )}
       </div>
 
       <ChefsFormViewer
-        formId={initState.formId}
-        authToken={initState.authToken}
-        baseUrl={initState.baseUrl}
-        submissionId={initState.submissionId}
-        prefillData={initState.prefillData}
-        token={initState.token}
-        user={initState.user}
-        headers={initState.headers}
+        formId={initData.formId}
+        authToken={initData.authToken}
+        baseUrl={initData.baseUrl}
+        submissionId={initData.submissionId}
+        prefillData={initData.prefillData}
+        token={initData.token}
+        user={initData.user}
+        headers={initData.headers}
         onSubmissionComplete={handleSubmissionComplete}
       />
     </div>

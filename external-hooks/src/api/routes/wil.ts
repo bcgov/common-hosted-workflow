@@ -9,11 +9,9 @@ import { createRequestParser } from '../utils/validation';
 import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilListQuery } from '../schemas/wil';
 import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
-import { createLogger } from '../utils/logger';
 import type { z } from 'zod';
 
 const CALLBACK_TIMEOUT_MS = 30_000;
-const log = createLogger('WilRouter');
 
 export function buildWilRouter({ services, customRepositories }: ApiRouteContext) {
   const router = Router();
@@ -110,35 +108,17 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
         throw new AppError(400, 'Missing formApiKey');
       }
 
-      const chefsGatewayUrl = process.env.CHEFS_GATEWAY_URL || 'https://submit.digital.gov.bc.ca/app/gateway/v1';
-      const chefsBaseUrl = chefsGatewayUrl.replace(/\/gateway\/v\d+\/?$/, '');
-      const tokenUrl = `${chefsGatewayUrl}/auth/token/forms/${formId}`;
-      const credentials = Buffer.from(`${formId}:${formApiKey}`).toString('base64');
-
-      let tokenResponse: Response;
-      try {
-        tokenResponse = await fetch(tokenUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch {
-        throw new AppError(502, 'CHEFS token exchange failed');
+      if (!formId) {
+        throw new AppError(400, 'Missing formId');
       }
 
-      if (!tokenResponse.ok) {
-        throw new AppError(502, 'CHEFS token exchange failed');
-      }
-
-      const tokenData = (await tokenResponse.json()) as { token: string };
+      const tokenResult = await services.chefs.getFormToken({ formId, formApiKey });
 
       OkResponse(res, {
-        authToken: tokenData.token,
-        formId,
+        authToken: tokenResult.authToken,
+        formId: tokenResult.formId,
         formName,
-        baseUrl: chefsBaseUrl,
+        baseUrl: tokenResult.baseUrl,
       });
     },
   );
@@ -197,17 +177,13 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
         return;
       }
 
-      // 2xx → update status to completed (failure here is non-fatal)
-      try {
-        await services.action.updateStatus({
-          allowedProjectIds,
-          actionId,
-          actorId: actor.primary,
-          status: 'completed',
-        });
-      } catch (err) {
-        log.error('Failed to update action status after successful upstream callback', err);
-      }
+      // 2xx → update status to completed
+      await services.action.updateStatus({
+        allowedProjectIds,
+        actionId,
+        actorId: actor.primary,
+        status: 'completed',
+      });
 
       OkResponse(res, { success: true, message: 'Action completed' });
     },
