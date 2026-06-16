@@ -13,6 +13,7 @@ n8n:
     OIDC_REDIRECT_URI: https://test-chwf.apps.golddr.devops.gov.bc.ca/rest/auth/oidc/callback
     UI_OIDC_REDIRECT_URI: https://test-chwf.apps.golddr.devops.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:test:"
+    CHEFS_GATEWAY_URL: https://chefs-test.apps.silver.devops.gov.bc.ca/app/gateway/v1
 
   route:
     enabled: true
