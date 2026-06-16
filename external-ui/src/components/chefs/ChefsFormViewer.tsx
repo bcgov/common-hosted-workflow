@@ -113,6 +113,13 @@ export function ChefsFormViewer({
       formViewer.removeEventListener('formio:ready', handleFormReady);
       formViewer.removeEventListener('formio:submitDone', handleSubmit);
       formViewer.removeEventListener('formio:submitError', handleSubmitError);
+
+      // Explicitly destroy the web component to clear internal timers (e.g. auth token refresh)
+      const viewerInstance = formViewer as HTMLElement & { destroy?: () => void };
+      if (typeof viewerInstance.destroy === 'function') {
+        viewerInstance.destroy();
+      }
+
       setIsFormMounted(false);
     };
   }, [scriptStatus, formId, authToken, submissionId, baseUrl, tokenJson, userJson, readOnly, language]);
