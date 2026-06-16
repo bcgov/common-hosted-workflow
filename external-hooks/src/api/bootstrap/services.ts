@@ -50,6 +50,7 @@ export function buildApiServices(
       customRepositories,
       n8nServices.userService,
       cssSsoService,
+      n8nServices.nodeMailerService,
     ),
     tenant: new TenantService(customRepositories),
   };

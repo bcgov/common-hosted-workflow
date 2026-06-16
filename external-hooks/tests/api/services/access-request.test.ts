@@ -19,6 +19,7 @@ function createService(overrides?: {
   user?: Record<string, unknown>;
   userRoleService?: Record<string, unknown>;
   cssSsoService?: ReturnType<typeof createMockCssSsoService> | null;
+  nodeMailerService?: { sender: string; sendMail: ReturnType<typeof vi.fn> } | null;
 }) {
   const accessRequest = {
     getPendingByRequesterEmail: vi.fn(),
@@ -35,6 +36,7 @@ function createService(overrides?: {
     findByEmail: vi.fn(),
     createUserWithProject: vi.fn(),
     setUserDisabled: vi.fn(),
+    findAdminEmails: vi.fn(),
     ...overrides?.user,
   };
 
@@ -45,16 +47,23 @@ function createService(overrides?: {
 
   const cssSsoService = overrides?.cssSsoService === undefined ? createMockCssSsoService() : overrides?.cssSsoService;
 
+  const nodeMailerService =
+    overrides?.nodeMailerService === undefined
+      ? { sender: 'noreply@example.com', sendMail: vi.fn().mockResolvedValue(undefined) }
+      : overrides?.nodeMailerService;
+
   return {
     accessRequest,
     user,
     userRoleService,
     cssSsoService,
+    nodeMailerService,
     service: new AccessRequestService(
       { user } as any,
       { accessRequest } as any,
       userRoleService as any,
       cssSsoService as any,
+      nodeMailerService as any,
     ),
   };
 }
@@ -495,5 +504,203 @@ describe('AccessRequestService', () => {
     expect(mockCssSso.ensureRequiredRoles).toHaveBeenCalled();
     expect(mockCssSso.lookupAzureIdirUser).toHaveBeenCalledWith('newuser@example.com');
     expect(mockCssSso.assignUserRole).toHaveBeenCalledWith('newuser@idir', 'global:member');
+  });
+
+  it('notifies admins when access request is submitted', async () => {
+    const mockSendMail = vi.fn().mockResolvedValue(undefined);
+
+    const { service, accessRequest, user } = createService({
+      nodeMailerService: { sender: 'noreply@example.com', sendMail: mockSendMail },
+      user: {
+        findAdminEmails: vi.fn().mockResolvedValue(['admin1@example.com', 'admin2@example.com']),
+      },
+      accessRequest: {
+        getPendingByRequesterEmail: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: 'request-1',
+          requesterEmail: 'person@example.com',
+          justification: 'Need access.',
+          status: 'pending',
+          reviewerEmail: null,
+          reviewerN8nUserId: null,
+          denyReason: null,
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        }),
+      },
+    });
+
+    await service.createAccessRequest({
+      requesterEmail: 'person@example.com',
+      justification: 'Need access.',
+    });
+
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockSendMail).toHaveBeenCalledWith({
+      to: 'noreply@example.com',
+      bcc: ['admin1@example.com', 'admin2@example.com'],
+      subject: 'New Access Request Submitted',
+      html: expect.stringContaining('person@example.com'),
+    });
+  });
+
+  it('notifies requester when access request is approved', async () => {
+    const mockSendMail = vi.fn().mockResolvedValue(undefined);
+    const existingRequest = {
+      id: 'request-1',
+      requesterEmail: 'person@example.com',
+      justification: 'Need access.',
+      status: 'pending',
+      reviewerEmail: null,
+      reviewerN8nUserId: null,
+      denyReason: null,
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+    };
+    const updatedRequest = {
+      ...existingRequest,
+      status: 'approved',
+      reviewerEmail: 'admin@example.com',
+      reviewerN8nUserId: 'admin-1',
+      updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+    };
+
+    const { service, accessRequest, user } = createService({
+      nodeMailerService: { sender: 'noreply@example.com', sendMail: mockSendMail },
+      accessRequest: {
+        getById: vi.fn().mockResolvedValue(existingRequest),
+        updateStatus: vi.fn().mockResolvedValue(updatedRequest),
+      },
+      user: {
+        findByEmail: vi.fn().mockResolvedValue({
+          id: 'user-1',
+          email: 'person@example.com',
+          disabled: false,
+          role: { slug: 'global:member' },
+        }),
+      },
+    });
+
+    await service.reviewAccessRequest({
+      accessRequestId: 'request-1',
+      action: 'approve',
+      reviewerEmail: 'admin@example.com',
+      reviewerN8nUserId: 'admin-1',
+    });
+
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockSendMail).toHaveBeenCalledWith({
+      to: 'person@example.com',
+      subject: 'Access Request Approved',
+      html: expect.stringContaining('Approved'),
+    });
+  });
+
+  it('notifies requester with deny reason when access request is denied', async () => {
+    const mockSendMail = vi.fn().mockResolvedValue(undefined);
+    const existingRequest = {
+      id: 'request-1',
+      requesterEmail: 'person@example.com',
+      justification: 'Need access.',
+      status: 'pending',
+      reviewerEmail: null,
+      reviewerN8nUserId: null,
+      denyReason: null,
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+    };
+    const updatedRequest = {
+      ...existingRequest,
+      status: 'denied',
+      reviewerEmail: 'admin@example.com',
+      reviewerN8nUserId: 'admin-1',
+      denyReason: 'Insufficient justification.',
+      updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+    };
+
+    const { service, accessRequest } = createService({
+      nodeMailerService: { sender: 'noreply@example.com', sendMail: mockSendMail },
+      accessRequest: {
+        getById: vi.fn().mockResolvedValue(existingRequest),
+        updateStatus: vi.fn().mockResolvedValue(updatedRequest),
+      },
+    });
+
+    await service.reviewAccessRequest({
+      accessRequestId: 'request-1',
+      action: 'deny',
+      reviewerEmail: 'admin@example.com',
+      reviewerN8nUserId: 'admin-1',
+      denyReason: 'Insufficient justification.',
+    });
+
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockSendMail).toHaveBeenCalledWith({
+      to: 'person@example.com',
+      subject: 'Access Request Denied',
+      html: expect.stringContaining('Insufficient justification.'),
+    });
+  });
+
+  it('does not throw when email notification fails', async () => {
+    const mockSendMail = vi.fn().mockRejectedValue(new Error('SMTP error'));
+
+    const { service } = createService({
+      nodeMailerService: { sender: 'noreply@example.com', sendMail: mockSendMail },
+      user: {
+        findAdminEmails: vi.fn().mockResolvedValue(['admin@example.com']),
+      },
+      accessRequest: {
+        getPendingByRequesterEmail: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: 'request-1',
+          requesterEmail: 'person@example.com',
+          justification: 'Need access.',
+          status: 'pending',
+          reviewerEmail: null,
+          reviewerN8nUserId: null,
+          denyReason: null,
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        }),
+      },
+    });
+
+    const result = await service.createAccessRequest({
+      requesterEmail: 'person@example.com',
+      justification: 'Need access.',
+    });
+
+    expect(result.status).toBe('pending');
+  });
+
+  it('skips email notification when nodeMailerService is null', async () => {
+    const { service } = createService({
+      nodeMailerService: null,
+      user: {
+        findAdminEmails: vi.fn().mockResolvedValue([]),
+      },
+      accessRequest: {
+        getPendingByRequesterEmail: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: 'request-1',
+          requesterEmail: 'person@example.com',
+          justification: 'Need access.',
+          status: 'pending',
+          reviewerEmail: null,
+          reviewerN8nUserId: null,
+          denyReason: null,
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        }),
+      },
+    });
+
+    const result = await service.createAccessRequest({
+      requesterEmail: 'person@example.com',
+      justification: 'Need access.',
+    });
+
+    expect(result.status).toBe('pending');
   });
 });
