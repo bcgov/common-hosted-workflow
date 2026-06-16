@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
@@ -15,6 +16,17 @@ interface WaitOnEventHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
+}
+
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const serverMessage =
+      (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message ??
+      (err.response?.data as { message?: string } | undefined)?.message;
+    return serverMessage ?? fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
 }
 
 export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: Readonly<WaitOnEventHandlerProps>) {
@@ -36,7 +48,7 @@ export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: R
       setIsSuccess(true);
       onInteractionSuccess?.();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      const message = extractErrorMessage(err, 'An unexpected error occurred. Please try again.');
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -53,19 +65,21 @@ export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: R
         Confirm Event
       </Button>
 
-      {isSuccess && (
-        <p className="flex items-center gap-1.5 text-sm text-green-700">
-          <IconCheck size={16} aria-hidden="true" />
-          Event acknowledged successfully
-        </p>
-      )}
+      <div aria-live="polite">
+        {isSuccess && (
+          <p className="flex items-center gap-1.5 text-sm text-green-700">
+            <IconCheck size={16} aria-hidden="true" />
+            Event acknowledged successfully
+          </p>
+        )}
 
-      {errorMessage && (
-        <p className="flex items-center gap-1.5 text-sm text-red-600">
-          <IconAlertTriangle size={16} aria-hidden="true" />
-          {errorMessage}
-        </p>
-      )}
+        {errorMessage && (
+          <p className="flex items-center gap-1.5 text-sm text-red-600">
+            <IconAlertTriangle size={16} aria-hidden="true" />
+            {errorMessage}
+          </p>
+        )}
+      </div>
 
       {isTerminal && <p className="text-xs text-[var(--bc-muted)]">This action is no longer active.</p>}
     </div>

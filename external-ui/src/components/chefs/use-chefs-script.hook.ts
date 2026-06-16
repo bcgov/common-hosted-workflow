@@ -3,8 +3,15 @@ import type { ScriptStatus } from './types';
 
 const DEFAULT_BASE_URL = 'https://submit.digital.gov.bc.ca/app';
 
+/**
+ * Script path can be overridden via VITE_CHEFS_SCRIPT_PATH to pin a specific version.
+ * Example: /embed/chefs-form-viewer.2.4.0.min.js
+ * Default: /embed/chefs-form-viewer.min.js (latest)
+ */
+const SCRIPT_PATH = import.meta.env.VITE_CHEFS_SCRIPT_PATH || '/embed/chefs-form-viewer.min.js';
+
 export function useChefsScript(baseUrl = DEFAULT_BASE_URL): ScriptStatus {
-  const scriptUrl = `${baseUrl}/embed/chefs-form-viewer.min.js`;
+  const scriptUrl = `${baseUrl}${SCRIPT_PATH}`;
 
   const [status, setStatus] = useState<ScriptStatus>(() => {
     if (typeof document === 'undefined') return 'idle';
@@ -17,7 +24,7 @@ export function useChefsScript(baseUrl = DEFAULT_BASE_URL): ScriptStatus {
     const existing = document.querySelector(`script[src="${scriptUrl}"]`) as HTMLScriptElement | null;
 
     if (existing?.dataset.status === 'ready') {
-      // Script already loaded — state was set via initializer or prior render
+      setStatus('ready');
       return;
     }
 
@@ -31,6 +38,8 @@ export function useChefsScript(baseUrl = DEFAULT_BASE_URL): ScriptStatus {
         document.head.appendChild(el);
         return el;
       })();
+
+    setStatus('loading');
 
     const onLoad = () => {
       script.dataset.status = 'ready';

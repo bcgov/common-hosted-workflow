@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import DOMPurify from 'dompurify';
 import { IconLoader2, IconCheck } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,17 @@ function sanitizeHtml(html: string): string {
   });
 }
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const serverMessage =
+      (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message ??
+      (err.response?.data as { message?: string } | undefined)?.message;
+    return serverMessage ?? fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: Readonly<GetApprovalHandlerProps>) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clickedOption, setClickedOption] = useState<string | null>(null);
@@ -76,7 +88,7 @@ export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: R
       setIsSuccess(true);
       onInteractionSuccess?.();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+      const message = extractErrorMessage(err, 'An unexpected error occurred. Please try again.');
       setErrorMessage(message);
       setIsSubmitting(false);
       setClickedOption(null);
@@ -92,18 +104,20 @@ export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: R
         />
       )}
 
-      {isSuccess && (
-        <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
-          <IconCheck size={16} aria-hidden="true" />
-          <span>Your response has been submitted.</span>
-        </div>
-      )}
+      <div aria-live="polite">
+        {isSuccess && (
+          <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
+            <IconCheck size={16} aria-hidden="true" />
+            <span>Your response has been submitted.</span>
+          </div>
+        )}
 
-      {errorMessage && (
-        <p className="text-sm text-red-600" role="alert">
-          {errorMessage}
-        </p>
-      )}
+        {errorMessage && (
+          <p className="text-sm text-red-600" role="alert">
+            {errorMessage}
+          </p>
+        )}
+      </div>
 
       {!isSuccess && options.length > 0 && (
         <div className="flex flex-wrap gap-2">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChefsFormViewerProps } from './types';
 import { useChefsScript } from './use-chefs-script.hook';
 
@@ -7,6 +7,7 @@ const DEFAULT_BASE_URL = 'https://submit.digital.gov.bc.ca/app';
 export function ChefsFormViewer({
   formId,
   authToken,
+  submissionId,
   prefillData,
   token,
   user,
@@ -21,28 +22,48 @@ export function ChefsFormViewer({
   const scriptStatus = useChefsScript(baseUrl);
   const [isFormMounted, setIsFormMounted] = useState(false);
 
-  const attrs = [
-    `form-id="${formId}"`,
-    `base-url="${baseUrl}"`,
-    authToken ? `auth-token="${authToken}"` : '',
-    token ? `token='${JSON.stringify(token)}'` : '',
-    user ? `user='${JSON.stringify(user)}'` : '',
-    readOnly ? `read-only="true"` : '',
-    language ? `language="${language}"` : '',
-    'isolate-styles',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  // Stabilize serialized objects to avoid unnecessary re-renders
+  const tokenJson = useMemo(() => (token ? JSON.stringify(token) : ''), [token]);
+  const userJson = useMemo(() => (user ? JSON.stringify(user) : ''), [user]);
 
-  // Inject the web component element into the DOM
+  // Use refs for callbacks to keep the effect stable while always calling the latest version
+  const onFormReadyRef = useRef(onFormReady);
+  const onSubmissionCompleteRef = useRef(onSubmissionComplete);
+  const onSubmissionErrorRef = useRef(onSubmissionError);
+  const prefillDataRef = useRef(prefillData);
+
+  useEffect(() => {
+    onFormReadyRef.current = onFormReady;
+  }, [onFormReady]);
+  useEffect(() => {
+    onSubmissionCompleteRef.current = onSubmissionComplete;
+  }, [onSubmissionComplete]);
+  useEffect(() => {
+    onSubmissionErrorRef.current = onSubmissionError;
+  }, [onSubmissionError]);
+  useEffect(() => {
+    prefillDataRef.current = prefillData;
+  }, [prefillData]);
+
+  // Single merged effect: inject web component, attach listeners, handle prefill, clean up
   useEffect(() => {
     if (!containerRef.current || scriptStatus !== 'ready') return;
-    containerRef.current.innerHTML = `<chefs-form-viewer ${attrs}></chefs-form-viewer>`;
-  }, [attrs, scriptStatus]);
 
-  // Attach event listeners and handle prefill
-  useEffect(() => {
-    if (scriptStatus !== 'ready' || !containerRef.current) return;
+    const attrs = [
+      `form-id="${formId}"`,
+      `base-url="${baseUrl}"`,
+      authToken ? `auth-token="${authToken}"` : '',
+      submissionId ? `submission-id="${submissionId}"` : '',
+      tokenJson ? `token='${tokenJson}'` : '',
+      userJson ? `user='${userJson}'` : '',
+      readOnly ? `read-only="true"` : '',
+      language ? `language="${language}"` : '',
+      'isolate-styles',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    containerRef.current.innerHTML = `<chefs-form-viewer ${attrs}></chefs-form-viewer>`;
 
     const formViewer = containerRef.current.querySelector('chefs-form-viewer');
     if (!formViewer) return;
@@ -52,29 +73,30 @@ export function ChefsFormViewer({
       const customEvent = event as CustomEvent;
       const formioInstance = customEvent.detail?.form ?? customEvent.detail;
 
-      // Apply prefill data for fresh forms (no submissionId)
-      if (prefillData) {
+      // Apply prefill data only for fresh forms (no submissionId)
+      const currentPrefill = prefillDataRef.current;
+      if (currentPrefill && !submissionId) {
         const viewer = formViewer as unknown as {
           setSubmission?: (data: Record<string, unknown>) => void;
         };
         if (typeof viewer.setSubmission === 'function') {
-          viewer.setSubmission(prefillData);
+          viewer.setSubmission(currentPrefill);
         } else if (formioInstance && typeof formioInstance === 'object' && 'submission' in formioInstance) {
-          formioInstance.submission = { data: { ...prefillData } };
+          formioInstance.submission = { data: { ...currentPrefill } };
         }
       }
 
-      onFormReady?.({ formio: formioInstance });
+      onFormReadyRef.current?.({ formio: formioInstance });
     };
 
     const handleSubmit = (event: Event) => {
       const customEvent = event as CustomEvent;
-      onSubmissionComplete?.(customEvent.detail);
+      onSubmissionCompleteRef.current?.(customEvent.detail);
     };
 
     const handleSubmitError = (event: Event) => {
       const customEvent = event as CustomEvent;
-      onSubmissionError?.(customEvent.detail);
+      onSubmissionErrorRef.current?.(customEvent.detail);
     };
 
     formViewer.addEventListener('formio:ready', handleFormReady);
@@ -91,8 +113,9 @@ export function ChefsFormViewer({
       formViewer.removeEventListener('formio:ready', handleFormReady);
       formViewer.removeEventListener('formio:submitDone', handleSubmit);
       formViewer.removeEventListener('formio:submitError', handleSubmitError);
+      setIsFormMounted(false);
     };
-  }, [scriptStatus, prefillData, onFormReady, onSubmissionComplete, onSubmissionError]);
+  }, [scriptStatus, formId, authToken, submissionId, baseUrl, tokenJson, userJson, readOnly, language]);
 
   if (scriptStatus === 'error') {
     return (

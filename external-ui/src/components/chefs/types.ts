@@ -2,6 +2,7 @@ export interface ChefsFormViewerProps {
   formId: string;
   authToken?: string;
   baseUrl?: string;
+  submissionId?: string;
   prefillData?: Record<string, unknown>;
   token?: Record<string, unknown>;
   user?: Record<string, unknown>;

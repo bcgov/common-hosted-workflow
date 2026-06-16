@@ -14,15 +14,11 @@ export type WilActionItem = {
   actionType: string;
   payload: Record<string, unknown>;
   actorId: string;
-  workflowId: string | null;
-  workflowInstanceId: string;
-  projectId: string;
   createdAt: string;
   updatedAt: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'expired' | 'deleted';
   priority: 'critical' | 'normal';
   dueDate: string | null;
-  metadata: Record<string, unknown> | null;
 };
 
 export type WilMessageItem = {
@@ -30,13 +26,9 @@ export type WilMessageItem = {
   title: string;
   body: string;
   actorId: string;
-  workflowId: string | null;
-  workflowInstanceId: string;
-  projectId: string;
   createdAt: string;
   updatedAt: string;
   status: 'active' | 'read';
-  metadata: Record<string, unknown> | null;
 };
 
 export type WilListResponse<T> = {
