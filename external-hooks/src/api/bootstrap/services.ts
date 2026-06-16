@@ -1,5 +1,6 @@
 import { AccessRequestService } from '../services/access-request';
 import { ActionService } from '../services/action.service';
+import { ChefsService } from '../services/chefs.service';
 import { MessageService } from '../services/message.service';
 import { TenantService } from '../services/tenant.service';
 import { UiApiService } from '../services/ui-api';
@@ -42,6 +43,7 @@ export function buildApiServices(
   return {
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
+    chefs: new ChefsService(),
     message: new MessageService(n8nRepositories, customRepositories),
     accessRequest: new AccessRequestService(
       n8nRepositories,

@@ -84,7 +84,7 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
 
   const isPatchable = ['pending', 'in_progress'].includes(a.status);
   const isApproval =
-    a.actionType === 'getapproval' && a.status === 'pending' && a.payload && Array.isArray(a.payload.option);
+    a.actionType === 'getapproval' && a.status === 'pending' && a.payload && Array.isArray(a.payload.options);
 
   // Resolve formId from payload — handle both casings (formId / FormID)
   const showFormId =
@@ -228,9 +228,16 @@ function ActionCard({ action: a, actorId, toast, onRefresh }: ActionCardProps) {
 
       {isApproval ? (
         <div className="mt-2.5 p-3.5 bg-surface-2 border border-border rounded-lg relative">
-          <div className="text-sm font-semibold text-text mb-3 leading-snug">{String(a.payload.question ?? '')}</div>
+          {a.payload.html ? (
+            <div
+              className="text-sm text-text mb-3 leading-snug"
+              dangerouslySetInnerHTML={{ __html: String(a.payload.html) }}
+            />
+          ) : a.payload.question ? (
+            <div className="text-sm font-semibold text-text mb-3 leading-snug">{String(a.payload.question)}</div>
+          ) : null}
           <div className="flex gap-2 flex-wrap">
-            {(a.payload.option as string[]).map((opt) => (
+            {(a.payload.options as string[]).map((opt) => (
               <button
                 key={opt}
                 className={`px-5 py-2 rounded-md border text-sm font-semibold cursor-pointer transition-all duration-150 ${

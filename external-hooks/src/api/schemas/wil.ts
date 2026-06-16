@@ -9,6 +9,8 @@ const MAX_LIMIT = 200;
  * - `limit`: optional positive integer, clamped to MAX_LIMIT, defaults to DEFAULT_LIMIT.
  * - `since`: optional keyset cursor string in the format `ISO|uuid` or a plain ISO-8601 date.
  */
+const VALID_ACTION_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted'] as const;
+
 export const wilListQuerySchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   body: z.record(z.string(), z.unknown()).optional(),
@@ -39,7 +41,37 @@ export const wilListQuerySchema = z.object({
         if (Number.isNaN(date.getTime()) || !id) return undefined;
         return { mode: 'cursor' as const, createdAt: date, id };
       }),
+    status: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .transform((val) => {
+        if (!val) return undefined;
+        const raw = Array.isArray(val) ? val : val.split(',');
+        const valid = raw.filter((s): s is (typeof VALID_ACTION_STATUSES)[number] =>
+          (VALID_ACTION_STATUSES as readonly string[]).includes(s),
+        );
+        return valid.length > 0 ? valid : undefined;
+      }),
   }),
 });
 
 export type WilListQuery = z.infer<typeof wilListQuerySchema>;
+
+/** POST /ui-api/wil/callback */
+export const wilCallbackSchema = z.object({
+  body: z.object({
+    actionId: z.string().min(1, 'actionId is required'),
+    body: z.record(z.string(), z.unknown()),
+  }),
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** POST /ui-api/wil/chefs-token */
+export const wilChefsTokenSchema = z.object({
+  body: z.object({
+    actionId: z.string().min(1, 'actionId is required'),
+  }),
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});

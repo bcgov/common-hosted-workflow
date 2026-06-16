@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { actionRequest } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
@@ -40,6 +40,7 @@ export type ListActionsParams = {
   workflowInstanceId?: string;
   limit: number;
   since?: import('../types/list-pagination').ListPaginationSince;
+  status?: string[];
 };
 
 export type GetActionByIdParams = {
@@ -66,10 +67,12 @@ export class ActionService {
     actorId?: string;
     workflowInstanceId?: string;
     since?: import('../types/list-pagination').ListPaginationSince;
+    status?: string[];
   }): any[] {
     const clauses: any[] = [inArray(actionRequest.projectId, params.allowedProjectIds)];
     if (params.actorId) clauses.push(eq(actionRequest.actorId, params.actorId));
     if (params.workflowInstanceId) clauses.push(eq(actionRequest.workflowInstanceId, params.workflowInstanceId));
+    if (params.status && params.status.length > 0) clauses.push(inArray(actionRequest.status, params.status));
     clauses.push(...buildPaginationClauses(actionRequest, params.since));
     return clauses;
   }
@@ -128,7 +131,13 @@ export class ActionService {
     });
 
     return await this.customRepositories.actionRequest.list({
-      where: this.buildListWhere(params),
+      where: this.buildListWhere({
+        allowedProjectIds: params.allowedProjectIds,
+        actorId: params.actorId,
+        workflowInstanceId: params.workflowInstanceId,
+        since: params.since,
+        status: params.status,
+      }),
       limit: params.limit,
     });
   }

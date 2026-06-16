@@ -15,6 +15,7 @@ n8n:
     UI_OIDC_REDIRECT_URI: https://dev-chwf.apps.gold.devops.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
     AUTHZ_ENVIRONMENT: dev
+    CHEFS_GATEWAY_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca/app/gateway/v1
 
   route:
     enabled: true

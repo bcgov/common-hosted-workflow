@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchPlayground } from '@/lib/api';
 import { useDashboard } from '@/hooks/useDashboard';
@@ -9,6 +9,105 @@ import PlaygroundHeader from '@/components/PlaygroundHeader';
 import FormsPanel from '@/components/FormsPanel';
 import MessagesPanel from '@/components/MessagesPanel';
 import ActionsPanel from '@/components/ActionsPanel';
+
+function ActorIdField({ actorId, onSave }: Readonly<{ actorId: string; onSave: (value: string) => void }>) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(actorId);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  function handleSave() {
+    const trimmed = draft.trim();
+    if (trimmed) {
+      onSave(trimmed);
+    } else {
+      setDraft(actorId);
+    }
+    setEditing(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') {
+      setDraft(actorId);
+      setEditing(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          ref={inputRef}
+          id="actor-id"
+          type="text"
+          className="w-36 px-2.5 py-1.5 rounded-md border border-accent bg-surface-2 text-text text-sm font-mono focus:outline-none focus:border-accent"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          placeholder="e.g. amina"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          className="p-1 rounded hover:bg-surface-2 text-accent"
+          aria-label="Save actor ID"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="px-2.5 py-1.5 text-sm font-mono text-text">{actorId}</span>
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(actorId);
+          setEditing(true);
+        }}
+        className="p-1 rounded hover:bg-surface-2 text-text-muted hover:text-accent"
+        aria-label="Edit actor ID"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 function UserTestContent({ name }: Readonly<{ name: string }>) {
   const router = useRouter();
@@ -65,14 +164,7 @@ function UserTestContent({ name }: Readonly<{ name: string }>) {
         <label className="flex items-center gap-1.5 text-xs text-text-muted font-medium" htmlFor="actor-id">
           Actor ID
         </label>
-        <input
-          id="actor-id"
-          type="text"
-          className="w-36 px-2.5 py-1.5 rounded-md border border-border bg-surface-2 text-text text-sm font-mono focus:outline-none focus:border-accent"
-          value={actorId}
-          onChange={(e) => setActorId(e.target.value)}
-          placeholder="e.g. amina"
-        />
+        <ActorIdField actorId={actorId} onSave={setActorId} />
 
         <label className="flex items-center gap-1.5 text-xs text-text-muted font-medium ml-2" htmlFor="since">
           Since

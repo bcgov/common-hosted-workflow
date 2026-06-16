@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { getWilActions, getWilMessages, getWilTenants } from '../services/backend/wil';
 import type { WilActionItem, WilMessageItem } from '../services/backend/wil';
@@ -16,8 +16,57 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ActionDetailPane } from '@/components/action-detail-pane';
 
 type Tab = 'actions' | 'messages';
+
+const STATUS_OPTIONS = ['pending', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted'] as const;
+
+function formatStatusLabel(status: string): string {
+  return status
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function StatusFilter({
+  selected,
+  onChange,
+}: Readonly<{
+  selected: string[];
+  onChange: (statuses: string[]) => void;
+}>) {
+  function toggleStatus(status: string) {
+    if (selected.includes(status)) {
+      if (selected.length > 1) {
+        onChange(selected.filter((s) => s !== status));
+      }
+    } else {
+      onChange([...selected, status]);
+    }
+  }
+
+  return (
+    <fieldset className="flex flex-wrap gap-1.5 border-0 p-0 m-0">
+      <legend className="sr-only">Status filter</legend>
+      {STATUS_OPTIONS.map((status) => (
+        <button
+          key={status}
+          type="button"
+          onClick={() => toggleStatus(status)}
+          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+            selected.includes(status)
+              ? 'bg-[var(--bc-blue)] text-white border-[var(--bc-blue)]'
+              : 'bg-white text-[var(--bc-muted)] border-[var(--bc-border)] hover:border-[var(--bc-blue)]'
+          }`}
+          aria-pressed={selected.includes(status)}
+        >
+          {formatStatusLabel(status)}
+        </button>
+      ))}
+    </fieldset>
+  );
+}
 
 type DateFilterOption = {
   label: string;
@@ -173,23 +222,29 @@ function ActionPriorityBadge({ priority }: Readonly<{ priority: WilActionItem['p
   return <Badge variant="secondary">Normal</Badge>;
 }
 
-function ActionItem({ action }: Readonly<{ action: WilActionItem }>) {
+function ActionItem({
+  action,
+  isSelected,
+  onClick,
+}: Readonly<{ action: WilActionItem; isSelected?: boolean; onClick?: () => void }>) {
   const title = (action.payload?.title as string) || action.actionType;
   const isOpen = action.status === 'pending' || action.status === 'in_progress';
 
   return (
-    <Card>
+    <Card
+      className={`cursor-pointer transition-all duration-150 shadow-sm ${isSelected ? 'ring-2 ring-[var(--bc-blue)] border-[var(--bc-blue)]' : 'hover:border-[var(--bc-blue)]/50 hover:shadow-md'}`}
+      onClick={onClick}
+    >
       <CardContent className="flex items-start justify-between gap-4 p-4">
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[var(--bc-text)] truncate">{title}</span>
+            <span className="text-sm font-semibold text-[var(--bc-text)] truncate">{title}</span>
             {isOpen && (
-              <span className="text-xs font-medium text-green-700 bg-green-50 rounded px-1.5 py-0.5">Open</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700 bg-green-50 rounded-full px-2 py-0.5">
+                Open
+              </span>
             )}
           </div>
-          {action.workflowId && (
-            <p className="text-xs text-[var(--bc-muted)] font-mono truncate">Workflow: {action.workflowId}</p>
-          )}
           <p className="text-xs text-[var(--bc-muted)]">{new Date(action.createdAt).toLocaleString()}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -204,19 +259,25 @@ function ActionItem({ action }: Readonly<{ action: WilActionItem }>) {
 function ActionsTab({
   tenantId,
   since,
+  statusFilter,
   cursor,
   onLoadMore,
+  selectedAction,
+  onSelectAction,
 }: Readonly<{
   tenantId: string;
   since: string | undefined;
+  statusFilter: string[];
   cursor: string | null;
   onLoadMore: (nextCursor: string) => void;
+  selectedAction: WilActionItem | null;
+  onSelectAction: (action: WilActionItem) => void;
 }>) {
   const sinceParam = cursor ?? since;
 
   const actionsQuery = useQuery({
-    queryKey: ['wil-actions', tenantId, sinceParam],
-    queryFn: ({ signal }) => getWilActions({ tenantId, since: sinceParam, signal }),
+    queryKey: ['wil-actions', tenantId, sinceParam, statusFilter],
+    queryFn: ({ signal }) => getWilActions({ tenantId, since: sinceParam, status: statusFilter, signal }),
     enabled: Boolean(tenantId),
   });
 
@@ -250,7 +311,12 @@ function ActionsTab({
   return (
     <div className="space-y-3">
       {data.data.map((action) => (
-        <ActionItem key={action.id} action={action} />
+        <ActionItem
+          key={action.id}
+          action={action}
+          isSelected={selectedAction?.id === action.id}
+          onClick={() => onSelectAction(action)}
+        />
       ))}
       {nextCursor ? (
         <div className="flex justify-center pt-2">
@@ -358,20 +424,32 @@ function MessagesTab({
   );
 }
 
+const ACTION_LIST_REFRESH_DELAY_MS = 1500;
+
 export function WorkflowInteraction() {
   const { user, login } = useAuth();
+  const queryClient = useQueryClient();
   const [tenantId, setTenantId] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<string[]>(['pending']);
   const [actionsCursor, setActionsCursor] = useState<string | null>(null);
   const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
+  const [selectedAction, setSelectedAction] = useState<WilActionItem | null>(null);
 
   const sinceDate = computeSinceDate(dateFilter);
+
+  const onInteractionSuccess = useCallback(() => {
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+    }, ACTION_LIST_REFRESH_DELAY_MS);
+  }, [queryClient]);
 
   function handleTenantChange(id: string) {
     setTenantId(id);
     setActionsCursor(null);
     setMessagesCursor(null);
+    setSelectedAction(null);
   }
 
   function handleDateFilterChange(value: string | undefined) {
@@ -380,8 +458,15 @@ export function WorkflowInteraction() {
     setMessagesCursor(null);
   }
 
+  function handleStatusFilterChange(statuses: string[]) {
+    setStatusFilter(statuses);
+    setSelectedAction(null);
+    setActionsCursor(null);
+  }
+
   function handleTabChange(tab: Tab) {
     setActiveTab(tab);
+    setSelectedAction(null);
   }
 
   return (
@@ -408,12 +493,30 @@ export function WorkflowInteraction() {
                 <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
                 {activeTab === 'actions' ? (
-                  <ActionsTab
-                    tenantId={tenantId}
-                    since={sinceDate}
-                    cursor={actionsCursor}
-                    onLoadMore={setActionsCursor}
-                  />
+                  <div className="space-y-5">
+                    <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} />
+                    <hr className="border-[var(--bc-border)] mt-4" />
+                    <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
+                      <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
+                        <ActionsTab
+                          tenantId={tenantId}
+                          since={sinceDate}
+                          statusFilter={statusFilter}
+                          cursor={actionsCursor}
+                          onLoadMore={setActionsCursor}
+                          selectedAction={selectedAction}
+                          onSelectAction={setSelectedAction}
+                        />
+                      </div>
+                      <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
+                        <ActionDetailPane
+                          action={selectedAction}
+                          tenantId={tenantId}
+                          onInteractionSuccess={onInteractionSuccess}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <MessagesTab
                     tenantId={tenantId}
