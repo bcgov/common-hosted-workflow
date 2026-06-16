@@ -11,6 +11,7 @@ export function ChefsFormViewer({
   prefillData,
   token,
   user,
+  headers,
   readOnly = false,
   language = 'en',
   baseUrl = DEFAULT_BASE_URL,
@@ -25,6 +26,7 @@ export function ChefsFormViewer({
   // Stabilize serialized objects to avoid unnecessary re-renders
   const tokenJson = useMemo(() => (token ? JSON.stringify(token) : ''), [token]);
   const userJson = useMemo(() => (user ? JSON.stringify(user) : ''), [user]);
+  const headersJson = useMemo(() => (headers ? JSON.stringify(headers) : ''), [headers]);
 
   // Use refs for callbacks to keep the effect stable while always calling the latest version
   const onFormReadyRef = useRef(onFormReady);
@@ -56,6 +58,7 @@ export function ChefsFormViewer({
       submissionId ? `submission-id="${submissionId}"` : '',
       tokenJson ? `token='${tokenJson}'` : '',
       userJson ? `user='${userJson}'` : '',
+      headersJson ? `headers='${headersJson}'` : '',
       readOnly ? `read-only="true"` : '',
       language ? `language="${language}"` : '',
       'isolate-styles',
@@ -122,7 +125,7 @@ export function ChefsFormViewer({
 
       setIsFormMounted(false);
     };
-  }, [scriptStatus, formId, authToken, submissionId, baseUrl, tokenJson, userJson, readOnly, language]);
+  }, [scriptStatus, formId, authToken, submissionId, baseUrl, tokenJson, userJson, headersJson, readOnly, language]);
 
   if (scriptStatus === 'error') {
     return (

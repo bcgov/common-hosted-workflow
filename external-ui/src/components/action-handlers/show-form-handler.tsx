@@ -4,6 +4,7 @@ import { IconLoader2, IconCircleCheck, IconAlertTriangle } from '@tabler/icons-r
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
 import { getWhoami } from '../../services/backend/auth';
+import { getStoredAppToken } from '../../services/backend/axios';
 import { ChefsFormViewer } from '../chefs/ChefsFormViewer';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -25,6 +26,7 @@ type InitState =
       prefillData: Record<string, unknown>;
       token: Record<string, unknown>;
       user: Record<string, unknown>;
+      headers: Record<string, string>;
     };
 
 type CallbackState =
@@ -125,6 +127,9 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
           ...userProfile,
         };
 
+        const userToken = getStoredAppToken();
+        const headers: Record<string, string> = userToken ? { Authorization: `Bearer ${userToken}` } : {};
+
         setInitState({
           status: 'ready',
           authToken: tokenResponse.authToken,
@@ -134,6 +139,7 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
           prefillData,
           token: tokenObject,
           user: userObject,
+          headers,
         });
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -247,6 +253,7 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
         prefillData={initState.prefillData}
         token={initState.token}
         user={initState.user}
+        headers={initState.headers}
         onSubmissionComplete={handleSubmissionComplete}
       />
     </div>

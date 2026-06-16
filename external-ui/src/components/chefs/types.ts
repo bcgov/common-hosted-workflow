@@ -6,6 +6,7 @@ export interface ChefsFormViewerProps {
   prefillData?: Record<string, unknown>;
   token?: Record<string, unknown>;
   user?: Record<string, unknown>;
+  headers?: Record<string, string>;
   readOnly?: boolean;
   language?: string;
   onFormReady?: (detail: { formio: unknown }) => void;
