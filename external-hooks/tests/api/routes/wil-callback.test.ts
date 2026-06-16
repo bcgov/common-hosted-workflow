@@ -230,7 +230,7 @@ describe('POST /wil/callback', () => {
     expect((error as AppError).message).toBe('Upstream request failed');
   });
 
-  it('returns success even when status update fails after successful upstream call', async () => {
+  it('propagates error when status update fails after successful upstream call', async () => {
     const action = makeActionRequestRow({ callbackMethod: 'POST', callbackUrl: 'https://upstream.test/hook' });
     const updateStatusMock = vi.fn().mockRejectedValue(new Error('DB write failed'));
     const { router } = createTestRouter({
@@ -252,9 +252,8 @@ describe('POST /wil/callback', () => {
 
     const error = await runHandlerChain(handlers!, req, res);
 
-    expect(error).toBeNull();
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Action completed' });
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('DB write failed');
   });
 
   it('propagates AppError when action is not found', async () => {

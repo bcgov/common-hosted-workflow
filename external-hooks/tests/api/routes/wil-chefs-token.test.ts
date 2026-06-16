@@ -67,11 +67,20 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
     list: vi.fn().mockResolvedValue([]),
     ...serviceOverrides.message,
   };
+  const chefsService = {
+    getFormToken: vi.fn().mockResolvedValue({
+      authToken: 'jwt-token-123',
+      formId: 'form-123',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app',
+    }),
+    ...serviceOverrides.chefs,
+  };
 
   const routeContext = {
     services: {
       action: actionService,
       message: messageService,
+      chefs: chefsService,
       uiApi: {} as any,
     },
     customRepositories: {
@@ -80,7 +89,7 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
   } as any;
 
   const router = buildWilRouter(routeContext);
-  return { router, actionService };
+  return { router, actionService, chefsService };
 }
 
 beforeEach(() => {
@@ -98,12 +107,6 @@ beforeEach(() => {
 
 describe('POST /wil/chefs-token', () => {
   it('returns 200 with authToken, formId, formName on success', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ token: 'jwt-token-123' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
-
     const { router } = createTestRouter();
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
     const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
@@ -122,73 +125,39 @@ describe('POST /wil/chefs-token', () => {
     });
   });
 
-  it('calls CHEFS gateway with correct Basic auth header', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ token: 'jwt-token-123' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const { router } = createTestRouter();
+  it('calls ChefsService.getFormToken with correct formId and formApiKey', async () => {
+    const { router, chefsService } = createTestRouter();
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
     const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
     const res = createMockResponse();
 
     await runHandlerChain(handlers!, req, res);
 
-    const expectedCredentials = Buffer.from('form-123:test-api-key-abc').toString('base64');
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/auth/token/forms/form-123'),
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          Authorization: `Basic ${expectedCredentials}`,
+    expect(chefsService.getFormToken).toHaveBeenCalledWith({
+      formId: 'form-123',
+      formApiKey: 'test-api-key-abc', // pragma: allowlist secret
+    });
+  });
+
+  it('returns baseUrl from ChefsService response', async () => {
+    const { router } = createTestRouter({
+      chefs: {
+        getFormToken: vi.fn().mockResolvedValue({
+          authToken: 'token-abc',
+          formId: 'form-123',
+          baseUrl: 'https://custom.example.com/app',
         }),
-      }),
-    );
-  });
-
-  it('uses default CHEFS_GATEWAY_URL when env is not set', async () => {
-    delete process.env.CHEFS_GATEWAY_URL;
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ token: 'jwt-token-123' }),
+      },
     });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const { router } = createTestRouter();
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
     const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
     const res = createMockResponse();
 
-    await runHandlerChain(handlers!, req, res);
+    const error = await runHandlerChain(handlers!, req, res);
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://submit.digital.gov.bc.ca/app/gateway/v1/auth/token/forms/form-123',
-      expect.anything(),
-    );
-  });
-
-  it('uses custom CHEFS_GATEWAY_URL when env is set', async () => {
-    process.env.CHEFS_GATEWAY_URL = 'https://custom-gateway.example.com/v1';
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ token: 'jwt-token-123' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const { router } = createTestRouter();
-    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
-    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
-    const res = createMockResponse();
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://custom-gateway.example.com/v1/auth/token/forms/form-123',
-      expect.anything(),
-    );
-    delete process.env.CHEFS_GATEWAY_URL;
+    expect(error).toBeNull();
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.baseUrl).toBe('https://custom.example.com/app');
   });
 
   it('throws AppError 400 when action type is not showform', async () => {
@@ -235,14 +204,12 @@ describe('POST /wil/chefs-token', () => {
     expect((error as AppError).statusCode).toBe(404);
   });
 
-  it('throws AppError 502 when CHEFS gateway returns non-2xx', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
+  it('throws AppError 502 when ChefsService rejects with gateway error', async () => {
+    const { router } = createTestRouter({
+      chefs: {
+        getFormToken: vi.fn().mockRejectedValue(new AppError(502, 'CHEFS token exchange failed')),
+      },
     });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const { router } = createTestRouter();
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
     const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
     const res = createMockResponse();
@@ -254,11 +221,12 @@ describe('POST /wil/chefs-token', () => {
     expect((error as AppError).message).toBe('CHEFS token exchange failed');
   });
 
-  it('throws AppError 502 when fetch throws a network error', async () => {
-    const mockFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
-    vi.stubGlobal('fetch', mockFetch);
-
-    const { router } = createTestRouter();
+  it('throws AppError 502 when ChefsService rejects with network error', async () => {
+    const { router } = createTestRouter({
+      chefs: {
+        getFormToken: vi.fn().mockRejectedValue(new AppError(502, 'CHEFS token exchange failed')),
+      },
+    });
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
     const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
     const res = createMockResponse();
@@ -271,12 +239,6 @@ describe('POST /wil/chefs-token', () => {
   });
 
   it('calls getById with resolved tenant project IDs and primary actor', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ token: 'jwt-token-123' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
-
     const getByIdMock = vi.fn().mockResolvedValue(SHOWFORM_ACTION);
     const { router } = createTestRouter({ action: { getById: getByIdMock } });
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
