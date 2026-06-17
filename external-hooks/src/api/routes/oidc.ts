@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
+import { N8N_PROTOCOL } from '@config';
 import { beginOidcAuthorization, completeOidcAuthorization, extractOidcIdentity } from '../helpers/oidc-provider';
 import {
   createAuthToken,
@@ -35,7 +36,7 @@ export type BuildOidcRouterParams = {
 function getCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.N8N_PROTOCOL === 'https',
+    secure: N8N_PROTOCOL === 'https',
     sameSite: 'lax' as const,
     maxAge: 15 * 60 * 1000,
   };
@@ -44,7 +45,7 @@ function getCookieOptions() {
 function getAuthCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.N8N_PROTOCOL === 'https',
+    secure: N8N_PROTOCOL === 'https',
     sameSite: 'lax' as const,
     maxAge: 24 * 60 * 60 * 1000,
   };

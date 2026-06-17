@@ -1,4 +1,18 @@
 import crypto from 'node:crypto';
+import {
+  OIDC_ISSUER,
+  OIDC_AUTHORIZATION_ENDPOINT,
+  OIDC_TOKEN_ENDPOINT,
+  OIDC_USERINFO_ENDPOINT,
+  OIDC_JWKS_URI,
+  OIDC_CLIENT_ID,
+  OIDC_CLIENT_SECRET,
+  OIDC_REDIRECT_URI,
+  OIDC_SCOPES,
+  OIDC_ROLES_CLAIM,
+  SSO_RESTRICT_NO_ROLE,
+  OIDC_COOKIE_SECRET_BASE,
+} from '@config';
 import { type OidcProviderConfig } from './oidc-provider';
 import type { JwtService } from '../services/jwt';
 
@@ -32,17 +46,17 @@ export type N8nOidcNonceCookiePayload = {
 
 export function getN8nOidcConfigFromEnv(): N8nOidcConfig {
   return {
-    issuerUrl: process.env.OIDC_ISSUER || '',
-    authorizationEndpoint: process.env.OIDC_AUTHORIZATION_ENDPOINT || '',
-    tokenEndpoint: process.env.OIDC_TOKEN_ENDPOINT || '',
-    userinfoEndpoint: process.env.OIDC_USERINFO_ENDPOINT || '',
-    jwksUri: process.env.OIDC_JWKS_URI || '',
-    clientId: process.env.OIDC_CLIENT_ID || '',
-    clientSecret: process.env.OIDC_CLIENT_SECRET || '',
-    redirectUri: process.env.OIDC_REDIRECT_URI || '',
-    scopes: process.env.OIDC_SCOPES || 'openid email profile',
-    rolesClaim: process.env.OIDC_ROLES_CLAIM || 'roles',
-    restrictNoRole: process.env.SSO_RESTRICT_NO_ROLE === 'true',
+    issuerUrl: OIDC_ISSUER,
+    authorizationEndpoint: OIDC_AUTHORIZATION_ENDPOINT,
+    tokenEndpoint: OIDC_TOKEN_ENDPOINT,
+    userinfoEndpoint: OIDC_USERINFO_ENDPOINT,
+    jwksUri: OIDC_JWKS_URI,
+    clientId: OIDC_CLIENT_ID,
+    clientSecret: OIDC_CLIENT_SECRET,
+    redirectUri: OIDC_REDIRECT_URI,
+    scopes: OIDC_SCOPES,
+    rolesClaim: OIDC_ROLES_CLAIM,
+    restrictNoRole: SSO_RESTRICT_NO_ROLE,
   };
 }
 
@@ -106,10 +120,9 @@ export function verifySignedCookie(cookie: string, secret: string) {
 }
 
 export function getCookieSecret() {
-  const baseKey = process.env.N8N_ENCRYPTION_KEY || process.env.OIDC_CLIENT_SECRET || 'n8n-oidc-hook-secret';
   return crypto
     .createHash('sha256')
-    .update(baseKey + '-oidc-state')
+    .update(OIDC_COOKIE_SECRET_BASE + '-oidc-state')
     .digest('hex');
 }
 

@@ -1,4 +1,5 @@
 import type { Express } from 'express';
+import { CUSTOM_DATABASE_URL, EXTERNAL_UI_PATH, EXTERNAL_UI_ENABLED } from '@config';
 import { mountAssets } from './bootstrap/assets';
 import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
@@ -20,15 +21,14 @@ function createHookConfig() {
         async function (this: Record<string, unknown>, server: { app: Express }) {
           log.info('Initializing Custom Endpoints...');
 
-          const databaseUrl = process.env.CUSTOM_DATABASE_URL;
-          if (!databaseUrl) {
+          if (!CUSTOM_DATABASE_URL) {
             throw new Error('CUSTOM_DATABASE_URL is not set');
           }
 
           const { app } = server;
           const n8nRuntime = buildN8nRuntimeContext();
           const n8nServices = buildN8nServices(n8nRuntime.container);
-          const customRepositories = buildCustomRepositories(databaseUrl);
+          const customRepositories = buildCustomRepositories(CUSTOM_DATABASE_URL);
           const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories, n8nServices);
           const routeContext = buildRouteContext({
             services,
@@ -39,7 +39,7 @@ function createHookConfig() {
           });
 
           mountCustomApi(app, routeContext);
-          mountUi(app, routeContext, process.env.EXTERNAL_UI_PATH, process.env.EXTERNAL_UI_ENABLED === 'true');
+          mountUi(app, routeContext, EXTERNAL_UI_PATH, EXTERNAL_UI_ENABLED);
           mountOidc({
             app,
             n8nRepositories: n8nRuntime.n8nRepositories,

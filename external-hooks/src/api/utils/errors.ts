@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { IS_DEVELOPMENT } from '@config';
 import { createLogger } from './logger';
 
 const log = createLogger('ErrorHandler');
@@ -20,7 +21,7 @@ export const handleErrorResponse = (err: Error | AppError, _req: Request, res: R
   const statusCode = err instanceof AppError ? err.statusCode : 500;
   const message = err.message || 'Internal Server Error';
 
-  log.error(message, { statusCode, stack: process.env.NODE_ENV === 'development' ? err.stack : undefined });
+  log.error(message, { statusCode, stack: IS_DEVELOPMENT ? err.stack : undefined });
 
   const error: Record<string, unknown> = { message };
 
@@ -28,7 +29,7 @@ export const handleErrorResponse = (err: Error | AppError, _req: Request, res: R
     error.details = err.details;
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (IS_DEVELOPMENT) {
     error.stack = err.stack;
   }
 

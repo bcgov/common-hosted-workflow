@@ -1,6 +1,7 @@
 import { createSecretKey } from 'crypto';
 import type { Request } from 'express';
 import { SignJWT, jwtVerify } from 'jose';
+import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE } from '@config';
 import {
   type UiAuthenticatedSession,
   type UiAuthTokenPayload,
@@ -9,18 +10,6 @@ import {
 } from './ui-oidc';
 
 const UI_AUTH_JWT_TTL_MS = 8 * 60 * 60 * 1000;
-
-function getJwtSecret() {
-  return process.env.UI_AUTH_JWT_SECRET || process.env.N8N_USER_MANAGEMENT_JWT_SECRET || '';
-}
-
-function getJwtIssuer() {
-  return process.env.UI_AUTH_JWT_ISSUER || 'chwf-ui-api';
-}
-
-function getJwtAudience() {
-  return process.env.UI_AUTH_JWT_AUDIENCE || 'chwf-ui';
-}
 
 function getBearerToken(req: Request) {
   const header = req.header('authorization');
@@ -44,8 +33,7 @@ export function serializeN8nUser(
 }
 
 export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser: UiSerializedN8nUser }) {
-  const secret = getJwtSecret();
-  if (!secret) {
+  if (!UI_AUTH_JWT_SECRET) {
     throw new Error('UI auth JWT secret is not configured');
   }
 
@@ -61,12 +49,12 @@ export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser:
     n8nUser: params.n8nUser,
   } satisfies Omit<UiAuthTokenPayload, 'iss' | 'aud' | 'sub'>)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuer(getJwtIssuer())
-    .setAudience(getJwtAudience())
+    .setIssuer(UI_AUTH_JWT_ISSUER)
+    .setAudience(UI_AUTH_JWT_AUDIENCE)
     .setSubject(params.oidc.subject)
     .setIssuedAt(now)
     .setExpirationTime(now + Math.floor(UI_AUTH_JWT_TTL_MS / 1000))
-    .sign(createSecretKey(Buffer.from(secret)));
+    .sign(createSecretKey(Buffer.from(UI_AUTH_JWT_SECRET)));
 }
 
 export async function getUiSession(req: Request) {
@@ -74,12 +62,11 @@ export async function getUiSession(req: Request) {
   if (!token) return null;
 
   try {
-    const secret = getJwtSecret();
-    if (!secret) return null;
+    if (!UI_AUTH_JWT_SECRET) return null;
 
-    const verification = await jwtVerify(token, createSecretKey(Buffer.from(secret)), {
-      issuer: getJwtIssuer(),
-      audience: getJwtAudience(),
+    const verification = await jwtVerify(token, createSecretKey(Buffer.from(UI_AUTH_JWT_SECRET)), {
+      issuer: UI_AUTH_JWT_ISSUER,
+      audience: UI_AUTH_JWT_AUDIENCE,
     });
 
     const payload = verification.payload as Partial<UiAuthTokenPayload>;
