@@ -1,10 +1,10 @@
 import { useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
 import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
+import { extractErrorMessage } from './shared/error-utils';
 
 const TERMINAL_STATUSES: ReadonlySet<WilActionItem['status']> = new Set([
   'completed',
@@ -17,17 +17,6 @@ interface WaitOnEventHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
-}
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const serverMessage =
-      (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message ??
-      (err.response?.data as { message?: string } | undefined)?.message;
-    return serverMessage ?? fallback;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
 }
 
 export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: Readonly<WaitOnEventHandlerProps>) {

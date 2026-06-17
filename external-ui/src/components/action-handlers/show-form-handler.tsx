@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
 import { IconLoader2, IconCircleCheck, IconAlertTriangle } from '@tabler/icons-react';
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
@@ -8,6 +7,7 @@ import { getWhoami } from '../../services/backend/auth';
 import { getStoredAppToken } from '../../services/backend/axios';
 import { ChefsFormViewer } from '../chefs/chefs-form-viewer';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { extractErrorMessage } from './shared/error-utils';
 
 interface ShowFormHandlerProps {
   action: WilActionItem;
@@ -25,17 +25,6 @@ type InitData = {
   user: Record<string, unknown>;
   headers: Record<string, string>;
 };
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const serverMessage =
-      (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message ??
-      (err.response?.data as { message?: string } | undefined)?.message;
-    return serverMessage ?? fallback;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
 
 function buildUserProfile(claims: Record<string, unknown>): Record<string, unknown> {
   return {

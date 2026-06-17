@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
 import DOMPurify from 'dompurify';
 import { IconLoader2, IconCheck } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
+import { extractErrorMessage } from './shared/error-utils';
 
 interface GetApprovalHandlerProps {
   action: WilActionItem;
@@ -56,17 +56,6 @@ function sanitizeHtml(html: string): string {
     ALLOW_DATA_ATTR: false,
     FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur'],
   });
-}
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const serverMessage =
-      (err.response?.data as { error?: { message?: string } } | undefined)?.error?.message ??
-      (err.response?.data as { message?: string } | undefined)?.message;
-    return serverMessage ?? fallback;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
 }
 
 export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: Readonly<GetApprovalHandlerProps>) {
