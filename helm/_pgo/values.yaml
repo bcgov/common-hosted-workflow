@@ -119,6 +119,31 @@ standby:
   enabled: false
   repoName: repo1
 
+# --- Conditional Restore (DR) ---
+# Runs on GoldDR only. Checks DNS probe every 10 min and restores from Gold's S3 pg_dump backup
+# when GoldDR is in standby mode (DR_FAILOVER=false).
+conditionalRestore:
+  enabled: false
+  image:
+    repository: ghcr.io/bcgov/backup-container
+    tag: latest
+    pullPolicy: Always
+  schedule: "*/10 * * * *"
+  # Full URL to the dns-probe status endpoint, e.g. http://chwf-dns-probe:8000/api/status
+  dnsProbStatusUrl: ""
+  s3:
+    endpoint: ""
+    bucket: ""
+    # Secret must have keys: s3-user, s3-password (same secret used by backup-storage on Gold)
+    secretName: ""
+  db:
+    secretName: chwf-pgo-pguser-n8n # pragma: allowlist secret
+    usernameKey: user
+    passwordKey: password  # pragma: allowlist secret
+    hostKey: host
+    portKey: port
+    dbnameKey: dbname
+
 # --- Monitoring ---
 pgmonitor:
   enabled: true

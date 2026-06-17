@@ -270,6 +270,14 @@ pgo:
         region: ca-central-1
         uriStyle: path
 
+# backup-storage — disabled by default, enabled only for gold deployments
+backup-storage:
+  enabled: false
+  image:
+    repository: ghcr.io/bcgov/backup-container
+    pullPolicy: Always
+    tag: latest
+
 # dns-probe — disabled by default, enabled only for golddr deployments
 dns-probe:
   enabled: false

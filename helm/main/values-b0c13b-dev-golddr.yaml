@@ -54,6 +54,20 @@ pgo:
       s3:
         bucket: workflow-dev
 
+  conditionalRestore:
+    enabled: true
+    dnsProbStatusUrl: "http://chwf-dns-probe:8000/status"
+    s3:
+      endpoint: https://commonservices.objectstore.gov.bc.ca
+      bucket: workflow-dev/backups/pgdump
+      secretName: chwf-pgdump-s3-creds  # pragma: allowlist secret
+    db:
+      secretName: chwf-pgo-pguser-n8n  # pragma: allowlist secret
+
+# backup-storage is intentionally disabled on GoldDR — backups are created on Gold only
+backup-storage:
+  enabled: false
+
 dns-probe:
   enabled: true
   env:

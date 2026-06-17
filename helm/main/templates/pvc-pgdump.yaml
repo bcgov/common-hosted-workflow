@@ -1,0 +1,25 @@
+{{- $bs := index .Values "backup-storage" }}
+{{- if $bs.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $bs.persistence.backup.claimName }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ $bs.persistence.backup.size | default "512Mi" }}
+  storageClassName: {{ $bs.persistence.backup.storageClassName | default "netapp-file-standard" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $bs.persistence.verification.claimName }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ $bs.persistence.verification.size | default "512Mi" }}
+  storageClassName: {{ $bs.persistence.verification.storageClassName | default "netapp-file-standard" }}
+{{- end }}

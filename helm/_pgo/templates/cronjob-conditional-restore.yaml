@@ -1,0 +1,263 @@
+{{- if .Values.conditionalRestore.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "_.fullname" . }}-restore-runner
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "_.fullname" . }}-restore-runner
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["postgres-operator.crunchydata.com"]
+    resources: ["postgresclusters"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["{{ include "_.fullname" . }}-restore-state"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "_.fullname" . }}-restore-runner
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "_.fullname" . }}-restore-runner
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "_.fullname" . }}-restore-runner
+---
+# Tracks the last successfully restored S3 key so we skip restores when no new backup exists
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-restore-state
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  last-restored-key: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-restore-script
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  restore.sh: |
+    #!/bin/bash
+    set -eo pipefail
+
+    log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
+
+    KUBE_API="https://kubernetes.default.svc"
+    KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    KUBE_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+    KUBE_CACERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+    log "pg-conditional-restore starting..."
+
+    # --- 1. Check DR failover status ---
+    log "Querying DNS probe: ${DNS_PROBE_STATUS_URL}"
+
+    HTTP_STATUS=$(curl -sf --max-time 10 \
+      -o /tmp/probe_response.json \
+      -w "%{http_code}" \
+      "${DNS_PROBE_STATUS_URL}" 2>/dev/null || echo "000")
+
+    if [ "${HTTP_STATUS}" != "200" ]; then
+      log "WARNING: DNS probe returned HTTP ${HTTP_STATUS}. Assuming DR_FAILOVER=true (safe default). Exiting."
+      exit 0
+    fi
+
+    # Parse current_routing from dns-probe:
+    #   "primary"   = DNS resolves to Gold → GoldDR is standby → restore
+    #   "secondary" = DNS resolves to GoldDR → GoldDR is active primary → skip
+    #   "unknown"   = DNS not configured / unrecognised IP → skip (safe default)
+    if grep -q '"current_routing": *"secondary"' /tmp/probe_response.json 2>/dev/null; then
+      ROUTING="secondary"
+    elif grep -q '"current_routing": *"primary"' /tmp/probe_response.json 2>/dev/null; then
+      ROUTING="primary"
+    else
+      log "WARNING: Could not parse current_routing from probe response. Assuming safe default (skip restore)."
+      cat /tmp/probe_response.json
+      exit 0
+    fi
+
+    log "current_routing=${ROUTING}"
+
+    # --- 2. Condition A: GoldDR is the active primary (DNS failover) — skip restore ---
+    if [ "${ROUTING}" = "secondary" ]; then
+      log "GoldDR is the active primary (current_routing=secondary). Skipping restore."
+      exit 0
+    fi
+
+    # --- 3. Condition B: GoldDR is standby — check if a new backup exists before restoring ---
+    log "GoldDR is in standby mode (current_routing=primary). Checking for new backup..."
+
+    # Configure MinIO client for listing only
+    mc alias set s3store "${S3_ENDPOINT}" "${S3_USER}" "${S3_PASSWORD}" --quiet
+
+    # Find the latest backup file (exclude directory markers)
+    LATEST_KEY=$(mc ls "s3store/${S3_BUCKET}/" --recursive 2>/dev/null \
+      | grep -v '/$' \
+      | sort \
+      | tail -1 \
+      | awk '{print $NF}')
+
+    if [ -z "${LATEST_KEY}" ]; then
+      log "ERROR: No backup files found at s3store/${S3_BUCKET}/. Cannot restore."
+      exit 1
+    fi
+
+    log "Latest backup on S3: ${LATEST_KEY}"
+
+    # Read the last restored key from the state ConfigMap
+    LAST_KEY=$(curl -sf --cacert "${KUBE_CACERT}" \
+      -H "Authorization: Bearer ${KUBE_TOKEN}" \
+      "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
+      2>/dev/null \
+      | grep -o '"last-restored-key":"[^"]*"' \
+      | head -1 \
+      | cut -d'"' -f4 || echo "")
+
+    log "Last restored key: ${LAST_KEY:-<none>}"
+
+    if [ "${LATEST_KEY}" = "${LAST_KEY}" ]; then
+      log "Latest backup already restored. No new backup available. Skipping."
+      exit 0
+    fi
+
+    # --- 4. New backup detected — stream and restore ---
+    log "New backup detected. Initiating restore from S3."
+
+    # Drop all public-schema tables first (backup-container uses -Fp plain SQL, not --clean)
+    log "Cleaning public schema tables in ${DATABASE_NAME} before restore..."
+    PGPASSWORD="${DATABASE_PASSWORD}" psql \
+      -h "${DATABASE_HOST}" \
+      -p "${DATABASE_PORT}" \
+      -U "${DATABASE_USER}" \
+      -d "${DATABASE_NAME}" \
+      -c "DO \$body\$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END \$body\$;" || true
+
+    log "Streaming ${LATEST_KEY} from S3 and restoring to ${DATABASE_NAME}..."
+    curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
+      -u "${S3_USER}:${S3_PASSWORD}" \
+      "${S3_ENDPOINT}/${S3_BUCKET}/${LATEST_KEY}" | gunzip | PGPASSWORD="${DATABASE_PASSWORD}" psql \
+      -h "${DATABASE_HOST}" \
+      -p "${DATABASE_PORT}" \
+      -U "${DATABASE_USER}" \
+      -d "${DATABASE_NAME}" \
+      -v ON_ERROR_STOP=0
+
+    log "Restore complete."
+    rm -f /tmp/probe_response.json
+
+    # --- 5. Update state ConfigMap with the restored key ---
+    log "Updating restore state (last-restored-key=${LATEST_KEY})..."
+    curl -sf --cacert "${KUBE_CACERT}" \
+      -X PATCH \
+      -H "Authorization: Bearer ${KUBE_TOKEN}" \
+      -H "Content-Type: application/merge-patch+json" \
+      "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
+      -d "{\"data\":{\"last-restored-key\":\"${LATEST_KEY}\"}}" \
+      > /dev/null
+
+    log "pg-conditional-restore done."
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "_.fullname" . }}-conditional-restore
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.conditionalRestore.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "_.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: restore-runner
+        spec:
+          serviceAccountName: {{ include "_.fullname" . }}-restore-runner
+          restartPolicy: Never
+          volumes:
+            - name: restore-script
+              configMap:
+                name: {{ include "_.fullname" . }}-restore-script
+                defaultMode: 0755
+          containers:
+            - name: pg-restore
+              image: "{{ .Values.conditionalRestore.image.repository }}:{{ .Values.conditionalRestore.image.tag }}"
+              imagePullPolicy: {{ .Values.conditionalRestore.image.pullPolicy }}
+              command: ["/bin/bash", "/scripts/restore.sh"]
+              volumeMounts:
+                - name: restore-script
+                  mountPath: /scripts
+              env:
+                - name: STATE_CONFIGMAP_NAME
+                  value: {{ include "_.fullname" . }}-restore-state
+                - name: DNS_PROBE_STATUS_URL
+                  value: {{ .Values.conditionalRestore.dnsProbStatusUrl | quote }}
+                - name: S3_ENDPOINT
+                  value: {{ .Values.conditionalRestore.s3.endpoint | quote }}
+                - name: S3_BUCKET
+                  value: {{ .Values.conditionalRestore.s3.bucket | quote }}
+                - name: S3_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.s3.secretName | quote }}
+                      key: s3-user
+                - name: S3_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.s3.secretName | quote }}
+                      key: s3-password
+                - name: DATABASE_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.hostKey }}
+                - name: DATABASE_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.portKey }}
+                - name: DATABASE_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.dbnameKey }}
+                - name: DATABASE_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.usernameKey }}
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.passwordKey }}
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+{{- end }}
