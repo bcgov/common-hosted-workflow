@@ -21,12 +21,13 @@ function getBearerToken(req: Request) {
 }
 
 export function serializeN8nUser(
-  user: { id: string; email: string; role: { slug: string; displayName: string } | null } | null,
+  user: { id: string; email: string; disabled: boolean; role: { slug: string; displayName: string } | null } | null,
 ): UiSerializedN8nUser | null {
   return user
     ? {
         id: user.id,
         email: user.email,
+        disabled: user.disabled,
         role: user.role ? { slug: user.role.slug, displayName: user.role.displayName } : null,
       }
     : null;
