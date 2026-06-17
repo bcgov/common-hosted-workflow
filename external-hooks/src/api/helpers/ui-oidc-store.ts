@@ -1,4 +1,5 @@
 import { createClient } from 'redis';
+import { UI_OIDC_REDIS_URL, UI_OIDC_REDIS_PASSWORD, UI_OIDC_REDIS_PREFIX } from '@config';
 
 type UiOidcStateRecord = {
   nonce: string;
@@ -11,28 +12,15 @@ type RedisClient = Awaited<ReturnType<typeof createClient>>;
 
 let redisClientPromise: Promise<RedisClient> | null = null;
 
-function getRedisUrl() {
-  return process.env.UI_OIDC_REDIS_URL || 'redis://localhost:6379';
-}
-
-function getRedisPassword() {
-  return process.env.UI_OIDC_REDIS_PASSWORD || '';
-}
-
-function getRedisPrefix() {
-  return process.env.UI_OIDC_REDIS_PREFIX || 'chwf:ui-oidc:';
-}
-
 function getStateKey(state: string) {
-  return `${getRedisPrefix()}state:${state}`;
+  return `${UI_OIDC_REDIS_PREFIX}state:${state}`;
 }
 
 async function getRedisClient(): Promise<RedisClient> {
   if (!redisClientPromise) {
-    const password = getRedisPassword();
     const client = createClient({
-      url: getRedisUrl(),
-      ...(password ? { password } : {}),
+      url: UI_OIDC_REDIS_URL,
+      ...(UI_OIDC_REDIS_PASSWORD ? { password: UI_OIDC_REDIS_PASSWORD } : {}),
     });
     client.on('error', () => {});
     redisClientPromise = client.connect().then(() => client) as Promise<RedisClient>;

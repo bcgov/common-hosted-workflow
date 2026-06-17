@@ -1,5 +1,6 @@
 import type { Application } from 'express';
 import swaggerUi from 'swagger-ui-express';
+import { ENABLE_SWAGGER_UI, IS_PRODUCTION } from '@config';
 import * as swaggerDocument from './openapi.json';
 import { createLogger } from './utils/logger';
 
@@ -15,10 +16,9 @@ const spec = swaggerDocument as unknown as Record<string, unknown>;
  * - Non-production: enabled unless `ENABLE_SWAGGER_UI=false`.
  */
 export function isSwaggerUiEnabled(): boolean {
-  const flag = process.env.ENABLE_SWAGGER_UI;
-  if (flag === 'false') return false;
-  if (flag === 'true') return true;
-  return process.env.NODE_ENV !== 'production';
+  if (ENABLE_SWAGGER_UI === 'false') return false;
+  if (ENABLE_SWAGGER_UI === 'true') return true;
+  return !IS_PRODUCTION;
 }
 
 export function mountSwaggerUi(app: Application): void {

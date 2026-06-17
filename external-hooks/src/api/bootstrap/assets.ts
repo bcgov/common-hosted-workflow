@@ -1,8 +1,7 @@
 import { type Express, static as serveStatic } from 'express';
+import { EXTERNAL_HOOK_ASSETS_PATH } from '@config';
 
-const defaultAssetsPath = process.env.EXTERNAL_HOOK_ASSETS_PATH || 'api/assets';
-
-export function mountAssets(app: Express, assetsPath = defaultAssetsPath) {
+export function mountAssets(app: Express, assetsPath = EXTERNAL_HOOK_ASSETS_PATH) {
   app.use(
     '/assets',
     serveStatic(assetsPath, {

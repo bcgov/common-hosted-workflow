@@ -25,6 +25,8 @@
  *   logError(log, error, { context: 'token exchange' });
  */
 
+import { LOG_LEVEL } from '@config';
+
 // ---------------------------------------------------------------------------
 // Log levels
 // ---------------------------------------------------------------------------
@@ -33,8 +35,7 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const;
 type LogLevel = keyof typeof LOG_LEVELS;
 
 function resolveLogLevel(): LogLevel {
-  const env = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
-  if (env in LOG_LEVELS) return env as LogLevel;
+  if (LOG_LEVEL in LOG_LEVELS) return LOG_LEVEL as LogLevel;
   return 'info';
 }
 

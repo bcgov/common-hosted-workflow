@@ -65,17 +65,29 @@ export type UiOidcConfig = {
   scopes: string;
 };
 
+import {
+  UI_OIDC_ISSUER,
+  UI_OIDC_AUTHORIZATION_ENDPOINT,
+  UI_OIDC_TOKEN_ENDPOINT,
+  UI_OIDC_USERINFO_ENDPOINT,
+  UI_OIDC_JWKS_URI,
+  UI_OIDC_CLIENT_ID,
+  UI_OIDC_CLIENT_SECRET,
+  UI_OIDC_REDIRECT_URI,
+  UI_OIDC_SCOPES,
+} from '@config';
+
 export function getOidcConfigFromEnv(): UiOidcConfig {
   return {
-    issuerUrl: process.env.UI_OIDC_ISSUER || process.env.OIDC_ISSUER || '',
-    authorizationEndpoint: process.env.UI_OIDC_AUTHORIZATION_ENDPOINT || process.env.OIDC_AUTHORIZATION_ENDPOINT || '',
-    tokenEndpoint: process.env.UI_OIDC_TOKEN_ENDPOINT || process.env.OIDC_TOKEN_ENDPOINT || '',
-    userinfoEndpoint: process.env.UI_OIDC_USERINFO_ENDPOINT || process.env.OIDC_USERINFO_ENDPOINT || '',
-    jwksUri: process.env.UI_OIDC_JWKS_URI || process.env.OIDC_JWKS_URI || '',
-    clientId: process.env.UI_OIDC_CLIENT_ID || process.env.OIDC_CLIENT_ID || '',
-    clientSecret: process.env.UI_OIDC_CLIENT_SECRET || process.env.OIDC_CLIENT_SECRET || '',
-    redirectUri: process.env.UI_OIDC_REDIRECT_URI || '',
-    scopes: process.env.UI_OIDC_SCOPES || process.env.OIDC_SCOPES || 'openid email profile',
+    issuerUrl: UI_OIDC_ISSUER,
+    authorizationEndpoint: UI_OIDC_AUTHORIZATION_ENDPOINT,
+    tokenEndpoint: UI_OIDC_TOKEN_ENDPOINT,
+    userinfoEndpoint: UI_OIDC_USERINFO_ENDPOINT,
+    jwksUri: UI_OIDC_JWKS_URI,
+    clientId: UI_OIDC_CLIENT_ID,
+    clientSecret: UI_OIDC_CLIENT_SECRET,
+    redirectUri: UI_OIDC_REDIRECT_URI,
+    scopes: UI_OIDC_SCOPES,
   };
 }
 

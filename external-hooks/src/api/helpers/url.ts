@@ -1,3 +1,5 @@
+import { UI_APP_BASE_URL } from '@config';
+
 export function appendQueryParam(urlOrPath: string, key: string, value: string) {
   try {
     const url = new URL(urlOrPath);
@@ -14,14 +16,13 @@ export function appendTokenToReturnTo(returnTo: string, token: string) {
 }
 
 export function buildUiAppUrl(path: string) {
-  const configuredBaseUrl = (process.env.UI_APP_BASE_URL || '/ui').trim();
   const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
 
-  if (configuredBaseUrl.startsWith('http://') || configuredBaseUrl.startsWith('https://')) {
-    const baseUrl = configuredBaseUrl.endsWith('/') ? configuredBaseUrl : `${configuredBaseUrl}/`;
+  if (UI_APP_BASE_URL.startsWith('http://') || UI_APP_BASE_URL.startsWith('https://')) {
+    const baseUrl = UI_APP_BASE_URL.endsWith('/') ? UI_APP_BASE_URL : `${UI_APP_BASE_URL}/`;
     return new URL(normalizedPath, baseUrl).toString();
   }
 
-  const basePath = configuredBaseUrl === '/' ? '' : configuredBaseUrl.replace(/\/$/, '');
+  const basePath = UI_APP_BASE_URL === '/' ? '' : UI_APP_BASE_URL.replace(/\/$/, '');
   return `${basePath}/${normalizedPath}`;
 }
