@@ -28,7 +28,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const whoamiQuery = useQuery({
     queryKey: ['whoami', user?.email ?? ''],
     queryFn: ({ signal }) => getWhoami({ signal }),
-    enabled: Boolean(user),
+    enabled: canQueryMyRequest,
   });
 
   const myAccessRequestQuery = useQuery({
@@ -38,8 +38,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   });
 
   const isAdmin = isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug);
+  const isDisabled = whoamiQuery.data?.n8nUser?.disabled === true;
+  const hasNoRole = whoamiQuery.data?.n8nUser?.role == null;
   const hasPendingAccessRequest = myAccessRequestQuery.data?.accessRequest?.status === 'pending';
-  const showAccessRequestLink = hasPendingAccessRequest && !isAdmin;
+  const showAccessRequestLink = !isAdmin && (isDisabled || hasNoRole || hasPendingAccessRequest);
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">

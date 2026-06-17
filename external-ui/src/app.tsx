@@ -20,7 +20,7 @@ function AccessRequestRoute() {
   const whoamiQuery = useQuery({
     queryKey: ['whoami', user?.email ?? ''],
     queryFn: ({ signal }) => getWhoami({ signal }),
-    enabled: Boolean(user),
+    enabled: canQuery,
   });
 
   const myRequestQuery = useQuery({
@@ -30,13 +30,17 @@ function AccessRequestRoute() {
   });
 
   const isAdmin = isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug);
+  const isDisabled = whoamiQuery.data?.n8nUser?.disabled === true;
+  const hasNoRole = whoamiQuery.data?.n8nUser?.role == null;
   const hasPendingRequest = myRequestQuery.data?.accessRequest?.status === 'pending';
 
   if (authLoading || whoamiQuery.isLoading || myRequestQuery.isLoading) {
     return null;
   }
 
-  if (isAdmin || !hasPendingRequest) {
+  const needsAccessRequest = isDisabled || hasNoRole || (!isAdmin && hasPendingRequest);
+
+  if (!needsAccessRequest) {
     return <Navigate to="/" replace />;
   }
 

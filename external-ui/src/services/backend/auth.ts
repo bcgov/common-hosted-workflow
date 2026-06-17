@@ -30,6 +30,7 @@ export type WhoamiResponse = {
   n8nUser: {
     id: string;
     email: string;
+    disabled: boolean;
     role: {
       slug: string;
       displayName: string;
