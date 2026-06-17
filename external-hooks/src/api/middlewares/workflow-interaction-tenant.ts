@@ -10,6 +10,7 @@ import type { TenantProjectRelationRepository } from '../../db/repository/custom
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
+import { INTERNAL_AUTH_TOKEN } from '@config';
 
 const log = createLogger('CustomAPIs');
 
@@ -76,12 +77,11 @@ export function createWorkflowInteractionTenantMiddleware(config: {
 
     // Authorization bearer is validated for internal-only POST.
     const bearerToken = extractBearerToken(req.header(AUTHORIZATION_HEADER));
-    const internalAuthToken = process.env.INTERNAL_AUTH_TOKEN;
-    const isInternalCall = Boolean(internalAuthToken && bearerToken && bearerToken === internalAuthToken);
+    const isInternalCall = Boolean(INTERNAL_AUTH_TOKEN && bearerToken && bearerToken === INTERNAL_AUTH_TOKEN);
     res.locals.chwfInternal = isInternalCall;
 
     if (isPostCreateInternalOnly) {
-      if (!internalAuthToken) {
+      if (!INTERNAL_AUTH_TOKEN) {
         log.warn('INTERNAL_AUTH_TOKEN not configured', {
           handler: 'workflowInteractionTenant',
           statusCode: 500,

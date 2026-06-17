@@ -19,7 +19,13 @@ vi.mock('../../src/api/services/project-access', () => ({
   listProjectIdsAccessibleToUser: vi.fn(),
 }));
 
+vi.mock('@config', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/config')>();
+  return { ...original, INTERNAL_AUTH_TOKEN: '' };
+});
+
 import { listProjectIdsAccessibleToUser } from '../../src/api/services/project-access';
+import * as config from '@config';
 
 const mockedlistProjectIdsAccessibleToUser = vi.mocked(listProjectIdsAccessibleToUser);
 
@@ -305,18 +311,12 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
   });
 
   describe('internal POST bearer validation', () => {
-    const originalEnv = process.env.INTERNAL_AUTH_TOKEN;
-
     afterEach(() => {
-      if (originalEnv === undefined) {
-        delete process.env.INTERNAL_AUTH_TOKEN;
-      } else {
-        process.env.INTERNAL_AUTH_TOKEN = originalEnv;
-      }
+      vi.mocked(config).INTERNAL_AUTH_TOKEN = '';
     });
 
     it('returns 500 when INTERNAL_AUTH_TOKEN not configured for internal POST', async () => {
-      delete process.env.INTERNAL_AUTH_TOKEN;
+      vi.mocked(config).INTERNAL_AUTH_TOKEN = '';
       const middleware = createMiddleware();
       const req = createMockRequest({
         headers: { 'X-TENANT-ID': VALID_TENANT_ID, Authorization: `Bearer ${VALID_INTERNAL_TOKEN}` },
@@ -332,7 +332,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
     });
 
     it('returns 401 when bearer token does not match INTERNAL_AUTH_TOKEN', async () => {
-      process.env.INTERNAL_AUTH_TOKEN = VALID_INTERNAL_TOKEN;
+      vi.mocked(config).INTERNAL_AUTH_TOKEN = VALID_INTERNAL_TOKEN;
       const middleware = createMiddleware();
       const req = createMockRequest({
         headers: { 'X-TENANT-ID': VALID_TENANT_ID, Authorization: 'Bearer wrong-token' },
@@ -348,7 +348,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
     });
 
     it('allows internal POST when bearer matches INTERNAL_AUTH_TOKEN', async () => {
-      process.env.INTERNAL_AUTH_TOKEN = VALID_INTERNAL_TOKEN;
+      vi.mocked(config).INTERNAL_AUTH_TOKEN = VALID_INTERNAL_TOKEN;
       const middleware = createMiddleware();
       const req = createMockRequest({
         headers: {
@@ -368,7 +368,7 @@ describe('createWorkflowInteractionTenantMiddleware', () => {
     });
 
     it('validates bearer for POST /v1/actions as well', async () => {
-      process.env.INTERNAL_AUTH_TOKEN = VALID_INTERNAL_TOKEN;
+      vi.mocked(config).INTERNAL_AUTH_TOKEN = VALID_INTERNAL_TOKEN;
       const middleware = createMiddleware();
       const req = createMockRequest({
         headers: { 'X-TENANT-ID': VALID_TENANT_ID, Authorization: 'Bearer wrong' },
