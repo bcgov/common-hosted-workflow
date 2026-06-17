@@ -35,6 +35,7 @@ export type UiSerializedRole = {
 export type UiSerializedN8nUser = {
   id: string;
   email: string;
+  disabled: boolean;
   role: UiSerializedRole | null;
 };
 
