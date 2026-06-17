@@ -62,6 +62,9 @@ export const UI_OIDC_CLIENT_SECRET = process.env.UI_OIDC_CLIENT_SECRET || OIDC_C
 export const UI_OIDC_REDIRECT_URI = process.env.UI_OIDC_REDIRECT_URI || '';
 export const UI_OIDC_SCOPES = process.env.UI_OIDC_SCOPES || OIDC_SCOPES;
 
+// CHEFS gateway
+export const CHEFS_GATEWAY_URL = process.env.CHEFS_GATEWAY_URL || '';
+
 // CSS SSO / AuthZ – all required; missing any disables CSS SSO
 export const AUTHZ_SERVICE_URL = process.env.AUTHZ_SERVICE_URL || '';
 export const AUTHZ_INTEGRATION_ID = process.env.AUTHZ_INTEGRATION_ID || '';

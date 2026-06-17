@@ -1,5 +1,6 @@
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
+import { CHEFS_GATEWAY_URL } from '@config';
 
 const log = createLogger('ChefsService');
 
@@ -19,7 +20,7 @@ export class ChefsService {
   private readonly baseUrl: string;
 
   constructor() {
-    this.gatewayUrl = process.env.CHEFS_GATEWAY_URL || 'https://submit.digital.gov.bc.ca/app/gateway/v1';
+    this.gatewayUrl = CHEFS_GATEWAY_URL;
     this.baseUrl = this.gatewayUrl.replace(/\/gateway\/v\d+\/?$/, '');
   }
 
