@@ -1,0 +1,11 @@
+{{- if .Values.conditionalRestore.enabled }}
+---
+# Tracks the last successfully restored S3 key to avoid re-restoring an unchanged backup
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-restore-state
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data: {}
+{{- end }}

@@ -17,5 +17,8 @@ dependencies:
 - name: dns-probe
   repository: file://../_dns-probe
   version: 0.1.0
-digest: sha256:9973ffbd3b511aeb85122c3fab9b234d0ded9fc1a13f6f90beab98611926ecad
-generated: "2026-06-16T22:28:21.559736739Z"
+- name: backup-storage
+  repository: https://bcgov.github.io/helm-charts
+  version: 0.1.18
+digest: sha256:ad87460b7ebe3e0be3ee1948f82990661bb5f102879e03a70b0a825e3b11c41f
+generated: "2026-06-17T10:32:17.603863706-07:00"

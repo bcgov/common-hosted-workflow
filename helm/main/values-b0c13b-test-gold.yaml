@@ -68,3 +68,16 @@ pgo:
     repo:
       s3:
         bucket: workflow-test
+
+backup-storage:
+  enabled: true
+
+  env:
+    S3_BUCKET:
+      value: workflow-test/backups/pgdump/
+
+  backupConfig: |
+    postgres=chwf-pgo-replicas:5432/n8n
+
+    0 * * * * default ./backup.sh -s
+    0 3 * * 1-5 default ./backup.sh -s -v all

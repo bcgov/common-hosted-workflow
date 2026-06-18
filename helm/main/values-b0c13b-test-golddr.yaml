@@ -53,6 +53,15 @@ pgo:
       s3:
         bucket: workflow-test
 
+  conditionalRestore:
+    enabled: false  # enable when dns-probe is enabled for test-golddr
+    s3:
+      bucket: workflow-test/backups/pgdump
+
+# backup-storage is intentionally disabled on GoldDR — backups are created on Gold only
+backup-storage:
+  enabled: false
+
 dns-probe:
   enabled: false
   env:

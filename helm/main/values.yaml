@@ -270,6 +270,55 @@ pgo:
         region: ca-central-1
         uriStyle: path
 
+# backup-storage — disabled by default, enabled only for gold deployments
+backup-storage:
+  enabled: false
+  image:
+    repository: ghcr.io/bcgov/backup-container
+    pullPolicy: IfNotPresent
+    tag: latest
+
+  persistence:
+    backup:
+      claimName: chwf-pgdump-backup
+      size: 256Mi
+      storageClassName: netapp-file-standard
+    verification:
+      claimName: chwf-pgdump-verify
+      size: 256Mi
+      storageClassName: netapp-file-standard
+      mountPath: /var/lib/pgsql/data
+
+  db:
+    enabled: true
+    secretName: chwf-pgo-pguser-n8n  # pragma: allowlist secret
+    usernameKey: user
+    passwordKey: password  # pragma: allowlist secret
+
+  env:
+    NUM_BACKUPS:
+      value: "2"
+    DAILY_BACKUPS:
+      value: "1"
+    WEEKLY_BACKUPS:
+      value: "1"
+    MONTHLY_BACKUPS:
+      value: "1"
+    BACKUP_STRATEGY:
+      value: "rolling"
+    S3_USER:
+      existingSecret:
+        name: chwf-pgo-s3  # pragma: allowlist secret
+        key: access-key
+    S3_PASSWORD:
+      existingSecret:
+        name: chwf-pgo-s3  # pragma: allowlist secret
+        key: secret-key
+    S3_ENDPOINT:
+      value: https://commonservices.objectstore.gov.bc.ca
+    S3_PRUNE_BACKUPS:
+      value: "false"
+
 # dns-probe — disabled by default, enabled only for golddr deployments
 dns-probe:
   enabled: false

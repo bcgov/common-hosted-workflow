@@ -1,0 +1,88 @@
+{{- if .Values.conditionalRestore.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "_.fullname" . }}-conditional-restore
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.conditionalRestore.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "_.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: restore-runner
+        spec:
+          serviceAccountName: {{ include "_.fullname" . }}-restore-runner
+          restartPolicy: Never
+          volumes:
+            - name: restore-script
+              configMap:
+                name: {{ include "_.fullname" . }}-restore-script
+                defaultMode: 0755
+          containers:
+            - name: pg-restore
+              image: "{{ .Values.conditionalRestore.image.repository }}:{{ .Values.conditionalRestore.image.tag }}"
+              imagePullPolicy: {{ .Values.conditionalRestore.image.pullPolicy }}
+              command: ["/bin/bash", "/scripts/restore.sh"]
+              volumeMounts:
+                - name: restore-script
+                  mountPath: /scripts
+              env:
+                - name: STATE_CONFIGMAP_NAME
+                  value: {{ include "_.fullname" . }}-restore-state
+                - name: DNS_PROBE_STATUS_URL
+                  value: {{ .Values.conditionalRestore.dnsProbStatusUrl | quote }}
+                - name: S3_ENDPOINT
+                  value: {{ .Values.conditionalRestore.s3.endpoint | quote }}
+                - name: S3_BUCKET
+                  value: {{ .Values.conditionalRestore.s3.bucket | quote }}
+                - name: S3_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.s3.secretName | quote }}
+                      key: access-key
+                - name: S3_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.s3.secretName | quote }}
+                      key: secret-key
+                - name: DATABASE_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.hostKey }}
+                - name: DATABASE_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.portKey }}
+                - name: DATABASE_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.dbnameKey }}
+                - name: DATABASE_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.usernameKey }}
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.passwordKey }}
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+{{- end }}

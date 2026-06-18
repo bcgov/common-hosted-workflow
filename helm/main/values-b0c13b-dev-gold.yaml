@@ -77,3 +77,16 @@ pgo:
     repo:
       s3:
         bucket: workflow-dev
+
+backup-storage:
+  enabled: true
+
+  env:
+    S3_BUCKET:
+      value: workflow-dev/backups/pgdump/
+
+  backupConfig: |
+    postgres=chwf-pgo-replicas:5432/n8n
+
+    0 * * * * default ./backup.sh -s
+    0 7 * * 1-5 default ./backup.sh -s -v all

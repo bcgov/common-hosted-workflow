@@ -54,6 +54,15 @@ pgo:
       s3:
         bucket: workflow-dev
 
+  conditionalRestore:
+    enabled: true
+    s3:
+      bucket: workflow-dev/backups/pgdump
+
+# backup-storage is intentionally disabled on GoldDR — backups are created on Gold only
+backup-storage:
+  enabled: false
+
 dns-probe:
   enabled: true
   env:

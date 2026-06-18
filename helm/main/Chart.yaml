@@ -29,3 +29,7 @@ dependencies:
     version: '0.1.0'
     repository: 'file://../_dns-probe'
     condition: dns-probe.enabled
+  - name: backup-storage
+    version: '0.1.18'
+    repository: 'https://bcgov.github.io/helm-charts'
+    condition: backup-storage.enabled
