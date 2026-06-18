@@ -48,10 +48,12 @@ export type UiAuthTokenPayload = {
   name?: string;
   oidc: UiOidcIdentity;
   n8nUser: UiSerializedN8nUser;
+  permissions: import('./permissions').Permissions;
 };
 
 export type UiAuthenticatedSession = UiSession & {
   n8nUser: UiSerializedN8nUser;
+  permissions: import('./permissions').Permissions;
 };
 
 export type UiOidcConfig = {

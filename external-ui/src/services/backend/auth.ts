@@ -12,6 +12,11 @@ export type AuthSessionResponse = {
   user: AuthSessionUser | null;
 };
 
+export type Permissions = {
+  canRequestAccess: boolean;
+  canReviewAccessRequests: boolean;
+};
+
 export type WhoamiResponse = {
   ok: boolean;
   route: string;
@@ -36,6 +41,7 @@ export type WhoamiResponse = {
       displayName: string;
     } | null;
   } | null;
+  permissions: Permissions;
 };
 
 export async function getWhoami(params?: { signal?: AbortSignal }) {
