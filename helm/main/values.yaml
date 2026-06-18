@@ -275,7 +275,7 @@ backup-storage:
   enabled: false
   image:
     repository: ghcr.io/bcgov/backup-container
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
     tag: latest
 
   persistence:

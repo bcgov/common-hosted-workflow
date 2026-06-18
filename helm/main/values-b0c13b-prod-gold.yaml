@@ -83,6 +83,10 @@ pgo:
 backup-storage:
   enabled: true
 
+  image:
+    tag: "2.13.0"
+    pullPolicy: IfNotPresent
+
   env:
     S3_BUCKET:
       value: workflow-prod/backups/pgdump/
