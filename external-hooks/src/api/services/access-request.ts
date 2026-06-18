@@ -250,8 +250,6 @@ export class AccessRequestService {
         return;
       }
 
-      console.log('debugging adminEmails', adminEmails);
-
       const html = renderEmail('accessRequestSubmitted', {
         requesterEmail,
         justification,

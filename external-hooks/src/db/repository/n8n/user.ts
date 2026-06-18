@@ -68,11 +68,19 @@ export class UserRepository {
 
   private getColumnName(propertyName: string): string {
     const column = this.userRepository.metadata.columns.find((entry) => entry.propertyName === propertyName);
-
-    if (!column) {
-      throw new Error(`Column metadata not found for user.${propertyName}`);
+    if (column) {
+      return column.databaseName;
     }
 
-    return column.databaseName;
+    for (const relation of this.userRepository.metadata.relations) {
+      const joinColumn = relation.joinColumns?.find(
+        (jc) => jc.propertyName === propertyName || jc.databaseName === propertyName,
+      );
+      if (joinColumn) {
+        return joinColumn.databaseName;
+      }
+    }
+
+    throw new Error(`Column metadata not found for user.${propertyName}`);
   }
 }
