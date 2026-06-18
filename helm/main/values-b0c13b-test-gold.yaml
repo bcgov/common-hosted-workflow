@@ -72,50 +72,12 @@ pgo:
 backup-storage:
   enabled: true
 
-  persistence:
-    backup:
-      claimName: chwf-pgdump-backup
-      size: 256Mi
-      storageClassName: netapp-file-standard
-    verification:
-      claimName: chwf-pgdump-verify
-      size: 256Mi
-      storageClassName: netapp-file-standard
-      mountPath: /var/lib/pgsql/data
-
-  db:
-    enabled: true
-    secretName: chwf-pgo-pguser-n8n  # pragma: allowlist secret
-    usernameKey: user
-    passwordKey: password  # pragma: allowlist secret
-
   env:
-    NUM_BACKUPS:
-      value: "2"
-    DAILY_BACKUPS:
-      value: "1"
-    WEEKLY_BACKUPS:
-      value: "1"
-    MONTHLY_BACKUPS:
-      value: "1"
-    BACKUP_STRATEGY:
-      value: "rolling"
-    S3_USER:
-      existingSecret:
-        name: chwf-pgdump-s3-creds  # pragma: allowlist secret
-        key: s3-user
-    S3_PASSWORD:
-      existingSecret:
-        name: chwf-pgdump-s3-creds  # pragma: allowlist secret
-        key: s3-password
-    S3_ENDPOINT:
-      value: https://commonservices.objectstore.gov.bc.ca
     S3_BUCKET:
       value: workflow-test/backups/pgdump/
-    S3_PRUNE_BACKUPS:
-      value: "false"
 
   backupConfig: |
-    postgres=chwf-pgo-primary:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n
 
     0 * * * * default ./backup.sh -s
+    0 3 * * 1-5 default ./backup.sh -s -v all

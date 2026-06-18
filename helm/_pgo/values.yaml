@@ -127,15 +127,14 @@ conditionalRestore:
   image:
     repository: ghcr.io/bcgov/backup-container
     tag: latest
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   schedule: "*/10 * * * *"
-  # Full URL to the dns-probe status endpoint, e.g. http://chwf-dns-probe:8000/api/status
-  dnsProbStatusUrl: ""
+  dnsProbStatusUrl: "http://chwf-dns-probe:8000/status"
   s3:
-    endpoint: ""
+    endpoint: https://commonservices.objectstore.gov.bc.ca
     bucket: ""
-    # Secret must have keys: s3-user, s3-password (same secret used by backup-storage on Gold)
-    secretName: ""
+    # Secret must have keys: access-key, secret-key (same secret used by backup-storage on Gold)
+    secretName: chwf-pgo-s3  # pragma: allowlist secret
   db:
     secretName: chwf-pgo-pguser-n8n # pragma: allowlist secret
     usernameKey: user
