@@ -129,7 +129,7 @@ conditionalRestore:
     tag: latest
     pullPolicy: IfNotPresent
   schedule: "*/10 * * * *"
-  dnsProbStatusUrl: "http://chwf-dns-probe:8000/status"
+  dnsProbStatusUrl: "http://chwf-dns-probe:8000/status"  # NOSONAR - internal k8s service, safe within cluster
   s3:
     endpoint: https://commonservices.objectstore.gov.bc.ca
     bucket: ""
