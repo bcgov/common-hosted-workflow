@@ -7,6 +7,5 @@ metadata:
   name: {{ include "_.fullname" . }}-restore-state
   labels:
     {{- include "_.labels" . | nindent 4 }}
-data:
-  last-restored-key: ""
+data: {}
 {{- end }}

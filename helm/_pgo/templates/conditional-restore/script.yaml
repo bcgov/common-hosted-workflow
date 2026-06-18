@@ -66,18 +66,24 @@ data:
     # --- 3. Condition C: GoldDR is standby — check if a new backup exists before restoring ---
     log "GoldDR is in standby mode (current_routing=primary). Checking for new backup..."
 
+    # S3_BUCKET is "bucket-name/path/prefix" — split for API calls
+    S3_BUCKET_NAME=$(echo "${S3_BUCKET}" | cut -d'/' -f1)
+    S3_PREFIX=$(echo "${S3_BUCKET}" | cut -d'/' -f2- | sed 's:/*$:/:')
+
     # Find the latest backup file via S3 ListObjectsV2 API (excludes directory markers)
-    LATEST_KEY=$(curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
+    S3_LIST=$(curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
       -u "${S3_USER}:${S3_PASSWORD}" \
-      "${S3_ENDPOINT}/${S3_BUCKET}?list-type=2" 2>/dev/null \
+      "${S3_ENDPOINT}/${S3_BUCKET_NAME}?list-type=2&prefix=${S3_PREFIX}" 2>&1 || true)
+
+    LATEST_KEY=$(echo "${S3_LIST}" \
       | grep -o '<Key>[^<]*</Key>' \
       | sed 's/<Key>//;s/<\/Key>//' \
       | grep -v '/$' \
       | sort \
-      | tail -1)
+      | tail -1 || true)
 
     if [ -z "${LATEST_KEY}" ]; then
-      log "ERROR: No backup files found at s3store/${S3_BUCKET}/. Cannot restore."
+      log "ERROR: No backup files found at ${S3_ENDPOINT}/${S3_BUCKET_NAME}/${S3_PREFIX}. Cannot restore."
       exit 1
     fi
 
@@ -104,7 +110,7 @@ data:
     curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
       -u "${S3_USER}:${S3_PASSWORD}" \
       -o /tmp/restore.sql.gz \
-      "${S3_ENDPOINT}/${S3_BUCKET}/${LATEST_KEY}"
+      "${S3_ENDPOINT}/${S3_BUCKET_NAME}/${LATEST_KEY}"
 
     log "Verifying downloaded archive..."
     gunzip -t /tmp/restore.sql.gz
