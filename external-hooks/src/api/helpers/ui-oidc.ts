@@ -1,3 +1,5 @@
+import type { Permissions } from './permissions';
+
 export type OidcDiscoveryDocument = {
   issuer?: string;
   authorization_endpoint?: string;
@@ -48,12 +50,12 @@ export type UiAuthTokenPayload = {
   name?: string;
   oidc: UiOidcIdentity;
   n8nUser: UiSerializedN8nUser;
-  permissions: import('./permissions').Permissions;
+  permissions: Permissions;
 };
 
 export type UiAuthenticatedSession = UiSession & {
   n8nUser: UiSerializedN8nUser;
-  permissions: import('./permissions').Permissions;
+  permissions: Permissions;
 };
 
 export type UiOidcConfig = {
