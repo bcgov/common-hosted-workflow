@@ -18,7 +18,7 @@ export function computePermissions(n8nUser: { disabled: boolean; role: { slug: s
   const isDisabled = n8nUser.disabled;
 
   return {
-    canRequestAccess: isDisabled || hasNoRole || !isAdmin,
+    canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
   };
 }
