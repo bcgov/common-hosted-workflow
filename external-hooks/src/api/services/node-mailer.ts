@@ -20,7 +20,6 @@ export type BaseNodeMailerService = {
 
 export type SendMailInput = {
   to: string | string[];
-  bcc?: string | string[];
   subject: string;
   html: string;
   text?: string;
@@ -38,14 +37,13 @@ export class NodeMailerService {
     this.transport = baseNodeMailer.transport;
   }
 
-  async sendMail({ to, bcc, subject, html, text, from, attachments = [] }: SendMailInput): Promise<void> {
+  async sendMail({ to, subject, html, text, from, attachments = [] }: SendMailInput): Promise<void> {
     const sanitizedHtml = sanitizeHtml(html);
     const plainText = text ?? convert(sanitizedHtml);
 
     await this.transport.sendMail({
       from: from ?? this.sender,
       to,
-      bcc,
       subject,
       text: plainText,
       html: sanitizedHtml,

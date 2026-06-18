@@ -256,12 +256,15 @@ export class AccessRequestService {
         createdAt: createdAt.toISOString(),
       });
 
-      await this.nodeMailerService.sendMail({
-        to: this.nodeMailerService.sender,
-        bcc: adminEmails,
-        subject: 'New Access Request Submitted',
-        html,
-      });
+      await Promise.all(
+        adminEmails.map((email) =>
+          this.nodeMailerService!.sendMail({
+            to: email,
+            subject: 'New Access Request Submitted',
+            html,
+          }),
+        ),
+      );
 
       log.info('Notified admins of new access request', { adminCount: adminEmails.length });
     } catch (error) {
