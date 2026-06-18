@@ -535,10 +535,14 @@ describe('AccessRequestService', () => {
       justification: 'Need access.',
     });
 
-    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockSendMail).toHaveBeenCalledTimes(2);
     expect(mockSendMail).toHaveBeenCalledWith({
-      to: 'noreply@example.com',
-      bcc: ['admin1@example.com', 'admin2@example.com'],
+      to: 'admin1@example.com',
+      subject: 'New Access Request Submitted',
+      html: expect.stringContaining('person@example.com'),
+    });
+    expect(mockSendMail).toHaveBeenCalledWith({
+      to: 'admin2@example.com',
       subject: 'New Access Request Submitted',
       html: expect.stringContaining('person@example.com'),
     });

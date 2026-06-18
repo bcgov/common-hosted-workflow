@@ -18,7 +18,6 @@ describe('NodeMailerService', () => {
     expect(sendMail).toHaveBeenCalledWith({
       from: 'default@example.com',
       to: 'person@example.com',
-      bcc: undefined,
       subject: 'Hello',
       text: 'Hi there',
       html: '<p>Hi there</p>',
@@ -44,36 +43,10 @@ describe('NodeMailerService', () => {
     expect(sendMail).toHaveBeenCalledWith({
       from: 'override@example.com',
       to: ['person@example.com'],
-      bcc: undefined,
       subject: 'Hello',
       text: 'Hello',
       html: '<p>Hello</p>',
       attachments: [{ filename: 'note.txt' }],
-    });
-  });
-
-  it('passes through bcc recipients', async () => {
-    const sendMail = vi.fn().mockResolvedValue(undefined);
-    const service = new NodeMailerService({
-      sender: 'default@example.com',
-      transport: { sendMail },
-    });
-
-    await service.sendMail({
-      to: 'default@example.com',
-      bcc: ['admin1@example.com', 'admin2@example.com'],
-      subject: 'Hello',
-      html: '<p>Hello</p>',
-    });
-
-    expect(sendMail).toHaveBeenCalledWith({
-      from: 'default@example.com',
-      to: 'default@example.com',
-      bcc: ['admin1@example.com', 'admin2@example.com'],
-      subject: 'Hello',
-      text: 'Hello',
-      html: '<p>Hello</p>',
-      attachments: [],
     });
   });
 });
