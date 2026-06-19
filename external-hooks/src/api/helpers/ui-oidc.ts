@@ -69,28 +69,28 @@ export type UiOidcConfig = {
 };
 
 import {
-  UI_OIDC_ISSUER,
-  UI_OIDC_AUTHORIZATION_ENDPOINT,
-  UI_OIDC_TOKEN_ENDPOINT,
-  UI_OIDC_USERINFO_ENDPOINT,
-  UI_OIDC_JWKS_URI,
-  UI_OIDC_CLIENT_ID,
-  UI_OIDC_CLIENT_SECRET,
+  OIDC_ISSUER,
+  OIDC_AUTHORIZATION_ENDPOINT,
+  OIDC_TOKEN_ENDPOINT,
+  OIDC_USERINFO_ENDPOINT,
+  OIDC_JWKS_URI,
+  OIDC_CLIENT_ID,
+  OIDC_CLIENT_SECRET,
   UI_OIDC_REDIRECT_URI,
-  UI_OIDC_SCOPES,
+  OIDC_SCOPES,
 } from '@config';
 
 export function getOidcConfigFromEnv(): UiOidcConfig {
   return {
-    issuerUrl: UI_OIDC_ISSUER,
-    authorizationEndpoint: UI_OIDC_AUTHORIZATION_ENDPOINT,
-    tokenEndpoint: UI_OIDC_TOKEN_ENDPOINT,
-    userinfoEndpoint: UI_OIDC_USERINFO_ENDPOINT,
-    jwksUri: UI_OIDC_JWKS_URI,
-    clientId: UI_OIDC_CLIENT_ID,
-    clientSecret: UI_OIDC_CLIENT_SECRET,
+    issuerUrl: OIDC_ISSUER,
+    authorizationEndpoint: OIDC_AUTHORIZATION_ENDPOINT,
+    tokenEndpoint: OIDC_TOKEN_ENDPOINT,
+    userinfoEndpoint: OIDC_USERINFO_ENDPOINT,
+    jwksUri: OIDC_JWKS_URI,
+    clientId: OIDC_CLIENT_ID,
+    clientSecret: OIDC_CLIENT_SECRET,
     redirectUri: UI_OIDC_REDIRECT_URI,
-    scopes: UI_OIDC_SCOPES,
+    scopes: OIDC_SCOPES,
   };
 }
 

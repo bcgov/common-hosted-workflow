@@ -18,8 +18,9 @@ import {
   accessRequestListResponseSchema,
   reviewAccessRequestResponseSchema,
 } from '../schemas/access-request';
+import { issueUiSessionToken } from '../helpers/ui-auth-token';
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
-import { getUiSession, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
+import { getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
 import { computePermissions } from '../helpers/permissions';
 import { appendQueryParam, appendTokenToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
@@ -148,17 +149,27 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       return;
     }
 
-    const token = await createUiAuthToken({
-      oidc: {
-        subject: result.subject,
-        email: result.email,
-        preferredUsername: result.preferredUsername,
-        name: result.name,
-        issuer: result.issuer,
-        audience: result.audience,
-        claims: result.claims,
-      },
-    });
+    let token: string;
+
+    try {
+      token = await issueUiSessionToken({
+        oidc: {
+          subject: result.subject,
+          email: result.email,
+          preferredUsername: result.preferredUsername,
+          name: result.name,
+          issuer: result.issuer,
+          audience: result.audience,
+          claims: result.claims,
+        },
+        upstreamAccessToken: result.accessToken,
+        upstreamExpiresAt: result.accessTokenExpiresAt,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to establish UI session';
+      res.redirect(appendQueryParam(result.returnTo, 'error', message));
+      return;
+    }
 
     res.redirect(appendTokenToReturnTo(result.returnTo, token));
   });

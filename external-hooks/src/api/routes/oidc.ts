@@ -15,7 +15,7 @@ import {
   parseN8nOidcRole,
   verifySignedCookie,
 } from '../helpers/n8n-oidc';
-import { createUiAuthToken } from '../helpers/ui-oidc-session';
+import { issueUiSessionToken, resolveAccessTokenExpiresAt } from '../helpers/ui-auth-token';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
 import { appendQueryParam, buildUiAppUrl } from '../helpers/url';
 import { createLogger, logError } from '../utils/logger';
@@ -51,9 +51,19 @@ function getAuthCookieOptions() {
   };
 }
 
-async function redirectToAccessRequest(params: { user: N8nOidcUser | null; identity: UiOidcIdentity }, res: Response) {
-  const uiToken = await createUiAuthToken({
+async function redirectToAccessRequest(
+  params: {
+    user: N8nOidcUser | null;
+    identity: UiOidcIdentity;
+    accessToken?: string;
+    accessTokenExpiresAt?: number;
+  },
+  res: Response,
+) {
+  const uiToken = await issueUiSessionToken({
     oidc: params.identity,
+    upstreamAccessToken: params.accessToken,
+    upstreamExpiresAt: params.accessTokenExpiresAt,
   });
 
   return res.redirect(appendQueryParam(buildUiAppUrl('/access-request'), 'token', uiToken));
@@ -152,6 +162,7 @@ export function buildOidcRouter({ n8nRepositories, jwtService, userService, conf
         audience: [config.clientId],
         claims: identity.claims,
       };
+      const accessTokenExpiresAt = resolveAccessTokenExpiresAt(completion.tokens.expires_in);
 
       const jwtRole = parseN8nOidcRole(identity.claims[config.rolesClaim]);
       const nextRole = config.restrictNoRole ? (jwtRole ?? '') : jwtRole || 'global:member';
@@ -163,7 +174,15 @@ export function buildOidcRouter({ n8nRepositories, jwtService, userService, conf
           log.info('No OIDC role for new user, redirecting to access request page without creating n8n user', {
             email: identity.email,
           });
-          return await redirectToAccessRequest({ user: null, identity: oidcIdentity }, res);
+          return await redirectToAccessRequest(
+            {
+              user: null,
+              identity: oidcIdentity,
+              accessToken: completion.tokens.access_token,
+              accessTokenExpiresAt,
+            },
+            res,
+          );
         }
 
         const userCount = await userRepository.count();
@@ -236,7 +255,15 @@ export function buildOidcRouter({ n8nRepositories, jwtService, userService, conf
           email: identity.email,
         });
 
-        return await redirectToAccessRequest({ user, identity: oidcIdentity }, res);
+        return await redirectToAccessRequest(
+          {
+            user,
+            identity: oidcIdentity,
+            accessToken: completion.tokens.access_token,
+            accessTokenExpiresAt,
+          },
+          res,
+        );
       }
 
       if (user.disabled) {

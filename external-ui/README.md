@@ -37,16 +37,17 @@ The UI now uses backend-managed auth. Sign-in redirects to `GET /ui-api/auth/log
 
 Set these on the backend process at runtime:
 
-| Var                    | Default                                | Description               |
-| ---------------------- | -------------------------------------- | ------------------------- |
-| `UI_OIDC_ISSUER`       | `http://localhost:8080/realms/starter` | Keycloak issuer URL       |
-| `UI_OIDC_CLIENT_ID`    | `app`                                  | Public Keycloak client ID |
-| `UI_OIDC_REDIRECT_URI` | `{origin}/ui-api/auth/callback`        | OIDC callback URL         |
-| `UI_OIDC_SCOPES`       | `openid email profile`                 | OIDC scopes               |
+| Var                          | Default                                | Description                                                  |
+| ---------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `OIDC_ISSUER`                | `http://localhost:8080/realms/starter` | Keycloak issuer URL                                          |
+| `OIDC_CLIENT_ID`             | `app`                                  | Public Keycloak client ID                                    |
+| `UI_OIDC_REDIRECT_URI`       | `{origin}/ui-api/auth/callback`        | OIDC callback URL                                            |
+| `OIDC_SCOPES`                | `openid email profile`                 | OIDC scopes                                                  |
+| `UI_AUTH_USE_SEPARATE_TOKEN` | `false`                                | Use app-issued UI token instead of raw upstream access token |
 
 ## Authentication
 
-Uses backend-driven **Authorization Code Flow with PKCE**. The backend mints a JWT for the UI after callback, the SPA stores it locally, and every `ui-api` request sends it as `Authorization: Bearer ...`.
+Uses backend-driven **Authorization Code Flow with PKCE**. After callback, the backend returns either the upstream access token or an app-issued UI token depending on `UI_AUTH_USE_SEPARATE_TOKEN`, and the SPA stores it locally for `Authorization: Bearer ...` requests to `ui-api`.
 
 ## Routes
 

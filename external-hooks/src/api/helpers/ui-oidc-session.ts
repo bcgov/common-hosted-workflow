@@ -1,10 +1,10 @@
 import { createSecretKey } from 'crypto';
 import type { Request } from 'express';
-import { SignJWT, jwtVerify } from 'jose';
+import { jwtVerify } from 'jose';
 import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE } from '@config';
 import { type UiAuthTokenPayload, type UiOidcIdentity, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
-
-const UI_AUTH_JWT_TTL_MS = 8 * 60 * 60 * 1000;
+import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo } from './oidc-provider';
+import { getOidcConfigFromEnv } from './ui-oidc';
 
 function getBearerToken(req: Request) {
   const header = req.header('authorization');
@@ -28,28 +28,77 @@ export function serializeN8nUser(
     : null;
 }
 
-export async function createUiAuthToken(params: { oidc: UiOidcIdentity }) {
+function tryGetTokenExpiryMs(token: string) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return undefined;
+    }
+
+    let base64 = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+
+    const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8')) as { exp?: number };
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function tryGetLocalUiSession(token: string): Promise<UiSession | null> {
   if (!UI_AUTH_JWT_SECRET) {
-    throw new Error('UI auth JWT secret is not configured');
+    return null;
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({
-    email: params.oidc.email,
-    preferredUsername: params.oidc.preferredUsername,
-    name: params.oidc.name,
-    oidc: {
-      ...params.oidc,
-      claims: params.oidc.claims,
-    },
-  } satisfies Omit<UiAuthTokenPayload, 'iss' | 'aud' | 'sub'>)
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuer(UI_AUTH_JWT_ISSUER)
-    .setAudience(UI_AUTH_JWT_AUDIENCE)
-    .setSubject(params.oidc.subject)
-    .setIssuedAt(now)
-    .setExpirationTime(now + Math.floor(UI_AUTH_JWT_TTL_MS / 1000))
-    .sign(createSecretKey(Buffer.from(UI_AUTH_JWT_SECRET)));
+  const verification = await jwtVerify(token, createSecretKey(Buffer.from(UI_AUTH_JWT_SECRET)), {
+    issuer: UI_AUTH_JWT_ISSUER,
+    audience: UI_AUTH_JWT_AUDIENCE,
+  });
+
+  const payload = verification.payload as Partial<UiAuthTokenPayload>;
+  if (!payload.sub || !payload.email || !payload.oidc) return null;
+
+  return {
+    subject: payload.sub,
+    email: payload.email,
+    preferredUsername: payload.preferredUsername,
+    name: payload.name,
+    issuer: payload.oidc.issuer,
+    audience: payload.oidc.audience,
+    claims: payload.oidc.claims,
+    expiresAt: verification.payload.exp ? verification.payload.exp * 1000 : undefined,
+  } satisfies UiSession;
+}
+
+async function tryGetUpstreamUiSession(token: string): Promise<UiSession | null> {
+  const config = getOidcConfigFromEnv();
+  if (!config.clientId) {
+    return null;
+  }
+
+  const discovery = await fetchOidcDiscoveryDocument(config);
+  const claims = await fetchOidcUserInfo({ accessToken: token, discovery, config });
+  if (!claims) {
+    return null;
+  }
+
+  const identity = extractOidcIdentity({ claims, discovery, config });
+  if (!identity.email) {
+    return null;
+  }
+
+  return {
+    subject: identity.subject,
+    email: identity.email,
+    preferredUsername: identity.preferredUsername,
+    name: identity.name,
+    issuer: identity.issuer,
+    audience: identity.audience,
+    claims: identity.claims,
+    expiresAt: tryGetTokenExpiryMs(token),
+  } satisfies UiSession;
 }
 
 export async function getUiSession(req: Request) {
@@ -57,27 +106,12 @@ export async function getUiSession(req: Request) {
   if (!token) return null;
 
   try {
-    if (!UI_AUTH_JWT_SECRET) return null;
-
-    const verification = await jwtVerify(token, createSecretKey(Buffer.from(UI_AUTH_JWT_SECRET)), {
-      issuer: UI_AUTH_JWT_ISSUER,
-      audience: UI_AUTH_JWT_AUDIENCE,
-    });
-
-    const payload = verification.payload as Partial<UiAuthTokenPayload>;
-    if (!payload.sub || !payload.email || !payload.oidc) return null;
-
-    return {
-      subject: payload.sub,
-      email: payload.email,
-      preferredUsername: payload.preferredUsername,
-      name: payload.name,
-      issuer: payload.oidc.issuer,
-      audience: payload.oidc.audience,
-      claims: payload.oidc.claims,
-      expiresAt: verification.payload.exp ? verification.payload.exp * 1000 : undefined,
-    } as UiSession;
+    return (await tryGetLocalUiSession(token)) ?? (await tryGetUpstreamUiSession(token));
   } catch {
-    return null;
+    try {
+      return await tryGetUpstreamUiSession(token);
+    } catch {
+      return null;
+    }
   }
 }
