@@ -1,12 +1,12 @@
 import { createSecretKey } from 'crypto';
 import type { Request } from 'express';
 import { jwtVerify } from 'jose';
-import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE } from '@config';
+import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE, UI_AUTH_USE_SEPARATE_TOKEN } from '@config';
 import { type UiAuthTokenPayload, type UiOidcIdentity, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
 import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo } from './oidc-provider';
 import { getOidcConfigFromEnv } from './ui-oidc';
 
-function getBearerToken(req: Request) {
+export function getBearerToken(req: Request) {
   const header = req.header('authorization');
   if (!header) return null;
 
@@ -106,12 +106,8 @@ export async function getUiSession(req: Request) {
   if (!token) return null;
 
   try {
-    return (await tryGetLocalUiSession(token)) ?? (await tryGetUpstreamUiSession(token));
+    return UI_AUTH_USE_SEPARATE_TOKEN ? await tryGetLocalUiSession(token) : await tryGetUpstreamUiSession(token);
   } catch {
-    try {
-      return await tryGetUpstreamUiSession(token);
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
