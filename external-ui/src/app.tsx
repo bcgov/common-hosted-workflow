@@ -10,7 +10,6 @@ import { useAuth } from './auth/auth-context';
 import { getWhoami } from './services/backend/auth';
 import { getMyAccessRequest } from './services/backend/access-requests';
 import { getStoredAppToken } from './services/backend/axios';
-import { isAdminRole } from './lib/roles';
 
 function AccessRequestRoute() {
   const { user, isLoading: authLoading } = useAuth();
@@ -29,18 +28,13 @@ function AccessRequestRoute() {
     enabled: canQuery,
   });
 
-  const isAdmin = isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug);
-  const isDisabled = whoamiQuery.data?.n8nUser?.disabled === true;
-  const hasNoRole = whoamiQuery.data?.n8nUser?.role == null;
-  const hasPendingRequest = myRequestQuery.data?.accessRequest?.status === 'pending';
+  const canRequestAccess = whoamiQuery.data?.permissions?.canRequestAccess ?? false;
 
   if (authLoading || whoamiQuery.isLoading || myRequestQuery.isLoading) {
     return null;
   }
 
-  const needsAccessRequest = isDisabled || hasNoRole || (!isAdmin && hasPendingRequest);
-
-  if (!needsAccessRequest) {
+  if (!canRequestAccess) {
     return <Navigate to="/" replace />;
   }
 

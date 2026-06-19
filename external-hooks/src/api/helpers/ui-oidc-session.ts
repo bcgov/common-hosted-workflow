@@ -8,6 +8,7 @@ import {
   type UiSerializedN8nUser,
   type UiOidcIdentity,
 } from './ui-oidc';
+import { computePermissions, type Permissions } from './permissions';
 
 const UI_AUTH_JWT_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -38,6 +39,7 @@ export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser:
     throw new Error('UI auth JWT secret is not configured');
   }
 
+  const permissions = computePermissions(params.n8nUser);
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({
     email: params.oidc.email,
@@ -48,6 +50,7 @@ export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser:
       claims: params.oidc.claims,
     },
     n8nUser: params.n8nUser,
+    permissions,
   } satisfies Omit<UiAuthTokenPayload, 'iss' | 'aud' | 'sub'>)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuer(UI_AUTH_JWT_ISSUER)
@@ -83,6 +86,7 @@ export async function getUiSession(req: Request) {
       claims: payload.oidc.claims,
       expiresAt: verification.payload.exp ? verification.payload.exp * 1000 : undefined,
       n8nUser: payload.n8nUser,
+      permissions: payload.permissions,
     } as UiAuthenticatedSession;
   } catch {
     return null;

@@ -5,13 +5,16 @@ type EmailTemplateDataMap = {
     requesterEmail: string;
     justification: string;
     createdAt: string;
+    reviewUrl: string;
   };
   accessRequestApproved: {
     reviewerEmail: string;
+    homeUrl: string;
   };
   accessRequestDenied: {
     reviewerEmail: string;
     denyReason?: string;
+    accessRequestUrl: string;
   };
 };
 
@@ -22,7 +25,7 @@ const templates = {
 <p><strong>Requester:</strong> {{requesterEmail}}</p>
 <p><strong>Justification:</strong> {{justification}}</p>
 <p><strong>Submitted:</strong> {{createdAt}}</p>
-<p>Please review this request in the admin dashboard.</p>`,
+<p><a href="{{reviewUrl}}">Review this request</a></p>`,
   ),
 
   accessRequestApproved: Handlebars.compile<EmailTemplateDataMap['accessRequestApproved']>(
@@ -30,7 +33,8 @@ const templates = {
 <p>Your access request has been approved.</p>
 <p><strong>Status:</strong> Approved</p>
 <p><strong>Reviewed by:</strong> {{reviewerEmail}}</p>
-<p>You can now access the system.</p>`,
+<p>You can now access the system.</p>
+<p><a href="{{homeUrl}}">Go to the application</a></p>`,
   ),
 
   accessRequestDenied: Handlebars.compile<EmailTemplateDataMap['accessRequestDenied']>(
@@ -39,7 +43,7 @@ const templates = {
 <p><strong>Status:</strong> Denied</p>
 <p><strong>Reviewed by:</strong> {{reviewerEmail}}</p>
 {{#if denyReason}}<p><strong>Reason:</strong> {{denyReason}}</p>{{/if}}
-<p>If you have questions, please contact your administrator.</p>`,
+<p><a href="{{accessRequestUrl}}">Submit a new request</a></p>`,
   ),
 } satisfies {
   [K in keyof EmailTemplateDataMap]: ReturnType<typeof Handlebars.compile<EmailTemplateDataMap[K]>>;

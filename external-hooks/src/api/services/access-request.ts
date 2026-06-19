@@ -6,6 +6,7 @@ import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { UserService } from './user';
 import type { CssSsoService } from './css-sso';
 import type { NodeMailerService } from './node-mailer';
+import { UI_APP_BASE_URL } from '@config';
 import { renderEmail } from './email-templates';
 import { accessRequest, type AccessRequest } from '../../db/schema/access-request';
 import { AppError } from '../utils/errors';
@@ -250,10 +251,12 @@ export class AccessRequestService {
         return;
       }
 
+      const reviewUrl = `${UI_APP_BASE_URL}/access-requests`;
       const html = renderEmail('accessRequestSubmitted', {
         requesterEmail,
         justification,
         createdAt: createdAt.toISOString(),
+        reviewUrl,
       });
 
       await Promise.all(
@@ -284,11 +287,17 @@ export class AccessRequestService {
     }
 
     try {
-      const templateName = action === 'approve' ? 'accessRequestApproved' : 'accessRequestDenied';
-      const html = renderEmail(templateName, {
-        reviewerEmail,
-        denyReason: action === 'deny' ? denyReason : undefined,
-      });
+      const html =
+        action === 'approve'
+          ? renderEmail('accessRequestApproved', {
+              reviewerEmail,
+              homeUrl: `${UI_APP_BASE_URL}/`,
+            })
+          : renderEmail('accessRequestDenied', {
+              reviewerEmail,
+              denyReason,
+              accessRequestUrl: `${UI_APP_BASE_URL}/access-request`,
+            });
 
       await this.nodeMailerService.sendMail({
         to: requesterEmail,

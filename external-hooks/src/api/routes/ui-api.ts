@@ -136,6 +136,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
         claims: session.claims,
       },
       n8nUser: session.n8nUser,
+      permissions: session.permissions,
       userAgent: req.get('user-agent'),
     });
   });
