@@ -51,9 +51,7 @@ export type UiAuthTokenPayload = {
   oidc: UiOidcIdentity;
 };
 
-export type UiIdentitySession = UiSession;
-
-export type UiResolvedSession = UiIdentitySession & {
+export type UiResolvedSession = UiSession & {
   n8nUser: UiSerializedN8nUser;
   permissions: Permissions;
 };

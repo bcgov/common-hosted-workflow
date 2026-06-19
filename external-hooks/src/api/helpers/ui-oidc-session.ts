@@ -2,12 +2,7 @@ import { createSecretKey } from 'crypto';
 import type { Request } from 'express';
 import { SignJWT, jwtVerify } from 'jose';
 import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE } from '@config';
-import {
-  type UiIdentitySession,
-  type UiAuthTokenPayload,
-  type UiOidcIdentity,
-  type UiSerializedN8nUser,
-} from './ui-oidc';
+import { type UiAuthTokenPayload, type UiOidcIdentity, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
 
 const UI_AUTH_JWT_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -81,7 +76,7 @@ export async function getUiSession(req: Request) {
       audience: payload.oidc.audience,
       claims: payload.oidc.claims,
       expiresAt: verification.payload.exp ? verification.payload.exp * 1000 : undefined,
-    } as UiIdentitySession;
+    } as UiSession;
   } catch {
     return null;
   }
