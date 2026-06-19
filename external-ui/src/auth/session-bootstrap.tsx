@@ -5,12 +5,12 @@ import { clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../se
 import { sessionState } from '../state/session';
 
 function consumeTokenFromUrl() {
-  const url = new URL(window.location.href);
+  const url = new URL(globalThis.location.href);
   const token = url.searchParams.get('token');
   if (!token) return null;
 
   url.searchParams.delete('token');
-  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  globalThis.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   return token;
 }
 

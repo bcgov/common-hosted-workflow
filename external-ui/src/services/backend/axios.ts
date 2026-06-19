@@ -4,7 +4,7 @@ export const APP_AUTH_TOKEN_STORAGE_KEY = 'external-ui.auth-token';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/';
 
 function getApiOrigin() {
-  return window.location.origin;
+  return globalThis.location.origin;
 }
 
 function getApiBaseUrl() {
@@ -12,15 +12,15 @@ function getApiBaseUrl() {
 }
 
 export function getStoredAppToken() {
-  return window.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY);
+  return globalThis.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY);
 }
 
 export function setStoredAppToken(token: string) {
-  window.localStorage.setItem(APP_AUTH_TOKEN_STORAGE_KEY, token);
+  globalThis.localStorage.setItem(APP_AUTH_TOKEN_STORAGE_KEY, token);
 }
 
 export function clearStoredAppToken() {
-  window.localStorage.removeItem(APP_AUTH_TOKEN_STORAGE_KEY);
+  globalThis.localStorage.removeItem(APP_AUTH_TOKEN_STORAGE_KEY);
 }
 
 export function buildApiUrl(path: string) {

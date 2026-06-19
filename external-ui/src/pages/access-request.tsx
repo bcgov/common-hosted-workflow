@@ -128,7 +128,7 @@ export function AccessRequest() {
   const queryClient = useQueryClient();
   const [justification, setJustification] = useState('');
   const [showNewRequest, setShowNewRequest] = useState(false);
-  const redirectError = new URLSearchParams(window.location.search).get('error');
+  const redirectError = new URLSearchParams(globalThis.location.search).get('error');
 
   const hasToken = Boolean(getStoredAppToken());
   const canQueryMyRequest = !authLoading && (Boolean(user) || hasToken);

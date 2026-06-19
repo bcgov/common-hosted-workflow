@@ -2,7 +2,7 @@ import { buildApiUrl, clearStoredAppToken } from '../services/backend/axios';
 import { sessionState } from '../state/session';
 
 function getCurrentUiPath() {
-  const url = new URL(window.location.href);
+  const url = new URL(globalThis.location.href);
   url.searchParams.delete('token');
   return url.toString();
 }
@@ -18,12 +18,12 @@ function buildAuthRouteUrl(path: string, params: Record<string, string>) {
 }
 
 export function login() {
-  window.location.assign(buildAuthRouteUrl('/ui-api/auth/login', { returnTo: getCurrentUiPath() }));
+  globalThis.location.assign(buildAuthRouteUrl('/ui-api/auth/login', { returnTo: getCurrentUiPath() }));
 }
 
 export function logout() {
   clearStoredAppToken();
   sessionState.session = null;
   sessionState.isLoading = false;
-  window.location.assign(buildAuthRouteUrl('/ui-api/auth/logout', { returnTo: getCurrentUiPath() }));
+  globalThis.location.assign(buildAuthRouteUrl('/ui-api/auth/logout', { returnTo: getCurrentUiPath() }));
 }

@@ -1,34 +1,26 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router';
+import { SessionBootstrap } from './auth/session-bootstrap';
+import { App } from './app';
 import './index.css';
 import { getAppBasePath } from './config/base-path';
+import { queryClient } from './query-client';
 
-async function bootstrap() {
-  const [{ BrowserRouter }, { QueryClientProvider }, { SessionBootstrap }, { queryClient }, { App }] =
-    await Promise.all([
-      import('react-router'),
-      import('@tanstack/react-query'),
-      import('./auth/session-bootstrap'),
-      import('./query-client'),
-      import('./app'),
-    ]);
-
-  const root = document.getElementById('root');
-  if (!root) {
-    throw new Error('Root element not found');
-  }
-
-  createRoot(root).render(
-    <StrictMode>
-      <BrowserRouter basename={getAppBasePath() || undefined}>
-        <QueryClientProvider client={queryClient}>
-          <SessionBootstrap>
-            <App />
-          </SessionBootstrap>
-        </QueryClientProvider>
-      </BrowserRouter>
-    </StrictMode>,
-  );
+const root = document.getElementById('root');
+if (!root) {
+  throw new Error('Root element not found');
 }
 
-void bootstrap();
+createRoot(root).render(
+  <StrictMode>
+    <BrowserRouter basename={getAppBasePath() || undefined}>
+      <QueryClientProvider client={queryClient}>
+        <SessionBootstrap>
+          <App />
+        </SessionBootstrap>
+      </QueryClientProvider>
+    </BrowserRouter>
+  </StrictMode>,
+);
