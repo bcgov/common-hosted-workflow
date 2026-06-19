@@ -3,12 +3,11 @@ import type { Request } from 'express';
 import { SignJWT, jwtVerify } from 'jose';
 import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE } from '@config';
 import {
-  type UiAuthenticatedSession,
+  type UiIdentitySession,
   type UiAuthTokenPayload,
-  type UiSerializedN8nUser,
   type UiOidcIdentity,
+  type UiSerializedN8nUser,
 } from './ui-oidc';
-import { computePermissions, type Permissions } from './permissions';
 
 const UI_AUTH_JWT_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -34,12 +33,11 @@ export function serializeN8nUser(
     : null;
 }
 
-export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser: UiSerializedN8nUser }) {
+export async function createUiAuthToken(params: { oidc: UiOidcIdentity }) {
   if (!UI_AUTH_JWT_SECRET) {
     throw new Error('UI auth JWT secret is not configured');
   }
 
-  const permissions = computePermissions(params.n8nUser);
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({
     email: params.oidc.email,
@@ -49,8 +47,6 @@ export async function createUiAuthToken(params: { oidc: UiOidcIdentity; n8nUser:
       ...params.oidc,
       claims: params.oidc.claims,
     },
-    n8nUser: params.n8nUser,
-    permissions,
   } satisfies Omit<UiAuthTokenPayload, 'iss' | 'aud' | 'sub'>)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuer(UI_AUTH_JWT_ISSUER)
@@ -74,7 +70,7 @@ export async function getUiSession(req: Request) {
     });
 
     const payload = verification.payload as Partial<UiAuthTokenPayload>;
-    if (!payload.sub || !payload.email || !payload.oidc || !payload.n8nUser) return null;
+    if (!payload.sub || !payload.email || !payload.oidc) return null;
 
     return {
       subject: payload.sub,
@@ -85,25 +81,8 @@ export async function getUiSession(req: Request) {
       audience: payload.oidc.audience,
       claims: payload.oidc.claims,
       expiresAt: verification.payload.exp ? verification.payload.exp * 1000 : undefined,
-      n8nUser: payload.n8nUser,
-      permissions: payload.permissions,
-    } as UiAuthenticatedSession;
+    } as UiIdentitySession;
   } catch {
     return null;
   }
-}
-
-export async function getUiSessionSummary(req: Request) {
-  const session = await getUiSession(req);
-  return session
-    ? {
-        authenticated: true,
-        user: {
-          subject: session.subject,
-          email: session.email,
-          preferredUsername: session.preferredUsername,
-          name: session.name,
-        },
-      }
-    : { authenticated: false, user: null };
 }

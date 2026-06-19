@@ -19,7 +19,8 @@ import {
   reviewAccessRequestResponseSchema,
 } from '../schemas/access-request';
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
-import { getUiSession, getUiSessionSummary, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
+import { getUiSession, createUiAuthToken, serializeN8nUser } from '../helpers/ui-oidc-session';
+import { computePermissions } from '../helpers/permissions';
 import { appendQueryParam, appendTokenToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
@@ -29,13 +30,37 @@ type UiApiMutableRequest = Request & {
   context?: UiApiRequest['context'];
 };
 
+async function resolveUiRequestContext(req: Request, services: ApiRouteContext['services']) {
+  const session = await getUiSession(req);
+  if (!session) {
+    return null;
+  }
+
+  const context = await services.uiApi.loadUserContext(session.email);
+  const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
+    id: session.subject,
+    email: session.email,
+    disabled: false,
+    role: null,
+  };
+
+  return {
+    session: {
+      ...session,
+      n8nUser: resolvedN8nUser,
+      permissions: computePermissions(resolvedN8nUser),
+    },
+    context,
+  };
+}
+
 function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
   return async (req: UiApiMutableRequest, _res: Response, next: NextFunction) => {
     try {
-      const session = await getUiSession(req);
-      if (session) {
-        req.session = session;
-        req.context = await services.uiApi.loadUserContext(session.email);
+      const resolved = await resolveUiRequestContext(req, services);
+      if (resolved) {
+        req.session = resolved.session;
+        req.context = resolved.context;
       }
 
       next();
@@ -81,7 +106,34 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   const requireUiRequestContext = requireUiRequestContextMiddleware(services);
 
   router.get('/session', async (req, res) => {
-    res.json(await getUiSessionSummary(req));
+    const resolved = await resolveUiRequestContext(req, services);
+    const session = resolved?.session;
+
+    res.json(
+      session
+        ? {
+            authenticated: true,
+            user: {
+              subject: session.subject,
+              email: session.email,
+              preferredUsername: session.preferredUsername,
+              name: session.name,
+            },
+            oidc: {
+              issuer: session.issuer,
+              subject: session.subject,
+              audience: session.audience,
+              email: session.email,
+              preferredUsername: session.preferredUsername,
+              name: session.name,
+              expiresAt: session.expiresAt,
+              claims: session.claims,
+            },
+            n8nUser: session.n8nUser,
+            permissions: session.permissions,
+          }
+        : { authenticated: false, user: null, oidc: null, n8nUser: null, permissions: null },
+    );
   });
 
   router.get('/auth/login', async (req, res) => {
@@ -96,7 +148,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       return;
     }
 
-    const n8nUser = await services.uiApi.getWhoami(result.email);
     const token = await createUiAuthToken({
       oidc: {
         subject: result.subject,
@@ -107,7 +158,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
         audience: result.audience,
         claims: result.claims,
       },
-      n8nUser: serializeN8nUser(n8nUser) ?? { id: result.subject, email: result.email, role: null },
     });
 
     res.redirect(appendTokenToReturnTo(result.returnTo, token));

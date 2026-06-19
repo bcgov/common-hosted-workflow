@@ -49,11 +49,11 @@ export type UiAuthTokenPayload = {
   preferredUsername?: string;
   name?: string;
   oidc: UiOidcIdentity;
-  n8nUser: UiSerializedN8nUser;
-  permissions: Permissions;
 };
 
-export type UiAuthenticatedSession = UiSession & {
+export type UiIdentitySession = UiSession;
+
+export type UiResolvedSession = UiIdentitySession & {
   n8nUser: UiSerializedN8nUser;
   permissions: Permissions;
 };
@@ -104,4 +104,16 @@ export type UiSessionSummary = {
     preferredUsername?: string;
     name?: string;
   } | null;
+  oidc: {
+    issuer: string;
+    subject: string;
+    audience: string[];
+    email: string;
+    preferredUsername?: string;
+    name?: string;
+    expiresAt?: number;
+    claims: Record<string, unknown>;
+  } | null;
+  n8nUser: UiSerializedN8nUser | null;
+  permissions: Permissions | null;
 };
