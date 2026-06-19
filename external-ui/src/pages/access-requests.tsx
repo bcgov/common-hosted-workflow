@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useAuth } from '../auth/auth-context';
-import { getWhoami } from '../services/backend/auth';
+import { login } from '../auth/session-actions';
 import { listAccessRequests, reviewAccessRequest } from '../services/backend/access-requests';
 import type { AccessRequestListItem } from '../services/backend/access-requests';
 import { AccessRequestStatusBadge } from '../components/access-request-status-badge';
-import { isAdminRole } from '../lib/roles';
+import { useAuthUser, useSession } from '../state/session';
 import { IconLogin2, IconCheck, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -211,22 +210,17 @@ function RequestTable({
 }
 
 export function AccessRequests() {
-  const { user, login } = useAuth();
+  const user = useAuthUser();
+  const session = useSession();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [reviewingRequest, setReviewingRequest] = useState<AccessRequestListItem | null>(null);
   const [denyReason, setDenyReason] = useState('');
 
-  const whoamiQuery = useQuery({
-    queryKey: ['whoami', user?.email ?? ''],
-    queryFn: ({ signal }) => getWhoami({ signal }),
-    enabled: Boolean(user),
-  });
-
   const listQuery = useQuery({
     queryKey: ['access-requests', 'admin', user?.email ?? '', statusFilter],
     queryFn: ({ signal }) => listAccessRequests({ status: statusFilter, limit: PAGE_SIZE }, { signal }),
-    enabled: Boolean(user) && isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug),
+    enabled: Boolean(user) && Boolean(session?.permissions.canReviewAccessRequests),
   });
 
   const reviewMutation = useMutation({
@@ -246,7 +240,7 @@ export function AccessRequests() {
     },
   });
 
-  const isAdmin = isAdminRole(whoamiQuery.data?.n8nUser?.role?.slug);
+  const isAdmin = session?.permissions.canReviewAccessRequests ?? false;
   const requests = listQuery.data?.items ?? [];
   const total = listQuery.data?.total ?? 0;
 

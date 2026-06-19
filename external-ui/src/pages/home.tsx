@@ -1,7 +1,8 @@
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../auth/auth-context';
+import { login } from '../auth/session-actions';
 import { getWhoami } from '../services/backend/auth';
+import { useAuthUser } from '../state/session';
 import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function Home() {
-  const { user, login } = useAuth();
+  const user = useAuthUser();
   const whoamiQuery = useQuery({
     queryKey: ['whoami', user?.email ?? ''],
     queryFn: ({ signal }) => getWhoami({ signal }),

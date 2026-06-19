@@ -65,6 +65,7 @@ describe('GET /ui-api/whoami', () => {
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
+          disabled: false,
           role: { slug: 'global:member', displayName: 'Member' },
         },
         accessibleProjectIds: ['proj-1'],
@@ -84,7 +85,12 @@ describe('GET /ui-api/whoami', () => {
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
-          role: null,
+          disabled: false,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        permissions: {
+          canRequestAccess: false,
+          canReviewAccessRequests: false,
         },
       }),
     );
@@ -98,6 +104,7 @@ describe('GET /ui-api/workflows', () => {
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
+          disabled: false,
           role: { slug: 'global:member', displayName: 'Member' },
         },
         accessibleProjectIds: ['proj-1'],
@@ -157,6 +164,7 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
+          disabled: false,
           role: { slug: 'global:member', displayName: 'Member' },
         },
         accessibleProjectIds: ['proj-1'],
@@ -196,6 +204,7 @@ describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
+          disabled: false,
           role: { slug: 'global:member', displayName: 'Member' },
         },
         accessibleProjectIds: ['proj-1'],
@@ -245,6 +254,7 @@ describe('GET /ui-api/access-requests/my', () => {
         n8nUser: {
           id: 'user-123',
           email: 'person@example.com',
+          disabled: false,
           role: null,
         },
         accessibleProjectIds: [],

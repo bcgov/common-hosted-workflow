@@ -5,6 +5,7 @@ import { formatDbErrorForLog } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
+import type { ListPaginationSince } from '../types/list-pagination';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -33,7 +34,7 @@ export type ListMessagesParams = {
   actorId?: string;
   workflowInstanceId?: string;
   limit: number;
-  since?: import('../types/list-pagination').ListPaginationSince;
+  since?: ListPaginationSince;
 };
 
 export class MessageService {
@@ -46,7 +47,7 @@ export class MessageService {
     allowedProjectIds: string[];
     actorId?: string;
     workflowInstanceId?: string;
-    since?: import('../types/list-pagination').ListPaginationSince;
+    since?: ListPaginationSince;
   }): any[] {
     const clauses: any[] = [inArray(message.projectId, params.allowedProjectIds)];
     if (params.actorId) clauses.push(eq(message.actorId, params.actorId));

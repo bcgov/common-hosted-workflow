@@ -1,10 +1,8 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../auth/auth-context';
-import { getWhoami } from '../services/backend/auth';
-import { getStoredAppToken } from '../services/backend/axios';
+import { login, logout } from '../auth/session-actions';
 import { withAppBasePath } from '../config/base-path';
+import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
 import { IconLogin2, IconLogout } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,18 +17,11 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { user, isLoading, login, logout } = useAuth();
-  const hasToken = Boolean(getStoredAppToken());
-  const canQuery = !isLoading && (Boolean(user) || hasToken);
-
-  const whoamiQuery = useQuery({
-    queryKey: ['whoami', user?.email ?? ''],
-    queryFn: ({ signal }) => getWhoami({ signal }),
-    enabled: canQuery,
-  });
-
-  const canRequestAccess = whoamiQuery.data?.permissions?.canRequestAccess ?? false;
-  const canReviewAccessRequests = whoamiQuery.data?.permissions?.canReviewAccessRequests ?? false;
+  const user = useAuthUser();
+  const permissions = usePermissions();
+  const isLoading = useSessionLoading();
+  const canRequestAccess = permissions?.canRequestAccess ?? false;
+  const canReviewAccessRequests = permissions?.canReviewAccessRequests ?? false;
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">

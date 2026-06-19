@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import { useAuth } from '../auth/auth-context';
+import { login } from '../auth/session-actions';
 import type { WilActionItem } from '../services/backend/wil';
+import { useAuthUser } from '../state/session';
 import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,7 +22,7 @@ import type { Tab } from '@/components/wil';
 const ACTION_LIST_REFRESH_DELAY_MS = 1500;
 
 export function WorkflowInteraction() {
-  const { user, login } = useAuth();
+  const user = useAuthUser();
   const queryClient = useQueryClient();
   const [tenantId, setTenantId] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('actions');

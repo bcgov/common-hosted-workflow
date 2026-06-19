@@ -4,7 +4,7 @@
  * Provides route-handler extraction, handler-chain execution,
  * and assertion helpers to eliminate duplication across test files.
  */
-import { expect } from 'vitest';
+import { expect, type Mock } from 'vitest';
 import { AppError } from '../../src/api/utils/errors';
 
 /* ------------------------------------------------------------------ */
@@ -71,7 +71,7 @@ export async function runHandlerChain(
  *   expect(next).toHaveBeenCalledWith(expect.any(AppError));
  *   expect((next.mock.calls[0][0] as AppError).statusCode).toBe(403);
  */
-export function expectNextAppError(next: ReturnType<typeof import('vitest').vi.fn>, expectedStatus: number) {
+export function expectNextAppError(next: Mock, expectedStatus: number) {
   expect(next).toHaveBeenCalledWith(expect.any(AppError));
   expect((next.mock.calls[0][0] as AppError).statusCode).toBe(expectedStatus);
 }

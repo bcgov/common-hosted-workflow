@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import { deleteUiOidcState, getUiOidcState, setUiOidcState } from './ui-oidc-store';
 import { getOidcConfigFromEnv, type UiOidcConfig } from './ui-oidc';
+import { resolveAccessTokenExpiresAt } from './ui-auth-token';
 import { beginOidcAuthorization, completeOidcAuthorization, extractOidcIdentity } from './oidc-provider';
 import { logger } from '../utils/logger';
 
@@ -117,6 +118,8 @@ export async function completeUiLogin(req: Request) {
   return {
     ok: true,
     returnTo,
+    accessToken: completion.tokens.access_token,
+    accessTokenExpiresAt: resolveAccessTokenExpiresAt(completion.tokens.expires_in),
     subject: identity.subject,
     email: identity.email,
     preferredUsername: identity.preferredUsername,

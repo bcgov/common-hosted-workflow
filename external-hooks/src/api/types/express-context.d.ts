@@ -1,12 +1,12 @@
 import type { User } from './user';
 import type { OidcTokenDetails } from './oidc';
-import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
+import type { UiResolvedSession } from '../helpers/ui-oidc';
 import type { UiApiContext } from './ui-api';
 
 declare global {
   namespace Express {
     interface Request {
-      session?: UiAuthenticatedSession;
+      session?: UiResolvedSession;
       context?: UiApiContext;
     }
 

@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../auth/auth-context';
 import { createAccessRequest, getMyAccessRequest } from '../services/backend/access-requests';
 import { getStoredAppToken } from '../services/backend/axios';
+import { useAuthUser, useSessionLoading } from '../state/session';
 import { AccessRequestStatusBadge } from '../components/access-request-status-badge';
 import type { AccessRequestListItem } from '../services/backend/access-requests';
 import { IconSend, IconPlus, IconAlertTriangle } from '@tabler/icons-react';
@@ -123,11 +123,12 @@ function NewRequestForm({
 }
 
 export function AccessRequest() {
-  const { user, isLoading: authLoading } = useAuth();
+  const user = useAuthUser();
+  const authLoading = useSessionLoading();
   const queryClient = useQueryClient();
   const [justification, setJustification] = useState('');
   const [showNewRequest, setShowNewRequest] = useState(false);
-  const redirectError = new URLSearchParams(window.location.search).get('error');
+  const redirectError = new URLSearchParams(globalThis.location.search).get('error');
 
   const hasToken = Boolean(getStoredAppToken());
   const canQueryMyRequest = !authLoading && (Boolean(user) || hasToken);

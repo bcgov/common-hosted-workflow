@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { ApiRouteContext } from '../types/routes';
-import type { UiAuthenticatedSession } from '../helpers/ui-oidc';
+import type { UiResolvedSession } from '../helpers/ui-oidc';
 import type { UiApiTypedRequest } from '../types/ui-api';
 import { resolveWilTenantProjectIds } from './helpers/wil-tenant';
 import { resolveActorIds } from './helpers/wil-actor';
@@ -31,7 +31,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
     createRequestParser(wilListQuerySchema),
     async (req: UiApiTypedRequest<WilListQuery>, res) => {
       const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-      const actor = resolveActorIds((req as unknown as { session: UiAuthenticatedSession }).session);
+      const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
       const { limit, since } = req.parsed.query;
 
       let items = await services.message.list({
@@ -56,7 +56,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
 
   router.get('/actions', createRequestParser(wilListQuerySchema), async (req: UiApiTypedRequest<WilListQuery>, res) => {
     const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-    const actor = resolveActorIds((req as unknown as { session: UiAuthenticatedSession }).session);
+    const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
     const { limit, since, status } = req.parsed.query;
 
     let items = await services.action.list({
@@ -86,7 +86,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
     createRequestParser(wilChefsTokenSchema),
     async (req: UiApiTypedRequest<z.infer<typeof wilChefsTokenSchema>>, res) => {
       const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-      const actor = resolveActorIds((req as unknown as { session: UiAuthenticatedSession }).session);
+      const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
       const { actionId } = req.parsed.body;
 
       const action = await services.action.getById({
@@ -128,7 +128,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
     createRequestParser(wilCallbackSchema),
     async (req: UiApiTypedRequest<z.infer<typeof wilCallbackSchema>>, res) => {
       const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-      const actor = resolveActorIds((req as unknown as { session: UiAuthenticatedSession }).session);
+      const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
       const { actionId, body } = req.parsed.body;
 
       const action = await services.action.getById({

@@ -1,36 +1,18 @@
 import { Routes, Route, Navigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from './layouts/app-layout';
 import { Home } from './pages/home';
 import { Workflows } from './pages/workflows';
 import { AccessRequest } from './pages/access-request';
 import { AccessRequests } from './pages/access-requests';
 import { WorkflowInteraction } from './pages/workflow-interaction';
-import { useAuth } from './auth/auth-context';
-import { getWhoami } from './services/backend/auth';
-import { getMyAccessRequest } from './services/backend/access-requests';
-import { getStoredAppToken } from './services/backend/axios';
+import { usePermissions, useSessionLoading } from './state/session';
 
 function AccessRequestRoute() {
-  const { user, isLoading: authLoading } = useAuth();
-  const hasToken = Boolean(getStoredAppToken());
-  const canQuery = !authLoading && (Boolean(user) || hasToken);
+  const permissions = usePermissions();
+  const isLoading = useSessionLoading();
+  const canRequestAccess = permissions?.canRequestAccess ?? false;
 
-  const whoamiQuery = useQuery({
-    queryKey: ['whoami', user?.email ?? ''],
-    queryFn: ({ signal }) => getWhoami({ signal }),
-    enabled: canQuery,
-  });
-
-  const myRequestQuery = useQuery({
-    queryKey: ['access-requests', 'my', user?.email ?? ''],
-    queryFn: ({ signal }) => getMyAccessRequest({ signal }),
-    enabled: canQuery,
-  });
-
-  const canRequestAccess = whoamiQuery.data?.permissions?.canRequestAccess ?? false;
-
-  if (authLoading || whoamiQuery.isLoading || myRequestQuery.isLoading) {
+  if (isLoading) {
     return null;
   }
 

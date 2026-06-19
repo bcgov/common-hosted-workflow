@@ -36,6 +36,7 @@ export const UI_OIDC_REDIS_PREFIX = process.env.UI_OIDC_REDIS_PREFIX || 'chwf:ui
 export const UI_AUTH_JWT_SECRET = process.env.UI_AUTH_JWT_SECRET || process.env.N8N_USER_MANAGEMENT_JWT_SECRET || '';
 export const UI_AUTH_JWT_ISSUER = process.env.UI_AUTH_JWT_ISSUER || 'chwf-ui-api';
 export const UI_AUTH_JWT_AUDIENCE = process.env.UI_AUTH_JWT_AUDIENCE || 'chwf-ui';
+export const UI_AUTH_USE_SEPARATE_TOKEN = process.env.UI_AUTH_USE_SEPARATE_TOKEN === 'true';
 export const N8N_USER_MANAGEMENT_JWT_SECRET = process.env.N8N_USER_MANAGEMENT_JWT_SECRET ?? '';
 
 // n8n OIDC – base provider config
@@ -51,16 +52,8 @@ export const OIDC_SCOPES = process.env.OIDC_SCOPES || 'openid email profile';
 export const OIDC_ROLES_CLAIM = process.env.OIDC_ROLES_CLAIM || 'roles';
 export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 
-// UI OIDC – provider overrides (fall back to base OIDC_* values)
-export const UI_OIDC_ISSUER = process.env.UI_OIDC_ISSUER || OIDC_ISSUER;
-export const UI_OIDC_AUTHORIZATION_ENDPOINT = process.env.UI_OIDC_AUTHORIZATION_ENDPOINT || OIDC_AUTHORIZATION_ENDPOINT;
-export const UI_OIDC_TOKEN_ENDPOINT = process.env.UI_OIDC_TOKEN_ENDPOINT || OIDC_TOKEN_ENDPOINT;
-export const UI_OIDC_USERINFO_ENDPOINT = process.env.UI_OIDC_USERINFO_ENDPOINT || OIDC_USERINFO_ENDPOINT;
-export const UI_OIDC_JWKS_URI = process.env.UI_OIDC_JWKS_URI || OIDC_JWKS_URI;
-export const UI_OIDC_CLIENT_ID = process.env.UI_OIDC_CLIENT_ID || OIDC_CLIENT_ID;
-export const UI_OIDC_CLIENT_SECRET = process.env.UI_OIDC_CLIENT_SECRET || OIDC_CLIENT_SECRET;
+// UI OIDC – only redirect remains UI-specific; shared provider/client config comes from OIDC_*
 export const UI_OIDC_REDIRECT_URI = process.env.UI_OIDC_REDIRECT_URI || '';
-export const UI_OIDC_SCOPES = process.env.UI_OIDC_SCOPES || OIDC_SCOPES;
 
 // CHEFS gateway
 export const CHEFS_GATEWAY_URL = process.env.CHEFS_GATEWAY_URL || '';
