@@ -1,8 +1,21 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getSession, toAuthenticatedSession } from '../services/backend/auth';
+import { getSession, type AuthSessionResponse, type AuthenticatedSession } from '../services/backend/auth';
 import { clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../services/backend/axios';
 import { sessionState } from '../state/session';
+
+function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSession | null {
+  if (!response.authenticated || !response.user || !response.oidc || !response.n8nUser || !response.permissions) {
+    return null;
+  }
+
+  return {
+    user: response.user,
+    oidc: response.oidc,
+    n8nUser: response.n8nUser,
+    permissions: response.permissions,
+  };
+}
 
 function consumeTokenFromUrl() {
   const url = new URL(globalThis.location.href);

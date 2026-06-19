@@ -183,9 +183,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     const { session } = req as UiApiRequest;
 
     OkResponse(res, {
-      ok: true,
-      route: '/ui-api/whoami',
-      method: req.method,
       oidc: {
         issuer: session.issuer,
         subject: session.subject,
@@ -205,15 +202,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.get('/workflows', requireUiRequestContext, async (req, res) => {
     const { context } = req as UiApiRequest;
 
-    OkResponse(res, {
-      ok: true,
-      route: '/ui-api/workflows',
-      method: req.method,
-      n8nUser: serializeN8nUser(context.n8nUser),
-      accessibleProjectIds: context.accessibleProjectIds,
-      projects: context.projects,
-      workflows: context.workflows,
-    });
+    OkResponse(res, context.workflows);
   });
 
   router.post(
@@ -230,8 +219,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       CreatedResponse(
         res,
         {
-          success: true as const,
-          message: `Workflow '${result.workflowId}' shared with '${result.sharedWithEmail}'.`,
           workflowId: result.workflowId,
           sharedWithEmail: result.sharedWithEmail,
         },
@@ -254,8 +241,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       OkResponse(
         res,
         {
-          success: true as const,
-          message: `Workflow '${result.workflowId}' unshared from project '${result.projectId}'.`,
           workflowId: result.workflowId,
           projectId: result.projectId,
         },
@@ -277,8 +262,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       CreatedResponse(
         res,
         {
-          success: true as const,
-          message: 'Access request submitted successfully.',
           accessRequest,
         },
         createAccessRequestResponseSchema,
@@ -335,8 +318,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       OkResponse(
         res,
         {
-          success: true as const,
-          message: `Access request ${req.parsed.body.action}d successfully.`,
           accessRequest: result,
         },
         reviewAccessRequestResponseSchema,

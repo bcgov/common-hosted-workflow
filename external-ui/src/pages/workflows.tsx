@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { login } from '../auth/session-actions';
 import { getWorkflows, shareWorkflow, unshareWorkflow } from '../services/backend/workflows';
-import { isAdminRole } from '../lib/roles';
-import { useAuthUser } from '../state/session';
+import { useAuthUser, usePermissions } from '../state/session';
 import { IconLogin2, IconShare, IconTrash, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 export function Workflows() {
   const user = useAuthUser();
+  const permissions = usePermissions();
   const queryClient = useQueryClient();
   const [sharingWorkflowId, setSharingWorkflowId] = useState<string | null>(null);
   const [shareEmail, setShareEmail] = useState('');
@@ -52,9 +52,8 @@ export function Workflows() {
     },
   });
 
-  const workflows = workflowsQuery.data?.workflows ?? [];
-  const currentRoleSlug = workflowsQuery.data?.n8nUser?.role?.slug ?? null;
-  const canShareWorkflows = isAdminRole(currentRoleSlug);
+  const workflows = workflowsQuery.data ?? [];
+  const canShareWorkflows = permissions?.isAdmin ?? false;
   const workflowsError = workflowsQuery.error instanceof Error ? workflowsQuery.error.message : null;
   const sharingWorkflow = workflows.find((workflow) => workflow.workflowId === sharingWorkflowId) ?? null;
 
