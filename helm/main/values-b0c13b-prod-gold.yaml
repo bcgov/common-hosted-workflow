@@ -61,7 +61,7 @@ pgo:
       - name: repo2
         enabled: true
         type: s3
-        secretName: objectstorage-creds # pragma: allowlist secret
+        secretName: chwf-pgo-s3 # pragma: allowlist secret
         retention: "30"
         retentionType: time
         s3:
@@ -94,5 +94,5 @@ backup-storage:
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
 
-    0 * * * * default ./backup.sh -s
-    0 2 * * * default ./backup.sh -s -v all
+    */10 * * * * default ./backup.sh -s
+    0 2 * * * default ./backup.sh -s -v latest

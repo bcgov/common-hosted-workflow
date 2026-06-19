@@ -260,7 +260,7 @@ pgo:
 
   dataSource:
     enabled: false
-    secretName: objectstorage-creds # pragma: allowlist secret
+    secretName: chwf-pgo-s3 # pragma: allowlist secret
     repo:
       name: repo2
       provider: s3
@@ -308,11 +308,11 @@ backup-storage:
       value: "rolling"
     S3_USER:
       existingSecret:
-        name: chwf-pgo-s3  # pragma: allowlist secret
+        name: chwf-s3-account  # pragma: allowlist secret
         key: access-key
     S3_PASSWORD:
       existingSecret:
-        name: chwf-pgo-s3  # pragma: allowlist secret
+        name: chwf-s3-account  # pragma: allowlist secret
         key: secret-key
     S3_ENDPOINT:
       value: https://commonservices.objectstore.gov.bc.ca
