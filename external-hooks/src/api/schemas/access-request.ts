@@ -84,8 +84,6 @@ export const accessRequestListResponseSchema = z.object({
 });
 
 export const createAccessRequestResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
   accessRequest: accessRequestResponseSchema,
 });
 
@@ -94,7 +92,5 @@ export const getMyAccessRequestResponseSchema = z.object({
 });
 
 export const reviewAccessRequestResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
   accessRequest: accessRequestResponseSchema,
 });

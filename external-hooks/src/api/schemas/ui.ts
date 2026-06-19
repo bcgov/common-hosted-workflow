@@ -17,8 +17,6 @@ export const shareWorkflowSchema = z.object({
 });
 
 export const shareWorkflowResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
   workflowId: z.string(),
   sharedWithEmail: z.string(),
 });
@@ -33,8 +31,6 @@ export const unshareWorkflowSchema = z.object({
 });
 
 export const unshareWorkflowResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
   workflowId: z.string(),
   projectId: z.string(),
 });

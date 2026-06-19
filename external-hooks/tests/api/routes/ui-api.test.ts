@@ -89,6 +89,7 @@ describe('GET /ui-api/whoami', () => {
           role: { slug: 'global:member', displayName: 'Member' },
         },
         permissions: {
+          isAdmin: false,
           canRequestAccess: false,
           canReviewAccessRequests: false,
         },
@@ -136,24 +137,14 @@ describe('GET /ui-api/workflows', () => {
     await runProtectedRoute({ uiApi }, 'get', '/workflows', req as any, res as any);
 
     expect(uiApi.loadUserContext).toHaveBeenCalledWith('person@example.com');
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        projects: [
-          expect.objectContaining({
-            id: 'proj-1',
-            name: 'Project One',
-          }),
-        ],
-        workflows: [
-          {
-            workflowId: 'wf-1',
-            workflowName: 'First workflow',
-            projectIds: ['proj-1'],
-            userEmails: ['person@example.com'],
-          },
-        ],
-      }),
-    );
+    expect(res.json).toHaveBeenCalledWith([
+      {
+        workflowId: 'wf-1',
+        workflowName: 'First workflow',
+        projectIds: ['proj-1'],
+        userEmails: ['person@example.com'],
+      },
+    ]);
   });
 });
 

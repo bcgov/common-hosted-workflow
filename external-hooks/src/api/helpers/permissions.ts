@@ -1,6 +1,7 @@
 const ADMIN_ROLE_SLUGS = new Set(['global:owner', 'global:admin']);
 
 export type Permissions = {
+  isAdmin: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
 };
@@ -8,6 +9,7 @@ export type Permissions = {
 export function computePermissions(n8nUser: { disabled: boolean; role: { slug: string } | null } | null): Permissions {
   if (!n8nUser) {
     return {
+      isAdmin: false,
       canRequestAccess: true,
       canReviewAccessRequests: false,
     };
@@ -18,6 +20,7 @@ export function computePermissions(n8nUser: { disabled: boolean; role: { slug: s
   const isDisabled = n8nUser.disabled;
 
   return {
+    isAdmin,
     canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
   };
