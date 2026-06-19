@@ -4,13 +4,14 @@ import './index.css';
 import { getAppBasePath } from './config/base-path';
 
 async function bootstrap() {
-  const [{ BrowserRouter }, { QueryClientProvider }, { AuthProvider }, { queryClient }, { App }] = await Promise.all([
-    import('react-router'),
-    import('@tanstack/react-query'),
-    import('./auth/auth-context'),
-    import('./query-client'),
-    import('./app'),
-  ]);
+  const [{ BrowserRouter }, { QueryClientProvider }, { SessionBootstrap }, { queryClient }, { App }] =
+    await Promise.all([
+      import('react-router'),
+      import('@tanstack/react-query'),
+      import('./auth/session-bootstrap'),
+      import('./query-client'),
+      import('./app'),
+    ]);
 
   const root = document.getElementById('root');
   if (!root) {
@@ -21,9 +22,9 @@ async function bootstrap() {
     <StrictMode>
       <BrowserRouter basename={getAppBasePath() || undefined}>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
+          <SessionBootstrap>
             <App />
-          </AuthProvider>
+          </SessionBootstrap>
         </QueryClientProvider>
       </BrowserRouter>
     </StrictMode>,

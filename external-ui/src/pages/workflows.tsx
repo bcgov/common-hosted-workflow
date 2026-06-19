@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useAuth } from '../auth/auth-context';
+import { login } from '../auth/session-actions';
 import { getWorkflows, shareWorkflow, unshareWorkflow } from '../services/backend/workflows';
 import { isAdminRole } from '../lib/roles';
+import { useAuthUser } from '../state/session';
 import { IconLogin2, IconShare, IconTrash, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export function Workflows() {
-  const { user, login } = useAuth();
+  const user = useAuthUser();
   const queryClient = useQueryClient();
   const [sharingWorkflowId, setSharingWorkflowId] = useState<string | null>(null);
   const [shareEmail, setShareEmail] = useState('');

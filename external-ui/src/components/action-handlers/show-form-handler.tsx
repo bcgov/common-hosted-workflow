@@ -3,8 +3,8 @@ import { useMutation } from '@tanstack/react-query';
 import { IconLoader2, IconCircleCheck, IconAlertTriangle } from '@tabler/icons-react';
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
-import { getWhoami } from '../../services/backend/auth';
 import { getStoredAppToken } from '../../services/backend/axios';
+import { useSessionSnapshot } from '../../state/session';
 import { ChefsFormViewer } from '../chefs/chefs-form-viewer';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { extractErrorMessage } from './shared/error-utils';
@@ -62,19 +62,12 @@ async function initializeForm(params: {
   tenantId: string;
   actionId: string;
   payload: Record<string, unknown>;
+  claims: Record<string, unknown>;
 }): Promise<InitData> {
-  const [tokenResponse, whoamiResponse] = await Promise.all([
-    postWilChefsToken({ tenantId: params.tenantId, actionId: params.actionId }),
-    getWhoami({}),
-  ]);
-
-  if (!whoamiResponse.ok || !whoamiResponse.oidc) {
-    throw new Error('Failed to retrieve user identity.');
-  }
-
-  const userProfile = buildUserProfile(whoamiResponse.oidc.claims);
-  const tokenObject = buildTokenObject(whoamiResponse.oidc.claims);
-  const userObject = buildUserObject(whoamiResponse.oidc.claims);
+  const tokenResponse = await postWilChefsToken({ tenantId: params.tenantId, actionId: params.actionId });
+  const userProfile = buildUserProfile(params.claims);
+  const tokenObject = buildTokenObject(params.claims);
+  const userObject = buildUserObject(params.claims);
   const formPreFillData = (params.payload.formPreFillData as Record<string, unknown>) ?? {};
   const submissionId = (params.payload.submissionId as string) || undefined;
 
@@ -99,6 +92,7 @@ async function initializeForm(params: {
 }
 
 export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Readonly<ShowFormHandlerProps>) {
+  const { session } = useSessionSnapshot();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
@@ -118,15 +112,20 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
 
   // Trigger initialization when action/tenant changes
   useEffect(() => {
+    if (!session?.oidc.claims) {
+      return;
+    }
+
     initMutation.mutate({
       tenantId,
       actionId: action.id,
       payload: action.payload,
+      claims: session.oidc.claims,
     });
     // Reset callback state when action changes
     callbackMutation.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action.id, tenantId]);
+  }, [action.id, action.payload, session?.oidc.claims, tenantId]);
 
   const handleSubmissionComplete = useCallback(
     (detail: unknown) => {
