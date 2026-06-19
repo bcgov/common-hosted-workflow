@@ -95,4 +95,4 @@ backup-storage:
     postgres=chwf-pgo-replicas:5432/n8n
 
     */10 * * * * default ./backup.sh -s
-    0 2 * * * default ./backup.sh -s -v latest
+    0 2 * * * default ./backup.sh -s -v all
