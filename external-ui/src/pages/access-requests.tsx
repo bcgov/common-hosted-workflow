@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { login } from '../auth/session-actions';
 import { listAccessRequests, reviewAccessRequest } from '../services/backend/access-requests';
 import type { AccessRequestListItem } from '../services/backend/access-requests';
 import { AccessRequestStatusBadge } from '../components/access-request-status-badge';
 import { useAuthUser, useSession } from '../state/session';
-import { IconLogin2, IconCheck, IconX } from '@tabler/icons-react';
+import { toast } from '../hooks/use-toasts';
+import { IconLogin2, IconCheck, IconX, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -23,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DENY_REASON_MIN_LENGTH = 10;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 function DenyDialog({
   request,
@@ -32,7 +33,6 @@ function DenyDialog({
   onConfirm,
   onOpenChange,
   isPending,
-  error,
 }: {
   request: AccessRequestListItem | null;
   denyReason: string;
@@ -40,7 +40,6 @@ function DenyDialog({
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   isPending: boolean;
-  error: Error | null;
 }) {
   return (
     <Dialog open={Boolean(request)} onOpenChange={onOpenChange}>
@@ -75,13 +74,6 @@ function DenyDialog({
             </p>
           </div>
 
-          {error instanceof Error && (
-            <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error.message}</AlertDescription>
-            </Alert>
-          )}
-
           <DialogFooter>
             <Button type="button" onClick={() => onOpenChange(false)} variant="outline">
               Cancel
@@ -102,6 +94,9 @@ function RequestTable({
   statusFilter,
   onStatusFilterChange,
   total,
+  currentPage,
+  pageSize,
+  onPageChange,
   onApprove,
   onDeny,
   isPending,
@@ -110,10 +105,17 @@ function RequestTable({
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
   total: number;
+  currentPage: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   onApprove: (request: AccessRequestListItem) => void;
   onDeny: (request: AccessRequestListItem) => void;
   isPending: boolean;
 }) {
+  const totalPages = Math.ceil(total / pageSize);
+  const startItem = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, total);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -202,6 +204,39 @@ function RequestTable({
                 </TableBody>
               </Table>
             </ScrollArea>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-[var(--bc-border)] px-4 py-3">
+                <p className="text-sm text-[var(--bc-muted)]">
+                  Showing {startItem} to {endItem} of {total} requests
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                  >
+                    <IconChevronLeft size={16} aria-hidden="true" />
+                    Previous
+                  </Button>
+                  <span className="text-sm text-[var(--bc-muted)]">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Next
+                    <IconChevronRight size={16} aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -214,12 +249,15 @@ export function AccessRequests() {
   const session = useSession();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>('pending');
+  const [currentPage, setCurrentPage] = useState(1);
   const [reviewingRequest, setReviewingRequest] = useState<AccessRequestListItem | null>(null);
   const [denyReason, setDenyReason] = useState('');
 
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
   const listQuery = useQuery({
-    queryKey: ['access-requests', 'admin', user?.email ?? '', statusFilter],
-    queryFn: ({ signal }) => listAccessRequests({ status: statusFilter, limit: PAGE_SIZE }, { signal }),
+    queryKey: ['access-requests', 'admin', user?.email ?? '', statusFilter, currentPage],
+    queryFn: ({ signal }) => listAccessRequests({ status: statusFilter, limit: PAGE_SIZE, offset }, { signal }),
     enabled: Boolean(user) && Boolean(session?.permissions.canReviewAccessRequests),
   });
 
@@ -233,16 +271,32 @@ export function AccessRequests() {
       action: 'approve' | 'deny';
       denyReason?: string;
     }) => reviewAccessRequest(accessRequestId, action, denyReason),
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
       setReviewingRequest(null);
       setDenyReason('');
+      toast.success(`Access request ${variables.action === 'approve' ? 'approved' : 'denied'} successfully.`);
       await queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to review access request.');
     },
   });
 
   const isAdmin = session?.permissions.canReviewAccessRequests ?? false;
   const requests = listQuery.data?.items ?? [];
   const total = listQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  useEffect(() => {
+    if (!listQuery.isLoading && total > 0 && requests.length === 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, listQuery.isLoading, requests.length, total, totalPages]);
+
+  function handleStatusFilterChange(value: string) {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  }
 
   function handleApprove(request: AccessRequestListItem) {
     reviewMutation.mutate({ accessRequestId: request.id, action: 'approve' });
@@ -319,7 +373,7 @@ export function AccessRequests() {
           </p>
         </div>
 
-        {(listQuery.isLoading || whoamiQuery.isLoading) && <p className="text-sm text-[var(--bc-muted)]">Loading...</p>}
+        {listQuery.isLoading && <p className="text-sm text-[var(--bc-muted)]">Loading...</p>}
 
         {listQuery.error instanceof Error && (
           <Alert variant="destructive">
@@ -332,8 +386,11 @@ export function AccessRequests() {
           <RequestTable
             requests={requests}
             statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
             total={total}
+            currentPage={currentPage}
+            pageSize={PAGE_SIZE}
+            onPageChange={setCurrentPage}
             onApprove={handleApprove}
             onDeny={handleDeny}
             isPending={reviewMutation.isPending}
@@ -348,7 +405,6 @@ export function AccessRequests() {
         onConfirm={confirmDeny}
         onOpenChange={handleDenyDialogOpenChange}
         isPending={reviewMutation.isPending}
-        error={reviewMutation.error}
       />
     </div>
   );
