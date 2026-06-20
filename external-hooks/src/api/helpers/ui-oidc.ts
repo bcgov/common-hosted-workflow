@@ -6,6 +6,7 @@ export type OidcDiscoveryDocument = {
   token_endpoint?: string;
   userinfo_endpoint?: string;
   jwks_uri?: string;
+  end_session_endpoint?: string;
 };
 
 export type UiSession = {
@@ -115,3 +116,47 @@ export type UiSessionSummary = {
   n8nUser: UiSerializedN8nUser | null;
   permissions: Permissions | null;
 };
+
+export type WhoamiResponse = {
+  oidc: UiSessionSummary['oidc'];
+  n8nUser: UiSerializedN8nUser | null;
+  permissions: Permissions | null;
+  userAgent?: string;
+};
+
+export function buildSessionSummary(session: UiResolvedSession | null): UiSessionSummary {
+  if (!session) {
+    return { authenticated: false, user: null, oidc: null, n8nUser: null, permissions: null };
+  }
+
+  return {
+    authenticated: true,
+    user: {
+      subject: session.subject,
+      email: session.email,
+      preferredUsername: session.preferredUsername,
+      name: session.name,
+    },
+    oidc: {
+      issuer: session.issuer,
+      subject: session.subject,
+      audience: session.audience,
+      email: session.email,
+      preferredUsername: session.preferredUsername,
+      name: session.name,
+      expiresAt: session.expiresAt,
+      claims: session.claims,
+    },
+    n8nUser: session.n8nUser,
+    permissions: session.permissions,
+  };
+}
+
+export function buildWhoamiResponse(session: UiResolvedSession, userAgent?: string): WhoamiResponse {
+  return {
+    oidc: buildSessionSummary(session).oidc,
+    n8nUser: session.n8nUser,
+    permissions: session.permissions,
+    userAgent,
+  };
+}
