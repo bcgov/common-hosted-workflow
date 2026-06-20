@@ -50,3 +50,11 @@ instance.interceptors.request.use((config) => {
   }
   return config;
 });
+
+instance.interceptors.response.use((response) => {
+  const refreshedToken = response.headers['x-ui-auth-token'];
+  if (typeof refreshedToken === 'string' && refreshedToken) {
+    setStoredAppToken(refreshedToken);
+  }
+  return response;
+});

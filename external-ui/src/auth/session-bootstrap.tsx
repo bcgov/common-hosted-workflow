@@ -1,6 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getSession, type AuthSessionResponse, type AuthenticatedSession } from '../services/backend/auth';
+import {
+  exchangeSession,
+  getSession,
+  type AuthSessionResponse,
+  type AuthenticatedSession,
+} from '../services/backend/auth';
 import { clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../services/backend/axios';
 import { sessionState } from '../state/session';
 
@@ -17,26 +22,47 @@ function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSes
   };
 }
 
-function consumeTokenFromUrl() {
+function consumeSessionHandleFromUrl() {
   const url = new URL(globalThis.location.href);
-  const token = url.searchParams.get('token');
-  if (!token) return null;
+  const session = url.searchParams.get('session');
+  if (!session) return null;
 
-  url.searchParams.delete('token');
+  url.searchParams.delete('session');
   globalThis.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-  return token;
+  return session;
 }
 
 export function SessionBootstrap({ children }: { children: ReactNode }) {
   const [isTokenReady, setIsTokenReady] = useState(false);
 
   useEffect(() => {
-    const tokenFromUrl = consumeTokenFromUrl();
-    if (tokenFromUrl) {
-      setStoredAppToken(tokenFromUrl);
+    let cancelled = false;
+
+    async function bootstrapToken() {
+      const sessionHandle = consumeSessionHandleFromUrl();
+      if (sessionHandle) {
+        try {
+          const result = await exchangeSession(sessionHandle);
+          if (!cancelled) {
+            setStoredAppToken(result.token);
+          }
+        } catch {
+          if (!cancelled) {
+            clearStoredAppToken();
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setIsTokenReady(true);
+      }
     }
 
-    setIsTokenReady(true);
+    void bootstrapToken();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const hasToken = isTokenReady && Boolean(getStoredAppToken());
