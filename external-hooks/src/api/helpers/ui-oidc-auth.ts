@@ -120,6 +120,8 @@ export async function completeUiLogin(req: Request) {
     returnTo,
     accessToken: completion.tokens.access_token,
     accessTokenExpiresAt: resolveAccessTokenExpiresAt(completion.tokens.expires_in),
+    idToken: completion.tokens.id_token,
+    refreshToken: completion.tokens.refresh_token,
     subject: identity.subject,
     email: identity.email,
     preferredUsername: identity.preferredUsername,

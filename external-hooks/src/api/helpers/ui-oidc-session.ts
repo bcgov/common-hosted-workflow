@@ -3,8 +3,19 @@ import type { Request } from 'express';
 import { jwtVerify } from 'jose';
 import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE, UI_AUTH_USE_SEPARATE_TOKEN } from '@config';
 import { type UiAuthTokenPayload, type UiOidcIdentity, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
-import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo } from './oidc-provider';
+import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo, refreshOidcTokens } from './oidc-provider';
+import {
+  getUiOidcAccessTokenRecord,
+  getUiOidcRefreshToken,
+  setUiOidcAccessTokenRecord,
+  setUiOidcIdToken,
+  setUiOidcRefreshToken,
+} from './ui-oidc-store';
+import { issueUiSessionToken, resolveAccessTokenExpiresAt, shouldRefreshAccessToken } from './ui-auth-token';
 import { getOidcConfigFromEnv } from './ui-oidc';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('UiSession');
 
 export function getBearerToken(req: Request) {
   const header = req.header('authorization');
@@ -101,12 +112,139 @@ async function tryGetUpstreamUiSession(token: string): Promise<UiSession | null>
   } satisfies UiSession;
 }
 
+type UiSessionResult = {
+  session: UiSession;
+  refreshedToken?: string;
+};
+
+async function buildUpstreamSessionFromToken(token: string, expiresAt?: number) {
+  const session = await tryGetUpstreamUiSession(token);
+  if (!session) {
+    return null;
+  }
+
+  if (expiresAt) {
+    session.expiresAt = expiresAt;
+  }
+
+  return session;
+}
+
+async function refreshSessionByEmail(email: string, currentAccessToken?: string): Promise<UiSessionResult | null> {
+  const refreshToken = await getUiOidcRefreshToken(email);
+  if (!refreshToken) {
+    log.debug('Refresh attempted but no refresh token stored', { email });
+    return null;
+  }
+
+  log.info('Refresh attempted', { email });
+
+  try {
+    const config = getOidcConfigFromEnv();
+    const discovery = await fetchOidcDiscoveryDocument(config);
+    const refreshed = await refreshOidcTokens({ refreshToken, discovery, config });
+    if (!refreshed.access_token) {
+      log.warn('Refresh failed: no access_token in response', { email });
+      return null;
+    }
+
+    log.info('Refresh succeeded', { email });
+
+    const refreshedExpiresAt = resolveAccessTokenExpiresAt(refreshed.expires_in);
+    const session = await buildUpstreamSessionFromToken(refreshed.access_token, refreshedExpiresAt);
+    if (!session) {
+      log.warn('Refresh succeeded but failed to build session from new token', { email });
+      return null;
+    }
+
+    if (refreshed.refresh_token) {
+      await setUiOidcRefreshToken(email, refreshed.refresh_token);
+    }
+    if (refreshed.id_token) {
+      await setUiOidcIdToken(email, refreshed.id_token);
+    }
+    await setUiOidcAccessTokenRecord(email, refreshed.access_token, refreshedExpiresAt);
+
+    const refreshedToken = await issueUiSessionToken({
+      oidc: {
+        subject: session.subject,
+        email: session.email,
+        preferredUsername: session.preferredUsername,
+        name: session.name,
+        issuer: session.issuer,
+        audience: session.audience,
+        claims: session.claims,
+      },
+      upstreamAccessToken: refreshed.access_token,
+      upstreamExpiresAt: refreshedExpiresAt,
+    });
+
+    if (currentAccessToken && currentAccessToken !== refreshed.access_token) {
+      await setUiOidcAccessTokenRecord(email, refreshed.access_token, refreshedExpiresAt);
+    }
+
+    return { session, refreshedToken };
+  } catch (error) {
+    log.warn('Refresh failed with exception', {
+      email,
+      message: error instanceof Error ? error.message : 'Unknown refresh error',
+    });
+    return null;
+  }
+}
+
+async function resolveLocalUiSession(token: string): Promise<UiSessionResult | null> {
+  const session = await tryGetLocalUiSession(token);
+  if (!session) {
+    return null;
+  }
+
+  if (!shouldRefreshAccessToken(session.expiresAt)) {
+    return { session };
+  }
+
+  const refreshed = await refreshSessionByEmail(session.email);
+
+  if (refreshed) {
+    return refreshed;
+  }
+
+  return session.expiresAt && session.expiresAt > Date.now() ? { session } : null;
+}
+
+async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult | null> {
+  const record = await getUiOidcAccessTokenRecord(token);
+  const knownExpiresAt = record?.expiresAt;
+
+  if (record?.email && shouldRefreshAccessToken(knownExpiresAt)) {
+    const session = await buildUpstreamSessionFromToken(token, knownExpiresAt);
+    if (!session) {
+      return await refreshSessionByEmail(record.email, token);
+    }
+
+    const refreshed = await refreshSessionByEmail(record.email, token);
+
+    return refreshed ?? { session };
+  }
+
+  const session = await buildUpstreamSessionFromToken(token, knownExpiresAt);
+  if (session) {
+    return { session };
+  }
+
+  if (!record?.email) {
+    return null;
+  }
+
+  return await refreshSessionByEmail(record.email, token);
+}
+
 export async function getUiSession(req: Request) {
   const token = getBearerToken(req);
   if (!token) return null;
 
   try {
-    return UI_AUTH_USE_SEPARATE_TOKEN ? await tryGetLocalUiSession(token) : await tryGetUpstreamUiSession(token);
+    return UI_AUTH_USE_SEPARATE_TOKEN ? await resolveLocalUiSession(token) : await resolveUpstreamUiSession(token);
   } catch {
     return null;
   }

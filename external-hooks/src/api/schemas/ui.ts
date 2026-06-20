@@ -34,3 +34,15 @@ export const unshareWorkflowResponseSchema = z.object({
   workflowId: z.string(),
   projectId: z.string(),
 });
+
+export const authExchangeSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+  body: z.object({
+    session: z.string().trim().min(1, { message: 'Missing session handle.' }),
+  }),
+});
+
+export const authExchangeResponseSchema = z.object({
+  token: z.string(),
+});
