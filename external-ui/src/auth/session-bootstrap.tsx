@@ -3,11 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import {
   exchangeSession,
   getSession,
+  type AuthExchangeResponse,
   type AuthSessionResponse,
   type AuthenticatedSession,
 } from '../services/backend/auth';
 import { clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../services/backend/axios';
 import { sessionState } from '../state/session';
+
+const sessionExchangeRequests = new Map<string, Promise<AuthExchangeResponse>>();
 
 function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSession | null {
   if (!response.authenticated || !response.user || !response.oidc || !response.n8nUser || !response.permissions) {
@@ -22,14 +25,35 @@ function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSes
   };
 }
 
-function consumeSessionHandleFromUrl() {
+function getSessionHandleFromUrl() {
   const url = new URL(globalThis.location.href);
   const session = url.searchParams.get('session');
   if (!session) return null;
 
+  return session;
+}
+
+function clearSessionHandleFromUrl() {
+  const url = new URL(globalThis.location.href);
+  if (!url.searchParams.has('session')) {
+    return;
+  }
+
   url.searchParams.delete('session');
   globalThis.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-  return session;
+}
+
+function exchangeSessionOnce(sessionHandle: string) {
+  const existing = sessionExchangeRequests.get(sessionHandle);
+  if (existing) {
+    return existing;
+  }
+
+  const request = exchangeSession(sessionHandle).finally(() => {
+    sessionExchangeRequests.delete(sessionHandle);
+  });
+  sessionExchangeRequests.set(sessionHandle, request);
+  return request;
 }
 
 export function SessionBootstrap({ children }: { children: ReactNode }) {
@@ -39,16 +63,18 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function bootstrapToken() {
-      const sessionHandle = consumeSessionHandleFromUrl();
+      const sessionHandle = getSessionHandleFromUrl();
       if (sessionHandle) {
         try {
-          const result = await exchangeSession(sessionHandle);
+          const result = await exchangeSessionOnce(sessionHandle);
           if (!cancelled) {
             setStoredAppToken(result.token);
+            clearSessionHandleFromUrl();
           }
         } catch {
           if (!cancelled) {
             clearStoredAppToken();
+            clearSessionHandleFromUrl();
           }
         }
       }
