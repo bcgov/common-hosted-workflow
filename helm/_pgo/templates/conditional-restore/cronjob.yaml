@@ -54,34 +54,31 @@ spec:
                       name: {{ .Values.conditionalRestore.s3.secretName | quote }}
                       key: secret-key
                 - name: DATABASE_COUNT
-                  value: {{ len .Values.conditionalRestore.databases | quote }}
-                {{- range $i, $db := .Values.conditionalRestore.databases }}
-                - name: DATABASE_{{ $i }}_HOST
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $db.secretName | quote }}
-                      key: {{ $db.hostKey | default "host" }}
-                - name: DATABASE_{{ $i }}_PORT
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $db.secretName | quote }}
-                      key: {{ $db.portKey | default "port" }}
+                  value: {{ len .Values.databases | quote }}
+                {{- range $i, $db := .Values.databases }}
                 - name: DATABASE_{{ $i }}_NAME
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $db.secretName | quote }}
-                      key: {{ $db.dbnameKey | default "dbname" }}
-                - name: DATABASE_{{ $i }}_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $db.secretName | quote }}
-                      key: {{ $db.usernameKey | default "user" }}
-                - name: DATABASE_{{ $i }}_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $db.secretName | quote }}
-                      key: {{ $db.passwordKey | default "password" }}
+                  value: {{ $db.name | quote }}
                 {{- end }}
+                - name: DB_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.hostKey }}
+                - name: DB_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.portKey }}
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.usernameKey }}
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
+                      key: {{ .Values.conditionalRestore.db.passwordKey }}
               resources:
                 requests:
                   cpu: 50m

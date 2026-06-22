@@ -58,9 +58,6 @@ pgo:
     enabled: false  # enable when dns-probe is enabled for test-golddr
     s3:
       bucket: workflow-test/backups/pgdump
-    databases:
-      - secretName: chwf-pgo-pguser-n8n # pragma: allowlist secret
-      - secretName: chwf-pgo-pguser-n8n-custom # pragma: allowlist secret
 
 # backup-storage is intentionally disabled on GoldDR — backups are created on Gold only
 backup-storage:

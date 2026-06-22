@@ -135,21 +135,15 @@ conditionalRestore:
     bucket: ""
     # Secret must have keys: access-key, secret-key (same secret used by backup-storage on Gold)
     secretName: chwf-s3-account  # pragma: allowlist secret
-  # List of databases to restore. Each entry must reference a PGO pguser secret that has
-  # credentials for that specific database. Add one entry per database in pgo.databases.
-  databases:
-    - secretName: chwf-pgo-pguser-n8n # pragma: allowlist secret
-      usernameKey: user
-      passwordKey: password  # pragma: allowlist secret
-      hostKey: host
-      portKey: port
-      dbnameKey: dbname
-    - secretName: chwf-pgo-pguser-n8n-custom # pragma: allowlist secret
-      usernameKey: user
-      passwordKey: password  # pragma: allowlist secret
-      hostKey: host
-      portKey: port
-      dbnameKey: dbname
+  # Uses the postgres superuser to restore all databases in pgo.databases.
+  # Connects via chwf-pgo-replicas (read-only replica service) for backup,
+  # and directly to primary for restore operations.
+  db:
+    secretName: chwf-pgo-pguser-postgres # pragma: allowlist secret
+    usernameKey: user
+    passwordKey: password # pragma: allowlist secret
+    hostKey: host
+    portKey: port
 
 # --- Monitoring ---
 pgmonitor:
