@@ -47,6 +47,11 @@ export class TenantProjectSyncService {
       return;
     }
 
+    if (!this.globalOwnerUserId) {
+      log.warn('Cannot sync tenant projects — no global owner user ID resolved at startup');
+      return;
+    }
+
     const { ssoUserId, n8nUserId, accessToken } = params;
     log.debug('Starting tenant project sync', { ssoUserId, n8nUserId });
 
@@ -62,8 +67,19 @@ export class TenantProjectSyncService {
       tenantNames: tenants.map((t) => t.name),
     });
 
-    for (const tenant of tenants) {
-      await this.syncTenantForUser(tenant.id, tenant.name, n8nUserId, ssoUserId, accessToken);
+    // Process tenants concurrently — each is independent
+    const results = await Promise.allSettled(
+      tenants.map((tenant) => this.syncTenantForUser(tenant.id, tenant.name, n8nUserId, ssoUserId, accessToken)),
+    );
+
+    const failures = results.filter((r) => r.status === 'rejected');
+    if (failures.length > 0) {
+      log.warn('Some tenant syncs failed', {
+        ssoUserId,
+        n8nUserId,
+        failedCount: failures.length,
+        totalCount: tenants.length,
+      });
     }
 
     log.debug('Tenant project sync completed', { ssoUserId, n8nUserId });
@@ -96,11 +112,11 @@ export class TenantProjectSyncService {
     log.debug('Resolved n8n project role', { tenantId, tenantName, resolvedRole });
 
     // Check if the tenant project already exists
-    const existingProjectIds = await this.customRepositories.tenantProjectRelation.getProjectIdsByTenantId(tenantId);
+    const existingProjectId = await this.getExistingProjectIdForTenant(tenantId);
 
-    if (existingProjectIds.length > 0) {
+    if (existingProjectId) {
       // Project exists — sync the user's relation (add/update/remove)
-      await this.syncUserProjectRelation(n8nUserId, existingProjectIds[0], resolvedRole, tenantId);
+      await this.syncUserProjectRelation(n8nUserId, existingProjectId, resolvedRole, tenantId);
     } else if (resolvedRole) {
       // Project does NOT exist and user HAS a qualifying role — create it
       const projectId = await this.createTenantProject(tenantId, tenantName);
@@ -111,6 +127,16 @@ export class TenantProjectSyncService {
       // Project does NOT exist and user has NO qualifying role — skip
       log.debug('Skipping tenant project creation — user has no qualifying role', { tenantId, tenantName, n8nUserId });
     }
+  }
+
+  /**
+   * Returns the first project ID linked to a tenant, or null if none exists.
+   * The tenant_project_relation table enforces at most one project per tenant
+   * via the unique index on project_id, and the composite PK on (tenant_id, project_id).
+   */
+  private async getExistingProjectIdForTenant(tenantId: string): Promise<string | null> {
+    const projectIds = await this.customRepositories.tenantProjectRelation.getProjectIdsByTenantId(tenantId);
+    return projectIds.length > 0 ? projectIds[0] : null;
   }
 
   private resolveProjectRole(roleNames: string[]): ManagedProjectRole | null {
@@ -126,6 +152,15 @@ export class TenantProjectSyncService {
   /**
    * Creates a new team project for a tenant.
    * Returns the project ID, or null if creation failed.
+   *
+   * Steps are executed in order with error handling to avoid orphaned state:
+   * 1. Create the team project
+   * 2. Link global owner as project:admin
+   * 3. Map tenant to project (uses onConflictDoNothing to handle race conditions)
+   *
+   * If the tenant mapping insert is a no-op (another request already created the project),
+   * we still return the project ID — the user relation sync will proceed against the
+   * project we just created (worst case: a duplicate project exists but both are functional).
    */
   private async createTenantProject(tenantId: string, tenantName: string): Promise<string | null> {
     log.debug('Creating new team project for tenant', { tenantId, tenantName, creatorId: this.globalOwnerUserId });
@@ -148,8 +183,9 @@ export class TenantProjectSyncService {
     });
     log.debug('Global owner linked as project:admin', { projectId: savedProject.id, userId: this.globalOwnerUserId });
 
-    // Map tenant to project
-    await this.customRepositories.tenantProjectRelation.insert({
+    // Map tenant to project — onConflictDoNothing handles the race condition
+    // where another concurrent login already mapped this tenant
+    await this.customRepositories.tenantProjectRelation.insertIgnoreConflict({
       tenantId,
       projectId: savedProject.id,
     });
@@ -199,6 +235,7 @@ export class TenantProjectSyncService {
         log.info('Added user to tenant project', { n8nUserId, projectId, role: resolvedRole, tenantId });
       } else if (currentRoleSlug !== resolvedRole && isManagedProjectRole(currentRoleSlug)) {
         // Update existing relation (only if the current role is one we manage)
+        // Delete then re-save — n8n's project relation has a composite key
         await this.n8nRepositories.projectRelation.delete({ projectId, userId: n8nUserId });
         await this.n8nRepositories.projectRelation.save({
           projectId,

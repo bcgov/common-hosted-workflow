@@ -40,6 +40,7 @@ import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
 import { createLogger } from '../utils/logger';
+import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 
 const log = createLogger('UiApi');
 
@@ -218,11 +219,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
 
     // Sync tenant projects (non-blocking — errors are logged but don't fail login)
     if (result.accessToken) {
-      const cstarSsoUserId =
-        (typeof result.claims.idir_user_guid === 'string' && result.claims.idir_user_guid) ||
-        (typeof result.claims.bceid_user_guid === 'string' && result.claims.bceid_user_guid) ||
-        result.subject ||
-        result.email;
+      const cstarSsoUserId = resolveCstarSsoUserId(result.claims, result.subject, result.email);
 
       // Look up n8n user by email to get the n8n user ID
       const n8nUser = result.email ? await n8nRepositories.user.findByEmail(result.email) : null;
@@ -233,8 +230,8 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
             n8nUserId: n8nUser.id,
             accessToken: result.accessToken,
           })
-          .catch(() => {
-            // Errors already logged inside the service
+          .catch((err) => {
+            log.error('Tenant project sync failed', { email: result.email, error: String(err) });
           });
       }
     }

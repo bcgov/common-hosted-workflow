@@ -82,7 +82,7 @@ async function resolveGlobalOwnerUserId(
     globalOwnerRoleSlug,
   ]);
   if (rows.length === 0) {
-    log.warn('No global owner user found — tenant project sync will fail until an owner exists');
+    log.warn('No global owner user found — tenant project sync will be skipped until an owner exists');
     return '';
   }
   return rows[0].id as string;
