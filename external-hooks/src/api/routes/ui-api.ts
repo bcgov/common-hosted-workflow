@@ -102,7 +102,7 @@ function requireGlobalAdminRole(req: Request, res: Response, next: NextFunction)
 }
 
 export function buildUiApiRouter(routeContext: ApiRouteContext) {
-  const { services } = routeContext;
+  const { services, n8nRepositories } = routeContext;
   const router = Router();
   const requireUiRequestContext = requireUiRequestContextMiddleware(services);
 
@@ -169,6 +169,29 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       const message = error instanceof Error ? error.message : 'Failed to establish UI session';
       res.redirect(appendQueryParam(result.returnTo, 'error', message));
       return;
+    }
+
+    // Sync tenant projects (non-blocking — errors are logged but don't fail login)
+    if (result.accessToken) {
+      const cstarSsoUserId =
+        (typeof result.claims.idir_user_guid === 'string' && result.claims.idir_user_guid) ||
+        (typeof result.claims.bceid_user_guid === 'string' && result.claims.bceid_user_guid) ||
+        result.subject ||
+        result.email;
+
+      // Look up n8n user by email to get the n8n user ID
+      const n8nUser = result.email ? await n8nRepositories.user.findByEmail(result.email) : null;
+      if (n8nUser) {
+        services.tenantProjectSync
+          .syncTenantsForUser({
+            ssoUserId: cstarSsoUserId,
+            n8nUserId: n8nUser.id,
+            accessToken: result.accessToken,
+          })
+          .catch(() => {
+            // Errors already logged inside the service
+          });
+      }
     }
 
     res.redirect(appendTokenToReturnTo(result.returnTo, token));

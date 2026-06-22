@@ -22,6 +22,7 @@ import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { JwtService } from '../services/jwt';
+import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
 
 const log = createLogger('OIDCHook');
@@ -30,6 +31,7 @@ export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
   jwtService: JwtService;
   userService: UserService;
+  tenantProjectSyncService: TenantProjectSyncService;
   config: N8nOidcConfig;
 };
 
@@ -69,7 +71,13 @@ async function redirectToAccessRequest(
   return res.redirect(appendQueryParam(buildUiAppUrl('/access-request'), 'token', uiToken));
 }
 
-export function buildOidcRouter({ n8nRepositories, jwtService, userService, config }: BuildOidcRouterParams) {
+export function buildOidcRouter({
+  n8nRepositories,
+  jwtService,
+  userService,
+  tenantProjectSyncService,
+  config,
+}: BuildOidcRouterParams) {
   const { user: userRepository } = n8nRepositories;
   const router = Router();
   const cookieSecret = getCookieSecret();
@@ -272,6 +280,26 @@ export function buildOidcRouter({ n8nRepositories, jwtService, userService, conf
         log.info('User re-enabled after receiving a valid OIDC role', {
           email: identity.email,
         });
+      }
+
+      // Sync tenant projects (non-blocking — errors are logged but don't fail login)
+      if (completion.tokens.access_token) {
+        // CSTAR expects the IDP user GUID (e.g. idir_user_guid), not the Keycloak sub
+        const cstarSsoUserId =
+          (typeof identity.claims.idir_user_guid === 'string' && identity.claims.idir_user_guid) ||
+          (typeof identity.claims.bceid_user_guid === 'string' && identity.claims.bceid_user_guid) ||
+          identity.subject ||
+          identity.email;
+
+        tenantProjectSyncService
+          .syncTenantsForUser({
+            ssoUserId: cstarSsoUserId,
+            n8nUserId: user.id,
+            accessToken: completion.tokens.access_token,
+          })
+          .catch((err) => {
+            log.error('Tenant project sync failed', { email: identity.email, error: String(err) });
+          });
       }
 
       const authToken = createAuthToken(user, jwtService);

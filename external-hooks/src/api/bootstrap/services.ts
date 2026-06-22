@@ -4,6 +4,7 @@ import { ChefsService } from '../services/chefs.service';
 import { CstarService } from '../services/cstar.service';
 import { MessageService } from '../services/message.service';
 import { TenantService } from '../services/tenant.service';
+import { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import { UiApiService } from '../services/ui-api';
 import { N8N_JWT_SERVICE_PATH, N8N_NODE_MAILER_PATH, N8N_USER_SERVICE_PATH } from '../constants/n8n-paths';
 import type { N8nRepositories, N8nContainer } from './n8n-repositories';
@@ -14,6 +15,9 @@ import { CssSsoService } from '../services/css-sso';
 import { JwtService, type BaseJwtService } from '../services/jwt';
 import { NodeMailerService, type BaseNodeMailerService } from '../services/node-mailer';
 import { UserService, type BaseUserService } from '../services/user';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Services');
 
 export type N8nServices = {
   jwtService: JwtService;
@@ -33,14 +37,19 @@ export function buildN8nServices(container: N8nContainer): N8nServices {
   };
 }
 
-export function buildApiServices(
+export async function buildApiServices(
   n8nRepositories: N8nRepositories,
   customRepositories: CustomRepositories,
   n8nServices: N8nServices,
-): ApiServices {
+  globalOwnerRoleSlug: string,
+): Promise<ApiServices> {
   const cssSsoConfig = getCssSsoConfig();
   const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
   const cstarService = new CstarService();
+
+  // Resolve global owner user ID for tenant project creation
+  const globalOwnerUserId = await resolveGlobalOwnerUserId(n8nRepositories, globalOwnerRoleSlug);
+  log.debug('Resolved global owner for tenant project sync', { globalOwnerUserId, globalOwnerRoleSlug });
 
   return {
     uiApi: new UiApiService(n8nRepositories),
@@ -56,5 +65,25 @@ export function buildApiServices(
       n8nServices.nodeMailerService,
     ),
     tenant: new TenantService(customRepositories, n8nRepositories, cstarService),
+    tenantProjectSync: new TenantProjectSyncService(
+      n8nRepositories,
+      customRepositories,
+      cstarService,
+      globalOwnerUserId,
+    ),
   };
+}
+
+async function resolveGlobalOwnerUserId(
+  n8nRepositories: N8nRepositories,
+  globalOwnerRoleSlug: string,
+): Promise<string> {
+  const rows = await n8nRepositories.raw.user.manager.query(`SELECT "id" FROM "user" WHERE "roleSlug" = $1 LIMIT 1`, [
+    globalOwnerRoleSlug,
+  ]);
+  if (rows.length === 0) {
+    log.warn('No global owner user found — tenant project sync will fail until an owner exists');
+    return '';
+  }
+  return rows[0].id as string;
 }

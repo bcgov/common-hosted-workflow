@@ -45,6 +45,7 @@ function createTestRouter() {
       chefs: {} as any,
       cstar: {} as any,
       tenant: {} as any,
+      tenantProjectSync: {} as any,
     },
   });
 

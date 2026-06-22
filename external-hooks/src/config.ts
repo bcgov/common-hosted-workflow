@@ -59,6 +59,9 @@ export const UI_OIDC_REDIRECT_URI = process.env.UI_OIDC_REDIRECT_URI || '';
 export const CSTAR_BASE_URL = process.env.CSTAR_BASE_URL || '';
 export const CSTAR_API_BASE_URL = CSTAR_BASE_URL ? `${CSTAR_BASE_URL}/api/v1` : '';
 
+// Tenant project sync – auto-provision n8n team projects from CSTAR tenants at login
+export const IS_TENANT_PROJECT_SYNC_ENABLED = process.env.IS_TENANT_PROJECT_SYNC_ENABLED !== 'false';
+
 // CHEFS gateway
 export const CHEFS_GATEWAY_URL = process.env.CHEFS_GATEWAY_URL || '';
 
