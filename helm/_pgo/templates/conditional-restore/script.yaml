@@ -80,7 +80,7 @@ data:
     # --- 4. Iterate each database: find its latest backup, compare state, restore if new ---
     for i in $(seq 0 $((DATABASE_COUNT-1))); do
       DB_NAME_VAR="DATABASE_${i}_NAME"; DB_NAME="${!DB_NAME_VAR}"
-      DB_PASS="${DB_PASSWORD}" # pragma: allowlist secret
+      DB_PASS="${DATABASE_PASSWORD}" # pragma: allowlist secret
 
       log "[${DB_NAME}] Checking for latest backup..."
 
@@ -130,17 +130,17 @@ data:
       # Drop schema only after confirming the backup file is intact
       log "[${DB_NAME}] Dropping and recreating public schema..."
       PGPASSWORD="${DB_PASS}" psql \
-        -h "${DB_HOST}" \
-        -p "${DB_PORT}" \
-        -U "${DB_USER}" \
+        -h "${DATABASE_HOST}" \
+        -p "${DATABASE_PORT}" \
+        -U "${DATABASE_USER}" \
         -d "${DB_NAME}" \
         -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;" || true
 
       log "[${DB_NAME}] Restoring from downloaded backup..."
       gunzip -c /tmp/restore.sql.gz | PGPASSWORD="${DB_PASS}" psql \
-        -h "${DB_HOST}" \
-        -p "${DB_PORT}" \
-        -U "${DB_USER}" \
+        -h "${DATABASE_HOST}" \
+        -p "${DATABASE_PORT}" \
+        -U "${DATABASE_USER}" \
         -d "${DB_NAME}" \
         -v ON_ERROR_STOP=0
 

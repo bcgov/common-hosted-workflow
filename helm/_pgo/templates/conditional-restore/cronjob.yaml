@@ -59,22 +59,22 @@ spec:
                 - name: DATABASE_{{ $i }}_NAME
                   value: {{ $db.name | quote }}
                 {{- end }}
-                - name: DB_HOST
+                - name: DATABASE_HOST
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.db.secretName | quote }}
                       key: {{ .Values.conditionalRestore.db.hostKey }}
-                - name: DB_PORT
+                - name: DATABASE_PORT
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.db.secretName | quote }}
                       key: {{ .Values.conditionalRestore.db.portKey }}
-                - name: DB_USER
+                - name: DATABASE_USER
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.db.secretName | quote }}
                       key: {{ .Values.conditionalRestore.db.usernameKey }}
-                - name: DB_PASSWORD
+                - name: DATABASE_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.db.secretName | quote }}
