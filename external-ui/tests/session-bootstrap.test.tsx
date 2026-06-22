@@ -58,6 +58,8 @@ describe('SessionBootstrap', () => {
         isAdmin: false,
         canRequestAccess: true,
         canReviewAccessRequests: false,
+        canShareWorkflows: false,
+        canUnshareWorkflows: false,
       },
     });
 

@@ -28,6 +28,7 @@ export function Workflows() {
   const queryClient = useQueryClient();
   const [sharingWorkflowId, setSharingWorkflowId] = useState<string | null>(null);
   const [shareEmail, setShareEmail] = useState('');
+  const [unshareTarget, setUnshareTarget] = useState<{ workflowId: string; projectId: string } | null>(null);
 
   const workflowsQuery = useQuery({
     queryKey: ['workflows', user?.email ?? ''],
@@ -48,12 +49,14 @@ export function Workflows() {
     mutationFn: ({ workflowId, projectId }: { workflowId: string; projectId: string }) =>
       unshareWorkflow(workflowId, projectId),
     onSuccess: async () => {
+      setUnshareTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['workflows', user?.email ?? ''] });
     },
   });
 
   const workflows = workflowsQuery.data ?? [];
-  const canShareWorkflows = permissions?.isAdmin ?? false;
+  const canShareWorkflows = permissions?.canShareWorkflows ?? false;
+  const canUnshareWorkflows = permissions?.canUnshareWorkflows ?? false;
   const workflowsError = workflowsQuery.error instanceof Error ? workflowsQuery.error.message : null;
   const sharingWorkflow = workflows.find((workflow) => workflow.workflowId === sharingWorkflowId) ?? null;
 
@@ -155,11 +158,11 @@ export function Workflows() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right">
-                                {canShareWorkflows && canRemoveProjects ? (
+                                {canUnshareWorkflows && canRemoveProjects ? (
                                   <Button
                                     type="button"
                                     onClick={() =>
-                                      unshareMutation.mutate({
+                                      setUnshareTarget({
                                         workflowId: workflow.workflowId,
                                         projectId: projectShare.projectId,
                                       })
@@ -239,6 +242,60 @@ export function Workflows() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={Boolean(unshareTarget)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setUnshareTarget(null);
+              unshareMutation.reset();
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove workflow share</DialogTitle>
+              <DialogDescription>
+                This will remove access to this workflow for all users in project{' '}
+                <span className="font-mono">{unshareTarget?.projectId}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            {unshareMutation.error instanceof Error ? (
+              <Alert variant="destructive">
+                <AlertTitle>remove error</AlertTitle>
+                <AlertDescription>{unshareMutation.error.message}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                onClick={() => {
+                  setUnshareTarget(null);
+                  unshareMutation.reset();
+                }}
+                variant="outline"
+              >
+                <IconX size={16} aria-hidden="true" />
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={unshareMutation.isPending}
+                onClick={() => {
+                  if (unshareTarget) {
+                    unshareMutation.mutate(unshareTarget);
+                  }
+                }}
+              >
+                <IconTrash size={14} aria-hidden="true" />
+                {unshareMutation.isPending ? 'Removing...' : 'Remove'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

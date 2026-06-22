@@ -63,6 +63,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: false,
           canRequestAccess: false,
           canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
         },
       };
 
@@ -89,6 +91,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: false,
           canRequestAccess: true,
           canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
         },
       };
 
@@ -117,6 +121,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: false,
           canRequestAccess: true,
           canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
         },
       };
 
@@ -143,6 +149,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: false,
           canRequestAccess: false,
           canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
         },
       };
 
@@ -169,6 +177,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: true,
           canRequestAccess: false,
           canReviewAccessRequests: true,
+          canShareWorkflows: true,
+          canUnshareWorkflows: true,
         },
       };
 
@@ -195,6 +205,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: false,
           canRequestAccess: true,
           canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
         },
       };
 
@@ -231,6 +243,8 @@ describe('Session-driven navigation/gating', () => {
           isAdmin: false,
           canRequestAccess: false,
           canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
         },
       };
 

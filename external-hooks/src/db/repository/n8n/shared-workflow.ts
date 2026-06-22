@@ -92,6 +92,19 @@ export class SharedWorkflowRepository {
     return rows as SharedWorkflowRow[];
   }
 
+  async findRowsByWorkflowIds(workflowIds: string[]): Promise<SharedWorkflowRow[]> {
+    if (!workflowIds.length) {
+      return [];
+    }
+
+    const { sharedWorkflowWorkflowColumn, selectSql } = this.buildWorkflowRowSelect();
+    const rows = await this.queryWorkflowRows(`${selectSql} WHERE sw.${sharedWorkflowWorkflowColumn} = ANY($1)`, [
+      workflowIds,
+    ]);
+
+    return rows as SharedWorkflowRow[];
+  }
+
   async findWorkflowRowsByProjectIds(projectIds?: string[]): Promise<SharedWorkflowRow[]> {
     const { sharedWorkflowProjectColumn, selectSql } = this.buildWorkflowRowSelect();
     const rows = projectIds?.length

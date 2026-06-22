@@ -44,7 +44,7 @@ export class UiWorkflowQueryService {
       return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
     }
 
-    const n8nUser = await this.userRepository.findByEmail(email);
+    const n8nUser = await this.userRepository.findByEmail(email, ['role']);
     if (!n8nUser) {
       return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
     }
@@ -57,7 +57,7 @@ export class UiWorkflowQueryService {
 
     const workflowRows = canViewAllWorkflows(n8nUser.role?.slug)
       ? await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds()
-      : await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds(accessibleProjectIds);
+      : await this.loadVisibleWorkflowRows(accessibleProjectIds);
     const projectEmailMap = await this.loadProjectEmailMap(workflowRows, personalProject?.id, n8nUser.email);
 
     return {
@@ -70,6 +70,17 @@ export class UiWorkflowQueryService {
 
   async loadWorkflowRows(workflowId: string): Promise<WorkflowRow[]> {
     return await this.sharedWorkflowRepository.findRowsByWorkflowId(workflowId);
+  }
+
+  private async loadVisibleWorkflowRows(accessibleProjectIds: string[]): Promise<WorkflowRow[]> {
+    const visibleWorkflowRows = await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds(accessibleProjectIds);
+    const workflowIds = [...new Set(visibleWorkflowRows.map((row) => row.workflowId))];
+
+    if (!workflowIds.length) {
+      return [];
+    }
+
+    return await this.sharedWorkflowRepository.findRowsByWorkflowIds(workflowIds);
   }
 
   private async loadAccessibleProjects(projectIds: string[]) {

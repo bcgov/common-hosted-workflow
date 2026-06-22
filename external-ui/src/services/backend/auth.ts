@@ -47,6 +47,8 @@ export type Permissions = {
   isAdmin: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
+  canShareWorkflows: boolean;
+  canUnshareWorkflows: boolean;
 };
 
 export type WhoamiResponse = {

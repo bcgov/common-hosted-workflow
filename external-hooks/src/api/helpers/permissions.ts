@@ -4,6 +4,8 @@ export type Permissions = {
   isAdmin: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
+  canShareWorkflows: boolean;
+  canUnshareWorkflows: boolean;
 };
 
 export function computePermissions(n8nUser: { disabled: boolean; role: { slug: string } | null } | null): Permissions {
@@ -12,6 +14,8 @@ export function computePermissions(n8nUser: { disabled: boolean; role: { slug: s
       isAdmin: false,
       canRequestAccess: true,
       canReviewAccessRequests: false,
+      canShareWorkflows: false,
+      canUnshareWorkflows: false,
     };
   }
 
@@ -23,5 +27,7 @@ export function computePermissions(n8nUser: { disabled: boolean; role: { slug: s
     isAdmin,
     canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
+    canShareWorkflows: !isDisabled && !hasNoRole,
+    canUnshareWorkflows: isAdmin,
   };
 }

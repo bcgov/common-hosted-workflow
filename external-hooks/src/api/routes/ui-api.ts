@@ -34,7 +34,7 @@ import {
 } from '../helpers/ui-oidc-store';
 import { fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
 import { getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
-import { computePermissions } from '../helpers/permissions';
+import { computePermissions, type Permissions } from '../helpers/permissions';
 import { getOidcConfigFromEnv, buildSessionSummary, buildWhoamiResponse } from '../helpers/ui-oidc';
 import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
@@ -124,13 +124,26 @@ function requireUiRequestContextMiddleware(services: ApiRouteContext['services']
 
 export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware };
 
-function requireGlobalAdminRole(req: Request, res: Response, next: NextFunction) {
-  const roleSlug = (req as UiApiRequest).session?.n8nUser?.role?.slug;
-  if (roleSlug !== 'global:owner' && roleSlug !== 'global:admin') {
-    ForbiddenResponse(res);
-    return;
-  }
-  next();
+function checkPermission(permissionKey: keyof Permissions) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const hasPermission = (req as UiApiRequest).session?.permissions?.[permissionKey];
+    if (!hasPermission) {
+      ForbiddenResponse(res);
+      return;
+    }
+    next();
+  };
+}
+
+function checkRole(...allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const roleSlug = (req as UiApiRequest).session?.n8nUser?.role?.slug;
+    if (!roleSlug || !allowedRoles.includes(roleSlug)) {
+      ForbiddenResponse(res);
+      return;
+    }
+    next();
+  };
 }
 
 export function buildUiApiRouter(routeContext: ApiRouteContext) {
@@ -257,6 +270,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.post(
     '/workflows/:workflowId/share',
     requireUiRequestContext,
+    checkPermission('canShareWorkflows'),
     createRequestParser(shareWorkflowSchema),
     async (req: UiApiTypedRequest<zInfer<typeof shareWorkflowSchema>>, res) => {
       const result = await services.uiApi.shareWorkflow(
@@ -279,6 +293,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.delete(
     '/workflows/:workflowId/projects/:projectId',
     requireUiRequestContext,
+    checkPermission('canUnshareWorkflows'),
     createRequestParser(unshareWorkflowSchema),
     async (req: UiApiTypedRequest<zInfer<typeof unshareWorkflowSchema>>, res) => {
       const result = await services.uiApi.unshareWorkflow(
@@ -301,6 +316,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.post(
     '/access-requests',
     requireUiRequestContext,
+    checkPermission('canRequestAccess'),
     createRequestParser(createAccessRequestSchema),
     async (req: UiApiTypedRequest<zInfer<typeof createAccessRequestSchema>>, res) => {
       const accessRequest = await services.accessRequest.createAccessRequest({
@@ -335,7 +351,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.get(
     '/access-requests',
     requireUiRequestContext,
-    requireGlobalAdminRole,
+    checkRole('global:owner', 'global:admin'),
     createRequestParser(listAccessRequestsSchema),
     async (req: UiApiTypedRequest<zInfer<typeof listAccessRequestsSchema>>, res) => {
       const { status, limit, offset } = req.parsed.query ?? {};
@@ -353,7 +369,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.post(
     '/access-requests/:id/review',
     requireUiRequestContext,
-    requireGlobalAdminRole,
+    checkRole('global:owner', 'global:admin'),
     createRequestParser(reviewAccessRequestSchema),
     async (req: UiApiTypedRequest<zInfer<typeof reviewAccessRequestSchema>>, res) => {
       const result = await services.accessRequest.reviewAccessRequest({
