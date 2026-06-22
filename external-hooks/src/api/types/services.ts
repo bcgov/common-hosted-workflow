@@ -4,6 +4,7 @@ import type { UiApiContext, UiWorkflowSummary } from './ui-api';
 import type { AccessRequestService } from '../services/access-request';
 import type { ActionService } from '../services/action.service';
 import type { ChefsService } from '../services/chefs.service';
+import type { CstarService } from '../services/cstar.service';
 import type { MessageService } from '../services/message.service';
 import type { TenantService } from '../services/tenant.service';
 
@@ -34,6 +35,7 @@ export type ApiServices = {
   uiApi: UiApiServiceContract;
   action: ActionService;
   chefs: ChefsService;
+  cstar: CstarService;
   message: MessageService;
   accessRequest: AccessRequestService;
   tenant: TenantService;

@@ -73,6 +73,8 @@ x-n8n-env: &n8n-env
   AUTHZ_CLIENT_SECRET: ${AUTHZ_CLIENT_SECRET}
   # CHEFS gateway URL for token exchange
   CHEFS_GATEWAY_URL: ${CHEFS_GATEWAY_URL}
+  # CSTAR tenant management service
+  CSTAR_BASE_URL: ${CSTAR_BASE_URL}
 
 services:
   sdg-mock-app:

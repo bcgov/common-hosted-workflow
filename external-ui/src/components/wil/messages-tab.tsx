@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getWilMessages } from '../../services/backend/wil';
 import type { WilMessageItem } from '../../services/backend/wil';
+import { extractErrorMessage } from '../action-handlers/shared/error-utils';
 
 function MessageStatusBadge({ status }: Readonly<{ status: WilMessageItem['status'] }>) {
   if (status === 'active') {
@@ -65,9 +66,7 @@ export function MessagesTab({ tenantId, since, cursor, onLoadMore }: Readonly<Me
     return (
       <Alert variant="destructive">
         <AlertTitle>Error loading messages</AlertTitle>
-        <AlertDescription>
-          {messagesQuery.error instanceof Error ? messagesQuery.error.message : 'An error occurred'}
-        </AlertDescription>
+        <AlertDescription>{extractErrorMessage(messagesQuery.error, 'An error occurred')}</AlertDescription>
       </Alert>
     );
   }

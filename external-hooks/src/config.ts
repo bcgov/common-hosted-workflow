@@ -55,6 +55,10 @@ export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 // UI OIDC – only redirect remains UI-specific; shared provider/client config comes from OIDC_*
 export const UI_OIDC_REDIRECT_URI = process.env.UI_OIDC_REDIRECT_URI || '';
 
+// CSTAR – Tenant & user management
+export const CSTAR_BASE_URL = process.env.CSTAR_BASE_URL || '';
+export const CSTAR_API_BASE_URL = CSTAR_BASE_URL ? `${CSTAR_BASE_URL}/api/v1` : '';
+
 // CHEFS gateway
 export const CHEFS_GATEWAY_URL = process.env.CHEFS_GATEWAY_URL || '';
 

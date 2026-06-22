@@ -319,7 +319,7 @@ export function AccessRequests() {
           </p>
         </div>
 
-        {(listQuery.isLoading || whoamiQuery.isLoading) && <p className="text-sm text-[var(--bc-muted)]">Loading...</p>}
+        {listQuery.isLoading && <p className="text-sm text-[var(--bc-muted)]">Loading...</p>}
 
         {listQuery.error instanceof Error && (
           <Alert variant="destructive">
