@@ -53,31 +53,35 @@ spec:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.s3.secretName | quote }}
                       key: secret-key
-                - name: DATABASE_HOST
+                - name: DATABASE_COUNT
+                  value: {{ len .Values.conditionalRestore.databases | quote }}
+                {{- range $i, $db := .Values.conditionalRestore.databases }}
+                - name: DATABASE_{{ $i }}_HOST
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
-                      key: {{ .Values.conditionalRestore.db.hostKey }}
-                - name: DATABASE_PORT
+                      name: {{ $db.secretName | quote }}
+                      key: {{ $db.hostKey | default "host" }}
+                - name: DATABASE_{{ $i }}_PORT
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
-                      key: {{ .Values.conditionalRestore.db.portKey }}
-                - name: DATABASE_NAME
+                      name: {{ $db.secretName | quote }}
+                      key: {{ $db.portKey | default "port" }}
+                - name: DATABASE_{{ $i }}_NAME
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
-                      key: {{ .Values.conditionalRestore.db.dbnameKey }}
-                - name: DATABASE_USER
+                      name: {{ $db.secretName | quote }}
+                      key: {{ $db.dbnameKey | default "dbname" }}
+                - name: DATABASE_{{ $i }}_USER
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
-                      key: {{ .Values.conditionalRestore.db.usernameKey }}
-                - name: DATABASE_PASSWORD
+                      name: {{ $db.secretName | quote }}
+                      key: {{ $db.usernameKey | default "user" }}
+                - name: DATABASE_{{ $i }}_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
-                      key: {{ .Values.conditionalRestore.db.passwordKey }}
+                      name: {{ $db.secretName | quote }}
+                      key: {{ $db.passwordKey | default "password" }}
+                {{- end }}
               resources:
                 requests:
                   cpu: 50m

@@ -93,6 +93,7 @@ backup-storage:
 
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n-custom
 
     */10 * * * * default ./backup.sh -s
     0 2 * * * default ./backup.sh -s -v all

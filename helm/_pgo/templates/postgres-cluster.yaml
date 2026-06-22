@@ -56,6 +56,15 @@ spec:
         - postgres
       options: "SUPERUSER"
 
+    # Dedicated backup user — read-only access to all application databases for pg_dump.
+    # Uses pg_read_all_data (PG14+) granted via databaseInitSQL. No superuser privileges.
+    - name: backup
+      databases:
+        {{- range $db := .Values.databases }}
+        - {{ $db.name }}
+        {{- end }}
+      options: "NOSUPERUSER NOCREATEROLE"
+
     {{- range $db := .Values.databases }}
     - name: {{ $db.name }}
       databases:
