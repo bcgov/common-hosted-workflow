@@ -75,6 +75,8 @@ x-n8n-env: &n8n-env
   CHEFS_GATEWAY_URL: ${CHEFS_GATEWAY_URL}
   # CSTAR tenant management service
   CSTAR_BASE_URL: ${CSTAR_BASE_URL}
+  # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
+  IS_TENANT_PROJECT_SYNC_ENABLED: ${IS_TENANT_PROJECT_SYNC_ENABLED:-true}
 
 services:
   sdg-mock-app:
