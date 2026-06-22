@@ -45,6 +45,7 @@ export const OIDC_AUTHORIZATION_ENDPOINT = process.env.OIDC_AUTHORIZATION_ENDPOI
 export const OIDC_TOKEN_ENDPOINT = process.env.OIDC_TOKEN_ENDPOINT || '';
 export const OIDC_USERINFO_ENDPOINT = process.env.OIDC_USERINFO_ENDPOINT || '';
 export const OIDC_JWKS_URI = process.env.OIDC_JWKS_URI || '';
+export const OIDC_END_SESSION_ENDPOINT = process.env.OIDC_END_SESSION_ENDPOINT || '';
 export const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || '';
 export const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || '';
 export const OIDC_REDIRECT_URI = process.env.OIDC_REDIRECT_URI || '';

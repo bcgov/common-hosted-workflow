@@ -11,6 +11,7 @@ describe('oidc-provider', () => {
         tokenEndpoint: 'https://issuer.example.com/token',
         userinfoEndpoint: 'https://issuer.example.com/userinfo',
         jwksUri: 'https://issuer.example.com/jwks',
+        endSessionEndpoint: '',
         clientId: 'client-123',
         clientSecret: 'secret-123', // pragma: allowlist secret
         redirectUri: 'https://app.example.com/callback',

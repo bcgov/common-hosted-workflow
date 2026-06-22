@@ -9,6 +9,7 @@ export type OidcProviderConfig = Pick<
   | 'tokenEndpoint'
   | 'userinfoEndpoint'
   | 'jwksUri'
+  | 'endSessionEndpoint'
   | 'clientId'
   | 'clientSecret'
   | 'redirectUri'
@@ -75,6 +76,7 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
       authorization_endpoint: config.authorizationEndpoint,
       token_endpoint: config.tokenEndpoint,
       userinfo_endpoint: config.userinfoEndpoint,
+      end_session_endpoint: config.endSessionEndpoint || undefined,
     } satisfies OidcDiscoveryDocument;
   }
 
