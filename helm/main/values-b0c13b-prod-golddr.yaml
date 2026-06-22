@@ -11,6 +11,7 @@ n8n:
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
     OIDC_ISSUER: https://loginproxy.gov.bc.ca/auth/realms/standard
     OIDC_REDIRECT_URI: https://n8n.developer.gov.bc.ca/rest/auth/oidc/callback
+    AUTHZ_ENVIRONMENT: prod
     UI_OIDC_REDIRECT_URI: https://n8n.developer.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:prod:"
     CHEFS_GATEWAY_URL: https://submit.digital.gov.bc.ca/app/gateway/v1
