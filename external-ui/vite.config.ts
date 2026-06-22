@@ -29,5 +29,11 @@ export default defineConfig(({ mode }) => {
         ignored: ['**/node_modules/**', '**/.pnpm/**'],
       },
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./tests/setup.ts'],
+      css: true,
+    },
   };
 });

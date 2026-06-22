@@ -9,6 +9,10 @@ export function resolveAccessTokenExpiresAt(expiresInSeconds?: number) {
   return typeof expiresInSeconds === 'number' ? Date.now() + expiresInSeconds * 1000 : undefined;
 }
 
+export function shouldRefreshAccessToken(expiresAt?: number) {
+  return typeof expiresAt === 'number' && expiresAt - Date.now() <= 60_000;
+}
+
 export async function createUiAuthToken(params: { oidc: UiOidcIdentity; upstreamExpiresAt?: number }) {
   if (!UI_AUTH_JWT_SECRET) {
     throw new Error('UI auth JWT secret is not configured');

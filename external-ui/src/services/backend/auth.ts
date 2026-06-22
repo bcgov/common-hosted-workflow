@@ -47,6 +47,8 @@ export type Permissions = {
   isAdmin: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
+  canShareWorkflows: boolean;
+  canUnshareWorkflows: boolean;
 };
 
 export type WhoamiResponse = {
@@ -65,10 +67,20 @@ export type WhoamiResponse = {
   permissions: Permissions;
 };
 
+export type AuthExchangeResponse = {
+  token: string;
+};
+
 export function getWhoami(params?: { signal?: AbortSignal }) {
   return instance.get<WhoamiResponse>('/ui-api/whoami', { signal: params?.signal }).then((res) => res.data);
 }
 
 export function getSession(params?: { signal?: AbortSignal }) {
   return instance.get<AuthSessionResponse>('/ui-api/session', { signal: params?.signal }).then((res) => res.data);
+}
+
+export function exchangeSession(session: string, params?: { signal?: AbortSignal }) {
+  return instance
+    .post<AuthExchangeResponse>('/ui-api/auth/exchange', { session }, { signal: params?.signal })
+    .then((res) => res.data);
 }

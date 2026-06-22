@@ -4,6 +4,7 @@ import { sessionState } from '../state/session';
 function getCurrentUiPath() {
   const url = new URL(globalThis.location.href);
   url.searchParams.delete('token');
+  url.searchParams.delete('session');
   return url.toString();
 }
 
@@ -22,8 +23,14 @@ export function login() {
 }
 
 export function logout() {
+  const email = sessionState.session?.user.email;
   clearStoredAppToken();
   sessionState.session = null;
   sessionState.isLoading = false;
-  globalThis.location.assign(buildAuthRouteUrl('/ui-api/auth/logout', { returnTo: getCurrentUiPath() }));
+  globalThis.location.assign(
+    buildAuthRouteUrl('/ui-api/auth/logout', {
+      returnTo: getCurrentUiPath(),
+      ...(email ? { email } : {}),
+    }),
+  );
 }

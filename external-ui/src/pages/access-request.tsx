@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createAccessRequest, getMyAccessRequest } from '../services/backend/access-requests';
 import { getStoredAppToken } from '../services/backend/axios';
 import { useAuthUser, useSessionLoading } from '../state/session';
 import { AccessRequestStatusBadge } from '../components/access-request-status-badge';
 import type { AccessRequestListItem } from '../services/backend/access-requests';
+import { toast } from '../hooks/use-toasts';
 import { IconSend, IconPlus, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,12 +68,12 @@ function NewRequestForm({
   justification,
   onJustificationChange,
   onSubmit,
-  mutation,
+  isPending,
 }: {
   justification: string;
   onJustificationChange: (value: string) => void;
   onSubmit: (event: React.FormEvent) => void;
-  mutation: { isPending: boolean; isSuccess: boolean; error: Error | null; reset: () => void };
+  isPending: boolean;
 }) {
   return (
     <Card>
@@ -98,23 +99,9 @@ function NewRequestForm({
             </p>
           </div>
 
-          {mutation.error instanceof Error && (
-            <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{mutation.error.message}</AlertDescription>
-            </Alert>
-          )}
-
-          {mutation.isSuccess && (
-            <Alert className="border-green-600 bg-green-50 text-green-800">
-              <AlertTitle>Request Submitted</AlertTitle>
-              <AlertDescription>Your access request has been submitted successfully.</AlertDescription>
-            </Alert>
-          )}
-
-          <Button type="submit" disabled={mutation.isPending || !justification.trim()}>
+          <Button type="submit" disabled={isPending || !justification.trim()}>
             <IconSend size={16} aria-hidden="true" />
-            {mutation.isPending ? 'Submitting...' : 'Submit Request'}
+            {isPending ? 'Submitting...' : 'Submit Request'}
           </Button>
         </form>
       </CardContent>
@@ -144,16 +131,13 @@ export function AccessRequest() {
     onSuccess: async () => {
       setJustification('');
       setShowNewRequest(false);
+      toast.success('Access request submitted successfully.');
       await queryClient.invalidateQueries({ queryKey: ['access-requests', 'my', user?.email ?? ''] });
     },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to submit access request.');
+    },
   });
-
-  useEffect(() => {
-    if (createMutation.isSuccess) {
-      const timer = setTimeout(() => createMutation.reset(), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [createMutation.isSuccess, createMutation]);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -193,7 +177,7 @@ export function AccessRequest() {
             justification={justification}
             onJustificationChange={setJustification}
             onSubmit={handleSubmit}
-            mutation={createMutation}
+            isPending={createMutation.isPending}
           />
         )}
       </section>

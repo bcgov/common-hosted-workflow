@@ -15,6 +15,10 @@ export function appendTokenToReturnTo(returnTo: string, token: string) {
   return appendQueryParam(returnTo, 'token', token);
 }
 
+export function appendSessionToReturnTo(returnTo: string, session: string) {
+  return appendQueryParam(returnTo, 'session', session);
+}
+
 export function buildUiAppUrl(path: string) {
   const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
 

@@ -106,7 +106,10 @@ export type BaseN8nExecutionRepository = BaseN8nRepository & {
   ) => Promise<{ workflowId: string } | null | undefined>;
 };
 
-export type BaseN8nSharedCredentialRepository = BaseN8nRepository;
+export type BaseN8nSharedCredentialRepository = BaseN8nRepository & {
+  create: (value: Record<string, unknown>) => Record<string, unknown>;
+  save: (value: Record<string, unknown>) => Promise<unknown>;
+};
 
 export type BaseN8nRepositories = {
   user: BaseN8nUserRepository;
