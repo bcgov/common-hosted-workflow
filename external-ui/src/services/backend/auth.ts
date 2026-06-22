@@ -44,14 +44,14 @@ export type AuthenticatedSession = {
 };
 
 export type Permissions = {
+  isAdmin: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
+  canShareWorkflows: boolean;
+  canUnshareWorkflows: boolean;
 };
 
 export type WhoamiResponse = {
-  ok: boolean;
-  route: string;
-  method: string;
   userAgent: string | null;
   oidc: {
     issuer: string;
@@ -67,23 +67,20 @@ export type WhoamiResponse = {
   permissions: Permissions;
 };
 
-export function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSession | null {
-  if (!response.authenticated || !response.user || !response.oidc || !response.n8nUser || !response.permissions) {
-    return null;
-  }
+export type AuthExchangeResponse = {
+  token: string;
+};
 
-  return {
-    user: response.user,
-    oidc: response.oidc,
-    n8nUser: response.n8nUser,
-    permissions: response.permissions,
-  };
-}
-
-export async function getWhoami(params?: { signal?: AbortSignal }) {
+export function getWhoami(params?: { signal?: AbortSignal }) {
   return instance.get<WhoamiResponse>('/ui-api/whoami', { signal: params?.signal }).then((res) => res.data);
 }
 
-export async function getSession(params?: { signal?: AbortSignal }) {
+export function getSession(params?: { signal?: AbortSignal }) {
   return instance.get<AuthSessionResponse>('/ui-api/session', { signal: params?.signal }).then((res) => res.data);
+}
+
+export function exchangeSession(session: string, params?: { signal?: AbortSignal }) {
+  return instance
+    .post<AuthExchangeResponse>('/ui-api/auth/exchange', { session }, { signal: params?.signal })
+    .then((res) => res.data);
 }

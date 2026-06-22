@@ -15,8 +15,6 @@ export type AccessRequestListItem = {
 };
 
 export type CreateAccessRequestResponse = {
-  success: true;
-  message: string;
   accessRequest: AccessRequestListItem;
 };
 
@@ -30,24 +28,22 @@ export type ListAccessRequestsResponse = {
 };
 
 export type ReviewAccessRequestResponse = {
-  success: true;
-  message: string;
   accessRequest: AccessRequestListItem;
 };
 
-export async function createAccessRequest(justification: string, params?: { signal?: AbortSignal }) {
+export function createAccessRequest(justification: string, params?: { signal?: AbortSignal }) {
   return instance
     .post<CreateAccessRequestResponse>('/ui-api/access-requests', { justification }, { signal: params?.signal })
     .then((res) => res.data);
 }
 
-export async function getMyAccessRequest(params?: { signal?: AbortSignal }) {
+export function getMyAccessRequest(params?: { signal?: AbortSignal }) {
   return instance
     .get<GetMyAccessRequestResponse>('/ui-api/access-requests/my', { signal: params?.signal })
     .then((res) => res.data);
 }
 
-export async function listAccessRequests(
+export function listAccessRequests(
   query?: { status?: string; limit?: number; offset?: number },
   params?: { signal?: AbortSignal },
 ) {
@@ -59,7 +55,7 @@ export async function listAccessRequests(
     .then((res) => res.data);
 }
 
-export async function reviewAccessRequest(
+export function reviewAccessRequest(
   accessRequestId: string,
   action: 'approve' | 'deny',
   denyReason?: string,

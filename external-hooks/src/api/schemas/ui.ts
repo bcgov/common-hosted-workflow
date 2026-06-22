@@ -17,8 +17,6 @@ export const shareWorkflowSchema = z.object({
 });
 
 export const shareWorkflowResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
   workflowId: z.string(),
   sharedWithEmail: z.string(),
 });
@@ -33,8 +31,18 @@ export const unshareWorkflowSchema = z.object({
 });
 
 export const unshareWorkflowResponseSchema = z.object({
-  success: z.literal(true),
-  message: z.string(),
   workflowId: z.string(),
   projectId: z.string(),
+});
+
+export const authExchangeSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+  body: z.object({
+    session: z.string().trim().min(1, { message: 'Missing session handle.' }),
+  }),
+});
+
+export const authExchangeResponseSchema = z.object({
+  token: z.string(),
 });

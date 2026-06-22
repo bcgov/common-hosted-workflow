@@ -10,4 +10,12 @@ export class SharedCredentialRepository {
   get manager(): BaseN8nRepositoryManager {
     return this.sharedCredentialRepository.manager;
   }
+
+  create(value: Record<string, unknown>) {
+    return this.sharedCredentialRepository.create(value);
+  }
+
+  async save(value: Record<string, unknown>) {
+    return await this.sharedCredentialRepository.save(value);
+  }
 }

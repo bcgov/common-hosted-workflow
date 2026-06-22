@@ -53,7 +53,7 @@ export type WilChefsTokenResponse = {
   baseUrl: string;
 };
 
-export async function getWilMessages(params: WilListParams) {
+export function getWilMessages(params: WilListParams) {
   return instance
     .get<WilListResponse<WilMessageItem>>('/ui-api/wil/messages', {
       params: { limit: params.limit, since: params.since },
@@ -63,7 +63,7 @@ export async function getWilMessages(params: WilListParams) {
     .then((res) => res.data);
 }
 
-export async function getWilActions(params: WilListParams) {
+export function getWilActions(params: WilListParams) {
   return instance
     .get<WilListResponse<WilActionItem>>('/ui-api/wil/actions', {
       params: { limit: params.limit, since: params.since, status: params.status },
@@ -73,11 +73,11 @@ export async function getWilActions(params: WilListParams) {
     .then((res) => res.data);
 }
 
-export async function getWilTenants(signal?: AbortSignal) {
+export function getWilTenants(signal?: AbortSignal) {
   return instance.get<WilTenantsResponse>('/ui-api/wil/tenants', { signal }).then((res) => res.data);
 }
 
-export async function postWilCallback(params: { tenantId: string; actionId: string; body: Record<string, unknown> }) {
+export function postWilCallback(params: { tenantId: string; actionId: string; body: Record<string, unknown> }) {
   return instance
     .post<void>(
       '/ui-api/wil/callback',
@@ -89,7 +89,7 @@ export async function postWilCallback(params: { tenantId: string; actionId: stri
     .then((res) => res.data);
 }
 
-export async function postWilChefsToken(params: { tenantId: string; actionId: string }) {
+export function postWilChefsToken(params: { tenantId: string; actionId: string }) {
   return instance
     .post<WilChefsTokenResponse>(
       '/ui-api/wil/chefs-token',

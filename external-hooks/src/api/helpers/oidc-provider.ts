@@ -216,6 +216,43 @@ export async function exchangeAuthorizationCode(params: {
   };
 }
 
+export async function refreshOidcTokens(params: {
+  refreshToken: string;
+  discovery: OidcDiscoveryDocument;
+  config: OidcProviderConfig;
+}) {
+  const tokenEndpoint = params.discovery.token_endpoint || params.config.tokenEndpoint;
+  if (!tokenEndpoint) {
+    throw new Error('OIDC token endpoint is not configured');
+  }
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: params.refreshToken,
+    client_id: params.config.clientId,
+    client_secret: params.config.clientSecret,
+  });
+
+  const response = await fetch(tokenEndpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Token refresh failed: ${response.status}`);
+  }
+
+  return (await response.json()) as {
+    access_token?: string;
+    id_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+}
+
 async function verifyOidcIdToken(params: {
   idToken: string;
   discovery: OidcDiscoveryDocument;

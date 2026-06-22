@@ -3,6 +3,7 @@ import { NavLink } from 'react-router';
 import { login, logout } from '../auth/session-actions';
 import { withAppBasePath } from '../config/base-path';
 import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
+import { ToastContainer } from '../components/toast-container';
 import { IconLogin2, IconLogout } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +26,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
+      <ToastContainer />
       <header className="sticky top-0 z-50 border-b-2 border-[var(--bc-gold)] bg-[var(--bc-blue)] text-white shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-3">
           <div className="flex items-center gap-3">

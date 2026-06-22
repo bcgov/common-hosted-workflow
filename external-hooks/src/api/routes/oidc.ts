@@ -3,6 +3,12 @@ import { Router, type Request, type Response } from 'express';
 import { N8N_PROTOCOL } from '@config';
 import { beginOidcAuthorization, completeOidcAuthorization, extractOidcIdentity } from '../helpers/oidc-provider';
 import {
+  setUiOidcAccessTokenRecord,
+  setUiOidcIdToken,
+  setUiOidcRefreshToken,
+  setUiSessionExchange,
+} from '../helpers/ui-oidc-store';
+import {
   createAuthToken,
   createSignedCookie,
   getCookieSecret,
@@ -17,7 +23,7 @@ import {
 } from '../helpers/n8n-oidc';
 import { issueUiSessionToken, resolveAccessTokenExpiresAt } from '../helpers/ui-auth-token';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
-import { appendQueryParam, buildUiAppUrl } from '../helpers/url';
+import { appendSessionToReturnTo, buildUiAppUrl } from '../helpers/url';
 import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
@@ -26,6 +32,7 @@ import type { TenantProjectSyncService } from '../services/tenant-project-sync.s
 import type { UserService } from '../services/user';
 
 const log = createLogger('OIDCHook');
+const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
 
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
@@ -68,7 +75,9 @@ async function redirectToAccessRequest(
     upstreamExpiresAt: params.accessTokenExpiresAt,
   });
 
-  return res.redirect(appendQueryParam(buildUiAppUrl('/access-request'), 'token', uiToken));
+  const sessionHandle = crypto.randomBytes(24).toString('base64url');
+  await setUiSessionExchange(sessionHandle, uiToken, UI_SESSION_EXCHANGE_TTL_MS);
+  return res.redirect(appendSessionToReturnTo(buildUiAppUrl('/access-request'), sessionHandle));
 }
 
 export function buildOidcRouter({
@@ -171,6 +180,16 @@ export function buildOidcRouter({
         claims: identity.claims,
       };
       const accessTokenExpiresAt = resolveAccessTokenExpiresAt(completion.tokens.expires_in);
+
+      if (completion.tokens.refresh_token) {
+        await setUiOidcRefreshToken(identity.email, completion.tokens.refresh_token);
+      }
+      if (completion.tokens.id_token) {
+        await setUiOidcIdToken(identity.email, completion.tokens.id_token);
+      }
+      if (completion.tokens.access_token) {
+        await setUiOidcAccessTokenRecord(identity.email, completion.tokens.access_token, accessTokenExpiresAt);
+      }
 
       const jwtRole = parseN8nOidcRole(identity.claims[config.rolesClaim]);
       const nextRole = config.restrictNoRole ? (jwtRole ?? '') : jwtRole || 'global:member';

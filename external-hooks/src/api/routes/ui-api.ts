@@ -1,9 +1,12 @@
+import { randomBytes } from 'crypto';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { type infer as zInfer } from 'zod';
 import { OkResponse, CreatedResponse, ForbiddenResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestParser } from '../utils/validation';
 import {
+  authExchangeResponseSchema,
+  authExchangeSchema,
   shareWorkflowResponseSchema,
   shareWorkflowSchema,
   unshareWorkflowResponseSchema,
@@ -20,22 +23,49 @@ import {
 } from '../schemas/access-request';
 import { issueUiSessionToken } from '../helpers/ui-auth-token';
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
+import {
+  consumeUiSessionExchange,
+  deleteUiOidcTokens,
+  getUiOidcIdToken,
+  setUiOidcAccessTokenRecord,
+  setUiOidcIdToken,
+  setUiOidcRefreshToken,
+  setUiSessionExchange,
+} from '../helpers/ui-oidc-store';
+import { fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
 import { getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
-import { computePermissions } from '../helpers/permissions';
-import { appendQueryParam, appendTokenToReturnTo } from '../helpers/url';
+import { computePermissions, type Permissions } from '../helpers/permissions';
+import { getOidcConfigFromEnv, buildSessionSummary, buildWhoamiResponse } from '../helpers/ui-oidc';
+import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('UiApi');
 
 type UiApiMutableRequest = Request & {
   session?: UiApiRequest['session'];
   context?: UiApiRequest['context'];
 };
 
+const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
+
+function setRefreshedUiTokenHeader(res: Response, token?: string) {
+  if (token) {
+    res.setHeader('X-UI-Auth-Token', token);
+  }
+}
+
 async function resolveUiRequestContext(req: Request, services: ApiRouteContext['services']) {
-  const session = await getUiSession(req);
-  if (!session) {
+  const rawSessionResult = await getUiSession(req);
+  if (!rawSessionResult) {
     return null;
   }
+
+  const hasWrappedSession =
+    typeof rawSessionResult === 'object' && rawSessionResult !== null && 'session' in rawSessionResult;
+  const session = hasWrappedSession ? rawSessionResult.session : rawSessionResult;
+  const refreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
   const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
@@ -52,6 +82,7 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
       permissions: computePermissions(resolvedN8nUser),
     },
     context,
+    refreshedToken,
   };
 }
 
@@ -62,6 +93,7 @@ function createUiRequestContextMiddleware(services: ApiRouteContext['services'])
       if (resolved) {
         req.session = resolved.session;
         req.context = resolved.context;
+        setRefreshedUiTokenHeader(_res, resolved.refreshedToken);
       }
 
       next();
@@ -92,13 +124,26 @@ function requireUiRequestContextMiddleware(services: ApiRouteContext['services']
 
 export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware };
 
-function requireGlobalAdminRole(req: Request, res: Response, next: NextFunction) {
-  const roleSlug = (req as UiApiRequest).session?.n8nUser?.role?.slug;
-  if (roleSlug !== 'global:owner' && roleSlug !== 'global:admin') {
-    ForbiddenResponse(res);
-    return;
-  }
-  next();
+function checkPermission(permissionKey: keyof Permissions) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const hasPermission = (req as UiApiRequest).session?.permissions?.[permissionKey];
+    if (!hasPermission) {
+      ForbiddenResponse(res);
+      return;
+    }
+    next();
+  };
+}
+
+function checkRole(...allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const roleSlug = (req as UiApiRequest).session?.n8nUser?.role?.slug;
+    if (!roleSlug || !allowedRoles.includes(roleSlug)) {
+      ForbiddenResponse(res);
+      return;
+    }
+    next();
+  };
 }
 
 export function buildUiApiRouter(routeContext: ApiRouteContext) {
@@ -108,39 +153,29 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
 
   router.get('/session', async (req, res) => {
     const resolved = await resolveUiRequestContext(req, services);
-    const session = resolved?.session;
+    setRefreshedUiTokenHeader(res, resolved?.refreshedToken);
 
-    res.json(
-      session
-        ? {
-            authenticated: true,
-            user: {
-              subject: session.subject,
-              email: session.email,
-              preferredUsername: session.preferredUsername,
-              name: session.name,
-            },
-            oidc: {
-              issuer: session.issuer,
-              subject: session.subject,
-              audience: session.audience,
-              email: session.email,
-              preferredUsername: session.preferredUsername,
-              name: session.name,
-              expiresAt: session.expiresAt,
-              claims: session.claims,
-            },
-            n8nUser: session.n8nUser,
-            permissions: session.permissions,
-          }
-        : { authenticated: false, user: null, oidc: null, n8nUser: null, permissions: null },
-    );
+    res.json(buildSessionSummary(resolved?.session ?? null));
   });
 
   router.get('/auth/login', async (req, res) => {
     const redirectUrl = await buildUiLoginRedirect(req);
     res.redirect(redirectUrl);
   });
+
+  router.post(
+    '/auth/exchange',
+    createRequestParser(authExchangeSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof authExchangeSchema>>, res) => {
+      const exchange = await consumeUiSessionExchange(req.parsed.body.session);
+      if (!exchange) {
+        UnauthorizedResponse(res);
+        return;
+      }
+
+      OkResponse(res, { token: exchange.token }, authExchangeResponseSchema);
+    },
+  );
 
   router.get('/auth/callback', async (req, res) => {
     const result = await completeUiLogin(req);
@@ -152,6 +187,16 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     let token: string;
 
     try {
+      if (result.refreshToken) {
+        await setUiOidcRefreshToken(result.email, result.refreshToken);
+      }
+      if (result.idToken) {
+        await setUiOidcIdToken(result.email, result.idToken);
+      }
+      if (result.accessToken) {
+        await setUiOidcAccessTokenRecord(result.email, result.accessToken, result.accessTokenExpiresAt);
+      }
+
       token = await issueUiSessionToken({
         oidc: {
           subject: result.subject,
@@ -194,54 +239,61 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       }
     }
 
-    res.redirect(appendTokenToReturnTo(result.returnTo, token));
+    const sessionHandle = randomBytes(24).toString('base64url');
+    await setUiSessionExchange(sessionHandle, token, UI_SESSION_EXCHANGE_TTL_MS);
+    res.redirect(appendSessionToReturnTo(result.returnTo, sessionHandle));
   });
 
   router.get('/auth/logout', async (req, res) => {
     const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/ui/';
-    res.redirect(returnTo);
+    const email = typeof req.query.email === 'string' ? req.query.email : '';
+
+    if (!email) {
+      log.debug('Logout requested without email, redirecting directly', { returnTo });
+      res.redirect(returnTo);
+      return;
+    }
+
+    const idToken = await getUiOidcIdToken(email);
+    await deleteUiOidcTokens(email);
+
+    if (!idToken) {
+      log.debug('Logout: no ID token stored, redirecting directly', { email, returnTo });
+      res.redirect(returnTo);
+      return;
+    }
+
+    const config = getOidcConfigFromEnv();
+    const discovery = await fetchOidcDiscoveryDocument(config);
+    if (!discovery.end_session_endpoint) {
+      log.debug('Logout: no end_session_endpoint in discovery, redirecting directly', { email, returnTo });
+      res.redirect(returnTo);
+      return;
+    }
+
+    log.info('Logout: redirecting to upstream IDP end_session_endpoint', { email, returnTo });
+    const logoutUrl = new URL(discovery.end_session_endpoint);
+    logoutUrl.searchParams.set('post_logout_redirect_uri', returnTo);
+    logoutUrl.searchParams.set('id_token_hint', idToken);
+    res.redirect(logoutUrl.toString());
   });
 
   router.get('/whoami', requireUiRequestContext, async (req, res) => {
     const { session } = req as UiApiRequest;
 
-    OkResponse(res, {
-      ok: true,
-      route: '/ui-api/whoami',
-      method: req.method,
-      oidc: {
-        issuer: session.issuer,
-        subject: session.subject,
-        audience: session.audience,
-        email: session.email,
-        preferredUsername: session.preferredUsername,
-        name: session.name,
-        expiresAt: session.expiresAt,
-        claims: session.claims,
-      },
-      n8nUser: session.n8nUser,
-      permissions: session.permissions,
-      userAgent: req.get('user-agent'),
-    });
+    OkResponse(res, buildWhoamiResponse(session, req.get('user-agent')));
   });
 
   router.get('/workflows', requireUiRequestContext, async (req, res) => {
     const { context } = req as UiApiRequest;
 
-    OkResponse(res, {
-      ok: true,
-      route: '/ui-api/workflows',
-      method: req.method,
-      n8nUser: serializeN8nUser(context.n8nUser),
-      accessibleProjectIds: context.accessibleProjectIds,
-      projects: context.projects,
-      workflows: context.workflows,
-    });
+    OkResponse(res, context.workflows);
   });
 
   router.post(
     '/workflows/:workflowId/share',
     requireUiRequestContext,
+    checkPermission('canShareWorkflows'),
     createRequestParser(shareWorkflowSchema),
     async (req: UiApiTypedRequest<zInfer<typeof shareWorkflowSchema>>, res) => {
       const result = await services.uiApi.shareWorkflow(
@@ -253,8 +305,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       CreatedResponse(
         res,
         {
-          success: true as const,
-          message: `Workflow '${result.workflowId}' shared with '${result.sharedWithEmail}'.`,
           workflowId: result.workflowId,
           sharedWithEmail: result.sharedWithEmail,
         },
@@ -266,6 +316,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.delete(
     '/workflows/:workflowId/projects/:projectId',
     requireUiRequestContext,
+    checkPermission('canUnshareWorkflows'),
     createRequestParser(unshareWorkflowSchema),
     async (req: UiApiTypedRequest<zInfer<typeof unshareWorkflowSchema>>, res) => {
       const result = await services.uiApi.unshareWorkflow(
@@ -277,8 +328,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       OkResponse(
         res,
         {
-          success: true as const,
-          message: `Workflow '${result.workflowId}' unshared from project '${result.projectId}'.`,
           workflowId: result.workflowId,
           projectId: result.projectId,
         },
@@ -290,6 +339,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.post(
     '/access-requests',
     requireUiRequestContext,
+    checkPermission('canRequestAccess'),
     createRequestParser(createAccessRequestSchema),
     async (req: UiApiTypedRequest<zInfer<typeof createAccessRequestSchema>>, res) => {
       const accessRequest = await services.accessRequest.createAccessRequest({
@@ -300,8 +350,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       CreatedResponse(
         res,
         {
-          success: true as const,
-          message: 'Access request submitted successfully.',
           accessRequest,
         },
         createAccessRequestResponseSchema,
@@ -326,7 +374,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.get(
     '/access-requests',
     requireUiRequestContext,
-    requireGlobalAdminRole,
+    checkRole('global:owner', 'global:admin'),
     createRequestParser(listAccessRequestsSchema),
     async (req: UiApiTypedRequest<zInfer<typeof listAccessRequestsSchema>>, res) => {
       const { status, limit, offset } = req.parsed.query ?? {};
@@ -344,7 +392,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   router.post(
     '/access-requests/:id/review',
     requireUiRequestContext,
-    requireGlobalAdminRole,
+    checkRole('global:owner', 'global:admin'),
     createRequestParser(reviewAccessRequestSchema),
     async (req: UiApiTypedRequest<zInfer<typeof reviewAccessRequestSchema>>, res) => {
       const result = await services.accessRequest.reviewAccessRequest({
@@ -358,8 +406,6 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       OkResponse(
         res,
         {
-          success: true as const,
-          message: `Access request ${req.parsed.body.action}d successfully.`,
           accessRequest: result,
         },
         reviewAccessRequestResponseSchema,
