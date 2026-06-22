@@ -242,14 +242,16 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
 
     const config = getOidcConfigFromEnv();
     const discovery = await fetchOidcDiscoveryDocument(config);
-    if (!discovery.end_session_endpoint) {
-      log.debug('Logout: no end_session_endpoint in discovery, redirecting directly', { email, returnTo });
+
+    const endSessionEndpoint = discovery.end_session_endpoint || config.endSessionEndpoint;
+    if (!endSessionEndpoint) {
+      log.debug('Logout: no end_session_endpoint in discovery or config, redirecting directly', { email, returnTo });
       res.redirect(returnTo);
       return;
     }
 
     log.info('Logout: redirecting to upstream IDP end_session_endpoint', { email, returnTo });
-    const logoutUrl = new URL(discovery.end_session_endpoint);
+    const logoutUrl = new URL(endSessionEndpoint);
     logoutUrl.searchParams.set('post_logout_redirect_uri', returnTo);
     logoutUrl.searchParams.set('id_token_hint', idToken);
     res.redirect(logoutUrl.toString());

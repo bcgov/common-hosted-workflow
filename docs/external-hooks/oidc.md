@@ -93,6 +93,9 @@ When `OIDC_ISSUER` is not set, all of the following must be provided:
 - `OIDC_ROLES_CLAIM`
   Default: `roles`
 
+- `OIDC_END_SESSION_ENDPOINT`
+  When `OIDC_ISSUER` is not set, this provides the IDP logout URL for upstream single-logout. If not set, logout redirects directly without IDP involvement.
+
 - `SSO_RESTRICT_NO_ROLE`
   When `true`, users without a mapped OIDC role cannot be newly provisioned, and existing users are synced to an empty role when the token carries no valid role.
 
