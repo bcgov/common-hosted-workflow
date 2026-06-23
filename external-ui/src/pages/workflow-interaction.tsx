@@ -2,7 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { login } from '../auth/session-actions';
 import type { WilActionItem } from '../services/backend/wil';
-import { useAuthUser } from '../state/session';
+import { useAuthUser, useSession } from '../state/session';
+import { canManageTriggers } from '../lib/trigger-manage-roles';
 import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import {
   TabBar,
   ActionsTab,
   MessagesTab,
+  TriggersTab,
 } from '@/components/wil';
 import type { Tab } from '@/components/wil';
 
@@ -23,7 +25,13 @@ const ACTION_LIST_REFRESH_DELAY_MS = 1500;
 
 export function WorkflowInteraction() {
   const user = useAuthUser();
+  const session = useSession();
   const queryClient = useQueryClient();
+
+  // Determine project-level role from the n8n user's role slug
+  const roleSlug = session?.n8nUser?.role?.slug ?? '';
+  // Delegates to TriggerManageRole enum — project:editor, global:admin, global:owner
+  const userCanManageTriggers = canManageTriggers(roleSlug);
   const [tenantId, setTenantId] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
@@ -112,6 +120,13 @@ export function WorkflowInteraction() {
                       </div>
                     </div>
                   </div>
+                ) : activeTab === 'triggers' ? (
+                  <TriggersTab
+                    tenantId={tenantId}
+                    canManageTriggers={userCanManageTriggers}
+                    userRoleSlug={roleSlug}
+                    userEmail={user?.email ?? ''}
+                  />
                 ) : (
                   <MessagesTab
                     tenantId={tenantId}
