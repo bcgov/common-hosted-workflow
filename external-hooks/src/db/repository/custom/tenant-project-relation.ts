@@ -33,4 +33,18 @@ export class TenantProjectRelationRepository {
   async insert(params: { tenantId: string; projectId: string }): Promise<void> {
     await this.db.insert(tenantProjectRelation).values(params);
   }
+
+  /**
+   * Inserts a tenant/project mapping, silently ignoring conflicts.
+   * Used during concurrent login scenarios where multiple requests may try
+   * to create the same tenant-to-project mapping simultaneously.
+   */
+  async insertIgnoreConflict(params: { tenantId: string; projectId: string }): Promise<void> {
+    await this.db
+      .insert(tenantProjectRelation)
+      .values(params)
+      .onConflictDoNothing({
+        target: [tenantProjectRelation.tenantId, tenantProjectRelation.projectId],
+      });
+  }
 }

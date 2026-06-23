@@ -3,6 +3,8 @@ import { instance } from './axios';
 export type WilTenantItem = {
   id: string;
   name: string;
+  source: 'cstar' | 'personal';
+  projectId?: string;
 };
 
 export type WilTenantsResponse = {

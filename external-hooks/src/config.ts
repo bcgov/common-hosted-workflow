@@ -55,8 +55,16 @@ export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 // UI OIDC – only redirect remains UI-specific; shared provider/client config comes from OIDC_*
 export const UI_OIDC_REDIRECT_URI = process.env.UI_OIDC_REDIRECT_URI || '';
 
-// CHEFS gateway
-export const CHEFS_GATEWAY_URL = process.env.CHEFS_GATEWAY_URL || '';
+// CSTAR – Tenant & user management
+export const CSTAR_BASE_URL = process.env.CSTAR_BASE_URL || '';
+export const CSTAR_API_BASE_URL = CSTAR_BASE_URL ? `${CSTAR_BASE_URL}/api/v1` : '';
+
+// Tenant project sync – auto-provision n8n team projects from CSTAR tenants at login
+export const IS_TENANT_PROJECT_SYNC_ENABLED = process.env.IS_TENANT_PROJECT_SYNC_ENABLED === 'true';
+
+// CHEFS – Common Hosted Form Service
+export const CHEFS_BASE_URL = process.env.CHEFS_BASE_URL || '';
+export const CHEFS_GATEWAY_URL = CHEFS_BASE_URL ? `${CHEFS_BASE_URL}/app/gateway/v1` : '';
 
 // CSS SSO / AuthZ – all required; missing any disables CSS SSO
 export const AUTHZ_SERVICE_URL = process.env.AUTHZ_SERVICE_URL || '';

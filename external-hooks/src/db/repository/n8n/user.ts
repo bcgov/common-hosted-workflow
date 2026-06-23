@@ -50,6 +50,17 @@ export class UserRepository {
     return await this.userRepository.createUserWithProject(userData);
   }
 
+  /**
+   * Returns the user ID of the first user with the given role slug, or null if none exists.
+   * Used to resolve the global owner for tenant project sync.
+   */
+  async findUserIdByRoleSlug(roleSlug: string): Promise<string | null> {
+    const rows = await this.userRepository.manager.query(`SELECT "id" FROM "user" WHERE "roleSlug" = $1 LIMIT 1`, [
+      roleSlug,
+    ]);
+    return rows.length > 0 ? (rows[0].id as string) : null;
+  }
+
   async findAdminEmails(): Promise<string[]> {
     const tableName = this.userRepository.metadata.tableName;
     const emailColumn = this.getColumnName('email');

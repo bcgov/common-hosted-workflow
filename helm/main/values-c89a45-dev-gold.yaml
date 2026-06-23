@@ -14,7 +14,9 @@ n8n:
     EXTERNAL_UI_ENABLED: 'true'
     UI_OIDC_REDIRECT_URI: https://dev-chwf-sdg.apps.gold.devops.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
-    CHEFS_GATEWAY_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
+    CSTAR_BASE_URL: https://dev-chwf-sdg-mock.apps.gold.devops.gov.bc.ca
+    IS_TENANT_PROJECT_SYNC_ENABLED: "true"
 
   route:
     enabled: true

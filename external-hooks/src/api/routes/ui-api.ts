@@ -40,6 +40,7 @@ import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
 import { createLogger } from '../utils/logger';
+import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 
 const log = createLogger('UiApi');
 
@@ -147,7 +148,7 @@ function checkRole(...allowedRoles: string[]) {
 }
 
 export function buildUiApiRouter(routeContext: ApiRouteContext) {
-  const { services } = routeContext;
+  const { services, n8nRepositories } = routeContext;
   const router = Router();
   const requireUiRequestContext = requireUiRequestContextMiddleware(services);
 
@@ -214,6 +215,25 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
       const message = error instanceof Error ? error.message : 'Failed to establish UI session';
       res.redirect(appendQueryParam(result.returnTo, 'error', message));
       return;
+    }
+
+    // Sync tenant projects (non-blocking — errors are logged but don't fail login)
+    if (result.accessToken) {
+      const cstarSsoUserId = resolveCstarSsoUserId(result.claims, result.subject, result.email);
+
+      // Look up n8n user by email to get the n8n user ID
+      const n8nUser = result.email ? await n8nRepositories.user.findByEmail(result.email) : null;
+      if (n8nUser) {
+        services.tenantProjectSync
+          .syncTenantsForUser({
+            ssoUserId: cstarSsoUserId,
+            n8nUserId: n8nUser.id,
+            accessToken: result.accessToken,
+          })
+          .catch((err) => {
+            log.error('Tenant project sync failed', { email: result.email, error: String(err) });
+          });
+      }
     }
 
     const sessionHandle = randomBytes(24).toString('base64url');
