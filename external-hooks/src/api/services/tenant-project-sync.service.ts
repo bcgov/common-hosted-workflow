@@ -20,11 +20,13 @@ export type SyncTenantsForUserParams = {
 };
 
 export class TenantProjectSyncService {
+  private globalOwnerUserId: string | null = null;
+
   constructor(
     private readonly n8nRepositories: N8nRepositories,
     private readonly customRepositories: CustomRepositories,
     private readonly cstarService: CstarService,
-    private readonly globalOwnerUserId: string,
+    private readonly globalOwnerRoleSlug: string,
   ) {}
 
   /**
@@ -47,8 +49,9 @@ export class TenantProjectSyncService {
       return;
     }
 
-    if (!this.globalOwnerUserId) {
-      log.warn('Cannot sync tenant projects — no global owner user ID resolved at startup');
+    const ownerUserId = await this.getGlobalOwnerUserId();
+    if (!ownerUserId) {
+      log.warn('Cannot sync tenant projects — no global owner user found');
       return;
     }
 
@@ -69,7 +72,9 @@ export class TenantProjectSyncService {
 
     // Process tenants concurrently — each is independent
     const results = await Promise.allSettled(
-      tenants.map((tenant) => this.syncTenantForUser(tenant.id, tenant.name, n8nUserId, ssoUserId, accessToken)),
+      tenants.map((tenant) =>
+        this.syncTenantForUser(tenant.id, tenant.name, n8nUserId, ssoUserId, accessToken, ownerUserId),
+      ),
     );
 
     const failures = results.filter((r) => r.status === 'rejected');
@@ -85,12 +90,28 @@ export class TenantProjectSyncService {
     log.debug('Tenant project sync completed', { ssoUserId, n8nUserId });
   }
 
+  /**
+   * Lazily resolves and caches the global owner user ID.
+   * If not yet cached, queries the DB. Returns null if no owner exists.
+   */
+  private async getGlobalOwnerUserId(): Promise<string | null> {
+    if (this.globalOwnerUserId) {
+      return this.globalOwnerUserId;
+    }
+    const userId = await this.n8nRepositories.user.findUserIdByRoleSlug(this.globalOwnerRoleSlug);
+    if (userId) {
+      this.globalOwnerUserId = userId;
+    }
+    return userId;
+  }
+
   private async syncTenantForUser(
     tenantId: string,
     tenantName: string,
     n8nUserId: string,
     ssoUserId: string,
     accessToken: string,
+    ownerUserId: string,
   ): Promise<void> {
     log.debug('Syncing tenant for user', { tenantId, tenantName, n8nUserId });
 
@@ -116,12 +137,12 @@ export class TenantProjectSyncService {
 
     if (existingProjectId) {
       // Project exists — sync the user's relation (add/update/remove)
-      await this.syncUserProjectRelation(n8nUserId, existingProjectId, resolvedRole, tenantId);
+      await this.syncUserProjectRelation(n8nUserId, existingProjectId, resolvedRole, tenantId, ownerUserId);
     } else if (resolvedRole) {
       // Project does NOT exist and user HAS a qualifying role — create it
-      const projectId = await this.createTenantProject(tenantId, tenantName);
+      const projectId = await this.createTenantProject(tenantId, tenantName, ownerUserId);
       if (projectId) {
-        await this.syncUserProjectRelation(n8nUserId, projectId, resolvedRole, tenantId);
+        await this.syncUserProjectRelation(n8nUserId, projectId, resolvedRole, tenantId, ownerUserId);
       }
     } else {
       // Project does NOT exist and user has NO qualifying role — skip
@@ -157,19 +178,15 @@ export class TenantProjectSyncService {
    * 1. Create the team project
    * 2. Link global owner as project:admin
    * 3. Map tenant to project (uses onConflictDoNothing to handle race conditions)
-   *
-   * If the tenant mapping insert is a no-op (another request already created the project),
-   * we still return the project ID — the user relation sync will proceed against the
-   * project we just created (worst case: a duplicate project exists but both are functional).
    */
-  private async createTenantProject(tenantId: string, tenantName: string): Promise<string | null> {
-    log.debug('Creating new team project for tenant', { tenantId, tenantName, creatorId: this.globalOwnerUserId });
+  private async createTenantProject(tenantId: string, tenantName: string, ownerUserId: string): Promise<string | null> {
+    log.debug('Creating new team project for tenant', { tenantId, tenantName, creatorId: ownerUserId });
 
     // Create a new team project owned by the global owner
     const projectEntity = this.n8nRepositories.project.create({
       name: tenantName,
       type: 'team',
-      creatorId: this.globalOwnerUserId,
+      creatorId: ownerUserId,
     });
 
     const savedProject = await this.n8nRepositories.project.save(projectEntity);
@@ -178,10 +195,10 @@ export class TenantProjectSyncService {
     // Link the global owner as project:admin
     await this.n8nRepositories.projectRelation.save({
       projectId: savedProject.id,
-      userId: this.globalOwnerUserId,
+      userId: ownerUserId,
       role: { slug: PROJECT_ROLE_ADMIN },
     });
-    log.debug('Global owner linked as project:admin', { projectId: savedProject.id, userId: this.globalOwnerUserId });
+    log.debug('Global owner linked as project:admin', { projectId: savedProject.id, userId: ownerUserId });
 
     // Map tenant to project — onConflictDoNothing handles the race condition
     // where another concurrent login already mapped this tenant
@@ -209,6 +226,7 @@ export class TenantProjectSyncService {
     projectId: string,
     resolvedRole: ManagedProjectRole | null,
     tenantId: string,
+    ownerUserId: string,
   ): Promise<void> {
     const existingRelation = (await this.n8nRepositories.projectRelation.findProjectRole({
       userId: n8nUserId,
@@ -219,7 +237,7 @@ export class TenantProjectSyncService {
     log.debug('Current user project relation', { n8nUserId, projectId, currentRoleSlug, resolvedRole, tenantId });
 
     // Skip if this user is the global owner (project:admin) — don't modify their relation
-    if (currentRoleSlug === PROJECT_ROLE_ADMIN && n8nUserId === this.globalOwnerUserId) {
+    if (currentRoleSlug === PROJECT_ROLE_ADMIN && n8nUserId === ownerUserId) {
       log.debug('Skipping global owner relation — not modifiable', { n8nUserId, projectId });
       return;
     }

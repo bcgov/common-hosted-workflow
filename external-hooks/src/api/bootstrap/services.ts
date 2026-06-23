@@ -15,9 +15,6 @@ import { CssSsoService } from '../services/css-sso';
 import { JwtService, type BaseJwtService } from '../services/jwt';
 import { NodeMailerService, type BaseNodeMailerService } from '../services/node-mailer';
 import { UserService, type BaseUserService } from '../services/user';
-import { createLogger } from '../utils/logger';
-
-const log = createLogger('Services');
 
 export type N8nServices = {
   jwtService: JwtService;
@@ -47,10 +44,6 @@ export async function buildApiServices(
   const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
   const cstarService = new CstarService();
 
-  // Resolve global owner user ID for tenant project creation
-  const globalOwnerUserId = await resolveGlobalOwnerUserId(n8nRepositories, globalOwnerRoleSlug);
-  log.debug('Resolved global owner for tenant project sync', { globalOwnerUserId, globalOwnerRoleSlug });
-
   return {
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
@@ -69,21 +62,7 @@ export async function buildApiServices(
       n8nRepositories,
       customRepositories,
       cstarService,
-      globalOwnerUserId,
+      globalOwnerRoleSlug,
     ),
   };
-}
-
-async function resolveGlobalOwnerUserId(
-  n8nRepositories: N8nRepositories,
-  globalOwnerRoleSlug: string,
-): Promise<string> {
-  const rows = await n8nRepositories.raw.user.manager.query(`SELECT "id" FROM "user" WHERE "roleSlug" = $1 LIMIT 1`, [
-    globalOwnerRoleSlug,
-  ]);
-  if (rows.length === 0) {
-    log.warn('No global owner user found — tenant project sync will be skipped until an owner exists');
-    return '';
-  }
-  return rows[0].id as string;
 }
