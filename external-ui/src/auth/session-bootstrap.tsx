@@ -22,6 +22,7 @@ function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSes
     oidc: response.oidc,
     n8nUser: response.n8nUser,
     permissions: response.permissions,
+    tenantRoles: response.tenantRoles ?? [],
   };
 }
 
