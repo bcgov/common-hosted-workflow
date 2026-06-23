@@ -14,7 +14,7 @@ n8n:
     AUTHZ_ENVIRONMENT: dev
     EXTERNAL_UI_ENABLED: 'true'
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
-    CHEFS_GATEWAY_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
 
   route:
     enabled: true

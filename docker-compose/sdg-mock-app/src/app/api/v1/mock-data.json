@@ -1,0 +1,74 @@
+{
+  "tenants": [
+    {
+      "id": "717626be-f59f-4e35-ac87-f84c4e11b865",
+      "name": "SDG",
+      "ministryName": "Agriculture and Food",
+      "description": "SDG",
+      "createdDateTime": "2026-06-16",
+      "updatedDateTime": "2026-06-16",
+      "createdBy": "670E63842AEF46209ADBF87989281814",
+      "updatedBy": "670E63842AEF46209ADBF87989281814"
+    },
+    {
+      "id": "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a",
+      "name": "DEVX",
+      "ministryName": "Agriculture and Food",
+      "description": "DEVX",
+      "createdDateTime": "2026-06-16",
+      "updatedDateTime": "2026-06-16",
+      "createdBy": "670E63842AEF46209ADBF87989281814",
+      "updatedBy": "670E63842AEF46209ADBF87989281814"
+    }
+  ],
+  "sharedServiceRoles": {
+    "717626be-f59f-4e35-ac87-f84c4e11b865": [
+      {
+        "id": "560c4de2-a0d4-4c7c-a500-75650475403d",
+        "name": "project:editor",
+        "description": "Can edit workflows in the SDG tenant project",
+        "allowedIdentityProviders": ["idir"],
+        "groups": [
+          {
+            "id": "ddd8b0a5-48a9-488e-b681-248756ecc6ec",
+            "name": "UI Actor"
+          }
+        ]
+      }
+    ],
+    "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a": [
+      {
+        "id": "660c5de3-b1e5-5d8d-b611-86761586514e",
+        "name": "project:viewer",
+        "description": "Can view workflows in the DEVX tenant project",
+        "allowedIdentityProviders": ["idir"],
+        "groups": []
+      }
+    ]
+  },
+  "groups": {
+    "717626be-f59f-4e35-ac87-f84c4e11b865": [
+      {
+        "id": "ddd8b0a5-48a9-488e-b681-248756ecc6ec",
+        "name": "UI Actor",
+        "description": "UI Actor",
+        "createdDateTime": "2026-06-19",
+        "updatedDateTime": "2026-06-19",
+        "sharedServiceRoles": [
+          {
+            "id": "560c4de2-a0d4-4c7c-a500-75650475403d",
+            "name": "ui:actor",
+            "description": "Only a Workflow External UI user",
+            "allowedIdentityProviders": ["idir"],
+            "isDeleted": false,
+            "createdDateTime": "2026-06-19",
+            "updatedDateTime": "2026-06-19",
+            "createdBy": "F45AFBBD68C44D6F956BA3A1D91878AD",
+            "updatedBy": "F45AFBBD68C44D6F956BA3A1D91878AD"
+          }
+        ]
+      }
+    ],
+    "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a": []
+  }
+}

@@ -53,6 +53,12 @@ spec:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.s3.secretName | quote }}
                       key: secret-key
+                - name: DATABASE_COUNT
+                  value: {{ len .Values.databases | quote }}
+                {{- range $i, $db := .Values.databases }}
+                - name: DATABASE_{{ $i }}_NAME
+                  value: {{ $db.name | quote }}
+                {{- end }}
                 - name: DATABASE_HOST
                   valueFrom:
                     secretKeyRef:
@@ -63,11 +69,6 @@ spec:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.db.secretName | quote }}
                       key: {{ .Values.conditionalRestore.db.portKey }}
-                - name: DATABASE_NAME
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ .Values.conditionalRestore.db.secretName | quote }}
-                      key: {{ .Values.conditionalRestore.db.dbnameKey }}
                 - name: DATABASE_USER
                   valueFrom:
                     secretKeyRef:

@@ -21,21 +21,23 @@ import {
   isValidEmail,
   type N8nOidcConfig,
   type N8nOidcNonceCookiePayload,
-  type N8nOidcRoleSlug,
   type N8nOidcStateCookiePayload,
   type N8nOidcUser,
   parseN8nOidcRole,
   verifySignedCookie,
 } from '../helpers/n8n-oidc';
 import { issueUiSessionToken, resolveAccessTokenExpiresAt } from '../helpers/ui-auth-token';
+import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
 import { getOidcConfigFromEnv } from '../helpers/ui-oidc';
 import { appendSessionToReturnTo, buildUiAppUrl } from '../helpers/url';
 import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
+import type { N8nUser } from '../types/user';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { AuthService } from '../services/auth';
 import type { JwtService } from '../services/jwt';
+import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
 
 const log = createLogger('OIDCHook');
@@ -46,6 +48,7 @@ export type BuildOidcRouterParams = {
   authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
+  tenantProjectSyncService: TenantProjectSyncService;
   config: N8nOidcConfig;
 };
 
@@ -92,6 +95,7 @@ export function buildOidcRouter({
   authService,
   jwtService,
   userService,
+  tenantProjectSyncService,
   config,
 }: BuildOidcRouterParams) {
   const { user: userRepository } = n8nRepositories;
@@ -127,33 +131,14 @@ export function buildOidcRouter({
     }
   });
 
-  router.get('/callback', async (req: Request, res: Response) => {
+  router.get('/callback', async (_req: Request, res: Response) => {
     try {
-      const { code, state, error, error_description } = req.query;
-
-      if (error) {
-        log.error('OIDC error from provider', { error, errorDescription: error_description });
-        return res.redirect('/signin?error=' + encodeURIComponent(String(error_description || error)));
+      const callbackResult = validateCallbackRequest(_req, cookieSecret);
+      if (callbackResult.redirect) {
+        return res.redirect(callbackResult.redirect);
       }
 
-      if (!code || !state) {
-        return res.redirect('/signin?error=' + encodeURIComponent('Missing authorization code or state'));
-      }
-
-      const stateCookie = req.cookies['n8n-oidc-state'];
-      const nonceCookie = req.cookies['n8n-oidc-nonce'];
-
-      if (!stateCookie || !nonceCookie) {
-        return res.redirect('/signin?error=' + encodeURIComponent('Missing state cookies - session expired'));
-      }
-
-      const statePayload = verifySignedCookie(stateCookie, cookieSecret) as N8nOidcStateCookiePayload | null;
-      const noncePayload = verifySignedCookie(nonceCookie, cookieSecret) as N8nOidcNonceCookiePayload | null;
-
-      if (!statePayload || statePayload.state !== state) {
-        return res.redirect('/signin?error=' + encodeURIComponent('Invalid state - possible CSRF attack'));
-      }
-
+      const { code, statePayload, noncePayload } = callbackResult;
       res.clearCookie('n8n-oidc-state');
       res.clearCookie('n8n-oidc-nonce');
 
@@ -188,15 +173,7 @@ export function buildOidcRouter({
       };
       const accessTokenExpiresAt = resolveAccessTokenExpiresAt(completion.tokens.expires_in);
 
-      if (completion.tokens.refresh_token) {
-        await setUiOidcRefreshToken(identity.email, completion.tokens.refresh_token);
-      }
-      if (completion.tokens.id_token) {
-        await setUiOidcIdToken(identity.email, completion.tokens.id_token);
-      }
-      if (completion.tokens.access_token) {
-        await setUiOidcAccessTokenRecord(identity.email, completion.tokens.access_token, accessTokenExpiresAt);
-      }
+      await persistOidcTokens(identity.email, completion.tokens, accessTokenExpiresAt);
 
       const jwtRole = parseN8nOidcRole(identity.claims[config.rolesClaim]);
       const nextRole = config.restrictNoRole ? (jwtRole ?? '') : jwtRole || 'global:member';
@@ -204,98 +181,32 @@ export function buildOidcRouter({
       let user = await userRepository.findByEmail(identity.email, ['role']);
 
       if (!user) {
-        if (!nextRole) {
-          log.info('No OIDC role for new user, redirecting to access request page without creating n8n user', {
-            email: identity.email,
-          });
-          return await redirectToAccessRequest(
-            {
-              user: null,
-              identity: oidcIdentity,
-              accessToken: completion.tokens.access_token,
-              accessTokenExpiresAt,
-            },
-            res,
-          );
-        }
-
-        const userCount = await userRepository.count();
-        const resolvedRole = userCount === 0 ? 'global:owner' : nextRole;
-
-        if (resolvedRole) {
-          const givenName = typeof identity.claims.given_name === 'string' ? identity.claims.given_name : undefined;
-          const familyName = typeof identity.claims.family_name === 'string' ? identity.claims.family_name : undefined;
-
-          const userData = {
-            email: identity.email,
-            firstName: givenName || identity.name?.split(' ')[0] || 'User',
-            lastName: familyName || identity.name?.split(' ').slice(1).join(' ') || '',
-            password: crypto.randomBytes(32).toString('hex'),
-            disabled: !nextRole,
-            role: { slug: resolvedRole },
-          };
-
-          const result = await userRepository.createUserWithProject(userData);
-          user = result.user;
-
-          log.info('Created user with personal project', {
-            role: resolvedRole,
-            disabled: !nextRole,
-            email: identity.email,
-          });
-        }
+        const newUserResult = await handleNewUser({
+          nextRole,
+          identity,
+          oidcIdentity,
+          accessToken: completion.tokens.access_token,
+          accessTokenExpiresAt,
+          userRepository,
+          res,
+        });
+        if (newUserResult.redirected) return;
+        user = newUserResult.user;
       }
 
       if (!user) {
         return res.redirect('/signin?error=' + encodeURIComponent('Failed to create or find user'));
       }
 
-      const currentRole = user.role?.slug || '';
-      let shouldUpdateRole = true;
+      await syncUserRole(user, nextRole, userRepository, userService, identity.email);
 
-      if (currentRole !== nextRole) {
-        if (currentRole === 'global:owner' && nextRole !== 'global:owner') {
-          const otherOwnerCount = await userRepository
-            .createQueryBuilder('user')
-            .innerJoin('user.role', 'role')
-            .where('role.slug = :ownerRole', { ownerRole: 'global:owner' })
-            .andWhere('user.id != :userId', { userId: user.id })
-            .getCount();
-
-          if (otherOwnerCount === 0) {
-            shouldUpdateRole = false;
-            log.warn('Not downgrading user role to avoid leaving system without an owner', {
-              email: identity.email,
-            });
-          }
-        }
-
-        if (shouldUpdateRole && nextRole) {
-          await userService.changeUserRole(user, { newRoleName: nextRole });
-          log.info('User role updated', {
-            previousRole: currentRole,
-            newRole: nextRole,
-            email: identity.email,
-          });
-        }
-      }
-
-      const shouldRedirectToAccessRequest = !nextRole;
-
-      if (shouldRedirectToAccessRequest) {
+      if (!nextRole) {
         await userRepository.setUserDisabled(user.id, true);
         user.disabled = true;
-        log.info('User disabled, redirecting to access request page', {
-          email: identity.email,
-        });
+        log.info('User disabled, redirecting to access request page', { email: identity.email });
 
         return await redirectToAccessRequest(
-          {
-            user,
-            identity: oidcIdentity,
-            accessToken: completion.tokens.access_token,
-            accessTokenExpiresAt,
-          },
+          { user, identity: oidcIdentity, accessToken: completion.tokens.access_token, accessTokenExpiresAt },
           res,
         );
       }
@@ -303,9 +214,22 @@ export function buildOidcRouter({
       if (user.disabled) {
         await userRepository.setUserDisabled(user.id, false);
         user.disabled = false;
-        log.info('User re-enabled after receiving a valid OIDC role', {
-          email: identity.email,
-        });
+        log.info('User re-enabled after receiving a valid OIDC role', { email: identity.email });
+      }
+
+      // Sync tenant projects (non-blocking — errors are logged but don't fail login)
+      if (completion.tokens.access_token) {
+        const cstarSsoUserId = resolveCstarSsoUserId(identity.claims, identity.subject, identity.email);
+
+        tenantProjectSyncService
+          .syncTenantsForUser({
+            ssoUserId: cstarSsoUserId,
+            n8nUserId: user.id,
+            accessToken: completion.tokens.access_token,
+          })
+          .catch((err) => {
+            log.error('Tenant project sync failed', { email: identity.email, error: String(err) });
+          });
       }
 
       const authToken = createAuthToken(user, jwtService);
@@ -374,4 +298,166 @@ export function buildOidcRouter({
   });
 
   return router;
+}
+
+// --- Extracted helpers to reduce callback cognitive complexity ---
+
+type CallbackValidationResult =
+  | { redirect: string; code: null; statePayload: null; noncePayload: null }
+  | {
+      redirect: null;
+      code: string;
+      statePayload: N8nOidcStateCookiePayload;
+      noncePayload: N8nOidcNonceCookiePayload | null;
+    };
+
+function validateCallbackRequest(req: Request, cookieSecret: string): CallbackValidationResult {
+  const { code, state, error, error_description } = req.query;
+
+  if (error) {
+    log.error('OIDC error from provider', { error, errorDescription: error_description });
+    return {
+      redirect: '/signin?error=' + encodeURIComponent(String(error_description || error)),
+      code: null,
+      statePayload: null,
+      noncePayload: null,
+    };
+  }
+
+  if (!code || !state) {
+    return {
+      redirect: '/signin?error=' + encodeURIComponent('Missing authorization code or state'),
+      code: null,
+      statePayload: null,
+      noncePayload: null,
+    };
+  }
+
+  const stateCookie = req.cookies['n8n-oidc-state'];
+  const nonceCookie = req.cookies['n8n-oidc-nonce'];
+
+  if (!stateCookie || !nonceCookie) {
+    return {
+      redirect: '/signin?error=' + encodeURIComponent('Missing state cookies - session expired'),
+      code: null,
+      statePayload: null,
+      noncePayload: null,
+    };
+  }
+
+  const statePayload = verifySignedCookie(stateCookie, cookieSecret) as N8nOidcStateCookiePayload | null;
+  const noncePayload = verifySignedCookie(nonceCookie, cookieSecret) as N8nOidcNonceCookiePayload | null;
+
+  if (!statePayload || statePayload.state !== state) {
+    return {
+      redirect: '/signin?error=' + encodeURIComponent('Invalid state - possible CSRF attack'),
+      code: null,
+      statePayload: null,
+      noncePayload: null,
+    };
+  }
+
+  return { redirect: null, code: code as string, statePayload, noncePayload };
+}
+
+async function persistOidcTokens(
+  email: string,
+  tokens: { refresh_token?: string; id_token?: string; access_token?: string },
+  accessTokenExpiresAt: number | undefined,
+): Promise<void> {
+  if (tokens.refresh_token) {
+    await setUiOidcRefreshToken(email, tokens.refresh_token);
+  }
+  if (tokens.id_token) {
+    await setUiOidcIdToken(email, tokens.id_token);
+  }
+  if (tokens.access_token) {
+    await setUiOidcAccessTokenRecord(email, tokens.access_token, accessTokenExpiresAt);
+  }
+}
+
+type HandleNewUserParams = {
+  nextRole: string;
+  identity: { email: string; subject?: string; name?: string; claims: Record<string, unknown> };
+  oidcIdentity: UiOidcIdentity;
+  accessToken?: string;
+  accessTokenExpiresAt?: number;
+  userRepository: BuildOidcRouterParams['n8nRepositories']['user'];
+  res: Response;
+};
+
+type HandleNewUserResult = { redirected: true; user: null } | { redirected: false; user: N8nUser | null };
+
+async function handleNewUser(params: HandleNewUserParams): Promise<HandleNewUserResult> {
+  const { nextRole, identity, oidcIdentity, accessToken, accessTokenExpiresAt, userRepository, res } = params;
+
+  if (!nextRole) {
+    log.info('No OIDC role for new user, redirecting to access request page without creating n8n user', {
+      email: identity.email,
+    });
+    await redirectToAccessRequest({ user: null, identity: oidcIdentity, accessToken, accessTokenExpiresAt }, res);
+    return { redirected: true, user: null };
+  }
+
+  const userCount = await userRepository.count();
+  const resolvedRole = userCount === 0 ? 'global:owner' : nextRole;
+
+  if (!resolvedRole) {
+    return { redirected: false, user: null };
+  }
+
+  const givenName = typeof identity.claims.given_name === 'string' ? identity.claims.given_name : undefined;
+  const familyName = typeof identity.claims.family_name === 'string' ? identity.claims.family_name : undefined;
+
+  const userData = {
+    email: identity.email,
+    firstName: givenName || identity.name?.split(' ')[0] || 'User',
+    lastName: familyName || identity.name?.split(' ').slice(1).join(' ') || '',
+    password: crypto.randomBytes(32).toString('hex'),
+    disabled: !nextRole,
+    role: { slug: resolvedRole },
+  };
+
+  const result = await userRepository.createUserWithProject(userData);
+
+  log.info('Created user with personal project', {
+    role: resolvedRole,
+    disabled: !nextRole,
+    email: identity.email,
+  });
+
+  return { redirected: false, user: result.user };
+}
+
+async function syncUserRole(
+  user: N8nUser,
+  nextRole: string,
+  userRepository: BuildOidcRouterParams['n8nRepositories']['user'],
+  userSvc: UserService,
+  email: string,
+): Promise<void> {
+  const currentRole = user.role?.slug || '';
+
+  if (currentRole === nextRole) {
+    return;
+  }
+
+  if (currentRole === 'global:owner' && nextRole !== 'global:owner') {
+    const otherOwnerCount = await userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user.role', 'role')
+      .where('role.slug = :ownerRole', { ownerRole: 'global:owner' })
+      .andWhere('user.id != :userId', { userId: user.id })
+      .getCount();
+
+    if (otherOwnerCount === 0) {
+      log.warn('Not downgrading user role to avoid leaving system without an owner', { email });
+      return;
+    }
+  }
+
+  if (nextRole) {
+    await userSvc.changeUserRole(user, { newRoleName: nextRole });
+    log.info('User role updated', { previousRole: currentRole, newRole: nextRole, email });
+  }
 }

@@ -50,6 +50,9 @@ function createMockParams(): BuildOidcRouterParams {
     userService: {
       changeUserRole: async () => undefined,
     },
+    tenantProjectSyncService: {
+      syncTenantsForUser: async () => undefined,
+    },
     config: {
       issuerUrl: '',
       authorizationEndpoint: 'https://issuer.example.com/auth',

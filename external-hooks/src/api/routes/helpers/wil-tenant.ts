@@ -19,7 +19,7 @@ export async function resolveWilTenantProjectIds(
 
   const projectIds = await tenantProjectRelationRepository.getProjectIdsByTenantId(tenantId);
   if (projectIds.length === 0) {
-    throw new AppError(403, 'No projects linked to this tenant');
+    throw new AppError(403, 'No projects linked to this tenant. Please contact your tenant admin');
   }
 
   // TODO: Integrate CSTAR API for tenant access verification

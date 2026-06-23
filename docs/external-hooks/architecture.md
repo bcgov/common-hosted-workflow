@@ -73,16 +73,16 @@ export class UserRepository {
 
 ### Repositories
 
-| Class                        | Wraps                               | Key Methods                                      |
-| ---------------------------- | ----------------------------------- | ------------------------------------------------ |
-| `UserRepository`             | `BaseN8nUserRepository`             | `findByEmail`, `getUserForApiKey`                |
-| `ProjectRepository`          | `BaseN8nProjectRepository`          | `findOneBy`, `getPersonalProjectForUser`         |
-| `ProjectRelationRepository`  | `BaseN8nProjectRelationRepository`  | `findAllByUser`, `listUserEmailsByProjectIds`    |
-| `WorkflowRepository`         | `BaseN8nWorkflowRepository`         | `findOneBy`                                      |
-| `SharedWorkflowRepository`   | `BaseN8nSharedWorkflowRepository`   | `findProjectIds`, `findWorkflowRowsByProjectIds` |
-| `CredentialRepository`       | `BaseN8nCredentialRepository`       | `findOneBy`                                      |
-| `SharedCredentialRepository` | `BaseN8nSharedCredentialRepository` | exposes `manager` for transactions               |
-| `ExecutionRepository`        | `BaseN8nExecutionRepository`        | `loadMetadataOrNull` (safe wrapper)              |
+| Class                        | Wraps                               | Key Methods                                                |
+| ---------------------------- | ----------------------------------- | ---------------------------------------------------------- |
+| `UserRepository`             | `BaseN8nUserRepository`             | `findByEmail`, `getUserForApiKey`                          |
+| `ProjectRepository`          | `BaseN8nProjectRepository`          | `findOneBy`, `getPersonalProjectForUser`, `create`, `save` |
+| `ProjectRelationRepository`  | `BaseN8nProjectRelationRepository`  | `findAllByUser`, `listUserEmailsByProjectIds`              |
+| `WorkflowRepository`         | `BaseN8nWorkflowRepository`         | `findOneBy`                                                |
+| `SharedWorkflowRepository`   | `BaseN8nSharedWorkflowRepository`   | `findProjectIds`, `findWorkflowRowsByProjectIds`           |
+| `CredentialRepository`       | `BaseN8nCredentialRepository`       | `findOneBy`                                                |
+| `SharedCredentialRepository` | `BaseN8nSharedCredentialRepository` | exposes `manager` for transactions                         |
+| `ExecutionRepository`        | `BaseN8nExecutionRepository`        | `loadMetadataOrNull` (safe wrapper)                        |
 
 ### Patterns
 

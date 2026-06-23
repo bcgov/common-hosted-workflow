@@ -29,7 +29,12 @@ function createHookConfig() {
           const n8nRuntime = buildN8nRuntimeContext();
           const n8nServices = buildN8nServices(n8nRuntime.container);
           const customRepositories = buildCustomRepositories(CUSTOM_DATABASE_URL);
-          const services = buildApiServices(n8nRuntime.n8nRepositories, customRepositories, n8nServices);
+          const services = await buildApiServices(
+            n8nRuntime.n8nRepositories,
+            customRepositories,
+            n8nServices,
+            n8nRuntime.globalOwnerRoleSlug,
+          );
           const routeContext = buildRouteContext({
             services,
             n8nRepositories: n8nRuntime.n8nRepositories,
@@ -46,6 +51,7 @@ function createHookConfig() {
             authService: n8nServices.authService,
             jwtService: n8nServices.jwtService,
             userService: n8nServices.userService,
+            tenantProjectSyncService: services.tenantProjectSync,
           });
           mountAssets(app);
 

@@ -47,7 +47,9 @@ function createTestRouter() {
       message: createMockMessageService(messageRepo, n8nRepos),
       accessRequest: {} as any,
       chefs: {} as any,
+      cstar: {} as any,
       tenant: {} as any,
+      tenantProjectSync: {} as any,
     },
   });
   const router = buildMessageRouter(routeContext);

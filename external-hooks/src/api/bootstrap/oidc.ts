@@ -3,6 +3,7 @@ import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from '../helpers/n8n-o
 import { buildOidcRouter } from '../routes/oidc';
 import type { AuthService } from '../services/auth';
 import type { JwtService } from '../services/jwt';
+import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
 import { createLogger } from '../utils/logger';
 import type { N8nRepositories } from './n8n-repositories';
@@ -15,9 +16,17 @@ type MountOidcParams = {
   authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
+  tenantProjectSyncService: TenantProjectSyncService;
 };
 
-export function mountOidc({ app, n8nRepositories, authService, jwtService, userService }: MountOidcParams) {
+export function mountOidc({
+  app,
+  n8nRepositories,
+  authService,
+  jwtService,
+  userService,
+  tenantProjectSyncService,
+}: MountOidcParams) {
   const config = getN8nOidcConfigFromEnv();
   const missing = validateN8nOidcConfig(config);
 
@@ -33,6 +42,7 @@ export function mountOidc({ app, n8nRepositories, authService, jwtService, userS
       authService,
       jwtService,
       userService,
+      tenantProjectSyncService,
       config,
     }),
   );

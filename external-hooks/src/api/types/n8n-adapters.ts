@@ -65,11 +65,19 @@ export type BaseN8nProjectRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nProjectRecord | null>;
   getPersonalProjectForUser: (userId: string) => Promise<N8nProjectRecord | null>;
   getPersonalProjectForUserOrFail: (userId: string) => Promise<N8nProjectRecord>;
+  create: (data: { name: string; type: string; creatorId: string }) => N8nProjectRecord;
+  save: (entity: N8nProjectRecord) => Promise<N8nProjectRecord>;
 };
 
 export type BaseN8nProjectRelationRepository = BaseN8nRepository & {
   findProjectRole: (args: { userId: string; projectId: string }) => Promise<unknown>;
   findAllByUser: (userId: string) => Promise<Array<{ projectId: string }>>;
+  save: (
+    relation:
+      | { projectId: string; userId: string; role: { slug: string } }
+      | Array<{ projectId: string; userId: string; role: { slug: string } }>,
+  ) => Promise<unknown>;
+  delete: (criteria: { projectId: string; userId: string }) => Promise<unknown>;
 };
 
 export type BaseN8nWorkflowRepository = BaseN8nRepository & {
