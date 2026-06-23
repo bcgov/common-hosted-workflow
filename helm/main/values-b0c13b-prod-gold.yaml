@@ -14,7 +14,7 @@ n8n:
     UI_OIDC_REDIRECT_URI: https://n8n.developer.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:prod:"
     AUTHZ_ENVIRONMENT: prod
-    CHEFS_GATEWAY_URL: https://submit.digital.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
 
   route:
     enabled: true

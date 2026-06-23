@@ -11,7 +11,7 @@ n8n:
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
     OIDC_ISSUER: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
     OIDC_REDIRECT_URI: https://dev-chwf-sdg.apps.golddr.devops.gov.bc.ca/rest/auth/oidc/callback
-    CHEFS_GATEWAY_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
     CSTAR_BASE_URL: https://dev-chwf-sdg-mock.apps.gold.devops.gov.bc.ca
     IS_TENANT_PROJECT_SYNC_ENABLED: "true"
 

@@ -1,4 +1,6 @@
+import axios, { type AxiosInstance } from 'axios';
 import { createLogger } from '../utils/logger';
+import { buildPath } from '../utils/url';
 import { CSTAR_API_BASE_URL } from '@config';
 import type {
   CstarTenant,
@@ -30,17 +32,24 @@ export type GetUserGroupsWithRolesParams = {
 };
 
 export class CstarService {
-  private readonly apiBaseUrl: string;
+  private readonly client: AxiosInstance | null;
 
   constructor() {
-    this.apiBaseUrl = CSTAR_API_BASE_URL;
+    if (CSTAR_API_BASE_URL) {
+      this.client = axios.create({
+        baseURL: CSTAR_API_BASE_URL,
+        headers: { Accept: 'application/json' },
+      });
+    } else {
+      this.client = null;
+    }
   }
 
   /**
    * Returns true if CSTAR is configured (CSTAR_BASE_URL is set).
    */
   isConfigured(): boolean {
-    return this.apiBaseUrl.length > 0;
+    return this.client !== null;
   }
 
   /**
@@ -48,18 +57,15 @@ export class CstarService {
    * GET /users/{ssoUserId}/tenants[?expand=tenantUserRoles]
    */
   async getUserTenants(params: GetUserTenantsParams): Promise<CstarTenant[]> {
-    if (!this.apiBaseUrl) {
-      log.warn('CSTAR_BASE_URL is not configured, skipping tenant fetch');
-      return [];
-    }
-
     const { ssoUserId, accessToken, expand } = params;
-    const url = new URL(`${this.apiBaseUrl}/users/${encodeURIComponent(ssoUserId)}/tenants`);
-    if (expand) {
-      url.searchParams.set('expand', expand);
-    }
+    const queryParams = expand ? { expand } : undefined;
 
-    const body = await this.fetchJson<CstarUserTenantsResponse>(url.toString(), accessToken, 'getUserTenants');
+    const body = await this.fetchJson<CstarUserTenantsResponse>(
+      buildPath('users', ssoUserId, 'tenants'),
+      accessToken,
+      'getUserTenants',
+      queryParams,
+    );
     return body?.data?.tenants ?? [];
   }
 
@@ -68,15 +74,10 @@ export class CstarService {
    * GET /tenants/{tenantId}/ssousers/{ssoUserId}/shared-service-roles
    */
   async getUserSharedServiceRoles(params: GetUserSharedServiceRolesParams): Promise<CstarSharedServiceRole[]> {
-    if (!this.apiBaseUrl) {
-      return [];
-    }
-
     const { tenantId, ssoUserId, accessToken } = params;
-    const url = `${this.apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}/ssousers/${encodeURIComponent(ssoUserId)}/shared-service-roles`;
 
     const body = await this.fetchJson<CstarUserSharedServiceRolesResponse>(
-      url,
+      buildPath('tenants', tenantId, 'ssousers', ssoUserId, 'shared-service-roles'),
       accessToken,
       'getUserSharedServiceRoles',
     );
@@ -88,49 +89,50 @@ export class CstarService {
    * GET /tenants/{tenantId}/users/{ssoUserId}/groups/shared-service-roles
    */
   async getUserGroupsWithRoles(params: GetUserGroupsWithRolesParams): Promise<CstarUserGroup[]> {
-    if (!this.apiBaseUrl) {
-      return [];
-    }
-
     const { tenantId, ssoUserId, accessToken } = params;
-    const url = `${this.apiBaseUrl}/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(ssoUserId)}/groups/shared-service-roles`;
 
-    const body = await this.fetchJson<CstarUserGroupsResponse>(url, accessToken, 'getUserGroupsWithRoles');
+    const body = await this.fetchJson<CstarUserGroupsResponse>(
+      buildPath('tenants', tenantId, 'users', ssoUserId, 'groups', 'shared-service-roles'),
+      accessToken,
+      'getUserGroupsWithRoles',
+    );
     return body?.data?.groups ?? [];
   }
 
   /**
-   * Shared fetch helper. Returns parsed JSON on success, null on any failure.
+   * Centralized GET request helper.
+   * - Accepts a pre-built path (use `buildPath()` to encode segments)
+   * - Attaches the Bearer token
+   * - Returns parsed JSON on success, null on any failure
    */
-  private async fetchJson<T>(url: string, accessToken: string, operation: string): Promise<T | null> {
-    let response: Response;
+  private async fetchJson<T>(
+    path: string,
+    accessToken: string,
+    operation: string,
+    queryParams?: Record<string, string>,
+  ): Promise<T | null> {
+    if (!this.client) {
+      log.warn(`CSTAR not configured, skipping ${operation}`);
+      return null;
+    }
+
     try {
-      response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-        },
+      const response = await this.client.get<T>(path, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        params: queryParams,
       });
+      return response.data;
     } catch (err) {
-      log.error(`CSTAR ${operation} network error`, { error: String(err) });
-      return null;
-    }
-
-    if (response.status === 401 || response.status === 403) {
-      log.warn(`CSTAR ${operation} auth error`, { status: response.status });
-      return null;
-    }
-
-    if (!response.ok) {
-      log.error(`CSTAR ${operation} returned non-OK status`, { status: response.status });
-      return null;
-    }
-
-    try {
-      return (await response.json()) as T;
-    } catch (err) {
-      log.error(`CSTAR ${operation} response parse error`, { error: String(err) });
+      if (axios.isAxiosError(err) && err.response) {
+        const status = err.response.status;
+        if (status === 401 || status === 403) {
+          log.warn(`CSTAR ${operation} auth error`, { status });
+        } else {
+          log.error(`CSTAR ${operation} returned non-OK status`, { status });
+        }
+      } else {
+        log.error(`CSTAR ${operation} network error`, { error: String(err) });
+      }
       return null;
     }
   }
