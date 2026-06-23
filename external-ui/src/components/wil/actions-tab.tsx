@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getWilActions } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
 import { ActionItem } from './action-item';
+import { extractErrorMessage } from '../action-handlers/shared/error-utils';
 
 interface ActionsTabProps {
   tenantId: string;
@@ -46,9 +47,7 @@ export function ActionsTab({
     return (
       <Alert variant="destructive">
         <AlertTitle>Error loading actions</AlertTitle>
-        <AlertDescription>
-          {actionsQuery.error instanceof Error ? actionsQuery.error.message : 'An error occurred'}
-        </AlertDescription>
+        <AlertDescription>{extractErrorMessage(actionsQuery.error, 'An error occurred')}</AlertDescription>
       </Alert>
     );
   }
