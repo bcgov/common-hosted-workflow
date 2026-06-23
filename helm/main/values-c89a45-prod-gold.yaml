@@ -9,8 +9,8 @@ n8n:
     N8N_SMTP_USER: ""
     N8N_SMTP_PASS: ""
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+    N8N_BASE_URL: https://chwf-sdg.apps.gold.devops.gov.bc.ca
     OIDC_ISSUER: https://loginproxy.gov.bc.ca/auth/realms/standard
-    OIDC_REDIRECT_URI: https://chwf-sdg.apps.gold.devops.gov.bc.ca/rest/auth/oidc/callback
     CHEFS_GATEWAY_URL: https://submit.digital.gov.bc.ca/app/gateway/v1
 
   route:

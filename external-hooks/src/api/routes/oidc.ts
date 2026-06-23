@@ -1,8 +1,14 @@
 import crypto from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import { N8N_PROTOCOL } from '@config';
-import { beginOidcAuthorization, completeOidcAuthorization, extractOidcIdentity } from '../helpers/oidc-provider';
 import {
+  beginOidcAuthorization,
+  completeOidcAuthorization,
+  extractOidcIdentity,
+  fetchOidcDiscoveryDocument,
+} from '../helpers/oidc-provider';
+import {
+  getUiOidcIdToken,
   setUiOidcAccessTokenRecord,
   setUiOidcIdToken,
   setUiOidcRefreshToken,
@@ -23,10 +29,12 @@ import {
 } from '../helpers/n8n-oidc';
 import { issueUiSessionToken, resolveAccessTokenExpiresAt } from '../helpers/ui-auth-token';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
+import { getOidcConfigFromEnv } from '../helpers/ui-oidc';
 import { appendSessionToReturnTo, buildUiAppUrl } from '../helpers/url';
 import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { AuthService } from '../services/auth';
 import type { JwtService } from '../services/jwt';
 import type { UserService } from '../services/user';
 
@@ -35,6 +43,7 @@ const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
 
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
+  authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
   config: N8nOidcConfig;
@@ -78,7 +87,13 @@ async function redirectToAccessRequest(
   return res.redirect(appendSessionToReturnTo(buildUiAppUrl('/access-request'), sessionHandle));
 }
 
-export function buildOidcRouter({ n8nRepositories, jwtService, userService, config }: BuildOidcRouterParams) {
+export function buildOidcRouter({
+  n8nRepositories,
+  authService,
+  jwtService,
+  userService,
+  config,
+}: BuildOidcRouterParams) {
   const { user: userRepository } = n8nRepositories;
   const router = Router();
   const cookieSecret = getCookieSecret();
@@ -300,6 +315,61 @@ export function buildOidcRouter({ n8nRepositories, jwtService, userService, conf
       logError(log, error, { context: 'OIDC callback' });
       const message = error instanceof Error ? error.message : String(error);
       res.redirect('/signin?error=' + encodeURIComponent('Authentication failed: ' + message));
+    }
+  });
+
+  router.get('/logout', async (req: Request, res: Response) => {
+    try {
+      const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
+
+      const token = req.cookies['n8n-auth'];
+      if (!token) {
+        log.debug('OIDC logout: no user session cookie provided, redirecting directly', { returnTo });
+        res.redirect(returnTo);
+        return;
+      }
+
+      const [user] = await authService.resolveJwt(token, req, res);
+      if (!user?.email) {
+        log.debug('OIDC logout: no user or email provided, redirecting directly', { returnTo });
+        res.redirect(returnTo);
+        return;
+      }
+
+      const email = user.email.trim();
+
+      await authService.invalidateToken(req as any);
+      authService.clearCookie(res);
+
+      const idToken = await getUiOidcIdToken(user.email);
+      if (!idToken) {
+        log.debug('OIDC logout: no ID token stored, redirecting directly', { email, returnTo });
+        res.redirect(returnTo);
+        return;
+      }
+
+      const oidcConfig = getOidcConfigFromEnv();
+      const discovery = await fetchOidcDiscoveryDocument(oidcConfig);
+
+      const endSessionEndpoint = discovery.end_session_endpoint || oidcConfig.endSessionEndpoint;
+      if (!endSessionEndpoint) {
+        log.debug('OIDC logout: no end_session_endpoint in discovery or config, redirecting directly', {
+          email,
+          returnTo,
+        });
+        res.redirect(returnTo);
+        return;
+      }
+
+      log.info('OIDC logout: redirecting to upstream IDP end_session_endpoint', { email, returnTo });
+      const logoutUrl = new URL(endSessionEndpoint);
+      logoutUrl.searchParams.set('post_logout_redirect_uri', returnTo);
+      logoutUrl.searchParams.set('id_token_hint', idToken);
+      res.redirect(logoutUrl.toString());
+    } catch (error) {
+      logError(log, error, { context: 'OIDC logout' });
+      const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
+      res.redirect(returnTo);
     }
   });
 

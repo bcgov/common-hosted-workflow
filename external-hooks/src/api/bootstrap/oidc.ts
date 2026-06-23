@@ -1,6 +1,7 @@
 import { type Express } from 'express';
 import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from '../helpers/n8n-oidc';
 import { buildOidcRouter } from '../routes/oidc';
+import type { AuthService } from '../services/auth';
 import type { JwtService } from '../services/jwt';
 import type { UserService } from '../services/user';
 import { createLogger } from '../utils/logger';
@@ -11,11 +12,12 @@ const log = createLogger('CustomAPIs');
 type MountOidcParams = {
   app: Express;
   n8nRepositories: N8nRepositories;
+  authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
 };
 
-export function mountOidc({ app, n8nRepositories, jwtService, userService }: MountOidcParams) {
+export function mountOidc({ app, n8nRepositories, authService, jwtService, userService }: MountOidcParams) {
   const config = getN8nOidcConfigFromEnv();
   const missing = validateN8nOidcConfig(config);
 
@@ -28,6 +30,7 @@ export function mountOidc({ app, n8nRepositories, jwtService, userService }: Mou
     '/rest/auth/oidc',
     buildOidcRouter({
       n8nRepositories,
+      authService,
       jwtService,
       userService,
       config,

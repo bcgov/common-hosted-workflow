@@ -13,6 +13,7 @@ export const CUSTOM_DATABASE_URL = process.env.CUSTOM_DATABASE_URL ?? '';
 export const N8N_PROTOCOL = process.env.N8N_PROTOCOL ?? '';
 export const N8N_ENCRYPTION_KEY = process.env.N8N_ENCRYPTION_KEY ?? '';
 export const INTERNAL_AUTH_TOKEN = process.env.INTERNAL_AUTH_TOKEN ?? '';
+export const N8N_BASE_URL = (process.env.N8N_BASE_URL || '').trim();
 
 // Environment helpers
 export const IS_PRODUCTION = NODE_ENV === 'production';
@@ -25,7 +26,8 @@ export const ENABLE_SWAGGER_UI = process.env.ENABLE_SWAGGER_UI;
 export const EXTERNAL_UI_PATH = process.env.EXTERNAL_UI_PATH ?? '';
 export const EXTERNAL_UI_ENABLED = process.env.EXTERNAL_UI_ENABLED === 'true';
 export const EXTERNAL_HOOK_ASSETS_PATH = process.env.EXTERNAL_HOOK_ASSETS_PATH || 'api/assets';
-export const UI_APP_BASE_URL = (process.env.UI_APP_BASE_URL || '/ui').trim();
+export const UI_APP_BASE_URL = (process.env.UI_APP_BASE_URL || `${N8N_BASE_URL}/ui`).trim();
+export const UI_API_BASE_URL = `${N8N_BASE_URL}/ui-api`;
 
 // UI OIDC – Redis store
 export const UI_OIDC_REDIS_URL = process.env.UI_OIDC_REDIS_URL || 'redis://localhost:6379';
@@ -48,13 +50,13 @@ export const OIDC_JWKS_URI = process.env.OIDC_JWKS_URI || '';
 export const OIDC_END_SESSION_ENDPOINT = process.env.OIDC_END_SESSION_ENDPOINT || '';
 export const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || '';
 export const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || '';
-export const OIDC_REDIRECT_URI = process.env.OIDC_REDIRECT_URI || '';
+export const OIDC_REDIRECT_URI = `${N8N_BASE_URL}/rest/auth/oidc/callback`;
 export const OIDC_SCOPES = process.env.OIDC_SCOPES || 'openid email profile';
 export const OIDC_ROLES_CLAIM = process.env.OIDC_ROLES_CLAIM || 'roles';
 export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 
 // UI OIDC – only redirect remains UI-specific; shared provider/client config comes from OIDC_*
-export const UI_OIDC_REDIRECT_URI = process.env.UI_OIDC_REDIRECT_URI || '';
+export const UI_OIDC_REDIRECT_URI = `${UI_API_BASE_URL}/auth/callback`;
 
 // CHEFS gateway
 export const CHEFS_GATEWAY_URL = process.env.CHEFS_GATEWAY_URL || '';

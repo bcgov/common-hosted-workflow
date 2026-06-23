@@ -66,7 +66,6 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 
 - `OIDC_CLIENT_ID`
 - `OIDC_CLIENT_SECRET`
-- `OIDC_REDIRECT_URI`
 
 ### Discovery mode
 
