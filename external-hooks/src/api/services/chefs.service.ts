@@ -1,6 +1,8 @@
+import axios from 'axios';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
-import { CHEFS_GATEWAY_URL } from '@config';
+import { buildPath } from '../utils/url';
+import { CHEFS_BASE_URL, CHEFS_GATEWAY_URL } from '@config';
 
 const log = createLogger('ChefsService');
 
@@ -21,39 +23,45 @@ export class ChefsService {
 
   constructor() {
     this.gatewayUrl = CHEFS_GATEWAY_URL;
-    this.baseUrl = this.gatewayUrl.replace(/\/gateway\/v\d+\/?$/, '');
+    this.baseUrl = CHEFS_BASE_URL ? `${CHEFS_BASE_URL}/app` : '';
   }
 
   async getFormToken(params: GetFormTokenParams): Promise<GetFormTokenResult> {
     const { formId, formApiKey } = params;
-    const tokenUrl = `${this.gatewayUrl}/auth/token/forms/${formId}`;
+    const tokenUrl = `${this.gatewayUrl}/${buildPath('auth', 'token', 'forms', formId)}`;
     const credentials = Buffer.from(`${formId}:${formApiKey}`).toString('base64');
 
-    let tokenResponse: Response;
+    log.debug('CHEFS token exchange request', { tokenUrl, formId, gatewayUrl: this.gatewayUrl });
+
     try {
-      tokenResponse = await fetch(tokenUrl, {
-        method: 'POST',
+      const response = await axios.post<{ token: string }>(tokenUrl, undefined, {
         headers: {
           Authorization: `Basic ${credentials}`,
           'Content-Type': 'application/json',
         },
       });
+
+      return {
+        authToken: response.data.token,
+        formId,
+        baseUrl: this.baseUrl,
+      };
     } catch (err) {
-      log.error('CHEFS token exchange network error', { error: String(err) });
+      if (axios.isAxiosError(err) && err.response) {
+        log.error('CHEFS token exchange returned non-OK status', {
+          status: err.response.status,
+          tokenUrl,
+          responseData: JSON.stringify(err.response.data),
+        });
+      } else {
+        log.error('CHEFS token exchange network error', {
+          error: String(err),
+          tokenUrl,
+          gatewayUrl: this.gatewayUrl,
+          baseUrl: this.baseUrl,
+        });
+      }
       throw new AppError(502, 'CHEFS token exchange failed');
     }
-
-    if (!tokenResponse.ok) {
-      log.error('CHEFS token exchange returned non-OK status', { status: tokenResponse.status });
-      throw new AppError(502, 'CHEFS token exchange failed');
-    }
-
-    const tokenData = (await tokenResponse.json()) as { token: string };
-
-    return {
-      authToken: tokenData.token,
-      formId,
-      baseUrl: this.baseUrl,
-    };
   }
 }
