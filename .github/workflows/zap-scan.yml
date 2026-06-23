@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: ZAP Full Scan
-      uses: zaproxy/action-full-scan@v0.12.0
+      uses: zaproxy/action-full-scan@75ee1686750ab1511a73b26b77a2aedd295053ed # v0.12.0
       with:
         target: ${{ inputs.target_url }}
         fail_action: true
