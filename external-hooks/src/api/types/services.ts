@@ -30,6 +30,7 @@ export type UiApiServiceContract = {
     workflowId: string,
     projectId: string,
   ) => Promise<{ workflowId: string; projectId: string }>;
+  ensureCredentialsSharedWithProject: (credentialIds: string[], projectId: string) => Promise<void>;
 };
 
 export type ApiServices = {

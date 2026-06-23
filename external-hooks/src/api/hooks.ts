@@ -4,17 +4,23 @@ import { mountAssets } from './bootstrap/assets';
 import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
 import { applyOidcFrontendSettings, type FrontendSettings } from './bootstrap/frontend-settings';
-import { buildN8nRuntimeContext } from './bootstrap/n8n-repositories';
+import { extractCredentialIds, getWorkflowNodes } from './helpers/workflow';
+import { buildN8nRuntimeContext, type N8nRepositories } from './bootstrap/n8n-repositories';
 import { mountOidc } from './bootstrap/oidc';
 import { buildRouteContext } from './bootstrap/route-context';
 import { buildApiServices, buildN8nServices } from './bootstrap/services';
 import { mountUi } from './bootstrap/ui';
+import type { IWorkflowBase } from './types/hooks';
+import type { UiApiServiceContract } from './types/services';
 import { handleErrorResponse } from './utils/errors';
 import { createLogger } from './utils/logger';
 
 const log = createLogger('CustomAPIs');
 
 function createHookConfig() {
+  let n8nRepositories: N8nRepositories | null = null;
+  let uiApiService: UiApiServiceContract | null = null;
+
   return {
     n8n: {
       ready: [
@@ -27,6 +33,8 @@ function createHookConfig() {
 
           const { app } = server;
           const n8nRuntime = buildN8nRuntimeContext();
+          n8nRepositories = n8nRuntime.n8nRepositories;
+
           const n8nServices = buildN8nServices(n8nRuntime.container);
           const customRepositories = buildCustomRepositories(CUSTOM_DATABASE_URL);
           const services = await buildApiServices(
@@ -35,6 +43,8 @@ function createHookConfig() {
             n8nServices,
             n8nRuntime.globalOwnerRoleSlug,
           );
+          uiApiService = services.uiApi;
+
           const routeContext = buildRouteContext({
             services,
             n8nRepositories: n8nRuntime.n8nRepositories,
@@ -67,6 +77,33 @@ function createHookConfig() {
       settings: [
         async function (frontendSettings: FrontendSettings) {
           applyOidcFrontendSettings(frontendSettings);
+        },
+      ],
+    },
+    workflow: {
+      afterUpdate: [
+        async function (updatedWorkflow: IWorkflowBase) {
+          if (!n8nRepositories || !uiApiService) {
+            log.warn('Workflow afterUpdate: services not initialized');
+            return;
+          }
+
+          try {
+            const credentialIds = extractCredentialIds(getWorkflowNodes(updatedWorkflow));
+            if (!credentialIds.length) return;
+
+            const projectIds = await n8nRepositories.sharedWorkflow.findProjectIds(updatedWorkflow.id);
+            if (!projectIds.length) return;
+
+            await Promise.all(
+              projectIds.map((projectId) => uiApiService!.ensureCredentialsSharedWithProject(credentialIds, projectId)),
+            );
+          } catch (error) {
+            log.error('Failed to sync credentials after workflow update', {
+              workflowId: updatedWorkflow.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         },
       ],
     },
