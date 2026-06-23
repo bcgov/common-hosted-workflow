@@ -8,60 +8,7 @@
       "createdDateTime": "2026-06-16",
       "updatedDateTime": "2026-06-16",
       "createdBy": "670E63842AEF46209ADBF87989281814",
-      "updatedBy": "670E63842AEF46209ADBF87989281814",
-      "users": [
-        {
-          "id": "ebf1e69a-fa9b-4244-8837-d8214f1375d5",
-          "ssoUser": {
-            "id": "016debad-3710-4e8f-88ec-81b936bcdbc4",
-            "ssoUserId": "670E63842AEF46209ADBF87989281814",
-            "firstName": "Ratheesh",
-            "lastName": "Kumar",
-            "displayName": "Kumar, Ratheesh 1 CITZ:EX",
-            "userName": "RATKUMAR",
-            "email": "ratheesh.1.kumar@gov.bc.ca",
-            "idpType": "idir",
-            "createdDateTime": "2026-06-16",
-            "updatedDateTime": "2026-06-16",
-            "createdBy": "670E63842AEF46209ADBF87989281814",
-            "updatedBy": "670E63842AEF46209ADBF87989281814"
-          },
-          "isDeleted": false,
-          "createdDateTime": "2026-06-16",
-          "updatedDateTime": "2026-06-16",
-          "createdBy": null,
-          "updatedBy": null,
-          "roles": [
-            {
-              "id": "a7bf8a57-b8ee-4394-a675-45ded0c14577",
-              "name": "TMS.TENANT_OWNER",
-              "description": "Tenant Owner",
-              "createdDateTime": "2026-06-12",
-              "updatedDateTime": "2026-06-12",
-              "createdBy": null,
-              "updatedBy": null
-            },
-            {
-              "id": "ad2741b0-f20b-462f-b40a-ee47162fd09c",
-              "name": "TMS.USER_ADMIN",
-              "description": "User Admin",
-              "createdDateTime": "2026-06-12",
-              "updatedDateTime": "2026-06-12",
-              "createdBy": null,
-              "updatedBy": null
-            },
-            {
-              "id": "ddd75815-4952-4f43-8055-aec22fb2ca51",
-              "name": "TMS.SERVICE_USER",
-              "description": "Service User",
-              "createdDateTime": "2026-06-12",
-              "updatedDateTime": "2026-06-12",
-              "createdBy": null,
-              "updatedBy": null
-            }
-          ]
-        }
-      ]
+      "updatedBy": "670E63842AEF46209ADBF87989281814"
     },
     {
       "id": "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a",
@@ -71,60 +18,7 @@
       "createdDateTime": "2026-06-16",
       "updatedDateTime": "2026-06-16",
       "createdBy": "670E63842AEF46209ADBF87989281814",
-      "updatedBy": "670E63842AEF46209ADBF87989281814",
-      "users": [
-        {
-          "id": "17bb803b-d78c-4967-9d97-94caf87935b3",
-          "ssoUser": {
-            "id": "016debad-3710-4e8f-88ec-81b936bcdbc4",
-            "ssoUserId": "670E63842AEF46209ADBF87989281814",
-            "firstName": "Ratheesh",
-            "lastName": "Kumar",
-            "displayName": "Kumar, Ratheesh 1 CITZ:EX",
-            "userName": "RATKUMAR",
-            "email": "ratheesh.1.kumar@gov.bc.ca",
-            "idpType": "idir",
-            "createdDateTime": "2026-06-16",
-            "updatedDateTime": "2026-06-16",
-            "createdBy": "670E63842AEF46209ADBF87989281814",
-            "updatedBy": "670E63842AEF46209ADBF87989281814"
-          },
-          "isDeleted": false,
-          "createdDateTime": "2026-06-16",
-          "updatedDateTime": "2026-06-16",
-          "createdBy": null,
-          "updatedBy": null,
-          "roles": [
-            {
-              "id": "a7bf8a57-b8ee-4394-a675-45ded0c14577",
-              "name": "TMS.TENANT_OWNER",
-              "description": "Tenant Owner",
-              "createdDateTime": "2026-06-12",
-              "updatedDateTime": "2026-06-12",
-              "createdBy": null,
-              "updatedBy": null
-            },
-            {
-              "id": "ad2741b0-f20b-462f-b40a-ee47162fd09c",
-              "name": "TMS.USER_ADMIN",
-              "description": "User Admin",
-              "createdDateTime": "2026-06-12",
-              "updatedDateTime": "2026-06-12",
-              "createdBy": null,
-              "updatedBy": null
-            },
-            {
-              "id": "ddd75815-4952-4f43-8055-aec22fb2ca51",
-              "name": "TMS.SERVICE_USER",
-              "description": "Service User",
-              "createdDateTime": "2026-06-12",
-              "updatedDateTime": "2026-06-12",
-              "createdBy": null,
-              "updatedBy": null
-            }
-          ]
-        }
-      ]
+      "updatedBy": "670E63842AEF46209ADBF87989281814"
     }
   ],
   "sharedServiceRoles": {
