@@ -7,7 +7,7 @@ dependencies:
   version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 18.7.3
+  version: 18.7.5
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 25.5.3
@@ -20,5 +20,5 @@ dependencies:
 - name: backup-storage
   repository: https://bcgov.github.io/helm-charts
   version: 0.1.18
-digest: sha256:ad87460b7ebe3e0be3ee1948f82990661bb5f102879e03a70b0a825e3b11c41f
-generated: "2026-06-17T10:32:17.603863706-07:00"
+digest: sha256:a7a7ec1b1d288441929399a85e3d2f261f43439c5c8f16e46651a2b90a28f4d0
+generated: "2026-06-23T23:06:05.825644073Z"
