@@ -19,6 +19,14 @@ export class ProjectRelationRepository {
     return await this.projectRelationRepository.findProjectRole(args);
   }
 
+  async save(relation: { projectId: string; userId: string; role: { slug: string } }): Promise<unknown> {
+    return await this.projectRelationRepository.save(relation);
+  }
+
+  async delete(criteria: { projectId: string; userId: string }): Promise<unknown> {
+    return await this.projectRelationRepository.delete(criteria);
+  }
+
   private buildUserEmailLookup() {
     const projectRelationMetadata = this.projectRelationRepository.metadata;
     const userMetadata = this.userMetadata;

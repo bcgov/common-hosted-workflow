@@ -9,6 +9,7 @@ import { createRequestParser } from '../utils/validation';
 import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilListQuery } from '../schemas/wil';
 import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
+import { getBearerToken } from '../helpers/ui-oidc-session';
 import type { z } from 'zod';
 
 const CALLBACK_TIMEOUT_MS = 30_000;
@@ -18,11 +19,23 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
 
   /**
    * GET /tenants — Returns available tenants for the logged-in user.
-   * Currently resolves distinct tenants from the tenant_project_relation table.
-   * TODO: Replace with CSTAR API integration to resolve tenants and real names per user.
+   * Fetches from CSTAR API using the user's OIDC token (forwarded from request),
+   * plus the user's personal n8n project as a pseudo-tenant.
+   * Falls back to personal project only if CSTAR is unreachable.
    */
-  router.get('/tenants', async (_req, res) => {
-    const tenants = await services.tenant.listTenants();
+  router.get('/tenants', async (req, res) => {
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const accessToken = getBearerToken(req) ?? undefined;
+
+    // CSTAR expects the IDP user GUID (e.g. idir_user_guid), not the Keycloak sub
+    const ssoUserId =
+      (session.claims.idir_user_guid as string) || (session.claims.bceid_user_guid as string) || session.subject;
+
+    const tenants = await services.tenant.listTenantsForUser({
+      ssoUserId,
+      accessToken,
+      n8nUserId: session.n8nUser?.id,
+    });
     OkResponse(res, { tenants });
   });
 
