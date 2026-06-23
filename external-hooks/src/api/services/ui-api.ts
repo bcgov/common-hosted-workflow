@@ -33,4 +33,8 @@ export class UiApiService implements UiApiServiceContract {
   async unshareWorkflow(email: string | undefined, workflowId: string, projectId: string) {
     return await this.sharingService.unshareWorkflow(email, workflowId, projectId);
   }
+
+  async ensureCredentialsSharedWithProject(credentialIds: string[], projectId: string) {
+    return await this.sharingService.ensureCredentialsSharedWithProject(credentialIds, projectId);
+  }
 }

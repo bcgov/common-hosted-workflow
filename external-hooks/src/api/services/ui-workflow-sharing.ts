@@ -1,11 +1,8 @@
 import { AppError } from '../utils/errors';
 import type { WorkflowRow } from '../types/ui-api';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import { extractCredentialIds, getWorkflowNodes } from '../helpers/workflow';
 import { UiWorkflowQueryService } from './ui-workflow-query';
-
-type WorkflowNode = {
-  credentials?: Record<string, { id?: string | null } | null>;
-};
 
 type SharingContext = {
   n8nUser: { id: string; role?: { slug: string } | null };
@@ -13,26 +10,6 @@ type SharingContext = {
 };
 
 const SHAREABLE_PROJECT_ROLE_SLUGS = new Set(['project:owner', 'project:admin']);
-
-function extractCredentialIds(nodes: WorkflowNode[]): string[] {
-  const ids = new Set<string>();
-  for (const node of nodes) {
-    if (!node.credentials) continue;
-    for (const cred of Object.values(node.credentials)) {
-      if (cred?.id) ids.add(cred.id);
-    }
-  }
-  return Array.from(ids);
-}
-
-function getWorkflowNodes(workflow: unknown): WorkflowNode[] {
-  if (!workflow || typeof workflow !== 'object') {
-    return [];
-  }
-
-  const nodes = Reflect.get(workflow, 'nodes');
-  return Array.isArray(nodes) ? (nodes as WorkflowNode[]) : [];
-}
 
 function canViewAllWorkflows(roleSlug?: string | null) {
   return roleSlug === 'global:owner' || roleSlug === 'global:admin';
@@ -213,6 +190,29 @@ export class UiWorkflowSharingService {
 
     const createdShares = newShares.map((share) => tx.create('SharedCredentials', share));
     await Promise.all(createdShares.map((share) => tx.save(share)));
+  }
+
+  async ensureCredentialsSharedWithProject(credentialIds: string[], projectId: string) {
+    if (!credentialIds.length) return;
+
+    const existingRows = await this.n8nRepositories.sharedCredential.manager.query(
+      `SELECT "credentialsId" FROM shared_credentials WHERE "projectId" = $1 AND "credentialsId" = ANY($2)`,
+      [projectId, credentialIds],
+    );
+    const existingIds = new Set<string>((existingRows as Array<{ credentialsId: string }>).map((r) => r.credentialsId));
+
+    const newShares = credentialIds
+      .filter((id) => !existingIds.has(id))
+      .map((credentialsId) => ({
+        credentialsId,
+        projectId,
+        role: 'credential:owner' as const,
+      }));
+
+    if (newShares.length === 0) return;
+
+    const createdShares = newShares.map((share) => this.n8nRepositories.sharedCredential.create(share));
+    await Promise.all(createdShares.map((share) => this.n8nRepositories.sharedCredential.save(share)));
   }
 
   private async unshareWorkflowCredentialsIfUnused(
