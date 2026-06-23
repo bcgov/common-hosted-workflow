@@ -40,6 +40,10 @@ function createMockParams(): BuildOidcRouterParams {
       withTransaction: {} as any,
       raw: {} as any,
     },
+    authService: {
+      invalidateToken: async () => undefined,
+      clearCookie: () => undefined,
+    },
     jwtService: {
       sign: () => 'token',
     },
@@ -55,6 +59,7 @@ function createMockParams(): BuildOidcRouterParams {
       tokenEndpoint: 'https://issuer.example.com/token',
       userinfoEndpoint: 'https://issuer.example.com/userinfo',
       jwksUri: 'https://issuer.example.com/jwks',
+      endSessionEndpoint: '',
       clientId: 'client-1',
       clientSecret: 'secret-1', // pragma: allowlist secret
       redirectUri: 'https://app.example.com/auth/oidc/callback',
@@ -73,9 +78,9 @@ function getRoutePaths(router: { stack: Array<{ route?: { path?: string } }> }) 
 }
 
 describe('oidc router', () => {
-  it('registers login and callback routes', () => {
+  it('registers login, callback, and logout routes', () => {
     const router = buildOidcRouter(createMockParams());
 
-    expect(getRoutePaths(router)).toEqual(['/callback', '/login']);
+    expect(getRoutePaths(router)).toEqual(['/callback', '/login', '/logout']);
   });
 });

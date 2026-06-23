@@ -1,6 +1,7 @@
 import { type Express } from 'express';
 import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from '../helpers/n8n-oidc';
 import { buildOidcRouter } from '../routes/oidc';
+import type { AuthService } from '../services/auth';
 import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
@@ -12,6 +13,7 @@ const log = createLogger('CustomAPIs');
 type MountOidcParams = {
   app: Express;
   n8nRepositories: N8nRepositories;
+  authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
   tenantProjectSyncService: TenantProjectSyncService;
@@ -20,6 +22,7 @@ type MountOidcParams = {
 export function mountOidc({
   app,
   n8nRepositories,
+  authService,
   jwtService,
   userService,
   tenantProjectSyncService,
@@ -36,6 +39,7 @@ export function mountOidc({
     '/rest/auth/oidc',
     buildOidcRouter({
       n8nRepositories,
+      authService,
       jwtService,
       userService,
       tenantProjectSyncService,

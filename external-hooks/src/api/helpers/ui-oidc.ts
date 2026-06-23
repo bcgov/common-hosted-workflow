@@ -63,6 +63,7 @@ export type UiOidcConfig = {
   tokenEndpoint: string;
   userinfoEndpoint: string;
   jwksUri: string;
+  endSessionEndpoint: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
@@ -75,6 +76,7 @@ import {
   OIDC_TOKEN_ENDPOINT,
   OIDC_USERINFO_ENDPOINT,
   OIDC_JWKS_URI,
+  OIDC_END_SESSION_ENDPOINT,
   OIDC_CLIENT_ID,
   OIDC_CLIENT_SECRET,
   UI_OIDC_REDIRECT_URI,
@@ -88,6 +90,7 @@ export function getOidcConfigFromEnv(): UiOidcConfig {
     tokenEndpoint: OIDC_TOKEN_ENDPOINT,
     userinfoEndpoint: OIDC_USERINFO_ENDPOINT,
     jwksUri: OIDC_JWKS_URI,
+    endSessionEndpoint: OIDC_END_SESSION_ENDPOINT,
     clientId: OIDC_CLIENT_ID,
     clientSecret: OIDC_CLIENT_SECRET,
     redirectUri: UI_OIDC_REDIRECT_URI,

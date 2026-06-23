@@ -9,10 +9,9 @@ n8n:
     N8N_SMTP_USER: ""
     N8N_SMTP_PASS: ""
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
+    N8N_BASE_URL: https://test-chwf.apps.golddr.devops.gov.bc.ca
     OIDC_ISSUER: https://test.loginproxy.gov.bc.ca/auth/realms/standard
-    OIDC_REDIRECT_URI: https://test-chwf.apps.golddr.devops.gov.bc.ca/rest/auth/oidc/callback
     AUTHZ_ENVIRONMENT: test
-    UI_OIDC_REDIRECT_URI: https://test-chwf.apps.golddr.devops.gov.bc.ca/ui-api/auth/callback
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:test:"
     CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
 

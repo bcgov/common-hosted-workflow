@@ -7,7 +7,6 @@ import {
   AUTH_REALM_NAME,
   AUTH_CLIENT_ID,
   AUTH_CLIENT_SECRET,
-  AUTH_REDIRECT_URIS,
 } from './config.js';
 
 async function main() {
@@ -33,7 +32,7 @@ async function main() {
   console.log('Creating test auth client...');
   const authClientHandle = await authRealmHandle.confidentialBrowserLoginClient(AUTH_CLIENT_ID).ensure({
     secret: AUTH_CLIENT_SECRET,
-    redirectUris: AUTH_REDIRECT_URIS,
+    redirectUris: ['*'],
   });
 
   await authClientHandle.protocolMapper('client-roles').ensure({

@@ -1,13 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getUiSessionMock, getUiOidcIdTokenMock, deleteUiOidcTokensMock, fetchOidcDiscoveryDocumentMock } = vi.hoisted(
-  () => ({
-    getUiSessionMock: vi.fn(),
-    getUiOidcIdTokenMock: vi.fn(),
-    deleteUiOidcTokensMock: vi.fn(),
-    fetchOidcDiscoveryDocumentMock: vi.fn(),
-  }),
-);
+const {
+  getUiSessionMock,
+  getUiOidcIdTokenMock,
+  deleteUiOidcTokensMock,
+  fetchOidcDiscoveryDocumentMock,
+  getOidcConfigFromEnvMock,
+} = vi.hoisted(() => ({
+  getUiSessionMock: vi.fn(),
+  getUiOidcIdTokenMock: vi.fn(),
+  deleteUiOidcTokensMock: vi.fn(),
+  fetchOidcDiscoveryDocumentMock: vi.fn(),
+  getOidcConfigFromEnvMock: vi.fn(),
+}));
+
+vi.mock('../../../src/api/helpers/ui-oidc', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/helpers/ui-oidc')>(
+    '../../../src/api/helpers/ui-oidc',
+  );
+
+  return {
+    ...actual,
+    getOidcConfigFromEnv: getOidcConfigFromEnvMock,
+  };
+});
 
 vi.mock('../../../src/api/helpers/ui-oidc-session', async () => {
   const actual = await vi.importActual<typeof import('../../../src/api/helpers/ui-oidc-session')>(
@@ -75,6 +91,19 @@ beforeEach(() => {
   getUiOidcIdTokenMock.mockReset();
   deleteUiOidcTokensMock.mockReset();
   fetchOidcDiscoveryDocumentMock.mockReset();
+  getOidcConfigFromEnvMock.mockReset();
+  getOidcConfigFromEnvMock.mockReturnValue({
+    issuerUrl: '',
+    authorizationEndpoint: '',
+    tokenEndpoint: '',
+    userinfoEndpoint: '',
+    jwksUri: '',
+    endSessionEndpoint: '',
+    clientId: '',
+    clientSecret: '',
+    redirectUri: '',
+    scopes: 'openid email profile',
+  });
   getUiSessionMock.mockResolvedValue({
     subject: 'sub-1',
     email: 'person@example.com',
@@ -170,6 +199,35 @@ describe('GET /ui-api/auth/logout', () => {
 
     expect(deleteUiOidcTokensMock).toHaveBeenCalledWith('person@example.com');
     expect(res.redirect).toHaveBeenCalledWith('https://app.example.com/ui/');
+  });
+
+  it('uses endSessionEndpoint from config when discovery document has no end_session_endpoint', async () => {
+    getUiOidcIdTokenMock.mockResolvedValue('id-token-hint');
+    fetchOidcDiscoveryDocumentMock.mockResolvedValue({});
+    getOidcConfigFromEnvMock.mockReturnValue({
+      issuerUrl: '',
+      authorizationEndpoint: '',
+      tokenEndpoint: '',
+      userinfoEndpoint: '',
+      jwksUri: '',
+      endSessionEndpoint: 'https://issuer.example.com/logout',
+      clientId: '',
+      clientSecret: '',
+      redirectUri: '',
+      scopes: 'openid email profile',
+    });
+
+    const router = buildUiApiRouter({ services: {} } as any);
+    const req = createMockRequest({ query: { email: 'person@example.com', returnTo: 'https://app.example.com/ui/' } });
+    const res = createMockResponse();
+
+    await runRoute(router, 'get', '/auth/logout', req as any, res as any);
+
+    expect(getUiOidcIdTokenMock).toHaveBeenCalledWith('person@example.com');
+    expect(deleteUiOidcTokensMock).toHaveBeenCalledWith('person@example.com');
+    expect(res.redirect).toHaveBeenCalledWith(
+      'https://issuer.example.com/logout?post_logout_redirect_uri=https%3A%2F%2Fapp.example.com%2Fui%2F&id_token_hint=id-token-hint',
+    );
   });
 });
 

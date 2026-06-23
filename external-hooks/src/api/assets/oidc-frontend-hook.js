@@ -142,4 +142,30 @@
   setTimeout(observeAndInject, 1000);
 
   console.log('[OIDC Hook] Frontend customization loaded');
+
+  // Logout interception: redirect to our OIDC logout endpoint
+  function interceptLogout() {
+    var LOGOUT_SELECTOR = '[data-test-id="main-sidebar-log-out"]';
+
+    document.addEventListener(
+      'click',
+      function (event) {
+        var logoutButton = event.target.closest(LOGOUT_SELECTOR);
+        if (!logoutButton) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        var returnTo = encodeURIComponent(window.location.origin + '/');
+        window.location.assign('/rest/auth/oidc/logout?returnTo=' + returnTo);
+      },
+      true,
+    );
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', interceptLogout);
+  } else {
+    interceptLogout();
+  }
 })();
