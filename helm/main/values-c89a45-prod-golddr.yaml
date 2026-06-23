@@ -12,6 +12,8 @@ n8n:
     N8N_BASE_URL: https://chwf-sdg.apps.golddr.devops.gov.bc.ca
     OIDC_ISSUER: https://loginproxy.gov.bc.ca/auth/realms/standard
     CHEFS_GATEWAY_URL: https://submit.digital.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
+    CSTAR_BASE_URL: https://cstar.apps.gold.devops.gov.bc.ca
 
   route:
     enabled: true

@@ -71,8 +71,12 @@ x-n8n-env: &n8n-env
   AUTHZ_TOKEN_ENDPOINT: ${AUTHZ_TOKEN_ENDPOINT}
   AUTHZ_CLIENT_ID: ${AUTHZ_CLIENT_ID}
   AUTHZ_CLIENT_SECRET: ${AUTHZ_CLIENT_SECRET}
-  # CHEFS gateway URL for token exchange
-  CHEFS_GATEWAY_URL: ${CHEFS_GATEWAY_URL}
+  # CHEFS – Common Hosted Form Service
+  CHEFS_BASE_URL: ${CHEFS_BASE_URL}
+  # CSTAR tenant management service
+  CSTAR_BASE_URL: ${CSTAR_BASE_URL}
+  # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
+  IS_TENANT_PROJECT_SYNC_ENABLED: ${IS_TENANT_PROJECT_SYNC_ENABLED:-true}
 
 services:
   sdg-mock-app:

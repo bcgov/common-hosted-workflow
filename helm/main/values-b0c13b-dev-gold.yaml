@@ -14,7 +14,7 @@ n8n:
     EXTERNAL_UI_ENABLED: 'true'
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
     AUTHZ_ENVIRONMENT: dev
-    CHEFS_GATEWAY_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
 
   route:
     enabled: true
@@ -90,6 +90,7 @@ backup-storage:
 
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n-custom
 
     */10 * * * * default ./backup.sh -s
     0 7 * * 1-5 default ./backup.sh -s -v all

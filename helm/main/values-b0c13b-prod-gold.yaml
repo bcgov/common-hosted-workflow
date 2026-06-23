@@ -13,7 +13,7 @@ n8n:
     OIDC_ISSUER: https://loginproxy.gov.bc.ca/auth/realms/standard
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:prod:"
     AUTHZ_ENVIRONMENT: prod
-    CHEFS_GATEWAY_URL: https://submit.digital.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
 
   route:
     enabled: true
@@ -92,6 +92,7 @@ backup-storage:
 
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n-custom
 
     */10 * * * * default ./backup.sh -s
     0 2 * * * default ./backup.sh -s -v all

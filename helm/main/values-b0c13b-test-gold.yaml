@@ -13,7 +13,7 @@ n8n:
     OIDC_ISSUER: https://test.loginproxy.gov.bc.ca/auth/realms/standard
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:test:"
     AUTHZ_ENVIRONMENT: test
-    CHEFS_GATEWAY_URL: https://chefs-test.apps.silver.devops.gov.bc.ca/app/gateway/v1
+    CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
 
   route:
     enabled: true
@@ -81,6 +81,7 @@ backup-storage:
 
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n-custom
 
     */10 * * * * default ./backup.sh -s
     0 3 * * 1-5 default ./backup.sh -s -v all
