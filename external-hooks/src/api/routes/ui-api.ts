@@ -76,11 +76,17 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
     role: null,
   };
 
+  const tenantRoles = await services.tenant.getTenantRolesForSession({
+    email: session.email,
+    ssoUserId: resolveCstarSsoUserId(session.claims, session.subject, session.email),
+  });
+
   return {
     session: {
       ...session,
       n8nUser: resolvedN8nUser,
       permissions: computePermissions(resolvedN8nUser),
+      tenantRoles,
     },
     context,
     refreshedToken,
@@ -220,6 +226,17 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     // Sync tenant projects (non-blocking — errors are logged but don't fail login)
     if (result.accessToken) {
       const cstarSsoUserId = resolveCstarSsoUserId(result.claims, result.subject, result.email);
+
+      // Pre-warm tenant roles cache (non-blocking)
+      services.tenant
+        .prewarmTenantRoles({
+          email: result.email,
+          ssoUserId: cstarSsoUserId,
+          accessToken: result.accessToken,
+        })
+        .catch((err) => {
+          log.error('Tenant roles pre-warm failed', { email: result.email, error: String(err) });
+        });
 
       // Look up n8n user by email to get the n8n user ID
       const n8nUser = result.email ? await n8nRepositories.user.findByEmail(result.email) : null;

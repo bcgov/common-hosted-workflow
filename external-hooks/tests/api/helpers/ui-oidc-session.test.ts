@@ -7,6 +7,7 @@ const {
   setUiOidcRefreshTokenMock,
   setUiOidcIdTokenMock,
   setUiOidcAccessTokenRecordMock,
+  deleteUiTenantRolesMock,
 } = vi.hoisted(() => ({
   getUiOidcRefreshTokenMock: vi.fn(),
   getUiOidcIdTokenMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   setUiOidcRefreshTokenMock: vi.fn(),
   setUiOidcIdTokenMock: vi.fn(),
   setUiOidcAccessTokenRecordMock: vi.fn(),
+  deleteUiTenantRolesMock: vi.fn(),
 }));
 
 vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
@@ -23,6 +25,7 @@ vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
   setUiOidcRefreshToken: setUiOidcRefreshTokenMock,
   setUiOidcIdToken: setUiOidcIdTokenMock,
   setUiOidcAccessTokenRecord: setUiOidcAccessTokenRecordMock,
+  deleteUiTenantRoles: deleteUiTenantRolesMock,
 }));
 
 const { refreshOidcTokensMock, fetchOidcDiscoveryDocumentMock, fetchOidcUserInfoMock, extractOidcIdentityMock } =

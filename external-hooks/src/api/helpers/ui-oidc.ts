@@ -1,4 +1,5 @@
 import type { Permissions } from './permissions';
+import type { TenantRole } from './ui-oidc-store';
 
 export type OidcDiscoveryDocument = {
   issuer?: string;
@@ -55,6 +56,7 @@ export type UiAuthTokenPayload = {
 export type UiResolvedSession = UiSession & {
   n8nUser: UiSerializedN8nUser;
   permissions: Permissions;
+  tenantRoles: TenantRole[];
 };
 
 export type UiOidcConfig = {
@@ -118,18 +120,20 @@ export type UiSessionSummary = {
   } | null;
   n8nUser: UiSerializedN8nUser | null;
   permissions: Permissions | null;
+  tenantRoles: TenantRole[] | null;
 };
 
 export type WhoamiResponse = {
   oidc: UiSessionSummary['oidc'];
   n8nUser: UiSerializedN8nUser | null;
   permissions: Permissions | null;
+  tenantRoles: TenantRole[] | null;
   userAgent?: string;
 };
 
 export function buildSessionSummary(session: UiResolvedSession | null): UiSessionSummary {
   if (!session) {
-    return { authenticated: false, user: null, oidc: null, n8nUser: null, permissions: null };
+    return { authenticated: false, user: null, oidc: null, n8nUser: null, permissions: null, tenantRoles: null };
   }
 
   return {
@@ -152,6 +156,7 @@ export function buildSessionSummary(session: UiResolvedSession | null): UiSessio
     },
     n8nUser: session.n8nUser,
     permissions: session.permissions,
+    tenantRoles: session.tenantRoles,
   };
 }
 
@@ -160,6 +165,7 @@ export function buildWhoamiResponse(session: UiResolvedSession, userAgent?: stri
     oidc: buildSessionSummary(session).oidc,
     n8nUser: session.n8nUser,
     permissions: session.permissions,
+    tenantRoles: session.tenantRoles,
     userAgent,
   };
 }

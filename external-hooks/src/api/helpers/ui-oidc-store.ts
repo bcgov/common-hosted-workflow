@@ -16,8 +16,15 @@ type UiSessionExchangeRecord = {
 type RedisClient = Awaited<ReturnType<typeof createClient>>;
 type AccessTokenRecord = { email: string; expiresAt?: number };
 
+export type TenantRole = {
+  tenantId: string;
+  tenantName: string;
+  roles: string[];
+};
+
 const REFRESH_TOKEN_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ID_TOKEN_DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TENANT_ROLES_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function extractJwtExpiryMs(token: string): number | undefined {
   try {
@@ -61,6 +68,10 @@ function getAccessTokenByEmailKey(email: string) {
 function getAccessTokenRecordKey(token: string) {
   const digest = createHash('sha256').update(token).digest('hex');
   return `${UI_OIDC_REDIS_PREFIX}tokenemail:${digest}`;
+}
+
+function getTenantRolesKey(email: string) {
+  return `${UI_OIDC_REDIS_PREFIX}tenantroles:${email}`;
 }
 
 async function getRedisClient(): Promise<RedisClient> {
@@ -161,11 +172,39 @@ export async function getUiOidcAccessTokenRecord(accessToken: string) {
 export async function deleteUiOidcTokens(email: string) {
   const client = await getRedisClient();
   const currentAccessToken = await client.get(getAccessTokenByEmailKey(email));
-  const keys = [getRefreshTokenKey(email), getIdTokenKey(email), getAccessTokenByEmailKey(email)];
+  const keys = [
+    getRefreshTokenKey(email),
+    getIdTokenKey(email),
+    getAccessTokenByEmailKey(email),
+    getTenantRolesKey(email),
+  ];
 
   if (currentAccessToken) {
     keys.push(getAccessTokenRecordKey(currentAccessToken));
   }
 
   await client.del(keys);
+}
+
+export async function setUiTenantRoles(email: string, roles: TenantRole[], ttlMs?: number) {
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? TENANT_ROLES_DEFAULT_TTL_MS;
+  await client.set(getTenantRolesKey(email), JSON.stringify(roles), { PX: effectiveTtl });
+}
+
+export async function getUiTenantRoles(email: string): Promise<TenantRole[] | null> {
+  const client = await getRedisClient();
+  const raw = await client.get(getTenantRolesKey(email));
+  if (!raw) return null;
+  return JSON.parse(raw) as TenantRole[];
+}
+
+export async function deleteUiTenantRoles(email: string) {
+  const client = await getRedisClient();
+  await client.del(getTenantRolesKey(email));
+}
+
+export async function getUiOidcAccessTokenByEmail(email: string): Promise<string | null> {
+  const client = await getRedisClient();
+  return await client.get(getAccessTokenByEmailKey(email));
 }

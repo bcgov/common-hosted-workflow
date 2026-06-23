@@ -2,7 +2,7 @@ import { createSecretKey } from 'crypto';
 import type { Request } from 'express';
 import { jwtVerify } from 'jose';
 import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE, UI_AUTH_USE_SEPARATE_TOKEN } from '@config';
-import { type UiAuthTokenPayload, type UiOidcIdentity, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
+import { type UiAuthTokenPayload, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
 import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo, refreshOidcTokens } from './oidc-provider';
 import {
   getUiOidcAccessTokenRecord,
@@ -13,6 +13,7 @@ import {
 } from './ui-oidc-store';
 import { issueUiSessionToken, resolveAccessTokenExpiresAt, shouldRefreshAccessToken } from './ui-auth-token';
 import { getOidcConfigFromEnv } from './ui-oidc';
+import { invalidateTenantRoles } from './tenant-roles';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('UiSession');
@@ -164,6 +165,9 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
       await setUiOidcIdToken(email, refreshed.id_token);
     }
     await setUiOidcAccessTokenRecord(email, refreshed.access_token, refreshedExpiresAt);
+
+    // Invalidate tenant roles cache — will be re-fetched with new token on next session call
+    await invalidateTenantRoles(email);
 
     const refreshedToken = await issueUiSessionToken({
       oidc: {

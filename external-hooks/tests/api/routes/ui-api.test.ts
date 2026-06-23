@@ -63,6 +63,10 @@ import { buildUiApiRouter } from '../../../src/api/routes/ui-api';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 import { getRouteHandlers } from '../../helpers/test-utils';
 
+const mockTenantService = {
+  getTenantRolesForSession: vi.fn().mockResolvedValue([]),
+};
+
 async function runRoute(router: any, method: string, path: string, req: any, res: any) {
   const handlers = getRouteHandlers(router, method, path) ?? [];
   let index = 0;
@@ -82,7 +86,8 @@ async function runRoute(router: any, method: string, path: string, req: any, res
 }
 
 async function runProtectedRoute(services: any, method: string, path: string, req: any, res: any) {
-  const router = buildUiApiRouter({ services } as any);
+  const servicesWithDefaults = { tenant: mockTenantService, ...services };
+  const router = buildUiApiRouter({ services: servicesWithDefaults } as any);
   await runRoute(router, method, path, req, res);
 }
 

@@ -34,6 +34,7 @@ export type AuthSessionResponse = {
   oidc: AuthSessionOidc | null;
   n8nUser: AuthSessionN8nUser | null;
   permissions: Permissions | null;
+  tenantRoles: TenantRole[] | null;
 };
 
 export type AuthenticatedSession = {
@@ -41,6 +42,7 @@ export type AuthenticatedSession = {
   oidc: AuthSessionOidc;
   n8nUser: AuthSessionN8nUser;
   permissions: Permissions;
+  tenantRoles: TenantRole[];
 };
 
 export type Permissions = {
@@ -49,6 +51,12 @@ export type Permissions = {
   canReviewAccessRequests: boolean;
   canShareWorkflows: boolean;
   canUnshareWorkflows: boolean;
+};
+
+export type TenantRole = {
+  tenantId: string;
+  tenantName: string;
+  roles: readonly string[];
 };
 
 export type WhoamiResponse = {
@@ -65,6 +73,7 @@ export type WhoamiResponse = {
   } | null;
   n8nUser: AuthSessionN8nUser | null;
   permissions: Permissions;
+  tenantRoles: TenantRole[] | null;
 };
 
 export type AuthExchangeResponse = {

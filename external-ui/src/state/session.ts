@@ -1,5 +1,5 @@
 import { proxy, useSnapshot } from 'valtio';
-import type { AuthenticatedSession } from '../services/backend/auth';
+import type { AuthenticatedSession, TenantRole } from '../services/backend/auth';
 
 type SessionState = {
   session: AuthenticatedSession | null;
@@ -25,6 +25,21 @@ export function useAuthUser() {
 
 export function usePermissions() {
   return useSnapshot(sessionState).session?.permissions ?? null;
+}
+
+export function useTenantRoles(): readonly TenantRole[] {
+  return useSnapshot(sessionState).session?.tenantRoles ?? [];
+}
+
+export function useHasRole(roleName: string): boolean {
+  const tenantRoles = useTenantRoles();
+  return tenantRoles.some((t) => t.roles.includes(roleName));
+}
+
+export function useHasTenantRole(tenantId: string, roleName: string): boolean {
+  const tenantRoles = useTenantRoles();
+  const tenant = tenantRoles.find((t) => t.tenantId === tenantId);
+  return tenant?.roles.includes(roleName) ?? false;
 }
 
 export function useSessionLoading() {
