@@ -218,8 +218,8 @@ The mock service returns static tenant and role data from `docker-compose/sdg-mo
 
 ## Deployed Environments
 
-| Environment        | CSTAR_BASE_URL                                                |
-| ------------------ | ------------------------------------------------------------- |
-| dev (gold/golddr)  | `https://dev-chwf-sdg-mock.apps.gold.devops.gov.bc.ca` (mock) |
-| test (gold/golddr) | `https://cstar-test.apps.gold.devops.gov.bc.ca`               |
-| prod (gold/golddr) | `https://cstar.apps.gold.devops.gov.bc.ca`                    |
+| Environment        | CSTAR_BASE_URL                                                 |
+| ------------------ | -------------------------------------------------------------- |
+| dev (gold/golddr)  | `https://dev.connect.digital.gov.bc.ca` (currently using mock) |
+| test (gold/golddr) | `https://test.connect.digital.gov.bc.ca`                       |
+| prod (gold/golddr) | `https://connect.digital.gov.bc.ca`                            |
