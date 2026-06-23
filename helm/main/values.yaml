@@ -291,7 +291,7 @@ backup-storage:
 
   db:
     enabled: true
-    secretName: chwf-pgo-pguser-n8n  # pragma: allowlist secret
+    secretName: chwf-pgo-pguser-postgres  # pragma: allowlist secret
     usernameKey: user
     passwordKey: password  # pragma: allowlist secret
 

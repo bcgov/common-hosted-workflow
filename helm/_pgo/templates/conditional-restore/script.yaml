@@ -63,89 +63,100 @@ data:
       exit 0
     fi
 
-    # --- 3. Condition C: GoldDR is standby — check if a new backup exists before restoring ---
-    log "GoldDR is in standby mode (current_routing=primary). Checking for new backup..."
+    # --- 3. Condition C: GoldDR is standby — restore each database if a new backup exists ---
+    log "GoldDR is in standby mode (current_routing=primary). Checking for new backups..."
 
     # S3_BUCKET is "bucket-name/path/prefix" — split for API calls
     S3_BUCKET_NAME=$(echo "${S3_BUCKET}" | cut -d'/' -f1)
     S3_PREFIX=$(echo "${S3_BUCKET}" | cut -d'/' -f2- | sed 's:/*$:/:')
 
-    # Find the latest backup file via S3 ListObjectsV2 API (excludes directory markers)
+    # Fetch full S3 listing once (all databases share the same prefix)
     S3_LIST=$(curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
       -u "${S3_USER}:${S3_PASSWORD}" \
       "${S3_ENDPOINT}/${S3_BUCKET_NAME}?list-type=2&prefix=${S3_PREFIX}" 2>&1 || true)
 
-    LATEST_KEY=$(echo "${S3_LIST}" \
-      | grep -o '<Key>[^<]*</Key>' \
-      | sed 's/<Key>//;s/<\/Key>//' \
-      | grep -v '/$' \
-      | sort \
-      | tail -1 || true)
-
-    if [ -z "${LATEST_KEY}" ]; then
-      log "ERROR: No backup files found at ${S3_ENDPOINT}/${S3_BUCKET_NAME}/${S3_PREFIX}. Cannot restore."
-      exit 1
-    fi
-
-    log "Latest backup on S3: ${LATEST_KEY}"
-
-    # Read the last restored key from the state ConfigMap
-    LAST_KEY=$(curl -sf --cacert "${KUBE_CACERT}" \
-      -H "Authorization: Bearer ${KUBE_TOKEN}" \
-      "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
-      2>/dev/null \
-      | grep -o '"last-restored-key":"[^"]*"' \
-      | head -1 \
-      | cut -d'"' -f4 || echo "")
-
-    log "Last restored key: ${LAST_KEY:-<none>}"
-
-    if [ "${LATEST_KEY}" = "${LAST_KEY}" ]; then
-      log "Latest backup already restored. No new backup available. Skipping."
-      exit 0
-    fi
-
-    # --- 4. New backup detected — download, verify, then restore ---
-    log "New backup detected. Downloading ${LATEST_KEY} from S3..."
-    curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
-      -u "${S3_USER}:${S3_PASSWORD}" \
-      -o /tmp/restore.sql.gz \
-      "${S3_ENDPOINT}/${S3_BUCKET_NAME}/${LATEST_KEY}"
-
-    log "Verifying downloaded archive..."
-    gunzip -t /tmp/restore.sql.gz
-
-    # Drop schema only after confirming the backup file is intact
-    log "Dropping and recreating public schema in ${DATABASE_NAME}..."
-    PGPASSWORD="${DATABASE_PASSWORD}" psql \
-      -h "${DATABASE_HOST}" \
-      -p "${DATABASE_PORT}" \
-      -U "${DATABASE_USER}" \
-      -d "${DATABASE_NAME}" \
-      -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO \"${DATABASE_USER}\";" || true
-
-    log "Restoring ${DATABASE_NAME} from downloaded backup..."
-    gunzip -c /tmp/restore.sql.gz | PGPASSWORD="${DATABASE_PASSWORD}" psql \
-      -h "${DATABASE_HOST}" \
-      -p "${DATABASE_PORT}" \
-      -U "${DATABASE_USER}" \
-      -d "${DATABASE_NAME}" \
-      -v ON_ERROR_STOP=0
-
-    rm -f /tmp/restore.sql.gz
-    log "Restore complete."
-
     rm -f /tmp/probe_response.json
 
-    # --- 5. Update state ConfigMap with the restored key ---
-    log "Updating restore state (last-restored-key=${LATEST_KEY})..."
-    curl -sf --cacert "${KUBE_CACERT}" \
-      -X PATCH \
-      -H "Authorization: Bearer ${KUBE_TOKEN}" \
-      -H "Content-Type: application/merge-patch+json" \
-      "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
-      -d "{\"data\":{\"last-restored-key\":\"${LATEST_KEY}\"}}" \
-      > /dev/null
+    # --- 4. Iterate each database: find its latest backup, compare state, restore if new ---
+    for i in $(seq 0 $((DATABASE_COUNT-1))); do
+      DB_NAME_VAR="DATABASE_${i}_NAME"; DB_NAME="${!DB_NAME_VAR}"
+      DB_PASS="${DATABASE_PASSWORD}" # pragma: allowlist secret
+
+      log "[${DB_NAME}] Checking for latest backup..."
+
+      # Find the latest S3 key whose filename contains the database name
+      LATEST_KEY=$(echo "${S3_LIST}" \
+        | grep -o '<Key>[^<]*</Key>' \
+        | sed 's/<Key>//;s/<\/Key>//' \
+        | grep -v '/$' \
+        | grep "${DB_NAME}" \
+        | sort \
+        | tail -1 || true)
+
+      if [ -z "${LATEST_KEY}" ]; then
+        log "[${DB_NAME}] WARNING: No backup files found matching '${DB_NAME}' at ${S3_ENDPOINT}/${S3_BUCKET_NAME}/${S3_PREFIX}. Skipping."
+        continue
+      fi
+
+      log "[${DB_NAME}] Latest backup on S3: ${LATEST_KEY}"
+
+      # Read the last restored key for this specific database from the state ConfigMap
+      STATE_KEY="${DB_NAME}.last-restored-key"
+      LAST_KEY=$(curl -sf --cacert "${KUBE_CACERT}" \
+        -H "Authorization: Bearer ${KUBE_TOKEN}" \
+        "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
+        2>/dev/null \
+        | grep -o "\"${STATE_KEY}\":\"[^\"]*\"" \
+        | head -1 \
+        | cut -d'"' -f4 || echo "")
+
+      log "[${DB_NAME}] Last restored key: ${LAST_KEY:-<none>}"
+
+      if [ "${LATEST_KEY}" = "${LAST_KEY}" ]; then
+        log "[${DB_NAME}] Latest backup already restored. Skipping."
+        continue
+      fi
+
+      # New backup detected — download, verify, then restore
+      log "[${DB_NAME}] New backup detected. Downloading ${LATEST_KEY}..."
+      curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
+        -u "${S3_USER}:${S3_PASSWORD}" \
+        -o /tmp/restore.sql.gz \
+        "${S3_ENDPOINT}/${S3_BUCKET_NAME}/${LATEST_KEY}"
+
+      log "[${DB_NAME}] Verifying downloaded archive..."
+      gunzip -t /tmp/restore.sql.gz
+
+      # Drop schema only after confirming the backup file is intact
+      log "[${DB_NAME}] Dropping and recreating public schema..."
+      PGPASSWORD="${DB_PASS}" psql \
+        -h "${DATABASE_HOST}" \
+        -p "${DATABASE_PORT}" \
+        -U "${DATABASE_USER}" \
+        -d "${DB_NAME}" \
+        -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;" || true
+
+      log "[${DB_NAME}] Restoring from downloaded backup..."
+      gunzip -c /tmp/restore.sql.gz | PGPASSWORD="${DB_PASS}" psql \
+        -h "${DATABASE_HOST}" \
+        -p "${DATABASE_PORT}" \
+        -U "${DATABASE_USER}" \
+        -d "${DB_NAME}" \
+        -v ON_ERROR_STOP=0
+
+      rm -f /tmp/restore.sql.gz
+      log "[${DB_NAME}] Restore complete."
+
+      # Update per-database state key
+      log "[${DB_NAME}] Updating restore state (${STATE_KEY}=${LATEST_KEY})..."
+      curl -sf --cacert "${KUBE_CACERT}" \
+        -X PATCH \
+        -H "Authorization: Bearer ${KUBE_TOKEN}" \
+        -H "Content-Type: application/merge-patch+json" \
+        "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
+        -d "{\"data\":{\"${STATE_KEY}\":\"${LATEST_KEY}\"}}" \
+        > /dev/null
+    done
 
     log "pg-conditional-restore done."
 {{- end }}
