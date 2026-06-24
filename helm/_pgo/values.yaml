@@ -4,6 +4,34 @@ fullnameOverride: pgo
 # --- General Cluster Settings ---
 postgresVersion: 17
 
+# --- PostgreSQL Server Configuration ---
+# Maps to spec.config in the Crunchy PostgresCluster CRD.
+# Put ordinary PostgreSQL GUCs here.
+# Avoid duplicating these values under patroni.dynamicConfiguration.postgresql.parameters.
+# These defaults are intentionally conservative for a tiny cluster.
+# When the cluster grows, raise pod resources and PostgreSQL memory/WAL settings together.
+# Example:
+# helm upgrade <release> ./helm/_pgo --reuse-values \
+#   --set instances[0].resources.requests.memory=1Gi \
+#   --set config.parameters.shared_buffers=256MB \
+#   --set config.parameters.work_mem=8MB \
+#   --set config.parameters.wal_buffers=-1 \
+#   --set config.parameters.min_wal_size=512MB \
+#   --set config.parameters.max_wal_size=2GB
+config:
+  # files:
+  #   - secret:
+  #       name: postgres-extra-config
+  parameters:
+    # See PostgreSQL runtime config docs for valid GUC names and units.
+    max_parallel_workers: "2"
+    shared_buffers: 32MB # conservative default for small clusters; increase with pod memory
+    work_mem: 2MB
+    wal_buffers: -1 # keep PostgreSQL auto-sizing enabled as the cluster grows
+    min_wal_size: 32MB
+    max_wal_size: 128MB # conservative tiny-cluster default; increase for heavier write volume
+    password_encryption: scram-sha-256 # pragma: allowlist secret
+
 databases: []
   # - name: inventory
   #   options: CREATEROLE
@@ -12,25 +40,71 @@ databases: []
   # - name: billing
 
 # --- Instance Configuration ---
+# Maps directly to spec.instances in the Crunchy PostgresCluster CRD.
+# When scaling up, increase CPU/memory here first, then raise config.parameters to match.
+# Example:
+# helm upgrade <release> ./helm/_pgo --reuse-values \
+#   --set instances[0].replicas=3 \
+#   --set instances[0].resources.requests.cpu=500m \
+#   --set instances[0].resources.requests.memory=2Gi
 instances:
-  name: ha
-  replicas: 2
-  resources:
-    requests:
-      cpu: 1m
-      memory: 256Mi
-  replicaCertCopy:
+  - name: ha
+    replicas: 2
+    # affinity:
+    #   podAntiAffinity:
+    #     preferredDuringSchedulingIgnoredDuringExecution:
+    #       - weight: 1
+    #         podAffinityTerm:
+    #           topologyKey: topology.kubernetes.io/zone
+    #           labelSelector:
+    #             matchLabels:
+    #               postgres-operator.crunchydata.com/cluster: pgo
+    #               postgres-operator.crunchydata.com/instance-set: ha
+    # containers: []
     resources:
       requests:
         cpu: 1m
-        memory: 32Mi
-  dataVolumeClaimSpec:
-    storage: 480Mi
-    storageClassName: netapp-block-standard
+        memory: 256Mi
+    sidecars:
+      replicaCertCopy:
+        resources:
+          requests:
+            cpu: 1m
+            memory: 32Mi
+    dataVolumeClaimSpec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 480Mi
+      storageClassName: netapp-block-standard
+    # metadata:
+    #   labels: {}
+    #   annotations: {}
+    # minAvailable: 1
+    # priorityClassName: postgres-ha
+    # tolerations: []
+    # topologySpreadConstraints: []
+    # volumes:
+    #   additional: []
+    # walVolumeClaimSpec:
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 240Mi
+    #   storageClassName: netapp-block-standard
 
 # --- Backup Configuration (pgBackRest) ---
+# Maps to spec.backups.pgbackrest in the Crunchy PostgresCluster CRD.
+# Top-level fields below are passed through directly when set.
 pgBackRest:
   image:
+  # configuration:
+  #   - secret:
+  #       name: pgbackrest-extra-config
+  # global:
+  #   process-max: "2"
   repos:
     - name: repo1
       enabled: true
@@ -38,9 +112,13 @@ pgBackRest:
       retention: "2"
       retentionType: count
       volume:
-        size: 240Mi
-        accessModes: ReadWriteOnce
-        storageClassName: netapp-file-standard
+        volumeClaimSpec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 240Mi
+          storageClassName: netapp-file-standard
       schedules:
         full: 0 8 * * *
         incremental: 0 0,4,12,16,20 * * *
@@ -66,58 +144,135 @@ pgBackRest:
         incremental: 0 0,4,12,16,20 * * *
 
   repoHost:
+    # affinity: {}
     resources:
       requests:
         cpu: 1m
         memory: 64Mi
+    # tolerations: []
 
   sidecars:
-    resources:
-      requests:
-        cpu: 1m
-        memory: 64Mi
+    pgbackrest:
+      resources:
+        requests:
+          cpu: 1m
+          memory: 64Mi
+    pgbackrestConfig:
+      resources:
+        requests:
+          cpu: 1m
+          memory: 64Mi
+  # jobs:
+  #   priorityClassName: postgres-backup
+  # log:
+  #   level: info
+  # manual: {}
+  # metadata:
+  #   labels: {}
+  # restore: {}
 
 # --- Restore / Bootstrap Configuration ---
+# Maps to spec.dataSource in the Crunchy PostgresCluster CRD.
+# Leave empty when the cluster should initialize normally.
 dataSource:
-  enabled: false
-  type: pgbackrest # Options: pgbackrest, postgresCluster
-  secretName: restore-creds # pragma: allowlist secret
-  stanza: db
-  repo:
-    name: repo2
-    provider: s3 # Options: s3, azure, gcs, volume
-    path: /backups/cluster
-    s3:
-      bucket: my-bucket
-      endpoint: s3.ca-central-1.amazonaws.com
-      region: ca-central-1
+  # postgresCluster:
+  #   clusterName: source-cluster
+  #   clusterNamespace: default
+  #   repoName: repo1
+  # pgbackrest:
+  #   stanza: db
+  #   configuration:
+  #     - secret:
+  #         name: restore-creds # pragma: allowlist secret
+  #   global:
+  #     repo2-path: /backups/cluster
+  #     repo2-s3-uri-style: host
+  #   repo:
+  #     name: repo2
+  #     s3:
+  #       bucket: my-bucket
+  #       endpoint: s3.ca-central-1.amazonaws.com
+  #       region: ca-central-1
 
-# --- High Availability & Performance (Patroni) ---
+# --- High Availability & Patroni Configuration ---
+# Maps to spec.patroni in the Crunchy PostgresCluster CRD.
+# Put Patroni-managed behavior here, not ordinary PostgreSQL tuning.
 patroni:
-  postgresql:
-    pg_hba:
-      - host all all 0.0.0.0/0 scram-sha-256
-    parameters:
-      shared_buffers: 16MB # default is 128MB; a good tuned default for shared_buffers is 25% of the memory allocated to the pod
-      wal_buffers: 64KB # this can be set to -1 to automatically set as 1/32 of shared_buffers or 64kB, whichever is larger
-      min_wal_size: 32MB
-      max_wal_size: 64MB # default is 1GB
-      max_slot_wal_keep_size: 128MB # default is -1, allowing unlimited wal growth when replicas fall behind
+  # leaderLeaseDurationSeconds: 30
+  # port: 8008
+  # syncPeriodSeconds: 10
+  # logging:
+  #   level: INFO
+  #   storageLimit: 100Mi
+  # switchover:
+  #   enabled: false
+  dynamicConfiguration:
+    postgresql:
+      pg_hba:
+        - host all all 0.0.0.0/0 scram-sha-256
+      # Patroni-managed PostgreSQL settings can go here when needed.
+      # Prefer config.parameters for normal PostgreSQL tuning.
+      # parameters:
+      #   max_connections: 200
+      # use_slots: true
+      # use_pg_rewind: true
 
 # --- Connection Pooling (PgBouncer) ---
+# Maps to spec.proxy.pgBouncer in the Crunchy PostgresCluster CRD.
 pgBouncer:
   enabled: true
+  config:
+    global:
+      client_tls_sslmode: disable
+      auth_type: scram-sha-256
   image:
   replicas: 2
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 1
+  #         podAffinityTerm:
+  #           topologyKey: topology.kubernetes.io/zone
+  #           labelSelector:
+  #             matchLabels:
+  #               postgres-operator.crunchydata.com/cluster: pgo
+  #               postgres-operator.crunchydata.com/role: pgbouncer
+  # metadata:
+  #   labels: {}
+  # minAvailable: 1
+  # port: 5432
+  # priorityClassName: postgres-proxy
   resources:
     requests:
       cpu: 1m
       memory: 64Mi
+  # service:
+  #   type: ClusterIP
+  # sidecars: {}
+  # tolerations: []
+  # topologySpreadConstraints: []
+  # volumes: {}
 
 # --- Standby / Disaster Recovery ---
+# Maps directly to spec.standby.
 standby:
   enabled: false
   repoName: repo1
+  # host: source-cluster-primary.example.com
+  # port: 5432
+
+# --- Database Users ---
+# Maps directly to spec.users.
+# The legacy databases helper below is still supported for compatibility.
+users:
+  - name: postgres
+    databases:
+      - postgres
+    options: SUPERUSER
+  # - name: app
+  #   databases:
+  #     - app
+  #   options: CREATEROLE NOSUPERUSER
 
 # --- Conditional Restore (DR) ---
 # Runs on GoldDR only. Checks DNS probe every 10 min and restores from Gold's S3 pg_dump backup
@@ -146,11 +301,16 @@ conditionalRestore:
     portKey: port
 
 # --- Monitoring ---
-pgmonitor:
-  enabled: true
-  exporter:
-    image:
-    resources:
-      requests:
-        cpu: 1m
-        memory: 64Mi
+monitoring:
+  pgmonitor:
+    exporter:
+      image:
+      resources:
+        requests:
+          cpu: 1m
+          memory: 64Mi
+    # queries can be projected via configuration:
+    # exporter:
+    #   configuration:
+    #     - configMap:
+    #         name: postgres-exporter-queries

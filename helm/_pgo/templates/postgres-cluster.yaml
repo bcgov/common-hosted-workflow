@@ -1,3 +1,18 @@
+{{- $config := .Values.config | default (dict) }}
+{{- $configFiles := get $config "files" | default (list) }}
+{{- $configParameters := get $config "parameters" | default (dict) }}
+{{- $instances := .Values.instances | default (list) }}
+{{- $dataSource := .Values.dataSource | default (dict) }}
+{{- $monitoring := .Values.monitoring | default (dict) }}
+{{- $patroni := .Values.patroni | default (dict) }}
+{{- $patroniDynamicConfiguration := get $patroni "dynamicConfiguration" | default (dict) }}
+{{- $patroniDynamicConfigurationWithoutPostgresql := omit $patroniDynamicConfiguration "postgresql" }}
+{{- $patroniPostgresql := get $patroniDynamicConfiguration "postgresql" | default (dict) }}
+{{- $patroniPostgresqlWithoutRecoveryConf := omit $patroniPostgresql "recovery_conf" }}
+{{- $pgBackRest := .Values.pgBackRest | default (dict) }}
+{{- $pgBouncer := .Values.pgBouncer | default (dict) }}
+{{- $users := .Values.users | default (list) }}
+# See https://access.crunchydata.com/documentation/postgres-operator/latest/references/crd/6.0.x/postgrescluster-v1
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
@@ -5,132 +20,35 @@ metadata:
   labels:
     {{- include "_.labels" . | nindent 4 }}
 spec:
-  openshift: true
-  postgresVersion: {{ .Values.postgresVersion }}
-
-  config:
-    parameters:
-      max_parallel_workers: "2"
-      shared_buffers: 1GB
-      work_mem: 2MB
-      password_encryption: scram-sha-256 # pragma: allowlist secret
-
-  instances:
-  - name: {{ .Values.instances.name }}
-    replicas: {{ .Values.instances.replicas }}
-    {{- with .Values.instances.resources }}
-    resources:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    sidecars:
-      replicaCertCopy:
-        {{- with .Values.instances.replicaCertCopy.resources }}
-        resources:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-    dataVolumeClaimSpec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: {{ .Values.instances.dataVolumeClaimSpec.storage }}
-      storageClassName: {{ .Values.instances.dataVolumeClaimSpec.storageClassName }}
-    affinity:
-      podAntiAffinity:
-        preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 1
-            podAffinityTerm:
-              topologyKey: topology.kubernetes.io/zone
-              labelSelector:
-                matchLabels:
-                  postgres-operator.crunchydata.com/cluster: {{ include "_.fullname" . }}
-                  postgres-operator.crunchydata.com/instance-set: {{ .Values.instances.name }}
-
-  databaseInitSQL:
-    name: {{ include "_.fullname" . }}-init-sql
-    key: init.sql
-
-  users:
-    - name: postgres
-      databases:
-        - postgres
-      options: "SUPERUSER"
-
-    {{- range $db := .Values.databases }}
-    - name: {{ $db.name }}
-      databases:
-      - {{ $db.name }}
-      # Ensure options do not contain SUPERUSER
-      options: {{ $db.options | default "CREATEROLE NOSUPERUSER" }}
-    {{- end }}
-
-  {{- if .Values.dataSource.enabled }}
-  dataSource:
-    # 1. Use postgresCluster for local cloning if defined
-    {{- if eq .Values.dataSource.type "postgresCluster" }}
-    postgresCluster:
-      clusterName: {{ .Values.dataSource.postgresCluster.clusterName }}
-      clusterNamespace: {{ .Values.dataSource.postgresCluster.clusterNamespace | default .Release.Namespace }}
-      repoName: {{ .Values.dataSource.postgresCluster.repoName | default "repo1" }}
-
-    # 2. Use pgbackrest for Cloud or External Volume restores
-    {{- else if eq .Values.dataSource.type "pgbackrest" }}
-    pgbackrest:
-      stanza: {{ .Values.dataSource.stanza | default "db" }}
-      configuration:
-        - secret: { name: {{ .Values.dataSource.secretName }} }
-      global:
-        # Dynamically map the repo path (e.g., repo84-path)
-        {{ .Values.dataSource.repo.name }}-path: {{ .Values.dataSource.repo.path | quote }}
-        {{- if eq .Values.dataSource.repo.provider "s3" }}
-        {{ .Values.dataSource.repo.name }}-s3-uri-style: {{ .Values.dataSource.repo.s3.uriStyle | default "host" | quote }}
-        {{- end }}
-        {{- if eq .Values.dataSource.repo.provider "azure" }}
-        {{ .Values.dataSource.repo.name }}-azure-account: {{ .Values.dataSource.repo.azure.account | quote }}
-        {{- end }}
-      repo:
-        name: {{ .Values.dataSource.repo.name }}
-
-        # S3 Support
-        {{- if eq .Values.dataSource.repo.provider "s3" }}
-        s3:
-          bucket: {{ .Values.dataSource.repo.s3.bucket | quote }}
-          endpoint: {{ .Values.dataSource.repo.s3.endpoint | quote }}
-          region: {{ .Values.dataSource.repo.s3.region | quote }}
-
-        # GCS Support
-        {{- else if eq .Values.dataSource.repo.provider "gcs" }}
-        gcs:
-          bucket: {{ .Values.dataSource.repo.gcs.bucket | quote }}
-
-        # Azure Support
-        {{- else if eq .Values.dataSource.repo.provider "azure" }}
-        azure:
-          container: {{ .Values.dataSource.repo.azure.container | quote }}
-
-        # Local Volume Support
-        {{- else if eq .Values.dataSource.repo.provider "volume" }}
-        volume:
-          volumeClaimSpec:
-            accessModes: {{ .Values.dataSource.repo.volume.accessModes | default (list "ReadWriteOnce") }}
-            resources:
-              requests:
-                storage: {{ .Values.dataSource.repo.volume.size | quote }}
-            storageClassName: {{ .Values.dataSource.repo.volume.storageClassName }}
-        {{- end }}
-      {{- end }}
-  {{- end }}
-
   backups:
     pgbackrest:
-      {{ if .Values.pgBackRest.image }}
-      image: {{ .Values.pgBackRest.image }}
-      {{ end }}
-
-      {{- $configs := list }}
-      {{- range .Values.pgBackRest.repos }}
+      {{- $configs := get $pgBackRest "configuration" | default (list) }}
+      {{- range (get $pgBackRest "repos" | default (list)) }}
         {{- if and .enabled .secretName }}
           {{- $configs = append $configs (dict "secret" (dict "name" .secretName)) }}
+        {{- end }}
+      {{- end }}
+
+      {{- $global := dict }}
+      {{- range $key, $value := (get $pgBackRest "global" | default (dict)) }}
+        {{- $_ := set $global $key $value }}
+      {{- end }}
+      {{- range (get $pgBackRest "repos" | default (list)) }}
+        {{- if .enabled }}
+          {{- $_ := set $global (printf "%s-retention-full" .name) (.retention | toString) }}
+          {{- $_ := set $global (printf "%s-retention-full-type" .name) .retentionType }}
+          {{- if and (eq .type "s3") .s3.path }}
+            {{- $_ := set $global (printf "%s-path" .name) .s3.path }}
+            {{- $_ := set $global (printf "%s-s3-uri-style" .name) (.s3.uriStyle | default "host") }}
+          {{- end }}
+          {{- if and (eq .type "azure") .azure.path }}
+            {{- $_ := set $global (printf "%s-path" .name) .azure.path }}
+            {{- $_ := set $global (printf "%s-azure-account" .name) .azure.accountName }}
+          {{- end }}
+          {{- if and (eq .type "gcs") .gcs.path }}
+            {{- $_ := set $global (printf "%s-path" .name) .gcs.path }}
+            {{- $_ := set $global (printf "%s-gcs-key-type" .name) "service-account" }}
+          {{- end }}
         {{- end }}
       {{- end }}
 
@@ -139,125 +57,233 @@ spec:
       {{ toYaml $configs | nindent 8 }}
       {{- end }}
 
+      {{- if $global }}
+      # See https://pgbackrest.org/configuration.html#section-repository/option-repo-retention-full
       global:
-        {{- range .Values.pgBackRest.repos }}
-        {{- if .enabled }}
-        {{ .name }}-retention-full: {{ .retention | quote }}
-        {{ .name }}-retention-full-type: {{ .retentionType }}
+        {{- toYaml $global | nindent 8 }}
+      {{- end }}
 
-        # S3 Specific Global Keys
-        {{- if eq .type "s3" }}
-        {{ .name }}-path: {{ .s3.path | quote }}
-        {{ .name }}-s3-uri-style: {{ .s3.uriStyle | default "host" }}
-        {{- end }}
+      {{- if $pgBackRest.image }}
+      image: {{ $pgBackRest.image }}
+      {{- end }}
 
-        # Azure Specific Global Keys
-        {{- if eq .type "azure" }}
-        {{ .name }}-path: {{ .azure.path | quote }}
-        {{ .name }}-azure-account: {{ .azure.accountName | quote }}
-        {{- end }}
-
-        # GCS Specific Global Keys
-        {{- if eq .type "gcs" }}
-        {{ .name }}-path: {{ .gcs.path | quote }}
-        {{ .name }}-gcs-key-type: "service-account"
-        {{- end }}
-
-        {{- end }}
-        {{- end }}
-
-      repos:
-        {{- range .Values.pgBackRest.repos }}
-        {{- if .enabled }}
-        - name: {{ .name }}
-          schedules:
-            full: {{ .schedules.full | quote }}
-            incremental: {{ .schedules.incremental | quote }}
-
-          # 1. Volume Repo
-          {{- if eq .type "volume" }}
-          volume:
-            volumeClaimSpec:
-              accessModes: [{{ .volume.accessModes | quote }}]
-              resources:
-                requests: { storage: {{ .volume.size }} }
-              storageClassName: {{ .volume.storageClassName }}
-
-          # 2. S3 Repo
-          {{- else if eq .type "s3" }}
-          s3:
-            bucket: {{ .s3.bucket | quote }}
-            endpoint: {{ .s3.endpoint | quote }}
-            region: {{ .s3.region | quote }}
-
-          # 3. Azure Repo
-          {{- else if eq .type "azure" }}
-          azure:
-            container: {{ .azure.container | quote }}
-
-          # 4. GCS Repo
-          {{- else if eq .type "gcs" }}
-          gcs:
-            bucket: {{ .gcs.bucket | quote }}
-          {{- end }}
-
-        {{- end }}
-        {{- end }}
-
-      repoHost:
-        {{- with .Values.pgBackRest.repoHost.resources }}
-        resources:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-      sidecars:
-        pgbackrest:
-          {{- with .Values.pgBackRest.sidecars.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-        pgbackrestConfig:
-          {{- with .Values.pgBackRest.sidecars.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-
-  standby:
-    enabled: {{ .Values.standby.enabled }}
-    repoName: {{ .Values.standby.repoName }}
-
-  patroni:
-    dynamicConfiguration:
-      postgresql:
-        {{ if .Values.standby.enabled }}
-        recovery_conf:
-          recovery_target_timeline: latest
-        {{ end }}
-        pg_hba:
-        {{- range .Values.patroni.postgresql.pg_hba }}
-        - {{ . | quote }}
-        {{- end }}
-        parameters:
-          shared_buffers: {{ .Values.patroni.postgresql.parameters.shared_buffers }}
-          wal_buffers: {{ .Values.patroni.postgresql.parameters.wal_buffers }}
-          min_wal_size: {{ .Values.patroni.postgresql.parameters.min_wal_size }}
-          max_wal_size: {{ .Values.patroni.postgresql.parameters.max_wal_size }}
-          max_slot_wal_keep_size:  {{ .Values.patroni.postgresql.parameters.max_slot_wal_keep_size }}
-
-  {{ if .Values.pgBouncer.enabled }}
-  proxy:
-    pgBouncer:
-      config:
-        global:
-          client_tls_sslmode: disable
-          auth_type: scram-sha-256
-      {{ if .Values.pgBouncer.image }}
-      image: {{ .Values.pgBouncer.image }}
-      {{ end }}
-      replicas: {{ .Values.pgBouncer.replicas }}
-      {{- with .Values.pgBouncer.resources }}
-      resources:
+      {{- with $pgBackRest.jobs }}
+      jobs:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      {{- with $pgBackRest.log }}
+      log:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $pgBackRest.manual }}
+      manual:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $pgBackRest.metadata }}
+      metadata:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $pgBackRest.repoHost }}
+      repoHost:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      repos:
+        {{- range (get $pgBackRest "repos" | default (list)) }}
+        {{- if .enabled }}
+        - name: {{ .name }}
+          {{- with .schedules }}
+          schedules:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .volume }}
+          volume:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .s3 }}
+          s3:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .azure }}
+          azure:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .gcs }}
+          gcs:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+        {{- end }}
+        {{- end }}
+
+      {{- with $pgBackRest.restore }}
+      restore:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with $pgBackRest.sidecars }}
+      sidecars:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+  {{- if or $configFiles $configParameters }}
+  config:
+    # Keep ordinary PostgreSQL settings here.
+    # This chart passes through supported spec.config fields from values.yaml.
+    {{- with $configFiles }}
+    files:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $configParameters }}
+    parameters:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+
+  {{- if $dataSource }}
+  dataSource:
+    {{- with $dataSource.pgbackrest }}
+    pgbackrest:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $dataSource.postgresCluster }}
+    postgresCluster:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+
+  databaseInitSQL:
+    key: init.sql
+    name: {{ include "_.fullname" . }}-init-sql
+
+  instances:
+  {{- range $instance := $instances }}
+  - affinity:
+      {{- with $instance.affinity }}
+      {{- toYaml . | nindent 6 }}
+      {{- else }}
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              topologyKey: topology.kubernetes.io/zone
+              labelSelector:
+                matchLabels:
+                  postgres-operator.crunchydata.com/cluster: {{ include "_.fullname" $ }}
+                  postgres-operator.crunchydata.com/instance-set: {{ $instance.name }}
+      {{- end }}
+    {{- with $instance.containers }}
+    containers:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    dataVolumeClaimSpec:
+      {{- toYaml $instance.dataVolumeClaimSpec | nindent 6 }}
+    {{- with $instance.metadata }}
+    metadata:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $instance.minAvailable }}
+    minAvailable: {{ . }}
+    {{- end }}
+    {{- with $instance.name }}
+    name: {{ . }}
+    {{- end }}
+    {{- with $instance.priorityClassName }}
+    priorityClassName: {{ . }}
+    {{- end }}
+    {{- with $instance.replicas }}
+    replicas: {{ . }}
+    {{- end }}
+    {{- with $instance.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $instance.sidecars }}
+    sidecars:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $instance.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $instance.topologySpreadConstraints }}
+    topologySpreadConstraints:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $instance.volumes }}
+    volumes:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $instance.walVolumeClaimSpec }}
+    walVolumeClaimSpec:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+
+  {{- with $monitoring.pgmonitor }}
+  monitoring:
+    pgmonitor:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+
+  openshift: true
+
+  {{- if or $patroni.leaderLeaseDurationSeconds $patroni.logging $patroni.port $patroni.switchover $patroni.syncPeriodSeconds $patroniDynamicConfiguration .Values.standby.enabled }}
+  patroni:
+    # Keep Patroni-managed behavior here.
+    # This includes pg_hba, recovery behavior, switchover, and other Patroni dynamic settings.
+    {{- with $patroni.leaderLeaseDurationSeconds }}
+    leaderLeaseDurationSeconds: {{ . }}
+    {{- end }}
+    {{- with $patroni.logging }}
+    logging:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $patroni.port }}
+    port: {{ . }}
+    {{- end }}
+    {{- with $patroni.switchover }}
+    switchover:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $patroni.syncPeriodSeconds }}
+    syncPeriodSeconds: {{ . }}
+    {{- end }}
+    {{- if or $patroniDynamicConfigurationWithoutPostgresql $patroniPostgresqlWithoutRecoveryConf .Values.standby.enabled }}
+    dynamicConfiguration:
+      {{- with $patroniDynamicConfigurationWithoutPostgresql }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- if or $patroniPostgresqlWithoutRecoveryConf .Values.standby.enabled }}
+      postgresql:
+        {{- if .Values.standby.enabled }}
+        recovery_conf:
+          recovery_target_timeline: latest
+        {{- end }}
+        {{- with $patroniPostgresqlWithoutRecoveryConf }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  postgresVersion: {{ .Values.postgresVersion }}
+
+  {{ if $pgBouncer.enabled }}
+  proxy:
+    pgBouncer:
+      {{- with $pgBouncer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- else }}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -268,17 +294,75 @@ spec:
                   matchLabels:
                     postgres-operator.crunchydata.com/cluster: {{ include "_.fullname" . }}
                     postgres-operator.crunchydata.com/role: pgbouncer
+      {{ end }}
+      {{- with $pgBouncer.config }}
+      config:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.containers }}
+      containers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.customTLSSecret }}
+      customTLSSecret:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{ if $pgBouncer.image }}
+      image: {{ $pgBouncer.image }}
+      {{ end }}
+      {{- with $pgBouncer.metadata }}
+      metadata:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.minAvailable }}
+      minAvailable: {{ . }}
+      {{- end }}
+      {{- with $pgBouncer.port }}
+      port: {{ . }}
+      {{- end }}
+      {{- with $pgBouncer.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      replicas: {{ $pgBouncer.replicas }}
+      {{- with $pgBouncer.resources }}
+      resources:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.service }}
+      service:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.sidecars }}
+      sidecars:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $pgBouncer.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   {{ end }}
 
-  {{ if .Values.pgmonitor.enabled }}
-  monitoring:
-    pgmonitor:
-      exporter:
-        {{ if .Values.pgmonitor.exporter.image}}
-        image: {{ .Values.pgmonitor.exporter.image}}
-        {{ end }}
-        {{- with .Values.pgmonitor.exporter.resources }}
-        resources:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-  {{ end }}
+  {{- with .Values.standby }}
+  standby:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- if or $users .Values.databases }}
+  users:
+    {{- range $user := $users }}{{ toYaml (list $user) | nindent 4 }}{{- end }}
+    {{- range $db := .Values.databases }}
+    - name: {{ $db.name }}
+      databases:
+        - {{ $db.name }}
+      # Convenience helper for legacy chart usage; prefer values.users for CRD-shaped config.
+      options: {{ $db.options | default "CREATEROLE NOSUPERUSER" }}
+    {{- end }}
+  {{- end }}
