@@ -13,6 +13,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -28,6 +36,19 @@ const PAGE_SIZE = 25;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ProjectTypeFilter = 'all' | 'personal' | 'team';
+
+interface PendingUpdate {
+  projectId: string;
+  projectName: string;
+  oldTenantId: string | null;
+  newTenantId: string;
+}
+
+interface PendingDelete {
+  projectId: string;
+  projectName: string;
+  tenantId: string;
+}
 
 function getMutationErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error) && error.response) {
@@ -54,6 +75,8 @@ export function AdminProjectsView() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ['admin-projects', page],
@@ -111,13 +134,13 @@ export function AdminProjectsView() {
     setValidationError(null);
   }
 
-  function saveEdit(projectId: string, originalValue: string | null) {
+  function saveEdit(projectId: string, originalValue: string | null, projectName: string) {
     const trimmed = editValue.trim();
 
     // If cleared, delete the mapping
     if (trimmed === '') {
       if (originalValue !== null) {
-        deleteMutation.mutate(projectId);
+        setPendingDelete({ projectId, projectName, tenantId: originalValue });
       } else {
         cancelEditing();
       }
@@ -137,7 +160,19 @@ export function AdminProjectsView() {
     }
 
     setValidationError(null);
-    updateMutation.mutate({ projectId, tenantId: trimmed });
+    setPendingUpdate({ projectId, projectName, oldTenantId: originalValue, newTenantId: trimmed });
+  }
+
+  function confirmUpdate() {
+    if (!pendingUpdate) return;
+    updateMutation.mutate({ projectId: pendingUpdate.projectId, tenantId: pendingUpdate.newTenantId });
+    setPendingUpdate(null);
+  }
+
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    deleteMutation.mutate(pendingDelete.projectId);
+    setPendingDelete(null);
   }
 
   if (projectsQuery.isLoading) {
@@ -258,7 +293,7 @@ export function AdminProjectsView() {
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     e.preventDefault();
-                                    saveEdit(project.projectId, project.tenantId);
+                                    saveEdit(project.projectId, project.tenantId, project.projectName);
                                   } else if (e.key === 'Escape') {
                                     e.preventDefault();
                                     cancelEditing();
@@ -290,7 +325,7 @@ export function AdminProjectsView() {
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => saveEdit(project.projectId, project.tenantId)}
+                                onClick={() => saveEdit(project.projectId, project.tenantId, project.projectName)}
                                 disabled={isSaving}
                                 aria-label="Save"
                               >
@@ -359,6 +394,78 @@ export function AdminProjectsView() {
           </div>
         </div>
       )}
+
+      {/* Update Confirmation Dialog */}
+      <Dialog
+        open={!!pendingUpdate}
+        onOpenChange={(open) => {
+          if (!open) setPendingUpdate(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Tenant Update</DialogTitle>
+            <DialogDescription>
+              You are about to change the tenant mapping for project{' '}
+              <strong className="text-[var(--bc-text)]">{pendingUpdate?.projectName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            {pendingUpdate?.oldTenantId ? (
+              <p>
+                <span className="text-[var(--bc-muted)]">Current tenant:</span>{' '}
+                <code className="font-mono text-xs">{pendingUpdate.oldTenantId}</code>
+              </p>
+            ) : (
+              <p className="text-[var(--bc-muted)]">No tenant currently assigned.</p>
+            )}
+            <p>
+              <span className="text-[var(--bc-muted)]">New tenant:</span>{' '}
+              <code className="font-mono text-xs">{pendingUpdate?.newTenantId}</code>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingUpdate(null)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmUpdate}>
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Tenant Removal</DialogTitle>
+            <DialogDescription>
+              You are about to remove the tenant mapping for project{' '}
+              <strong className="text-[var(--bc-text)]">{pendingDelete?.projectName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p>
+              <span className="text-[var(--bc-muted)]">Tenant to remove:</span>{' '}
+              <code className="font-mono text-xs">{pendingDelete?.tenantId}</code>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmDelete}>
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
