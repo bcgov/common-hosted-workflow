@@ -4,6 +4,7 @@ import { AuthService, type BaseAuthService } from '../services/auth';
 import { ChefsService } from '../services/chefs.service';
 import { CstarService } from '../services/cstar.service';
 import { MessageService } from '../services/message.service';
+import { ProjectTenantService } from '../services/project-tenant.service';
 import { TenantService } from '../services/tenant.service';
 import { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import { UiApiService } from '../services/ui-api';
@@ -52,6 +53,7 @@ export async function buildApiServices(
   const cssSsoConfig = getCssSsoConfig();
   const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
   const cstarService = new CstarService();
+  const tenantService = new TenantService(customRepositories, n8nRepositories, cstarService);
 
   return {
     uiApi: new UiApiService(n8nRepositories),
@@ -66,12 +68,13 @@ export async function buildApiServices(
       cssSsoService,
       n8nServices.nodeMailerService,
     ),
-    tenant: new TenantService(customRepositories, n8nRepositories, cstarService),
+    tenant: tenantService,
     tenantProjectSync: new TenantProjectSyncService(
       n8nRepositories,
       customRepositories,
       cstarService,
       globalOwnerRoleSlug,
     ),
+    projectTenant: new ProjectTenantService(n8nRepositories, customRepositories, tenantService, cstarService),
   };
 }

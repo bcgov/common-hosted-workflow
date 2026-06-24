@@ -47,4 +47,31 @@ export class TenantProjectRelationRepository {
         target: [tenantProjectRelation.tenantId, tenantProjectRelation.projectId],
       });
   }
+
+  /** Deletes the mapping for a given project ID. */
+  async deleteByProjectId(projectId: string): Promise<void> {
+    await this.db.delete(tenantProjectRelation).where(eq(tenantProjectRelation.projectId, projectId));
+  }
+
+  /** Upserts a tenant-project mapping. Uses the unique index on project_id for conflict resolution. */
+  async upsertByProjectId(params: { tenantId: string; projectId: string }): Promise<void> {
+    await this.db
+      .insert(tenantProjectRelation)
+      .values(params)
+      .onConflictDoUpdate({
+        target: tenantProjectRelation.projectId,
+        set: { tenantId: params.tenantId },
+      });
+  }
+
+  /** Returns all tenant-project relations as a map of projectId → tenantId. */
+  async listAll(): Promise<Map<string, string>> {
+    const rows = await this.db
+      .select({
+        projectId: tenantProjectRelation.projectId,
+        tenantId: tenantProjectRelation.tenantId,
+      })
+      .from(tenantProjectRelation);
+    return new Map(rows.map((r: { projectId: string; tenantId: string }) => [r.projectId, r.tenantId]));
+  }
 }

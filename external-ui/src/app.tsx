@@ -5,6 +5,7 @@ import { Workflows } from './pages/workflows';
 import { AccessRequest } from './pages/access-request';
 import { AccessRequests } from './pages/access-requests';
 import { WorkflowInteraction } from './pages/workflow-interaction';
+import { Projects } from './pages/projects';
 import { usePermissions, useSessionLoading } from './state/session';
 
 function AccessRequestRoute() {
@@ -32,6 +33,7 @@ export function App() {
         <Route path="/access-request" element={<AccessRequestRoute />} />
         <Route path="/access-requests" element={<AccessRequests />} />
         <Route path="/workflow-interaction" element={<WorkflowInteraction />} />
+        <Route path="/projects" element={<Projects />} />
       </Routes>
     </AppLayout>
   );

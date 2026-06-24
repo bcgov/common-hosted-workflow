@@ -6,6 +6,7 @@ import type { ActionService } from '../services/action.service';
 import type { ChefsService } from '../services/chefs.service';
 import type { CstarService } from '../services/cstar.service';
 import type { MessageService } from '../services/message.service';
+import type { ProjectTenantService } from '../services/project-tenant.service';
 import type { TenantService } from '../services/tenant.service';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 
@@ -42,4 +43,5 @@ export type ApiServices = {
   accessRequest: AccessRequestService;
   tenant: TenantService;
   tenantProjectSync: TenantProjectSyncService;
+  projectTenant: ProjectTenantService;
 };

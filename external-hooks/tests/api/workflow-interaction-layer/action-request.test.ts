@@ -49,6 +49,7 @@ function createTestRouter() {
       cstar: {} as any,
       tenant: {} as any,
       tenantProjectSync: {} as any,
+      projectTenant: {} as any,
     },
   });
   const router = buildActionRouter(routeContext);

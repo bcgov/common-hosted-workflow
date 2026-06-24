@@ -33,12 +33,13 @@ import {
   setUiSessionExchange,
 } from '../helpers/ui-oidc-store';
 import { fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
-import { getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
+import { getBearerToken, getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
 import { computePermissions, type Permissions } from '../helpers/permissions';
 import { getOidcConfigFromEnv, buildSessionSummary, buildWhoamiResponse } from '../helpers/ui-oidc';
 import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
+import { buildAdminProjectRouter } from './admin-projects';
 import { createLogger } from '../utils/logger';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 
@@ -427,6 +428,30 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
         reviewAccessRequestResponseSchema,
       );
     },
+  );
+
+  // List user personal project and their tenant projects (non-admin API)
+  router.get('/projects', requireUiRequestContext, async (req, res) => {
+    const session = (req as UiApiRequest).session;
+    const accessToken = getBearerToken(req) ?? '';
+    const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
+    const n8nUserId = session.n8nUser?.id ?? '';
+
+    const data = await services.projectTenant.listUserProjectTenants({
+      ssoUserId,
+      n8nUserId,
+      accessToken,
+    });
+
+    OkResponse(res, { data });
+  });
+
+  // Mount admin project-tenant sub-router (UI session auth + admin role)
+  router.use(
+    '/admin',
+    requireUiRequestContext,
+    checkRole('global:owner', 'global:admin'),
+    buildAdminProjectRouter(routeContext),
   );
 
   // Mount WIL sub-router (protected by requireUiRequestContext)
