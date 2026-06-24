@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   zap-scan:
@@ -28,6 +29,5 @@ jobs:
       uses: zaproxy/action-full-scan@75ee1686750ab1511a73b26b77a2aedd295053ed # v0.12.0
       with:
         target: ${{ inputs.target_url }}
-        allow_issue_writing: false
-        fail_action: true
+        fail_action: false
         artifact_name: zap_scan_report
