@@ -59,13 +59,14 @@ export function AllowedActorsTypeField({
   id,
   value,
   onChange,
-}: Readonly<{ id: string; value: TriggerActorType; onChange: (v: TriggerActorType) => void }>) {
+  disabled = false,
+}: Readonly<{ id: string; value: TriggerActorType; onChange: (v: TriggerActorType) => void; disabled?: boolean }>) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>
         Allowed Actors Type <span className="text-red-500">*</span>
       </Label>
-      <Select id={id} value={value} onChange={(v) => onChange(v as TriggerActorType)}>
+      <Select id={id} value={value} onChange={(v) => onChange(v as TriggerActorType)} disabled={disabled}>
         <option value="" disabled>
           Select an actor type
         </option>
@@ -84,11 +85,25 @@ export function AllowedActorsField({
   onChange,
   placeholder = '*',
   required = false,
-}: Readonly<{ id: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }>) {
+  disabled = false,
+}: Readonly<{
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+}>) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>Allowed Actors {required && <span className="text-red-500">*</span>}</Label>
-      <Input id={id} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        id={id}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      />
     </div>
   );
 }

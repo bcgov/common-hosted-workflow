@@ -1,5 +1,7 @@
 import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
+import { TRIGGER_MANAGE_ROLE_VALUES } from '../../../lib/trigger-manage-roles';
+import { useHasTenantRoles, useTenantRolesById } from '../../../state/session';
 import { useTriggers } from './use-triggers';
 import { canUserSeeTrigger } from './trigger-utils';
 import { TriggerListItem } from './trigger-list-item';
@@ -7,13 +9,15 @@ import { TriggerFormPane } from './trigger-form-pane';
 
 interface TriggersTabProps {
   tenantId: string;
-  /** True for project:editor, global:admin, global:owner */
-  canManageTriggers: boolean;
-  userRoleSlug: string;
+  isPersonalTenant: boolean;
   userEmail: string;
 }
 
-export function TriggersTab({ tenantId, canManageTriggers, userRoleSlug, userEmail }: Readonly<TriggersTabProps>) {
+export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<TriggersTabProps>) {
+  const hasManageRoles = useHasTenantRoles(tenantId, TRIGGER_MANAGE_ROLE_VALUES);
+  const canManage = isPersonalTenant || hasManageRoles;
+  const userTenantRoles = useTenantRolesById(tenantId);
+
   const {
     triggers,
     selectedTriggerId,
@@ -31,17 +35,17 @@ export function TriggersTab({ tenantId, canManageTriggers, userRoleSlug, userEma
     setChefsForm,
     setButtonForm,
     save,
-  } = useTriggers(tenantId);
+  } = useTriggers({ tenantId, isPersonalTenant, userEmail });
 
-  const visibleTriggers = canManageTriggers
+  const visibleTriggers = canManage
     ? triggers
-    : triggers.filter((t) => canUserSeeTrigger(t, userRoleSlug, userEmail));
+    : triggers.filter((t) => canUserSeeTrigger(t, userTenantRoles, userEmail));
 
   return (
     <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
       {/* List pane */}
       <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4 space-y-3">
-        {canManageTriggers && (
+        {canManage && (
           <Button type="button" className="w-full" onClick={openCreate}>
             <IconPlus size={16} aria-hidden="true" />
             Create Trigger
@@ -55,8 +59,8 @@ export function TriggersTab({ tenantId, canManageTriggers, userRoleSlug, userEma
               key={trigger.id}
               trigger={trigger}
               isSelected={selectedTriggerId === trigger.id}
-              canManage={canManageTriggers}
-              onClick={() => selectTrigger(trigger, canManageTriggers)}
+              canManage={canManage}
+              onClick={() => selectTrigger(trigger, canManage)}
               onEdit={() => openEdit(trigger)}
             />
           ))
@@ -77,6 +81,7 @@ export function TriggersTab({ tenantId, canManageTriggers, userRoleSlug, userEma
           onSave={save}
           onCancel={cancel}
           isSaving={isSaving}
+          actorsLocked={isPersonalTenant}
         />
       </div>
     </div>

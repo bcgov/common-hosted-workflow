@@ -18,6 +18,7 @@ interface TriggerFormPaneProps {
   onSave: () => void;
   onCancel: () => void;
   isSaving: boolean;
+  actorsLocked: boolean;
 }
 
 export function TriggerFormPane({
@@ -31,6 +32,7 @@ export function TriggerFormPane({
   onSave,
   onCancel,
   isSaving,
+  actorsLocked,
 }: Readonly<TriggerFormPaneProps>) {
   if (mode === 'idle') {
     return (
@@ -64,6 +66,7 @@ export function TriggerFormPane({
           onSave={onSave}
           onCancel={onCancel}
           isSaving={isSaving}
+          actorsLocked={actorsLocked}
         />
       )}
       {triggerType === 'button' && (
@@ -73,6 +76,7 @@ export function TriggerFormPane({
           onSave={onSave}
           onCancel={onCancel}
           isSaving={isSaving}
+          actorsLocked={actorsLocked}
         />
       )}
       {!triggerType && (

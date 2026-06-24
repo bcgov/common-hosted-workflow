@@ -29,6 +29,8 @@ interface ButtonTriggerFieldsProps {
   onSave: () => void;
   onCancel: () => void;
   isSaving: boolean;
+  /** When true, Allowed Actors Type and Allowed Actors fields are read-only (personal project). */
+  actorsLocked?: boolean;
 }
 
 export function ButtonTriggerFields({
@@ -37,6 +39,7 @@ export function ButtonTriggerFields({
   onSave,
   onCancel,
   isSaving,
+  actorsLocked = false,
 }: Readonly<ButtonTriggerFieldsProps>) {
   function set<K extends keyof ButtonTriggerPayload>(key: K, val: ButtonTriggerPayload[K]) {
     onChange({ ...value, [key]: val });
@@ -87,12 +90,14 @@ export function ButtonTriggerFields({
           id="btn-actors-type"
           value={value.allowedActorsType}
           onChange={(v) => set('allowedActorsType', v)}
+          disabled={actorsLocked}
         />
         <AllowedActorsField
           id="btn-allowed-actors"
           value={value.allowedActors}
           onChange={(v) => set('allowedActors', v)}
           placeholder="e.g. * or specific role/user"
+          disabled={actorsLocked}
         />
       </div>
       <ActorIdBanner method={value.triggerMethod} />

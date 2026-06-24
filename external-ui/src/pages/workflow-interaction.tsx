@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { login } from '../auth/session-actions';
-import type { WilActionItem } from '../services/backend/wil';
-import { useAuthUser, useSession } from '../state/session';
-import { canManageTriggers } from '../lib/trigger-manage-roles';
+import type { WilActionItem, WilTenantItem } from '../services/backend/wil';
+import { useAuthUser } from '../state/session';
+import { isPersonalTenant } from '../lib/tenant';
 import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,14 +25,9 @@ const ACTION_LIST_REFRESH_DELAY_MS = 1500;
 
 export function WorkflowInteraction() {
   const user = useAuthUser();
-  const session = useSession();
   const queryClient = useQueryClient();
 
-  // Determine project-level role from the n8n user's role slug
-  const roleSlug = session?.n8nUser?.role?.slug ?? '';
-  // Delegates to TriggerManageRole enum — project:editor, global:admin, global:owner
-  const userCanManageTriggers = canManageTriggers(roleSlug);
-  const [tenantId, setTenantId] = useState('');
+  const [selectedTenant, setSelectedTenant] = useState<WilTenantItem | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string[]>(['pending']);
@@ -40,6 +35,8 @@ export function WorkflowInteraction() {
   const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<WilActionItem | null>(null);
 
+  const tenantId = selectedTenant?.id ?? '';
+  const personalTenant = isPersonalTenant(selectedTenant);
   const sinceDate = computeSinceDate(dateFilter);
 
   const onInteractionSuccess = useCallback(() => {
@@ -48,8 +45,8 @@ export function WorkflowInteraction() {
     }, ACTION_LIST_REFRESH_DELAY_MS);
   }, [queryClient]);
 
-  function handleTenantChange(id: string) {
-    setTenantId(id);
+  function handleTenantChange(tenant: WilTenantItem | null) {
+    setSelectedTenant(tenant);
     setActionsCursor(null);
     setMessagesCursor(null);
     setSelectedAction(null);
@@ -121,12 +118,7 @@ export function WorkflowInteraction() {
                     </div>
                   </div>
                 ) : activeTab === 'triggers' ? (
-                  <TriggersTab
-                    tenantId={tenantId}
-                    canManageTriggers={userCanManageTriggers}
-                    userRoleSlug={roleSlug}
-                    userEmail={user?.email ?? ''}
-                  />
+                  <TriggersTab tenantId={tenantId} isPersonalTenant={personalTenant} userEmail={user.email} />
                 ) : (
                   <MessagesTab
                     tenantId={tenantId}

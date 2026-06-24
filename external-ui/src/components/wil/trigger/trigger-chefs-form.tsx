@@ -29,9 +29,18 @@ interface ChefsFormFieldsProps {
   onSave: () => void;
   onCancel: () => void;
   isSaving: boolean;
+  /** When true, Allowed Actors Type and Allowed Actors fields are read-only (personal project). */
+  actorsLocked?: boolean;
 }
 
-export function ChefsFormFields({ value, onChange, onSave, onCancel, isSaving }: Readonly<ChefsFormFieldsProps>) {
+export function ChefsFormFields({
+  value,
+  onChange,
+  onSave,
+  onCancel,
+  isSaving,
+  actorsLocked = false,
+}: Readonly<ChefsFormFieldsProps>) {
   function set<K extends keyof ChefsFormTriggerPayload>(key: K, val: ChefsFormTriggerPayload[K]) {
     onChange({ ...value, [key]: val });
   }
@@ -92,12 +101,14 @@ export function ChefsFormFields({ value, onChange, onSave, onCancel, isSaving }:
           id="chefs-actors-type"
           value={value.allowedActorsType}
           onChange={(v) => set('allowedActorsType', v)}
+          disabled={actorsLocked}
         />
         <AllowedActorsField
           id="chefs-allowed-actors"
           value={value.allowedActors}
           onChange={(v) => set('allowedActors', v)}
           required
+          disabled={actorsLocked}
         />
       </div>
       <TriggerUrlField

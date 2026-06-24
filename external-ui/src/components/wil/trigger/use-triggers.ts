@@ -11,8 +11,15 @@ import { createTrigger, getTriggers, updateTrigger } from '../../../services/bac
 import type { FormMode } from './trigger-shared';
 import { DEFAULT_CHEFS_FORM } from './trigger-chefs-form';
 import { DEFAULT_BUTTON } from './trigger-button-form';
+import { applyPersonalActorDefaults } from './trigger-utils';
 
-export function useTriggers(tenantId: string) {
+interface UseTriggersOptions {
+  tenantId: string;
+  isPersonalTenant: boolean;
+  userEmail: string;
+}
+
+export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTriggersOptions) {
   const queryClient = useQueryClient();
 
   // Backend API: List Triggers
@@ -30,8 +37,12 @@ export function useTriggers(tenantId: string) {
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('idle');
   const [triggerType, setTriggerType] = useState<TriggerType | null>(null);
-  const [chefsForm, setChefsForm] = useState<ChefsFormTriggerPayload>({ ...DEFAULT_CHEFS_FORM });
-  const [buttonForm, setButtonForm] = useState<ButtonTriggerPayload>({ ...DEFAULT_BUTTON });
+  const [chefsForm, setChefsForm] = useState<ChefsFormTriggerPayload>(
+    applyPersonalActorDefaults({ ...DEFAULT_CHEFS_FORM }, isPersonalTenant, userEmail),
+  );
+  const [buttonForm, setButtonForm] = useState<ButtonTriggerPayload>(
+    applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail),
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   // Backend API: Create Trigger
@@ -79,8 +90,8 @@ export function useTriggers(tenantId: string) {
     setSelectedTriggerId(null);
     setFormMode('create');
     setTriggerType(null);
-    setChefsForm({ ...DEFAULT_CHEFS_FORM });
-    setButtonForm({ ...DEFAULT_BUTTON });
+    setChefsForm(applyPersonalActorDefaults({ ...DEFAULT_CHEFS_FORM }, isPersonalTenant, userEmail));
+    setButtonForm(applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail));
   }
 
   function openEdit(trigger: Trigger) {
@@ -110,8 +121,12 @@ export function useTriggers(tenantId: string) {
 
   function changeTriggerType(t: TriggerType) {
     setTriggerType(t);
-    if (t === 'chefs-form') setChefsForm({ ...DEFAULT_CHEFS_FORM });
-    if (t === 'button') setButtonForm({ ...DEFAULT_BUTTON });
+    if (t === 'chefs-form') {
+      setChefsForm(applyPersonalActorDefaults({ ...DEFAULT_CHEFS_FORM }, isPersonalTenant, userEmail));
+    }
+    if (t === 'button') {
+      setButtonForm(applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail));
+    }
   }
 
   async function save() {
