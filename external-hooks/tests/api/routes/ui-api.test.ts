@@ -465,3 +465,67 @@ describe('GET /ui-api/access-requests/my', () => {
     expect(res.json).toHaveBeenCalledWith({ accessRequest });
   });
 });
+
+describe('GET /ui-api/projects', () => {
+  it('returns user project tenants from projectTenant service', async () => {
+    const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          disabled: false,
+          role: null,
+        },
+        accessibleProjectIds: [],
+        projects: [],
+        workflows: [],
+      }),
+    };
+    const projectTenant = {
+      listUserProjectTenants: vi.fn().mockResolvedValue([
+        { tenantId: '550e8400-e29b-41d4-a716-446655440000', tenantName: 'My Org', projectId: 'abc-123' },
+        { tenantId: '660e8400-e29b-41d4-a716-446655440000', tenantName: 'My Personal Project', projectId: 'def-456' },
+      ]),
+    };
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer test-access-token' }, // pragma: allowlist secret
+      get: vi.fn((name: string) => {
+        if (name.toLowerCase() === 'authorization') return 'Bearer test-access-token'; // pragma: allowlist secret
+        return undefined;
+      }) as any,
+    });
+    const res = createMockResponse();
+
+    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+
+    expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith({
+      ssoUserId: 'sub-1',
+      n8nUserId: 'user-123',
+      accessToken: 'test-access-token', // pragma: allowlist secret
+    });
+    expect(res.json).toHaveBeenCalledWith({
+      data: [
+        { tenantId: '550e8400-e29b-41d4-a716-446655440000', tenantName: 'My Org', projectId: 'abc-123' },
+        { tenantId: '660e8400-e29b-41d4-a716-446655440000', tenantName: 'My Personal Project', projectId: 'def-456' },
+      ],
+    });
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    getUiSessionMock.mockResolvedValue(null);
+
+    const uiApi = {
+      loadUserContext: vi.fn(),
+    };
+    const projectTenant = {
+      listUserProjectTenants: vi.fn(),
+    };
+    const req = createMockRequest({ get: vi.fn(() => undefined) as any });
+    const res = createMockResponse();
+
+    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+
+    expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+});

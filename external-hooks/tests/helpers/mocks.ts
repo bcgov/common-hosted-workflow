@@ -160,6 +160,11 @@ export function createMockTenantProjectRelationRepository() {
     getProjectIdsByTenantId: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
     getTenantIdByProjectId: vi.fn().mockResolvedValue(null),
     insert: vi.fn().mockResolvedValue(undefined),
+    insertIgnoreConflict: vi.fn().mockResolvedValue(undefined),
+    listDistinctTenantIds: vi.fn().mockResolvedValue([VALID_TENANT_ID]),
+    deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+    upsertByProjectId: vi.fn().mockResolvedValue(undefined),
+    listAll: vi.fn().mockResolvedValue(new Map([[VALID_PROJECT_ID, VALID_TENANT_ID]])),
   };
 }
 

@@ -85,6 +85,20 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <NavLink
+                    to="/projects"
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                        : '!text-white hover:!text-white'
+                    }
+                  >
+                    Projects
+                  </NavLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
               {canRequestAccess && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
