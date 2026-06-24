@@ -10,9 +10,11 @@ on:
         default: https://test-chwf.apps.gold.devops.gov.bc.ca
         options:
         - https://dev-chwf.apps.gold.devops.gov.bc.ca
-        - https://dev-chwf-sdg.apps.gold.devops.gov.bc.ca
+        - https://dev-chwf.apps.gold.devops.gov.bc.ca/ui
         - https://test-chwf.apps.gold.devops.gov.bc.ca
+        - https://test-chwf.apps.gold.devops.gov.bc.ca/ui
         - https://n8n.developer.gov.bc.ca
+        - https://n8n.developer.gov.bc.ca/ui
 
 permissions:
   contents: read
@@ -26,5 +28,6 @@ jobs:
       uses: zaproxy/action-full-scan@75ee1686750ab1511a73b26b77a2aedd295053ed # v0.12.0
       with:
         target: ${{ inputs.target_url }}
+        allow_issue_writing: false
         fail_action: true
         artifact_name: zap_scan_report
