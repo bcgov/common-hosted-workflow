@@ -35,15 +35,6 @@ config:
     max_wal_size: 128MB # conservative tiny-cluster default; increase for heavier write volume
     password_encryption: scram-sha-256 # pragma: allowlist secret
 
-# Legacy helper that generates users entries automatically.
-# Prefer values.users for new config. Avoid defining the same logical user in both places.
-databases: []
-  # - name: inventory
-  #   options: CREATEROLE
-  # - name: analytics
-  #   options: NOSUPERUSER
-  # - name: billing
-
 # --- Instance Configuration ---
 # Maps directly to spec.instances in the Crunchy PostgresCluster CRD.
 # When scaling up, increase CPU/memory here first, then raise config.parameters to match.
@@ -81,7 +72,7 @@ instances:
         - ReadWriteOnce
       resources:
         requests:
-          storage: 480Mi
+          storage: 1Gi
       storageClassName: netapp-block-standard
     # metadata:
     #   labels: {}
@@ -274,10 +265,6 @@ standby:
 # Maps directly to spec.users.
 # The legacy databases helper above is still supported for compatibility.
 users:
-  - name: postgres
-    databases:
-      - postgres
-    options: SUPERUSER
   # - name: app
   #   databases:
   #     - app

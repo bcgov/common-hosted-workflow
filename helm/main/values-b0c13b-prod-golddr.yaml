@@ -58,24 +58,7 @@ pgo:
           requests:
             storage: 2Gi
         storageClassName: netapp-block-standard
-
   pgBackRest:
-    repos:
-      - name: repo1
-        retention:
-          full: "2"
-          fullType: count
-        volume:
-          volumeClaimSpec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
-            storageClassName: netapp-file-standard
-        schedules:
-          full: 0 8 * * *
-          incremental: 0 0,4,12,16,20 * * *
   conditionalRestore:
     enabled: false  # enable when dns-probe is enabled for prod-golddr
     s3:

@@ -38,22 +38,6 @@ redis:
 pgo:
   enabled: true
   pgBackRest:
-    repos:
-      - name: repo1
-        retention:
-          full: "2"
-          fullType: count
-        volume:
-          volumeClaimSpec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 512Mi
-            storageClassName: netapp-file-standard
-        schedules:
-          full: 0 8 * * *
-          incremental: 0 0,4,12,16,20 * * *
 
 dns-probe:
   enabled: false
