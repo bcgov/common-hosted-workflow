@@ -76,7 +76,7 @@ instances:
         - ReadWriteOnce
       resources:
         requests:
-          storage: 480Mi
+          storage: 1Gi
       storageClassName: netapp-block-standard
     # metadata:
     #   labels: {}
@@ -304,7 +304,7 @@ conditionalRestore:
 monitoring:
   pgmonitor:
     exporter:
-      image:
+      image: ""
       resources:
         requests:
           cpu: 1m

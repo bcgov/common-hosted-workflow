@@ -256,22 +256,6 @@ pgo:
   - name: n8n
   - name: n8n-custom
 
-  instances:
-    dataVolumeClaimSpec:
-      storage: 1Gi
-
-  dataSource:
-    enabled: false
-    secretName: chwf-pgo-s3 # pragma: allowlist secret
-    repo:
-      name: repo2
-      provider: s3
-      path: /backups/pgo
-      s3:
-        endpoint: commonservices.objectstore.gov.bc.ca
-        region: ca-central-1
-        uriStyle: path
-
 # backup-storage — disabled by default, enabled only for gold deployments
 backup-storage:
   enabled: false
