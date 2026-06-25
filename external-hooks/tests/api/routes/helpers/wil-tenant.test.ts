@@ -15,13 +15,13 @@ function makeTenantRepo(projectIds: string[] = ['proj-1']) {
 }
 
 describe('resolveWilTenantProjectIds', () => {
-  it('returns project IDs for a valid tenant', async () => {
+  it('returns tenantId and project IDs for a valid tenant', async () => {
     const repo = makeTenantRepo(['proj-a', 'proj-b']);
     const req = createMockRequest({ headers: { 'x-tenant-id': VALID_UUID } });
 
     const result = await resolveWilTenantProjectIds(req, repo as any);
 
-    expect(result).toEqual(['proj-a', 'proj-b']);
+    expect(result).toEqual({ tenantId: VALID_UUID, projectIds: ['proj-a', 'proj-b'] });
     expect(repo.getProjectIdsByTenantId).toHaveBeenCalledWith(VALID_UUID);
   });
 
@@ -82,7 +82,7 @@ describe('resolveWilTenantProjectIds', () => {
 
     const result = await resolveWilTenantProjectIds(req, repo as any);
 
-    expect(result).toEqual(['proj-1']);
+    expect(result).toEqual({ tenantId: VALID_UUID, projectIds: ['proj-1'] });
     expect(repo.getProjectIdsByTenantId).toHaveBeenCalledWith(VALID_UUID);
   });
 
@@ -93,6 +93,7 @@ describe('resolveWilTenantProjectIds', () => {
 
     const result = await resolveWilTenantProjectIds(req, repo as any);
 
-    expect(result).toEqual(['proj-1']);
+    expect(result.projectIds).toEqual(['proj-1']);
+    expect(result.tenantId).toBe(upperUuid);
   });
 });

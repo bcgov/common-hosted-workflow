@@ -14,6 +14,7 @@ import {
 import { issueUiSessionToken, resolveAccessTokenExpiresAt, shouldRefreshAccessToken } from './ui-auth-token';
 import { getOidcConfigFromEnv } from './ui-oidc';
 import { invalidateTenantRoles } from './tenant-roles';
+import { invalidateTenantGroups } from './tenant-groups';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('UiSession');
@@ -166,8 +167,9 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
     }
     await setUiOidcAccessTokenRecord(email, refreshed.access_token, refreshedExpiresAt);
 
-    // Invalidate tenant roles cache — will be re-fetched with new token on next session call
+    // Invalidate tenant roles and groups cache — will be re-fetched with new token on next session call
     await invalidateTenantRoles(email);
+    await invalidateTenantGroups(email);
 
     const refreshedToken = await issueUiSessionToken({
       oidc: {
@@ -182,10 +184,6 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
       upstreamAccessToken: refreshed.access_token,
       upstreamExpiresAt: refreshedExpiresAt,
     });
-
-    if (currentAccessToken && currentAccessToken !== refreshed.access_token) {
-      await setUiOidcAccessTokenRecord(email, refreshed.access_token, refreshedExpiresAt);
-    }
 
     return { session, refreshedToken };
   } catch (error) {

@@ -77,9 +77,16 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
     role: null,
   };
 
+  const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
+
   const tenantRoles = await services.tenant.getTenantRolesForSession({
     email: session.email,
-    ssoUserId: resolveCstarSsoUserId(session.claims, session.subject, session.email),
+    ssoUserId,
+  });
+
+  const tenantGroups = await services.tenant.getTenantGroupsForSession({
+    email: session.email,
+    ssoUserId,
   });
 
   return {
@@ -88,6 +95,7 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
       n8nUser: resolvedN8nUser,
       permissions: computePermissions(resolvedN8nUser),
       tenantRoles,
+      tenantGroups,
     },
     context,
     refreshedToken,
@@ -228,9 +236,9 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     if (result.accessToken) {
       const cstarSsoUserId = resolveCstarSsoUserId(result.claims, result.subject, result.email);
 
-      // Pre-warm tenant roles cache (non-blocking)
+      // Pre-warm tenant roles and groups cache (non-blocking)
       services.tenant
-        .prewarmTenantRoles({
+        .prewarmTenantRolesAndGroups({
           email: result.email,
           ssoUserId: cstarSsoUserId,
           accessToken: result.accessToken,

@@ -40,7 +40,7 @@
 │  │                                                                        │   │
 │  │  Helpers:                                                              │   │
 │  │   • resolveWilTenantProjectIds — tenant → project IDs                  │   │
-│  │   • resolveActorIds — session → email/subject                          │   │
+│  │   • resolveActorMatchers — session + tenantId → user/role/group ids    │   │
 │  │   • mapActionToUiResponse — strip sensitive fields                     │   │
 │  │   • formatListResponse — keyset pagination cursor                      │   │
 │  │                                                                        │   │
@@ -146,23 +146,31 @@ Express app (n8n)
 
 3. **resolveWilTenantProjectIds** extracts and validates `X-TENANT-ID`, queries `tenant_project_relation` table for project IDs.
 
-4. **resolveActorIds** extracts `email` (primary) and `subject` (fallback) from the OIDC session.
+4. **resolveActorMatchers** builds the actor filter from the OIDC session and the validated `tenantId`:
+   - `userId` — user's email
+   - `userFallback` — OIDC subject (legacy identifier)
+   - `roleNames` — CSTAR role names the user holds in this tenant
+   - `groupNames` — CSTAR group names the user belongs to in this tenant
 
 5. **Zod schema** parses query params (`limit`, `since`, `status`).
 
-6. **ActionService.list()** queries `action_requests` table with:
-   - `projectId IN (resolved project IDs)`
-   - `actorId = primary email`
-   - `status IN (filter values)`
-   - Keyset pagination conditions
+6. **ActionService.list()** queries `action_requests` table with a single OR clause:
 
-7. If zero results with primary actor → retry with fallback (subject).
+   ```sql
+   WHERE project_id IN (resolved project IDs)
+     AND (
+       (actor_type = 'user'  AND actor_id IN [email, subject])
+       OR (actor_type = 'role'  AND actor_id IN [role names])
+       OR (actor_type = 'group' AND actor_id IN [group names])
+     )
+     AND status IN (filter values)
+   ```
 
-8. **mapActionToUiResponse** strips sensitive fields from each action.
+7. **mapActionToUiResponse** strips sensitive fields from each action.
 
-9. **formatListResponse** adds `nextCursor` if results fill the limit.
+8. **formatListResponse** adds `nextCursor` if results fill the limit.
 
-10. Response returned to browser.
+9. Response returned to browser.
 
 ### Callback Proxy Request
 
@@ -206,6 +214,12 @@ Offset-based pagination (`OFFSET N`) suffers from drift when new records are ins
 - O(1) performance regardless of offset depth
 - Simple "Load More" UX without page numbers
 
-### Why Actor Fallback?
+### Why OR-Based Actor Matching?
 
-Actions can be created with either the user's email or OIDC subject as the `actorId`. The fallback strategy (try email first, then subject) ensures users see their actions regardless of which identifier was used during workflow execution.
+Actions and messages can be assigned to a user (by email or OIDC subject), a CSTAR role, or a CSTAR group. A single OR-based query matches all three in one database round-trip:
+
+- **`actor_type = 'user'`** — direct user assignment by email or legacy OIDC subject
+- **`actor_type = 'role'`** — any user holding that CSTAR role in the current tenant sees the item
+- **`actor_type = 'group'`** — any member of that CSTAR group in the current tenant sees the item
+
+This allows workflow designers to target a position (role) or a team (group) rather than a specific individual, which is the common case in government workflows where the responsible party may vary.
