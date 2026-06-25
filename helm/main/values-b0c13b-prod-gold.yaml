@@ -39,45 +39,58 @@ pgo:
   enabled: true
 
   instances:
-    dataVolumeClaimSpec:
-      storage: 2Gi
+    - name: ha
+      replicas: 2
+      resources:
+        requests:
+          cpu: 1m
+          memory: 256Mi
+      sidecars:
+        replicaCertCopy:
+          resources:
+            requests:
+              cpu: 1m
+              memory: 32Mi
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+        storageClassName: netapp-block-standard
 
   pgBackRest:
     repos:
       - name: repo1
-        enabled: true
-        type: volume
-        retention: "2"
-        retentionType: count
+        retention:
+          full: "2"
+          fullType: count
         volume:
-          size: 1Gi
-          accessModes: ReadWriteOnce
-          storageClassName: netapp-file-standard
+          volumeClaimSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: netapp-file-standard
         schedules:
           full: "0 2 * * *"                  # Heavy routine at 2:00 AM daily (Lowest traffic window)
           incremental: "0 */4 * * *"         # Frequency protection every 4 hours, every day
 
       - name: repo2
-        enabled: true
-        type: s3
         secretName: chwf-pgo-s3 # pragma: allowlist secret
-        retention: "30"
-        retentionType: time
+        retention:
+          full: "30"
+          fullType: time
+        path: /backups/pgo
+        uriStyle: path
         s3:
           bucket: workflow-prod
           endpoint: commonservices.objectstore.gov.bc.ca
           region: ca-central-1
-          path: /backups/pgo
-          uriStyle: path
         schedules:
           full: "0 2 * * *"                  # Heavy routine at 2:00 AM daily (Lowest traffic window)
           incremental: "0 */4 * * *"         # Frequency protection every 4 hours, every day
-
-  dataSource:
-    enabled: false
-    repo:
-      s3:
-        bucket: workflow-prod
 
 backup-storage:
   enabled: true

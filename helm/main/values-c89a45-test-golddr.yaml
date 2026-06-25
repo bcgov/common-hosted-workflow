@@ -36,14 +36,17 @@ pgo:
   pgBackRest:
     repos:
       - name: repo1
-        enabled: true
-        type: volume
-        retention: "2"
-        retentionType: count
+        retention:
+          full: "2"
+          fullType: count
         volume:
-          size: 512Mi
-          accessModes: ReadWriteOnce
-          storageClassName: netapp-file-standard
+          volumeClaimSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 512Mi
+            storageClassName: netapp-file-standard
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *

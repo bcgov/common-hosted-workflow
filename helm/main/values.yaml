@@ -252,25 +252,50 @@ pgo:
   nameOverride: chwf-pgo
   fullnameOverride: chwf-pgo
 
-  databases:
+  users:
   - name: n8n
+    databases:
+      - n8n
+    options: CREATEROLE NOSUPERUSER
   - name: n8n-custom
+    databases:
+      - n8n-custom
+    options: CREATEROLE NOSUPERUSER
 
   instances:
-    dataVolumeClaimSpec:
-      storage: 1Gi
+    - name: ha
+      replicas: 2
+      resources:
+        requests:
+          cpu: 1m
+          memory: 256Mi
+      sidecars:
+        replicaCertCopy:
+          resources:
+            requests:
+              cpu: 1m
+              memory: 32Mi
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: netapp-block-standard
 
   dataSource:
-    enabled: false
-    secretName: chwf-pgo-s3 # pragma: allowlist secret
-    repo:
-      name: repo2
-      provider: s3
-      path: /backups/pgo
-      s3:
-        endpoint: commonservices.objectstore.gov.bc.ca
-        region: ca-central-1
-        uriStyle: path
+    # pgbackrest:
+    #   configuration:
+    #     - secret:
+    #         name: chwf-pgo-s3 # pragma: allowlist secret
+    #   global:
+    #     repo2-path: /backups/pgo
+    #     repo2-s3-uri-style: path
+    #   repo:
+    #     name: repo2
+    #     s3:
+    #       endpoint: commonservices.objectstore.gov.bc.ca
+    #       region: ca-central-1
 
 # backup-storage — disabled by default, enabled only for gold deployments
 backup-storage:
