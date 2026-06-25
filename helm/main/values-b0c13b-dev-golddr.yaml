@@ -34,6 +34,7 @@ redis:
 
 pgo:
   enabled: true
+  pgBackRest:
   conditionalRestore:
     enabled: true
     s3:
