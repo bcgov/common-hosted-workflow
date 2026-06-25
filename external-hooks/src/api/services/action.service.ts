@@ -3,9 +3,11 @@ import { actionRequest } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
+import { buildActorMatcherClause } from './actor-matcher-clause';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { ListPaginationSince } from '../types/list-pagination';
+import type { ActorMatchers } from '../types/actor-matchers';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -38,6 +40,7 @@ export type CreateActionParams = {
 export type ListActionsParams = {
   allowedProjectIds: string[];
   actorId?: string;
+  actorMatchers?: ActorMatchers;
   workflowInstanceId?: string;
   limit: number;
   since?: ListPaginationSince;
@@ -48,12 +51,14 @@ export type GetActionByIdParams = {
   allowedProjectIds: string[];
   actionId: string;
   actorId?: string;
+  actorMatchers?: ActorMatchers;
 };
 
 export type UpdateActionStatusParams = {
   allowedProjectIds: string[];
   actionId: string;
   actorId?: string;
+  actorMatchers?: ActorMatchers;
   status: string;
 };
 
@@ -66,12 +71,17 @@ export class ActionService {
   private buildListWhere(params: {
     allowedProjectIds: string[];
     actorId?: string;
+    actorMatchers?: ActorMatchers;
     workflowInstanceId?: string;
     since?: ListPaginationSince;
     status?: string[];
   }): any[] {
     const clauses: any[] = [inArray(actionRequest.projectId, params.allowedProjectIds)];
-    if (params.actorId) clauses.push(eq(actionRequest.actorId, params.actorId));
+    if (params.actorMatchers) {
+      clauses.push(buildActorMatcherClause(actionRequest, params.actorMatchers));
+    } else if (params.actorId) {
+      clauses.push(eq(actionRequest.actorId, params.actorId));
+    }
     if (params.workflowInstanceId) clauses.push(eq(actionRequest.workflowInstanceId, params.workflowInstanceId));
     if (params.status && params.status.length > 0) clauses.push(inArray(actionRequest.status, params.status));
     clauses.push(...buildPaginationClauses(actionRequest, params.since));
@@ -135,6 +145,7 @@ export class ActionService {
       where: this.buildListWhere({
         allowedProjectIds: params.allowedProjectIds,
         actorId: params.actorId,
+        actorMatchers: params.actorMatchers,
         workflowInstanceId: params.workflowInstanceId,
         since: params.since,
         status: params.status,
@@ -148,7 +159,11 @@ export class ActionService {
       actionId: params.actionId,
       where: [
         inArray(actionRequest.projectId, params.allowedProjectIds),
-        ...(params.actorId ? [eq(actionRequest.actorId, params.actorId)] : []),
+        ...(params.actorMatchers
+          ? [buildActorMatcherClause(actionRequest, params.actorMatchers)]
+          : params.actorId
+            ? [eq(actionRequest.actorId, params.actorId)]
+            : []),
       ],
     });
     if (!row) throw new AppError(404, 'Action not found');
@@ -161,7 +176,11 @@ export class ActionService {
       status: params.status,
       where: [
         inArray(actionRequest.projectId, params.allowedProjectIds),
-        ...(params.actorId ? [eq(actionRequest.actorId, params.actorId)] : []),
+        ...(params.actorMatchers
+          ? [buildActorMatcherClause(actionRequest, params.actorMatchers)]
+          : params.actorId
+            ? [eq(actionRequest.actorId, params.actorId)]
+            : []),
       ],
     });
     if (!row) throw new AppError(404, 'Action not found');

@@ -22,9 +22,16 @@ export type TenantRole = {
   roles: string[];
 };
 
+export type TenantGroup = {
+  tenantId: string;
+  tenantName: string;
+  groups: string[];
+};
+
 const REFRESH_TOKEN_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ID_TOKEN_DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const TENANT_ROLES_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const TENANT_GROUPS_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function extractJwtExpiryMs(token: string): number | undefined {
   try {
@@ -72,6 +79,10 @@ function getAccessTokenRecordKey(token: string) {
 
 function getTenantRolesKey(email: string) {
   return `${UI_OIDC_REDIS_PREFIX}tenantroles:${email}`;
+}
+
+function getTenantGroupsKey(email: string) {
+  return `${UI_OIDC_REDIS_PREFIX}tenantgroups:${email}`;
 }
 
 async function getRedisClient(): Promise<RedisClient> {
@@ -177,6 +188,7 @@ export async function deleteUiOidcTokens(email: string) {
     getIdTokenKey(email),
     getAccessTokenByEmailKey(email),
     getTenantRolesKey(email),
+    getTenantGroupsKey(email),
   ];
 
   if (currentAccessToken) {
@@ -202,6 +214,24 @@ export async function getUiTenantRoles(email: string): Promise<TenantRole[] | nu
 export async function deleteUiTenantRoles(email: string) {
   const client = await getRedisClient();
   await client.del(getTenantRolesKey(email));
+}
+
+export async function setUiTenantGroups(email: string, groups: TenantGroup[], ttlMs?: number) {
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? TENANT_GROUPS_DEFAULT_TTL_MS;
+  await client.set(getTenantGroupsKey(email), JSON.stringify(groups), { PX: effectiveTtl });
+}
+
+export async function getUiTenantGroups(email: string): Promise<TenantGroup[] | null> {
+  const client = await getRedisClient();
+  const raw = await client.get(getTenantGroupsKey(email));
+  if (!raw) return null;
+  return JSON.parse(raw) as TenantGroup[];
+}
+
+export async function deleteUiTenantGroups(email: string) {
+  const client = await getRedisClient();
+  await client.del(getTenantGroupsKey(email));
 }
 
 export async function getUiOidcAccessTokenByEmail(email: string): Promise<string | null> {

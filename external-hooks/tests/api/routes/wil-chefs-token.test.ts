@@ -12,17 +12,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 /*  Module mocks                                                       */
 /* ------------------------------------------------------------------ */
 
-const { resolveWilTenantProjectIdsMock, resolveActorIdsMock } = vi.hoisted(() => ({
+const { resolveWilTenantProjectIdsMock, resolveActorMatchersMock, extractTenantIdMock } = vi.hoisted(() => ({
   resolveWilTenantProjectIdsMock: vi.fn(),
-  resolveActorIdsMock: vi.fn(),
+  resolveActorMatchersMock: vi.fn(),
+  extractTenantIdMock: vi.fn(),
 }));
 
 vi.mock('../../../src/api/routes/helpers/wil-tenant', () => ({
   resolveWilTenantProjectIds: resolveWilTenantProjectIdsMock,
+  extractTenantId: extractTenantIdMock,
 }));
 
 vi.mock('../../../src/api/routes/helpers/wil-actor', () => ({
-  resolveActorIds: resolveActorIdsMock,
+  resolveActorMatchers: resolveActorMatchersMock,
 }));
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +43,7 @@ import { AppError } from '../../../src/api/utils/errors';
 const ALLOWED_PROJECT_IDS = ['proj-1', 'proj-2'];
 const ACTOR_PRIMARY = 'user@example.com';
 const ACTOR_FALLBACK = 'sub-123';
+const TENANT_ID = '717626be-f59f-4e35-ac87-f84c4e11b865';
 
 const SHOWFORM_ACTION = {
   id: 'act-001',
@@ -94,11 +97,18 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
 
 beforeEach(() => {
   resolveWilTenantProjectIdsMock.mockReset();
-  resolveActorIdsMock.mockReset();
+  resolveActorMatchersMock.mockReset();
+  extractTenantIdMock.mockReset();
   vi.restoreAllMocks();
 
-  resolveWilTenantProjectIdsMock.mockResolvedValue(ALLOWED_PROJECT_IDS);
-  resolveActorIdsMock.mockReturnValue({ primary: ACTOR_PRIMARY, fallback: ACTOR_FALLBACK });
+  resolveWilTenantProjectIdsMock.mockResolvedValue({ tenantId: TENANT_ID, projectIds: ALLOWED_PROJECT_IDS });
+  extractTenantIdMock.mockReturnValue(TENANT_ID);
+  resolveActorMatchersMock.mockReturnValue({
+    userId: ACTOR_PRIMARY,
+    userFallback: ACTOR_FALLBACK,
+    roleNames: [],
+    groupNames: [],
+  });
 });
 
 /* ================================================================== */
@@ -238,7 +248,7 @@ describe('POST /wil/chefs-token', () => {
     expect((error as AppError).message).toBe('CHEFS token exchange failed');
   });
 
-  it('calls getById with resolved tenant project IDs and primary actor', async () => {
+  it('calls getById with resolved tenant project IDs and actor matchers', async () => {
     const getByIdMock = vi.fn().mockResolvedValue(SHOWFORM_ACTION);
     const { router } = createTestRouter({ action: { getById: getByIdMock } });
     const handlers = getRouteHandlers(router, 'post', '/chefs-token');
@@ -250,7 +260,7 @@ describe('POST /wil/chefs-token', () => {
     expect(getByIdMock).toHaveBeenCalledWith({
       allowedProjectIds: ALLOWED_PROJECT_IDS,
       actionId: 'act-001',
-      actorId: ACTOR_PRIMARY,
+      actorMatchers: { userId: ACTOR_PRIMARY, userFallback: ACTOR_FALLBACK, roleNames: [], groupNames: [] },
     });
   });
 

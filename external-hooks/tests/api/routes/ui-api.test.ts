@@ -65,6 +65,7 @@ import { getRouteHandlers } from '../../helpers/test-utils';
 
 const mockTenantService = {
   getTenantRolesForSession: vi.fn().mockResolvedValue([]),
+  getTenantGroupsForSession: vi.fn().mockResolvedValue([]),
 };
 
 async function runRoute(router: any, method: string, path: string, req: any, res: any) {

@@ -13,7 +13,7 @@ WIL is implemented across two packages:
 
 1. **Sensitive data stays server-side.** Callback URLs, FormAPIKeys, and internal metadata never reach the browser.
 2. **Tenant-scoped access.** Every request is scoped to a tenant via the `X-TENANT-ID` header, resolved to project IDs.
-3. **Actor-based filtering.** Actions and messages are matched to the logged-in user by email (primary) or OIDC subject (fallback).
+3. **Actor-based filtering.** Actions and messages are matched to the logged-in user by email/OIDC subject (`actor_type = 'user'`), by any CSTAR role they hold in the tenant (`actor_type = 'role'`), or by any CSTAR group they belong to in the tenant (`actor_type = 'group'`). A single OR query covers all three in one database round-trip.
 4. **Security through proxying.** The callback proxy pattern ensures the frontend cannot forge upstream webhook calls or discover internal URLs.
 
 ## Documentation Index

@@ -1,5 +1,5 @@
 import type { Permissions } from './permissions';
-import type { TenantRole } from './ui-oidc-store';
+import type { TenantRole, TenantGroup } from './ui-oidc-store';
 
 export type OidcDiscoveryDocument = {
   issuer?: string;
@@ -57,6 +57,7 @@ export type UiResolvedSession = UiSession & {
   n8nUser: UiSerializedN8nUser;
   permissions: Permissions;
   tenantRoles: TenantRole[];
+  tenantGroups: TenantGroup[];
 };
 
 export type UiOidcConfig = {
@@ -121,6 +122,7 @@ export type UiSessionSummary = {
   n8nUser: UiSerializedN8nUser | null;
   permissions: Permissions | null;
   tenantRoles: TenantRole[] | null;
+  tenantGroups: TenantGroup[] | null;
 };
 
 export type WhoamiResponse = {
@@ -128,12 +130,21 @@ export type WhoamiResponse = {
   n8nUser: UiSerializedN8nUser | null;
   permissions: Permissions | null;
   tenantRoles: TenantRole[] | null;
+  tenantGroups: TenantGroup[] | null;
   userAgent?: string;
 };
 
 export function buildSessionSummary(session: UiResolvedSession | null): UiSessionSummary {
   if (!session) {
-    return { authenticated: false, user: null, oidc: null, n8nUser: null, permissions: null, tenantRoles: null };
+    return {
+      authenticated: false,
+      user: null,
+      oidc: null,
+      n8nUser: null,
+      permissions: null,
+      tenantRoles: null,
+      tenantGroups: null,
+    };
   }
 
   return {
@@ -157,6 +168,7 @@ export function buildSessionSummary(session: UiResolvedSession | null): UiSessio
     n8nUser: session.n8nUser,
     permissions: session.permissions,
     tenantRoles: session.tenantRoles,
+    tenantGroups: session.tenantGroups,
   };
 }
 
@@ -166,6 +178,7 @@ export function buildWhoamiResponse(session: UiResolvedSession, userAgent?: stri
     n8nUser: session.n8nUser,
     permissions: session.permissions,
     tenantRoles: session.tenantRoles,
+    tenantGroups: session.tenantGroups,
     userAgent,
   };
 }
