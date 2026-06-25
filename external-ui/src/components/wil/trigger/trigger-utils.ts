@@ -35,5 +35,5 @@ export function applyPersonalActorDefaults<T extends { allowedActors: string; al
   userEmail: string,
 ): T {
   if (!isPersonal) return form;
-  return { ...form, allowedActorsType: 'user', allowedActors: userEmail };
+  return { ...form, allowedActorsType: 'user' as const, allowedActors: userEmail };
 }

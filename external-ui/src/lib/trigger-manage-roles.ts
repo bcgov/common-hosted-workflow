@@ -6,6 +6,4 @@ export const TriggerManageRole = {
   ProjectEditor: 'project:editor',
 } as const;
 
-export type TriggerManageRoleValue = (typeof TriggerManageRole)[keyof typeof TriggerManageRole];
-
 export const TRIGGER_MANAGE_ROLE_VALUES: string[] = Object.values(TriggerManageRole);

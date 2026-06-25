@@ -7,7 +7,7 @@ import type {
   ChefsFormTriggerPayload,
   ButtonTriggerPayload,
 } from '../../../services/backend/triggers';
-import { createTrigger, getTriggers, updateTrigger } from '../../../services/backend/triggers';
+import { getTriggers, createTrigger, updateTrigger } from '../../../services/backend/triggers';
 import type { FormMode } from './trigger-shared';
 import { DEFAULT_CHEFS_FORM } from './trigger-chefs-form';
 import { DEFAULT_BUTTON } from './trigger-button-form';
@@ -23,11 +23,10 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
   const queryClient = useQueryClient();
 
   // Backend API: List Triggers
-  // TODO: set enabled: Boolean(tenantId) once the endpoint is live.
   const triggersQuery = useQuery({
     queryKey: ['triggers', tenantId],
     queryFn: ({ signal }) => getTriggers({ tenantId, signal }),
-    enabled: false, // TODO: flip to Boolean(tenantId) when backend is ready
+    enabled: Boolean(tenantId),
     retry: false,
   });
 
@@ -46,43 +45,24 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
   const [isSaving, setIsSaving] = useState(false);
 
   // Backend API: Create Trigger
-  // TODO: swap mutationFn body for → return createTrigger({ tenantId, config });
   const createMutation = useMutation({
-    mutationFn: async (config: TriggerPayload): Promise<Trigger> => {
-      void createTrigger;
-      return {
-        id: `trigger-${Date.now()}`,
-        tenantId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        config,
-      };
-    },
+    mutationFn: (config: TriggerPayload) => createTrigger({ tenantId, config }),
     onSuccess: (t) => {
       setLocalTriggers((prev) => [...prev, t]);
       setSelectedTriggerId(t.id);
-      void queryClient.invalidateQueries({ queryKey: ['triggers', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['triggers', tenantId] });
     },
   });
 
   // Backend API: Update Trigger
-  // TODO: swap mutationFn body for → return updateTrigger({ tenantId, triggerId, config });
   const updateMutation = useMutation({
-    mutationFn: async ({ triggerId, config }: { triggerId: string; config: TriggerPayload }): Promise<Trigger> => {
-      void updateTrigger;
-      return {
-        id: triggerId,
-        tenantId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        config,
-      };
-    },
+    mutationFn: ({ triggerId, config }: { triggerId: string; config: TriggerPayload }) =>
+      updateTrigger({ tenantId, triggerId, config }),
     onSuccess: (updated) => {
       setLocalTriggers((prev) =>
         prev.map((t) => (t.id === updated.id ? { ...t, updatedAt: updated.updatedAt, config: updated.config } : t)),
       );
-      void queryClient.invalidateQueries({ queryKey: ['triggers', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['triggers', tenantId] });
     },
   });
 
@@ -108,8 +88,8 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
 
   function selectTrigger(trigger: Trigger, canManage: boolean) {
     setSelectedTriggerId(trigger.id);
-    if (formMode !== 'edit' || trigger.id !== selectedTriggerId) {
-      if (!canManage) setFormMode('idle');
+    if (!canManage && (formMode !== 'edit' || trigger.id !== selectedTriggerId)) {
+      setFormMode('idle');
     }
   }
 
@@ -130,7 +110,12 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
   }
 
   async function save() {
-    const payload = triggerType === 'chefs-form' ? chefsForm : triggerType === 'button' ? buttonForm : null;
+    let payload: TriggerPayload | null = null;
+    if (triggerType === 'chefs-form') {
+      payload = chefsForm;
+    } else if (triggerType === 'button') {
+      payload = buttonForm;
+    }
     if (!payload) return;
     setIsSaving(true);
     try {
@@ -144,6 +129,12 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     }
   }
 
+  function getFormPaneTitle(): string {
+    if (formMode === 'create') return 'Create Trigger';
+    if (formMode === 'edit') return 'Edit Trigger';
+    return 'Details';
+  }
+
   return {
     triggers,
     selectedTriggerId,
@@ -152,7 +143,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     chefsForm,
     buttonForm,
     isSaving,
-    formPaneTitle: formMode === 'create' ? 'Create Trigger' : formMode === 'edit' ? 'Edit Trigger' : 'Details',
+    formPaneTitle: getFormPaneTitle(),
     openCreate,
     openEdit,
     selectTrigger,

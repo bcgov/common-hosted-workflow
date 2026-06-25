@@ -69,6 +69,41 @@ export function WorkflowInteraction() {
     setSelectedAction(null);
   }
 
+  function renderTabContent() {
+    if (activeTab === 'actions') {
+      return (
+        <div className="space-y-5">
+          <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} />
+          <hr className="border-[var(--bc-border)] mt-4" />
+          <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
+            <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
+              <ActionsTab
+                tenantId={tenantId}
+                since={sinceDate}
+                statusFilter={statusFilter}
+                cursor={actionsCursor}
+                onLoadMore={setActionsCursor}
+                selectedAction={selectedAction}
+                onSelectAction={setSelectedAction}
+              />
+            </div>
+            <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
+              <ActionDetailPane
+                action={selectedAction}
+                tenantId={tenantId}
+                onInteractionSuccess={onInteractionSuccess}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (activeTab === 'triggers') {
+      return <TriggersTab tenantId={tenantId} isPersonalTenant={personalTenant} userEmail={user?.email ?? ''} />;
+    }
+    return <MessagesTab tenantId={tenantId} since={sinceDate} cursor={messagesCursor} onLoadMore={setMessagesCursor} />;
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
       <section className="max-w-6xl space-y-6">
@@ -92,41 +127,7 @@ export function WorkflowInteraction() {
               <div className="space-y-4">
                 <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-                {activeTab === 'actions' ? (
-                  <div className="space-y-5">
-                    <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} />
-                    <hr className="border-[var(--bc-border)] mt-4" />
-                    <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
-                      <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
-                        <ActionsTab
-                          tenantId={tenantId}
-                          since={sinceDate}
-                          statusFilter={statusFilter}
-                          cursor={actionsCursor}
-                          onLoadMore={setActionsCursor}
-                          selectedAction={selectedAction}
-                          onSelectAction={setSelectedAction}
-                        />
-                      </div>
-                      <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
-                        <ActionDetailPane
-                          action={selectedAction}
-                          tenantId={tenantId}
-                          onInteractionSuccess={onInteractionSuccess}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : activeTab === 'triggers' ? (
-                  <TriggersTab tenantId={tenantId} isPersonalTenant={personalTenant} userEmail={user.email} />
-                ) : (
-                  <MessagesTab
-                    tenantId={tenantId}
-                    since={sinceDate}
-                    cursor={messagesCursor}
-                    onLoadMore={setMessagesCursor}
-                  />
-                )}
+                {renderTabContent()}
               </div>
             ) : (
               <Card>
