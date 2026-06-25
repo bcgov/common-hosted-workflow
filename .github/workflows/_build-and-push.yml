@@ -24,13 +24,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-    - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
     - name: Setup Tools
       uses: ./.github/actions/setup-tools
 
     - name: Build and Push
-      uses: egose/actions/docker-build-push@fb7c0ce76762ce2b5bc5d081efe23aed7dd854bb
+      uses: egose/actions/docker-build-push@68448c0027aeafe0a824f6c9b33fd875e77b844c
       with:
         registry-url: ${{ env.GITHUB_REGISTRY }}
         registry-username: ${{ github.actor }}
