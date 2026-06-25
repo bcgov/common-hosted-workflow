@@ -2,6 +2,7 @@
  * Shared primitives used across trigger form components.
  */
 import { IconDeviceFloppy, IconInfoCircle, IconX } from '@tabler/icons-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -125,6 +126,15 @@ export function TriggerMethodField({
   );
 }
 
+function isValidUrl(val: string): boolean {
+  try {
+    const url = new URL(val);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function TriggerUrlField({
   id,
   label,
@@ -132,12 +142,24 @@ export function TriggerUrlField({
   onChange,
   placeholder = 'e.g. http://n8n:5678/webhook/...',
 }: Readonly<{ id: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string }>) {
+  const [touched, setTouched] = useState(false);
+  const invalid = touched && value.trim() !== '' && !isValidUrl(value);
+
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>
         {label} <span className="text-red-500">*</span>
       </Label>
-      <Input id={id} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        id={id}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setTouched(true)}
+        aria-invalid={invalid}
+        className={invalid ? 'border-red-500 focus-visible:ring-red-500' : undefined}
+      />
+      {invalid && <p className="text-xs text-red-500">Please enter a valid HTTP or HTTPS URL.</p>}
     </div>
   );
 }
