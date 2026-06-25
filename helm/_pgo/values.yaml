@@ -265,10 +265,6 @@ standby:
 # Maps directly to spec.users.
 # The legacy databases helper above is still supported for compatibility.
 users:
-  - name: postgres
-    databases:
-      - postgres
-    options: SUPERUSER
   # - name: app
   #   databases:
   #     - app
