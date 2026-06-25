@@ -5,5 +5,6 @@ export { TabBar } from './tab-bar';
 export { ActionsTab } from './actions-tab';
 export { ActionItem } from './action-item';
 export { MessagesTab } from './messages-tab';
+export { TriggersTab } from './trigger';
 
 export type { Tab } from './tab-bar';
