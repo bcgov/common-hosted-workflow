@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { login } from '../auth/session-actions';
-import type { WilActionItem } from '../services/backend/wil';
+import type { WilActionItem, WilTenantItem } from '../services/backend/wil';
 import { useAuthUser } from '../state/session';
+import { isPersonalTenant } from '../lib/tenant';
 import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import {
   TabBar,
   ActionsTab,
   MessagesTab,
+  TriggersTab,
 } from '@/components/wil';
 import type { Tab } from '@/components/wil';
 
@@ -24,7 +26,8 @@ const ACTION_LIST_REFRESH_DELAY_MS = 1500;
 export function WorkflowInteraction() {
   const user = useAuthUser();
   const queryClient = useQueryClient();
-  const [tenantId, setTenantId] = useState('');
+
+  const [selectedTenant, setSelectedTenant] = useState<WilTenantItem | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string[]>(['pending']);
@@ -32,6 +35,8 @@ export function WorkflowInteraction() {
   const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<WilActionItem | null>(null);
 
+  const tenantId = selectedTenant?.id ?? '';
+  const personalTenant = isPersonalTenant(selectedTenant);
   const sinceDate = computeSinceDate(dateFilter);
 
   const onInteractionSuccess = useCallback(() => {
@@ -40,8 +45,8 @@ export function WorkflowInteraction() {
     }, ACTION_LIST_REFRESH_DELAY_MS);
   }, [queryClient]);
 
-  function handleTenantChange(id: string) {
-    setTenantId(id);
+  function handleTenantChange(tenant: WilTenantItem | null) {
+    setSelectedTenant(tenant);
     setActionsCursor(null);
     setMessagesCursor(null);
     setSelectedAction(null);
@@ -62,6 +67,41 @@ export function WorkflowInteraction() {
   function handleTabChange(tab: Tab) {
     setActiveTab(tab);
     setSelectedAction(null);
+  }
+
+  function renderTabContent() {
+    if (activeTab === 'actions') {
+      return (
+        <div className="space-y-5">
+          <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} />
+          <hr className="border-[var(--bc-border)] mt-4" />
+          <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
+            <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
+              <ActionsTab
+                tenantId={tenantId}
+                since={sinceDate}
+                statusFilter={statusFilter}
+                cursor={actionsCursor}
+                onLoadMore={setActionsCursor}
+                selectedAction={selectedAction}
+                onSelectAction={setSelectedAction}
+              />
+            </div>
+            <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
+              <ActionDetailPane
+                action={selectedAction}
+                tenantId={tenantId}
+                onInteractionSuccess={onInteractionSuccess}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (activeTab === 'triggers') {
+      return <TriggersTab tenantId={tenantId} isPersonalTenant={personalTenant} userEmail={user?.email ?? ''} />;
+    }
+    return <MessagesTab tenantId={tenantId} since={sinceDate} cursor={messagesCursor} onLoadMore={setMessagesCursor} />;
   }
 
   return (
@@ -87,39 +127,7 @@ export function WorkflowInteraction() {
               <div className="space-y-4">
                 <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-                {activeTab === 'actions' ? (
-                  <div className="space-y-5">
-                    <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} />
-                    <hr className="border-[var(--bc-border)] mt-4" />
-                    <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
-                      <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
-                        <ActionsTab
-                          tenantId={tenantId}
-                          since={sinceDate}
-                          statusFilter={statusFilter}
-                          cursor={actionsCursor}
-                          onLoadMore={setActionsCursor}
-                          selectedAction={selectedAction}
-                          onSelectAction={setSelectedAction}
-                        />
-                      </div>
-                      <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
-                        <ActionDetailPane
-                          action={selectedAction}
-                          tenantId={tenantId}
-                          onInteractionSuccess={onInteractionSuccess}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <MessagesTab
-                    tenantId={tenantId}
-                    since={sinceDate}
-                    cursor={messagesCursor}
-                    onLoadMore={setMessagesCursor}
-                  />
-                )}
+                {renderTabContent()}
               </div>
             ) : (
               <Card>
