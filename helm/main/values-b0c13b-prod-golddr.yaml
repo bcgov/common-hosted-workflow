@@ -58,6 +58,7 @@ pgo:
           requests:
             storage: 2Gi
         storageClassName: netapp-block-standard
+  pgBackRest:
   conditionalRestore:
     enabled: false  # enable when dns-probe is enabled for prod-golddr
     s3:

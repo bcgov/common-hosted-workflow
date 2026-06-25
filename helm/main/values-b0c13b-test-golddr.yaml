@@ -33,6 +33,7 @@ redis:
 
 pgo:
   enabled: true
+  pgBackRest:
   conditionalRestore:
     enabled: false  # enable when dns-probe is enabled for test-golddr
     s3:
