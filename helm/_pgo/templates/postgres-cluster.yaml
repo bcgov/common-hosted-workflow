@@ -17,6 +17,10 @@
 {{- $pgBackRest := .Values.pgBackRest | default (dict) }}
 {{- $pgBouncer := .Values.pgBouncer | default (dict) }}
 {{- $users := .Values.users | default (list) }}
+{{- $hasPostgres := false }}
+{{- range $user := $users }}
+{{-   if eq $user.name "postgres" }}{{- $hasPostgres = true }}{{- end }}
+{{- end }}
 {{- $openshift := true }}
 {{- if hasKey .Values "openshift" }}{{- $openshift = .Values.openshift }}{{- end }}
 {{- $defaultRepoName := "" }}
@@ -440,14 +444,12 @@ spec:
     {{- end }}
   {{- end }}
 
-  {{- if or $users .Values.databases }}
+  {{- if $users }}
   users:
-    {{- range $user := $users }}{{ toYaml (list $user) | nindent 4 }}{{- end }}
-    {{- range $db := .Values.databases }}
-    - name: {{ $db.name }}
+    {{- range $user := $users }}{{ toYaml (list $user) | nindent 4 }}{{- end }}{{- if not $hasPostgres }}
+    - name: postgres
       databases:
-        - {{ $db.name }}
-      # Convenience helper for legacy chart usage; prefer values.users for CRD-shaped config.
-      options: {{ $db.options | default "CREATEROLE NOSUPERUSER" }}
+        - postgres
+      options: SUPERUSER
     {{- end }}
   {{- end }}
