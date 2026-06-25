@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { getWilTenants } from '../../services/backend/wil';
+import { getWilTenants, type WilTenantItem } from '../../services/backend/wil';
 
 interface TenantSelectorProps {
   tenantId: string;
-  onTenantChange: (id: string) => void;
+  onTenantChange: (tenant: WilTenantItem | null) => void;
 }
 
 export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSelectorProps>) {
@@ -14,6 +14,11 @@ export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSele
 
   const tenants = tenantsQuery.data?.tenants ?? [];
 
+  function handleChange(id: string) {
+    const tenant = tenants.find((t) => t.id === id) ?? null;
+    onTenantChange(tenant);
+  }
+
   return (
     <div className="flex items-center gap-2">
       <label htmlFor="tenant-select" className="text-sm font-medium text-[var(--bc-text)] whitespace-nowrap">
@@ -22,7 +27,7 @@ export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSele
       <select
         id="tenant-select"
         value={tenantId}
-        onChange={(e) => onTenantChange(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         disabled={tenantsQuery.isLoading}
         className="h-9 min-w-48 rounded-md border border-[var(--bc-border)] bg-white px-3 text-sm text-[var(--bc-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bc-blue)]"
       >
