@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { IconEye, IconEyeOff } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ChefsFormTriggerPayload } from '../../../services/backend/triggers';
@@ -40,6 +43,8 @@ export function ChefsFormFields({
   isSaving,
   actorsLocked = false,
 }: Readonly<ChefsFormFieldsProps>) {
+  const [showApiKey, setShowApiKey] = useState(false);
+
   function set<K extends keyof ChefsFormTriggerPayload>(key: K, val: ChefsFormTriggerPayload[K]) {
     onChange({ ...value, [key]: val });
   }
@@ -82,12 +87,25 @@ export function ChefsFormFields({
           <Label htmlFor="chefs-api-key">
             API Key <span className="text-red-500">*</span>
           </Label>
-          <Input
-            id="chefs-api-key"
-            placeholder="Form API key"
-            value={value.apiKey}
-            onChange={(e) => set('apiKey', e.target.value)}
-          />
+          <div className="relative">
+            <Input
+              id="chefs-api-key"
+              type={showApiKey ? 'text' : 'password'}
+              placeholder="Form API key"
+              value={value.apiKey}
+              onChange={(e) => set('apiKey', e.target.value)}
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowApiKey(!showApiKey)}
+              aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--bc-muted)] hover:text-[var(--bc-text)]"
+            >
+              {showApiKey ? <IconEyeOff size={16} aria-hidden="true" /> : <IconEye size={16} aria-hidden="true" />}
+            </Button>
+          </div>
         </div>
         <TriggerMethodField
           id="chefs-trigger-method"
