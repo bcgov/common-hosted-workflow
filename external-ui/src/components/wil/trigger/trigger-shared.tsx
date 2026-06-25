@@ -1,7 +1,8 @@
 /**
  * Shared primitives used across trigger form components.
  */
-import { IconInfoCircle } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconInfoCircle, IconX } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { TriggerActorType, TriggerMethod } from '../../../services/backend/triggers';
@@ -137,6 +138,26 @@ export function TriggerUrlField({
         {label} <span className="text-red-500">*</span>
       </Label>
       <Input id={id} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+export function TriggerFormActions({
+  onSave,
+  onCancel,
+  isSaving,
+  isValid,
+}: Readonly<{ onSave: () => void; onCancel: () => void; isSaving: boolean; isValid: boolean }>) {
+  return (
+    <div className="flex justify-end gap-2 pt-2">
+      <Button type="button" variant="outline" onClick={onCancel}>
+        <IconX size={16} aria-hidden="true" />
+        Cancel
+      </Button>
+      <Button type="button" onClick={onSave} disabled={!isValid || isSaving}>
+        <IconDeviceFloppy size={16} aria-hidden="true" />
+        {isSaving ? 'Saving...' : 'Save Trigger'}
+      </Button>
     </div>
   );
 }

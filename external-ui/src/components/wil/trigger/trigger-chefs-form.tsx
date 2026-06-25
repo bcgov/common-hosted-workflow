@@ -1,5 +1,3 @@
-import { IconDeviceFloppy, IconX } from '@tabler/icons-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ChefsFormTriggerPayload } from '../../../services/backend/triggers';
@@ -7,6 +5,7 @@ import {
   ActorIdBanner,
   AllowedActorsField,
   AllowedActorsTypeField,
+  TriggerFormActions,
   TriggerMethodField,
   TriggerUrlField,
 } from './trigger-shared';
@@ -118,16 +117,7 @@ export function ChefsFormFields({
         onChange={(v) => set('callbackWebhookUrl', v)}
       />
       <ActorIdBanner method={value.triggerMethod} />
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          <IconX size={16} aria-hidden="true" />
-          Cancel
-        </Button>
-        <Button type="button" onClick={onSave} disabled={!isValid || isSaving}>
-          <IconDeviceFloppy size={16} aria-hidden="true" />
-          {isSaving ? 'Saving...' : 'Save Trigger'}
-        </Button>
-      </div>
+      <TriggerFormActions onSave={onSave} onCancel={onCancel} isSaving={isSaving} isValid={!!isValid} />
     </div>
   );
 }
