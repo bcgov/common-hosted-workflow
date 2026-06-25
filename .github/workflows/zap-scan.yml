@@ -10,11 +10,16 @@ on:
         default: https://test-chwf.apps.gold.devops.gov.bc.ca
         options:
         - https://dev-chwf.apps.gold.devops.gov.bc.ca
-        - https://dev-chwf.apps.gold.devops.gov.bc.ca/ui
         - https://test-chwf.apps.gold.devops.gov.bc.ca
-        - https://test-chwf.apps.gold.devops.gov.bc.ca/ui
         - https://n8n.developer.gov.bc.ca
-        - https://n8n.developer.gov.bc.ca/ui
+      scan_ui_path:
+        description: Scan /ui path only
+        required: false
+        type: choice
+        default: no
+        options:
+        - no
+        - yes
 
 permissions:
   contents: read
@@ -28,6 +33,8 @@ jobs:
     - name: ZAP Full Scan
       uses: zaproxy/action-full-scan@75ee1686750ab1511a73b26b77a2aedd295053ed # v0.12.0
       with:
-        target: ${{ inputs.target_url }}
+        target: ${{ inputs.scan_ui_path == 'yes' && format('{0}/ui', inputs.target_url) || inputs.target_url }}
+        issue_title: ZAP Scan - ${{ inputs.scan_ui_path == 'yes' && format('{0}/ui', inputs.target_url) || inputs.target_url }}
+        cmd_options: ${{ inputs.scan_ui_path == 'yes' && '-config globalexcludeurl.url.regex="^((?!/ui).)*$"' || '' }}
         fail_action: false
         artifact_name: zap_scan_report
