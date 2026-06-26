@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,9 @@ interface WaitOnEventHandlerProps {
 
 export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: Readonly<WaitOnEventHandlerProps>) {
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
-  onInteractionSuccessRef.current = onInteractionSuccess;
+  useEffect(() => {
+    onInteractionSuccessRef.current = onInteractionSuccess;
+  });
 
   const eventMutation = useMutation({
     mutationFn: () => postWilCallback({ tenantId, actionId: action.id, body: { eventName: 'clicked' } }),
