@@ -22,33 +22,29 @@ jobs:
     - name: Setup NPM Packages
       uses: ./.github/actions/setup-npm
 
-    - name: Test community nodes build & test
+    - name: Run community nodes build & test
       run: |
         pnpm build
         pnpm test
       working-directory: ./community-nodes
       shell: bash
 
-    - name: Test sdg-mock-app sample app build & lint
+    - name: Run sdg-mock-app sample app build & lint
       run: |
-        pnpm build
         pnpm lint
+        pnpm build
       working-directory: ./docker-compose/sdg-mock-app
       shell: bash
 
-    - name: Test external-hooks build & test
+    - name: Run external-hooks lint, build & test
       run: |
+        pnpm lint
         pnpm bundle
         pnpm test
       working-directory: ./external-hooks
       shell: bash
 
-    - name: Lint external-hooks
-      run: pnpm lint
-      working-directory: ./external-hooks
-      shell: bash
-
-    - name: Lint external-ui
+    - name: Run external-ui lint
       run: pnpm lint
       working-directory: ./external-ui
       shell: bash
