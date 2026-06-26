@@ -42,3 +42,13 @@ jobs:
         pnpm test
       working-directory: ./external-hooks
       shell: bash
+
+    - name: Lint external-hooks
+      run: pnpm lint
+      working-directory: ./external-hooks
+      shell: bash
+
+    - name: Lint external-ui
+      run: pnpm lint
+      working-directory: ./external-ui
+      shell: bash

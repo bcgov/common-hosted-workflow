@@ -11,5 +11,6 @@ runs:
       paths: |
         .
         community-nodes
-        docker-compose/sdg-mock-app
+        external-ui
         external-hooks
+        docker-compose/sdg-mock-app
