@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
 import { IconLoader2, IconCheck } from '@tabler/icons-react';
@@ -61,7 +61,9 @@ function sanitizeHtml(html: string): string {
 export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: Readonly<GetApprovalHandlerProps>) {
   const [clickedOption, setClickedOption] = useState<string | null>(null);
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
-  onInteractionSuccessRef.current = onInteractionSuccess;
+  useEffect(() => {
+    onInteractionSuccessRef.current = onInteractionSuccess;
+  });
 
   const approvalMutation = useMutation({
     mutationFn: (option: string) => postWilCallback({ tenantId, actionId: action.id, body: { option } }),
