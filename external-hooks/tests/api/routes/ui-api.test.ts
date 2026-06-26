@@ -262,7 +262,7 @@ describe('GET /ui-api/whoami', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         n8nUser: {
-          id: 'user-123',
+          id: 'sub-1',
           email: 'person@example.com',
           disabled: false,
           role: { slug: 'global:member', displayName: 'Member' },
@@ -501,7 +501,7 @@ describe('GET /ui-api/projects', () => {
 
     expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith({
       ssoUserId: 'sub-1',
-      n8nUserId: 'user-123',
+      n8nUserId: 'sub-1',
       accessToken: 'test-access-token', // pragma: allowlist secret
     });
     expect(res.json).toHaveBeenCalledWith({

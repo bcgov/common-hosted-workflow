@@ -35,7 +35,12 @@ import {
 import { fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
 import { getBearerToken, getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
 import { computePermissions, type Permissions } from '../helpers/permissions';
-import { getOidcConfigFromEnv, buildSessionSummary, buildWhoamiResponse } from '../helpers/ui-oidc';
+import {
+  getOidcConfigFromEnv,
+  buildSessionSummary,
+  buildWhoamiResponse,
+  type UiSerializedN8nUser,
+} from '../helpers/ui-oidc';
 import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
@@ -70,14 +75,12 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
   const refreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
-  const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
-    id: session.subject,
-    email: session.email,
-    disabled: false,
-    role: null,
-  };
-
   const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
+
+  const serialized = serializeN8nUser(context.n8nUser);
+  const resolvedN8nUser: UiSerializedN8nUser = serialized
+    ? { ...serialized, id: ssoUserId }
+    : { id: ssoUserId, email: session.email, disabled: false, role: null };
 
   const tenantRoles = await services.tenant.getTenantRolesForSession({
     email: session.email,
