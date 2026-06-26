@@ -23,7 +23,10 @@ define arguments
 	--set dns-probe.image.tag="${IMAGE_TAG}"
 endef
 
-.PHONY: helm-dep install upgrade lint uninstall template force-install help
+.PHONY: helm-dep install upgrade lint uninstall template force-install help delete-successful-jobs
+
+delete-successful-jobs:
+	oc delete jobs --field-selector status.successful=1 -n "${NAMESPACE}"
 
 helm-dep:
 	helm dependency update
@@ -31,7 +34,7 @@ helm-dep:
 install: helm-dep
 	@helm install $(call arguments)
 
-upgrade: helm-dep
+upgrade: helm-dep delete-successful-jobs
 	@helm upgrade --install $(call arguments)
 
 lint: helm-dep
