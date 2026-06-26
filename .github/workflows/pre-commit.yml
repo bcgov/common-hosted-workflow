@@ -24,7 +24,7 @@ jobs:
 
     - name: Set executable permissions for local format scripts
       run: |
-        chmod +x ./.bin/prettier.sh ./.bin/eslint-external-hooks.sh ./.bin/eslint-external-ui.sh
+        chmod +x ./.bin/prettier.sh ./.bin/eslint-external-hooks.sh ./.bin/eslint-external-ui.sh ./.bin/commitlint.sh
 
     - name: Run pre-commit
       uses: egose/actions/precommit@68448c0027aeafe0a824f6c9b33fd875e77b844c
