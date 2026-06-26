@@ -14,3 +14,8 @@ runs:
         external-ui
         external-hooks
         docker-compose/sdg-mock-app
+
+  - name: Set executable permissions for local format scripts
+    run: |
+      chmod +x ./.bin/prettier.sh ./.bin/eslint-external-hooks.sh ./.bin/eslint-external-ui.sh ./.bin/commitlint.sh
+    shell: bash
