@@ -109,7 +109,7 @@ export class CssSsoService {
     } catch (err) {
       const detail =
         axios.isAxiosError(err) && err.response ? `(${err.response.status}): ${err.response.data}` : String(err);
-      throw new Error(`CSS SSO token request failed ${detail}`);
+      throw new Error(`CSS SSO token request failed ${detail}`, { cause: err });
     }
   }
 
@@ -125,7 +125,7 @@ export class CssSsoService {
     } catch (err) {
       const detail =
         axios.isAxiosError(err) && err.response ? `(${err.response.status}): ${err.response.data}` : String(err);
-      throw new Error(`CSS SSO GET ${path} failed ${detail}`);
+      throw new Error(`CSS SSO GET ${path} failed ${detail}`, { cause: err });
     }
   }
 
@@ -143,7 +143,7 @@ export class CssSsoService {
     } catch (err) {
       const detail =
         axios.isAxiosError(err) && err.response ? `(${err.response.status}): ${err.response.data}` : String(err);
-      throw new Error(`CSS SSO POST ${path} failed ${detail}`);
+      throw new Error(`CSS SSO POST ${path} failed ${detail}`, { cause: err });
     }
   }
 }
