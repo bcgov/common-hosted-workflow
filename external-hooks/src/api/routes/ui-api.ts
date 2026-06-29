@@ -21,6 +21,7 @@ import {
   accessRequestListResponseSchema,
   reviewAccessRequestResponseSchema,
 } from '../schemas/access-request';
+import { configResponseSchema } from '../schemas/config';
 import { issueUiSessionToken } from '../helpers/ui-auth-token';
 import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
 import {
@@ -188,6 +189,11 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     setRefreshedUiTokenHeader(res, resolved?.refreshedToken);
 
     res.json(buildSessionSummary(resolved?.session ?? null));
+  });
+
+  router.get('/config', async (_req, res) => {
+    const flags = services.featureFlag.getAllFlags();
+    OkResponse(res, { featureFlags: flags }, configResponseSchema);
   });
 
   router.get('/auth/login', async (req, res) => {

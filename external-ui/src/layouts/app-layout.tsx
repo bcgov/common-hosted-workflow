@@ -3,6 +3,7 @@ import { NavLink } from 'react-router';
 import { login, logout } from '../auth/session-actions';
 import { withAppBasePath } from '../config/base-path';
 import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
+import { useFeatureFlag } from '../state/feature-flags';
 import { ToastContainer } from '../components/toast-container';
 import { IconLogin2, IconLogout } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const canRequestAccess = permissions?.canRequestAccess ?? false;
   const canReviewAccessRequests = permissions?.canReviewAccessRequests ?? false;
   const canViewWorkflows = permissions?.canViewWorkflows ?? false;
+  const isWorkflowShareEnabled = useFeatureFlag('WORKFLOW_SHARE_FEATURE');
+  const isWilEnabled = useFeatureFlag('WIL_FEATURE');
+  const isProjectEnabled = useFeatureFlag('PROJECT_FEATURE');
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
@@ -58,7 +62,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
-              {canViewWorkflows && (
+              {isWorkflowShareEnabled && canViewWorkflows && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <NavLink
@@ -74,34 +78,38 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               )}
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <NavLink
-                    to="/workflow-interaction"
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                        : '!text-white hover:!text-white'
-                    }
-                  >
-                    Workflow Interaction
-                  </NavLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <NavLink
-                    to="/projects"
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                        : '!text-white hover:!text-white'
-                    }
-                  >
-                    Projects
-                  </NavLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
+              {isWilEnabled && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/workflow-interaction"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Workflow Interaction
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
+              {isProjectEnabled && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/projects"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Projects
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
               {canRequestAccess && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>

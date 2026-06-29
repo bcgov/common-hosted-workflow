@@ -109,10 +109,10 @@ The service only manages roles it owns (`project:editor`, `project:viewer`). If 
 
 ## Configuration
 
-| Environment Variable             | Default | Description                                      |
-| -------------------------------- | ------- | ------------------------------------------------ |
-| `IS_TENANT_PROJECT_SYNC_ENABLED` | `true`  | Feature flag to enable/disable the sync entirely |
-| `CSTAR_BASE_URL`                 | `""`    | CSTAR API base URL. If empty, sync is skipped    |
+| Environment Variable                               | Default | Description                                      |
+| -------------------------------------------------- | ------- | ------------------------------------------------ |
+| `FEATURE_FLAG_CONFIG` (key: `TENANT_PROJECT_SYNC`) | `true`  | Feature flag to enable/disable the sync entirely |
+| `CSTAR_BASE_URL`                                   | `""`    | CSTAR API base URL. If empty, sync is skipped    |
 
 Both must be set for the sync to function. The sync also requires a valid global owner user in the n8n database (resolved at startup).
 
@@ -138,7 +138,7 @@ Maps CSTAR tenants to n8n team projects.
 
 ## Safety Mechanisms
 
-1. **Feature flag** — `IS_TENANT_PROJECT_SYNC_ENABLED=false` disables all sync logic instantly.
+1. **Feature flag** — `TENANT_PROJECT_SYNC: false` in `FEATURE_FLAG_CONFIG` disables all sync logic instantly.
 2. **Non-blocking execution** — sync failures never block or fail user login.
 3. **Global owner protection** — the global owner's `project:admin` relation is never modified.
 4. **Managed role guard** — only roles assigned by the sync (`project:editor`, `project:viewer`) are updated or removed. Manually assigned roles are left untouched.
@@ -211,7 +211,7 @@ In local docker-compose, the CSTAR API is mocked by the `sdg-mock-app` service:
 
 ```env
 CSTAR_BASE_URL=http://host.docker.internal:8081
-IS_TENANT_PROJECT_SYNC_ENABLED=true
+# TENANT_PROJECT_SYNC is controlled via FEATURE_FLAG_CONFIG (set to true by default)
 ```
 
 The mock service returns static tenant and role data from `docker-compose/sdg-mock-app/src/app/api/v1/mock-data.json`.

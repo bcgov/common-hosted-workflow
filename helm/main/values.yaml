@@ -80,8 +80,6 @@ n8n:
     UI_OIDC_REDIS_URL: redis://chwf-redis-master:6379
     AUTHZ_SERVICE_URL: https://api.loginproxy.gov.bc.ca/api/v1
     AUTHZ_TOKEN_ENDPOINT: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
-    # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
-    IS_TENANT_PROJECT_SYNC_ENABLED: "false"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:

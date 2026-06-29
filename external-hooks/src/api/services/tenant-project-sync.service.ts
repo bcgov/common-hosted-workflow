@@ -1,7 +1,7 @@
-import { IS_TENANT_PROJECT_SYNC_ENABLED } from '@config';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CstarService } from './cstar.service';
+import type { FeatureFlagService } from './feature-flag.service';
 import {
   PROJECT_ROLE_ADMIN,
   PROJECT_ROLE_EDITOR,
@@ -26,6 +26,7 @@ export class TenantProjectSyncService {
     private readonly n8nRepositories: N8nRepositories,
     private readonly customRepositories: CustomRepositories,
     private readonly cstarService: CstarService,
+    private readonly featureFlagService: FeatureFlagService,
     private readonly globalOwnerRoleSlug: string,
   ) {}
 
@@ -39,8 +40,8 @@ export class TenantProjectSyncService {
    * 4. Adds/updates/removes the user's project relation based on current CSTAR roles
    */
   async syncTenantsForUser(params: SyncTenantsForUserParams): Promise<void> {
-    if (!IS_TENANT_PROJECT_SYNC_ENABLED) {
-      log.debug('Tenant project sync disabled via IS_TENANT_PROJECT_SYNC_ENABLED=false');
+    if (!this.featureFlagService.isFeatureEnabled('TENANT_PROJECT_SYNC')) {
+      log.debug('Tenant project sync disabled via TENANT_PROJECT_SYNC feature flag');
       return;
     }
 

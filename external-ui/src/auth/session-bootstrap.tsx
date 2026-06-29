@@ -9,6 +9,7 @@ import {
 } from '../services/backend/auth';
 import { clearStoredAppToken, getStoredAppToken, setStoredAppToken } from '../services/backend/axios';
 import { sessionState } from '../state/session';
+import { useFeatureFlagLoader } from '../hooks/use-feature-flag-loader';
 
 const sessionExchangeRequests = new Map<string, Promise<AuthExchangeResponse>>();
 
@@ -59,6 +60,9 @@ function exchangeSessionOnce(sessionHandle: string) {
 
 export function SessionBootstrap({ children }: { children: ReactNode }) {
   const [isTokenReady, setIsTokenReady] = useState(false);
+
+  // Load feature flags from the backend config endpoint
+  useFeatureFlagLoader();
 
   useEffect(() => {
     let cancelled = false;
