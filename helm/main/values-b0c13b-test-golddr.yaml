@@ -33,6 +33,11 @@ redis:
 
 pgo:
   enabled: true
+  instance:
+    dataVolumeClaimSpec:
+      resources:
+        requests:
+          storage: 1.5Gi
   pgBackRest:
   conditionalRestore:
     enabled: false  # enable when dns-probe is enabled for test-golddr

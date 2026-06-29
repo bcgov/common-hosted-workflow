@@ -49,3 +49,16 @@ Selector labels
 app.kubernetes.io/name: {{ include "_.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Resolve instances list: use 'instances' array if provided, otherwise wrap 'instance' in a list.
+*/}}
+{{- define "_.instances" -}}
+  {{- if .Values.instances }}
+    {{- toYaml .Values.instances }}
+  {{- else if .Values.instance }}
+    {{- toYaml (list .Values.instance) }}
+  {{- else }}
+    []
+  {{- end }}
+{{- end }}
