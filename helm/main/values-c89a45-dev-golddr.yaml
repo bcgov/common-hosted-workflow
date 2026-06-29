@@ -15,6 +15,7 @@ n8n:
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
     CSTAR_BASE_URL: https://dev-chwf-sdg-mock.apps.gold.devops.gov.bc.ca
     IS_TENANT_PROJECT_SYNC_ENABLED: "true"
+    NODES_EXCLUDE: '["n8n-nodes-base.scheduleTrigger","n8n-nodes-base.rabbitmqTrigger","n8n-nodes-base.mqttTrigger","n8n-nodes-base.amqpTrigger","n8n-nodes-base.kafkaTrigger","n8n-nodes-base.redisTrigger","n8n-nodes-base.emailReadImap","n8n-nodes-base.rssFeedReadTrigger","n8n-nodes-base.sseTrigger","n8n-nodes-base.postgresTrigger"]'
 
   route:
     enabled: true
