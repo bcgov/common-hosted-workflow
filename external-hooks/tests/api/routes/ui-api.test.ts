@@ -167,6 +167,7 @@ describe('GET /ui-api/session', () => {
         authenticated: true,
         permissions: {
           isAdmin: false,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: false,
           canShareWorkflows: true,
@@ -273,6 +274,7 @@ describe('GET /ui-api/whoami', () => {
         },
         permissions: {
           isAdmin: false,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: false,
           canShareWorkflows: true,
@@ -348,6 +350,7 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
         workflows: [],
         permissions: {
           isAdmin: true,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: true,
           canShareWorkflows: true,
@@ -395,6 +398,7 @@ describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
         workflows: [],
         permissions: {
           isAdmin: true,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: true,
           canShareWorkflows: true,

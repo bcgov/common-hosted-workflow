@@ -2,6 +2,7 @@ const ADMIN_ROLE_SLUGS = new Set(['global:owner', 'global:admin']);
 
 export type Permissions = {
   isAdmin: boolean;
+  canViewWorkflows: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
   canShareWorkflows: boolean;
@@ -12,6 +13,7 @@ export function computePermissions(n8nUser: { disabled: boolean; role: { slug: s
   if (!n8nUser) {
     return {
       isAdmin: false,
+      canViewWorkflows: false,
       canRequestAccess: true,
       canReviewAccessRequests: false,
       canShareWorkflows: false,
@@ -25,6 +27,7 @@ export function computePermissions(n8nUser: { disabled: boolean; role: { slug: s
 
   return {
     isAdmin,
+    canViewWorkflows: !isDisabled && !hasNoRole,
     canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
     canShareWorkflows: !isDisabled && !hasNoRole,
