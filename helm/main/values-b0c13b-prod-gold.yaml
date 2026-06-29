@@ -37,27 +37,11 @@ redis:
 
 pgo:
   enabled: true
-
-  instances:
-    - name: ha
-      replicas: 2
+  instance:
+    dataVolumeClaimSpec:
       resources:
         requests:
-          cpu: 1m
-          memory: 256Mi
-      sidecars:
-        replicaCertCopy:
-          resources:
-            requests:
-              cpu: 1m
-              memory: 32Mi
-      dataVolumeClaimSpec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 2Gi
-        storageClassName: netapp-block-standard
+          storage: 2Gi
 
   pgBackRest:
     repos:

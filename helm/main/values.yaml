@@ -262,26 +262,26 @@ pgo:
       - n8n-custom
     options: CREATEROLE NOSUPERUSER
 
-  instances:
-    - name: ha
-      replicas: 2
-      resources:
-        requests:
-          cpu: 1m
-          memory: 256Mi
-      sidecars:
-        replicaCertCopy:
-          resources:
-            requests:
-              cpu: 1m
-              memory: 32Mi
-      dataVolumeClaimSpec:
-        accessModes:
-          - ReadWriteOnce
+  instance:
+    name: ha
+    replicas: 2
+    resources:
+      requests:
+        cpu: 1m
+        memory: 256Mi
+    sidecars:
+      replicaCertCopy:
         resources:
           requests:
-            storage: 1Gi
-        storageClassName: netapp-block-standard
+            cpu: 1m
+            memory: 32Mi
+    dataVolumeClaimSpec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: netapp-block-standard
 
   dataSource:
     # pgbackrest:
