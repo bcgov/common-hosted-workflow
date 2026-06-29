@@ -30,10 +30,11 @@ import {
   setUiOidcAccessTokenRecord,
   setUiOidcIdToken,
   setUiOidcRefreshToken,
+  setUiOidcRefreshTokenWithExpiry,
   setUiSessionExchange,
 } from '../helpers/ui-oidc-store';
 import { fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
-import { getBearerToken, getUiSession, serializeN8nUser } from '../helpers/ui-oidc-session';
+import { getBearerToken, getUiSession, serializeN8nUser, refreshSessionByEmail } from '../helpers/ui-oidc-session';
 import { computePermissions, type Permissions } from '../helpers/permissions';
 import { getOidcConfigFromEnv, buildSessionSummary, buildWhoamiResponse } from '../helpers/ui-oidc';
 import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
@@ -67,7 +68,7 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
   const hasWrappedSession =
     typeof rawSessionResult === 'object' && rawSessionResult !== null && 'session' in rawSessionResult;
   const session = hasWrappedSession ? rawSessionResult.session : rawSessionResult;
-  const refreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
+  const sessionRefreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
   const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
@@ -79,23 +80,34 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
 
   const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
 
-  const tenantRoles = await services.tenant.getTenantRolesForSession({
+  const refreshAccessToken = async () => {
+    const result = await refreshSessionByEmail(session.email);
+    if (!result) return null;
+    if (!result.upstreamAccessToken) return null;
+    return { accessToken: result.upstreamAccessToken, refreshedToken: result.refreshedToken };
+  };
+
+  const tenantRolesResult = await services.tenant.getTenantRolesForSession({
     email: session.email,
     ssoUserId,
+    refreshAccessToken,
   });
 
-  const tenantGroups = await services.tenant.getTenantGroupsForSession({
+  const tenantGroupsResult = await services.tenant.getTenantGroupsForSession({
     email: session.email,
     ssoUserId,
+    refreshAccessToken,
   });
+
+  const refreshedToken = tenantRolesResult.refreshedToken ?? tenantGroupsResult.refreshedToken ?? sessionRefreshedToken;
 
   return {
     session: {
       ...session,
       n8nUser: resolvedN8nUser,
       permissions: computePermissions(resolvedN8nUser),
-      tenantRoles,
-      tenantGroups,
+      tenantRoles: tenantRolesResult.roles,
+      tenantGroups: tenantGroupsResult.groups,
     },
     context,
     refreshedToken,
@@ -204,7 +216,11 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
 
     try {
       if (result.refreshToken) {
-        await setUiOidcRefreshToken(result.email, result.refreshToken);
+        if (result.refreshTokenExpiresAt) {
+          await setUiOidcRefreshTokenWithExpiry(result.email, result.refreshToken, result.refreshTokenExpiresAt);
+        } else {
+          await setUiOidcRefreshToken(result.email, result.refreshToken);
+        }
       }
       if (result.idToken) {
         await setUiOidcIdToken(result.email, result.idToken);

@@ -6,12 +6,17 @@ import { type UiAuthTokenPayload, type UiSession, type UiSerializedN8nUser } fro
 import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo, refreshOidcTokens } from './oidc-provider';
 import {
   getUiOidcAccessTokenRecord,
-  getUiOidcRefreshToken,
+  getUiOidcRefreshTokenRecord,
   setUiOidcAccessTokenRecord,
   setUiOidcIdToken,
-  setUiOidcRefreshToken,
+  setUiOidcRefreshTokenWithExpiry,
 } from './ui-oidc-store';
-import { issueUiSessionToken, resolveAccessTokenExpiresAt, shouldRefreshAccessToken } from './ui-auth-token';
+import {
+  issueUiSessionToken,
+  resolveAccessTokenExpiresAt,
+  shouldRefreshAccessToken,
+  isRefreshTokenExpired,
+} from './ui-auth-token';
 import { getOidcConfigFromEnv } from './ui-oidc';
 import { invalidateTenantRoles } from './tenant-roles';
 import { invalidateTenantGroups } from './tenant-groups';
@@ -117,6 +122,7 @@ async function tryGetUpstreamUiSession(token: string): Promise<UiSession | null>
 type UiSessionResult = {
   session: UiSession;
   refreshedToken?: string;
+  upstreamAccessToken?: string;
 };
 
 async function buildUpstreamSessionFromToken(token: string, expiresAt?: number) {
@@ -133,9 +139,14 @@ async function buildUpstreamSessionFromToken(token: string, expiresAt?: number) 
 }
 
 async function refreshSessionByEmail(email: string, currentAccessToken?: string): Promise<UiSessionResult | null> {
-  const refreshToken = await getUiOidcRefreshToken(email);
-  if (!refreshToken) {
+  const refreshTokenRecord = await getUiOidcRefreshTokenRecord(email);
+  if (!refreshTokenRecord?.token) {
     log.debug('Refresh attempted but no refresh token stored', { email });
+    return null;
+  }
+
+  if (isRefreshTokenExpired(refreshTokenRecord.expiresAt)) {
+    log.warn('Refresh token is expired', { email });
     return null;
   }
 
@@ -144,7 +155,7 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
   try {
     const config = getOidcConfigFromEnv();
     const discovery = await fetchOidcDiscoveryDocument(config);
-    const refreshed = await refreshOidcTokens({ refreshToken, discovery, config });
+    const refreshed = await refreshOidcTokens({ refreshToken: refreshTokenRecord.token, discovery, config });
     if (!refreshed.access_token) {
       log.warn('Refresh failed: no access_token in response', { email });
       return null;
@@ -160,7 +171,10 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
     }
 
     if (refreshed.refresh_token) {
-      await setUiOidcRefreshToken(email, refreshed.refresh_token);
+      const refreshExpiresAt = refreshed.refresh_expires_in
+        ? Date.now() + refreshed.refresh_expires_in * 1000
+        : undefined;
+      await setUiOidcRefreshTokenWithExpiry(email, refreshed.refresh_token, refreshExpiresAt);
     }
     if (refreshed.id_token) {
       await setUiOidcIdToken(email, refreshed.id_token);
@@ -185,7 +199,7 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
       upstreamExpiresAt: refreshedExpiresAt,
     });
 
-    return { session, refreshedToken };
+    return { session, refreshedToken, upstreamAccessToken: refreshed.access_token };
   } catch (error) {
     log.warn('Refresh failed with exception', {
       email,
@@ -211,7 +225,7 @@ async function resolveLocalUiSession(token: string): Promise<UiSessionResult | n
     return refreshed;
   }
 
-  return session.expiresAt && session.expiresAt > Date.now() ? { session } : null;
+  return null;
 }
 
 async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult | null> {
@@ -226,7 +240,7 @@ async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult 
 
     const refreshed = await refreshSessionByEmail(record.email, token);
 
-    return refreshed ?? { session };
+    return refreshed ?? null;
   }
 
   const session = await buildUpstreamSessionFromToken(token, knownExpiresAt);
@@ -251,3 +265,5 @@ export async function getUiSession(req: Request) {
     return null;
   }
 }
+
+export { refreshSessionByEmail };

@@ -34,6 +34,7 @@ export type OidcAuthorizationResult = {
     id_token?: string;
     refresh_token?: string;
     expires_in?: number;
+    refresh_expires_in?: number;
   };
   idTokenClaims: Record<string, unknown> | null;
   userInfo: Record<string, unknown> | null;
@@ -215,6 +216,7 @@ export async function exchangeAuthorizationCode(params: {
     id_token?: string;
     refresh_token?: string;
     expires_in?: number;
+    refresh_expires_in?: number;
   };
 }
 
@@ -252,6 +254,7 @@ export async function refreshOidcTokens(params: {
     id_token?: string;
     refresh_token?: string;
     expires_in?: number;
+    refresh_expires_in?: number;
   };
 }
 

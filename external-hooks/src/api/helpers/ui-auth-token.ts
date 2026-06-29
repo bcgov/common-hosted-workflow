@@ -10,7 +10,12 @@ export function resolveAccessTokenExpiresAt(expiresInSeconds?: number) {
 }
 
 export function shouldRefreshAccessToken(expiresAt?: number) {
-  return typeof expiresAt === 'number' && expiresAt - Date.now() <= 60_000;
+  return typeof expiresAt === 'number' && Date.now() >= expiresAt;
+}
+
+export function isRefreshTokenExpired(expiresAt?: number): boolean {
+  if (typeof expiresAt !== 'number') return false;
+  return Date.now() > expiresAt;
 }
 
 export async function createUiAuthToken(params: { oidc: UiOidcIdentity; upstreamExpiresAt?: number }) {

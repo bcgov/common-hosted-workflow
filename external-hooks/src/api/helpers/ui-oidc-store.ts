@@ -15,6 +15,7 @@ type UiSessionExchangeRecord = {
 
 type RedisClient = Awaited<ReturnType<typeof createClient>>;
 type AccessTokenRecord = { email: string; expiresAt?: number };
+export type RefreshTokenRecord = { token: string; expiresAt?: number };
 
 export type TenantRole = {
   tenantId: string;
@@ -133,12 +134,48 @@ export async function consumeUiSessionExchange(sessionHandle: string) {
 export async function setUiOidcRefreshToken(email: string, refreshToken: string, ttlMs?: number) {
   const client = await getRedisClient();
   const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
-  await client.set(getRefreshTokenKey(email), refreshToken, { PX: effectiveTtl });
+  const record: RefreshTokenRecord = { token: refreshToken };
+  await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
+}
+
+export async function setUiOidcRefreshTokenWithExpiry(
+  email: string,
+  refreshToken: string,
+  expiresAt?: number,
+  ttlMs?: number,
+) {
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  const record: RefreshTokenRecord = { token: refreshToken, expiresAt };
+  await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
+}
+
+export async function getUiOidcRefreshTokenRecord(email: string): Promise<RefreshTokenRecord | null> {
+  const client = await getRedisClient();
+  const raw = await client.get(getRefreshTokenKey(email));
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'string') {
+      return { token: parsed };
+    }
+    return parsed as RefreshTokenRecord;
+  } catch {
+    return { token: raw };
+  }
 }
 
 export async function getUiOidcRefreshToken(email: string) {
-  const client = await getRedisClient();
-  return await client.get(getRefreshTokenKey(email));
+  const record = await getUiOidcRefreshTokenRecord(email);
+  return record?.token ?? null;
+}
+
+export async function isRefreshTokenExpiredByEmail(email: string): Promise<boolean> {
+  const record = await getUiOidcRefreshTokenRecord(email);
+  if (!record) return true;
+  if (!record.expiresAt) return false;
+  return Date.now() > record.expiresAt;
 }
 
 export async function setUiOidcIdToken(email: string, idToken: string, ttlMs?: number) {
