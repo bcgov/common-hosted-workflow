@@ -64,8 +64,8 @@ import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 import { getRouteHandlers } from '../../helpers/test-utils';
 
 const mockTenantService = {
-  getTenantRolesForSession: vi.fn().mockResolvedValue([]),
-  getTenantGroupsForSession: vi.fn().mockResolvedValue([]),
+  getTenantRolesForSession: vi.fn().mockResolvedValue({ roles: [] }),
+  getTenantGroupsForSession: vi.fn().mockResolvedValue({ groups: [] }),
 };
 
 async function runRoute(router: any, method: string, path: string, req: any, res: any) {
@@ -93,6 +93,10 @@ async function runProtectedRoute(services: any, method: string, path: string, re
 }
 
 beforeEach(() => {
+  mockTenantService.getTenantRolesForSession.mockReset();
+  mockTenantService.getTenantGroupsForSession.mockReset();
+  mockTenantService.getTenantRolesForSession.mockResolvedValue({ roles: [] });
+  mockTenantService.getTenantGroupsForSession.mockResolvedValue({ groups: [] });
   getUiSessionMock.mockReset();
   getUiOidcIdTokenMock.mockReset();
   deleteUiOidcTokensMock.mockReset();
@@ -262,7 +266,7 @@ describe('GET /ui-api/whoami', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         n8nUser: {
-          id: 'sub-1',
+          id: 'user-123',
           email: 'person@example.com',
           disabled: false,
           role: { slug: 'global:member', displayName: 'Member' },
@@ -501,7 +505,7 @@ describe('GET /ui-api/projects', () => {
 
     expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith({
       ssoUserId: 'sub-1',
-      n8nUserId: 'sub-1',
+      n8nUserId: 'user-123',
       accessToken: 'test-access-token', // pragma: allowlist secret
     });
     expect(res.json).toHaveBeenCalledWith({
