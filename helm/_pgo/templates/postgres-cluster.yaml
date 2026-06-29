@@ -1,7 +1,7 @@
 {{- $config := .Values.config | default (dict) }}
 {{- $configFiles := get $config "files" | default (list) }}
 {{- $configParameters := get $config "parameters" | default (dict) }}
-{{- $instances := fromJsonArray (include "_.instances" .) }}
+{{- $instances := fromYamlArray (include "_.instances" .) }}
 {{- $dataSource := .Values.dataSource | default (dict) }}
 {{- $monitoring := .Values.monitoring | default (dict) }}
 {{- $pgmonitor := get $monitoring "pgmonitor" | default (dict) }}
