@@ -76,6 +76,12 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
   const sessionRefreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
+  const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
+    id: session.subject,
+    email: session.email,
+    disabled: false,
+    role: null,
+  };
   const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
 
   const refreshAccessToken = async () => {
