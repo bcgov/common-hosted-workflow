@@ -47,6 +47,7 @@ export type AuthenticatedSession = {
 
 export type Permissions = {
   isAdmin: boolean;
+  canViewWorkflows: boolean;
   canRequestAccess: boolean;
   canReviewAccessRequests: boolean;
   canShareWorkflows: boolean;

@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import { UI_APP_BASE_URL } from '@config';
 import { deleteUiOidcState, getUiOidcState, setUiOidcState } from './ui-oidc-store';
 import { getOidcConfigFromEnv, type UiOidcConfig } from './ui-oidc';
 import { resolveAccessTokenExpiresAt } from './ui-auth-token';
@@ -50,7 +51,7 @@ export async function buildUiLoginRedirect(req: Request) {
   logger.info('Initiating OIDC login flow', { returnTo: req.query.returnTo, redirectUri: config.redirectUri });
 
   const redirectUri = config.redirectUri || `${getRequestOrigin(req)}/ui-api/auth/callback`;
-  const returnTo = normalizeReturnTo(req.query.returnTo, '/ui/', getAllowedReturnToOrigins(req, config));
+  const returnTo = normalizeReturnTo(req.query.returnTo, UI_APP_BASE_URL, getAllowedReturnToOrigins(req, config));
   const authRequest = await beginOidcAuthorization({
     config,
     redirectUri,
@@ -85,7 +86,7 @@ export async function completeUiLogin(req: Request) {
     await deleteUiOidcState(state);
   }
 
-  const returnTo = entry?.returnTo || '/ui/';
+  const returnTo = entry?.returnTo || UI_APP_BASE_URL || '/ui/';
 
   if (error) {
     return { ok: false, returnTo, errorMessage: errorDescription || error } as const;
