@@ -134,8 +134,7 @@ export async function consumeUiSessionExchange(sessionHandle: string) {
 export async function setUiOidcRefreshToken(email: string, refreshToken: string, ttlMs?: number) {
   const client = await getRedisClient();
   const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
-  const record: RefreshTokenRecord = { token: refreshToken };
-  await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
+  await client.set(getRefreshTokenKey(email), refreshToken, { PX: effectiveTtl });
 }
 
 export async function setUiOidcRefreshTokenWithExpiry(
