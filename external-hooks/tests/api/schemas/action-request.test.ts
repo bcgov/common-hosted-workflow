@@ -257,6 +257,7 @@ describe('mapActionRequestRowToResponse', () => {
     const result = mapActionRequestRowToResponse(row as any);
     expect(result.id).toBe(row.id);
     expect(result.actionType).toBe(row.actionType);
+    expect(result.actionTitle).toBeNull();
     expect(result.callbackMethod).toBe(row.callbackMethod);
     expect(result.status).toBe(row.status);
     expect(result.priority).toBe(row.priority);
@@ -271,5 +272,17 @@ describe('mapActionRequestRowToResponse', () => {
     const result = mapActionRequestRowToResponse(row as any);
     expect(result.dueDate).toEqual(due);
     expect(result.checkIn).toEqual(check);
+  });
+
+  it('maps non-null actionTitle', () => {
+    const row = makeActionRequestRow({ actionTitle: 'Review Purchase Order' });
+    const result = mapActionRequestRowToResponse(row as any);
+    expect(result.actionTitle).toBe('Review Purchase Order');
+  });
+
+  it('maps missing actionTitle (undefined) as null', () => {
+    const { actionTitle: _, ...rowWithoutTitle } = makeActionRequestRow();
+    const result = mapActionRequestRowToResponse(rowWithoutTitle as any);
+    expect(result.actionTitle).toBeNull();
   });
 });

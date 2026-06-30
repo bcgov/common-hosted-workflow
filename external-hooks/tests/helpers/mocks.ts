@@ -115,6 +115,7 @@ export function makeActionRequestRow(overrides: Record<string, unknown> = {}) {
   return {
     id: VALID_ACTION_ID,
     actionType: 'approval',
+    actionTitle: null,
     payload: { key: 'value' },
     callbackUrl: 'https://example.com/callback',
     callbackMethod: 'POST',
@@ -131,6 +132,27 @@ export function makeActionRequestRow(overrides: Record<string, unknown> = {}) {
     metadata: null,
     createdAt: BASE_DATE,
     updatedAt: BASE_DATE,
+    ...overrides,
+  };
+}
+
+export const VALID_TRIGGER_ID = 'trigger-001';
+
+export function makeWorkflowTriggerRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: VALID_TRIGGER_ID,
+    projectId: VALID_PROJECT_ID,
+    triggerType: 'button',
+    triggerUrl: 'https://example.com/webhook',
+    triggerMethod: 'POST',
+    metadata: { buttonText: 'Run', postBody: '' },
+    allowedActorsType: 'user',
+    allowedActors: ['actor@example.com'],
+    authEnabled: false,
+    createdAt: BASE_DATE,
+    updatedAt: BASE_DATE,
+    createdBy: 'creator@example.com',
+    updatedBy: null,
     ...overrides,
   };
 }
@@ -159,12 +181,34 @@ export function createMockTenantProjectRelationRepository() {
   return {
     getProjectIdsByTenantId: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
     getTenantIdByProjectId: vi.fn().mockResolvedValue(null),
+    getRowByTenantId: vi
+      .fn()
+      .mockResolvedValue({ tenantId: VALID_TENANT_ID, projectId: VALID_PROJECT_ID, projectType: null }),
     insert: vi.fn().mockResolvedValue(undefined),
     insertIgnoreConflict: vi.fn().mockResolvedValue(undefined),
     listDistinctTenantIds: vi.fn().mockResolvedValue([VALID_TENANT_ID]),
     deleteByProjectId: vi.fn().mockResolvedValue(undefined),
     upsertByProjectId: vi.fn().mockResolvedValue(undefined),
     listAll: vi.fn().mockResolvedValue(new Map([[VALID_PROJECT_ID, VALID_TENANT_ID]])),
+  };
+}
+
+export function createMockWorkflowTriggerRepository() {
+  return {
+    list: vi.fn().mockResolvedValue([]),
+    getById: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue(makeWorkflowTriggerRow()),
+    update: vi.fn().mockResolvedValue(makeWorkflowTriggerRow()),
+    deleteById: vi.fn().mockResolvedValue(null),
+    listIdsByProjectIds: vi.fn().mockResolvedValue([]),
+  };
+}
+
+export function createMockTriggerCredentialRelationRepository() {
+  return {
+    listTriggerIdsWithCredentials: vi.fn().mockResolvedValue(new Set<string>()),
+    findLinkedCredentialByTriggerIdAndType: vi.fn().mockResolvedValue(null),
+    upsert: vi.fn().mockResolvedValue(undefined),
   };
 }
 
