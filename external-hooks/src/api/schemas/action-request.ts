@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { actionRequests } from '../../db/schema/workflow-interaction-layer';
+import { actionRequest } from '../../db/schema/workflow-interaction-layer';
 import {
   actionRequestPriorityZodEnum,
   actionRequestStatusZodEnum,
@@ -14,6 +14,7 @@ import { applyLowercaseToOptionalZodEnum, applyLowercaseToZodEnum } from '../uti
 export const actionRequestItemSchema = z.object({
   id: z.string(),
   actionType: z.string(),
+  actionTitle: z.string().nullable(),
   payload: z.record(z.string(), z.unknown()),
   callbackUrl: z.string(),
   callbackMethod: z.string(),
@@ -119,6 +120,7 @@ export const createActionRequestSchema = z
     body: z
       .object({
         actionType: z.string().trim().min(1),
+        actionTitle: z.string().trim().min(1).nullable().optional(),
         payload: z.record(z.string(), z.unknown()),
         callbackUrl: z.string().trim().optional().default(''),
         callbackMethod: z
@@ -179,10 +181,11 @@ export const patchActionStatusResponseSchema = z.object({
 export const createActionRequestResponseSchema = actionRequestItemSchema;
 
 /** Maps a DB row to the wire response shape. */
-export function mapActionRequestRowToResponse(item: typeof actionRequests.$inferSelect) {
+export function mapActionRequestRowToResponse(item: typeof actionRequest.$inferSelect) {
   return actionRequestItemSchema.parse({
     id: item.id,
     actionType: item.actionType,
+    actionTitle: item.actionTitle ?? null,
     payload: item.payload as Record<string, unknown>,
     callbackUrl: item.callbackUrl,
     callbackMethod: item.callbackMethod,

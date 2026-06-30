@@ -117,7 +117,7 @@ export async function validateN8nExecutionInTenantScope(params: {
 export function requireChwfAllowedProjectIds(
   res: Response,
   routeLabel: string,
-  logDomain: 'messages' | 'actions',
+  logDomain: 'messages' | 'actions' | 'triggers',
 ): string[] {
   const allowed = res.locals.chwfAllowedProjectIds;
   if (!allowed?.length) {

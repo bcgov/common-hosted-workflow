@@ -3,6 +3,7 @@ import type { N8nProjectRecord } from './n8n-adapters';
 import type { UiApiContext, UiWorkflowSummary } from './ui-api';
 import type { AccessRequestService } from '../services/access-request';
 import type { ActionService } from '../services/action.service';
+import type { TriggerService } from '../services/trigger.service';
 import type { ChefsService } from '../services/chefs.service';
 import type { CstarService } from '../services/cstar.service';
 import type { MessageService } from '../services/message.service';
@@ -37,6 +38,7 @@ export type UiApiServiceContract = {
 export type ApiServices = {
   uiApi: UiApiServiceContract;
   action: ActionService;
+  trigger: TriggerService;
   chefs: ChefsService;
   cstar: CstarService;
   message: MessageService;
