@@ -28,6 +28,7 @@ export class ActionRequestRepository {
   /** Creates a new action request row. */
   async create(input: {
     actionType: string;
+    actionTitle?: string | null;
     payload: Record<string, unknown>;
     callbackUrl: string;
     callbackMethod: string;
