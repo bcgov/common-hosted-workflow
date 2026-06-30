@@ -34,16 +34,15 @@ spec:
                 sleep 5
               done
 
-              {{- range $db := .Values.databases }}
-              echo "Setting up database: {{ $db.name }}"
-
-              # Construct the connection string to the primary service
-              export DB_HOST={{ include "_.fullname" $ }}-primary
-
-              # Run your specific requirements
-              psql -h "$DB_HOST" -U postgres -d "{{ $db.name }}" <<EOF
-                ALTER SCHEMA public OWNER TO "{{ $db.name }}";
-                ALTER USER "{{ $db.name }}" NOSUPERUSER;
-                GRANT ALL ON SCHEMA public TO "{{ $db.name }}";
+              {{- range $user := .Values.users }}
+              {{- range $db := $user.databases }}
+              echo "Setting up database: {{ $db }}"
+              psql -h "$DB_HOST" -U postgres -d "{{ $db }}" <<EOF
+                ALTER SCHEMA public OWNER TO "{{ $user.name }}";
+                {{- if not (contains "SUPERUSER" ($user.options | default "")) }}
+                ALTER USER "{{ $user.name }}" NOSUPERUSER;
+                {{- end }}
+                GRANT ALL ON SCHEMA public TO "{{ $user.name }}";
               EOF
+              {{- end }}
               {{- end }}

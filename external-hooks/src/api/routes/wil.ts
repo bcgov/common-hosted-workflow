@@ -3,7 +3,7 @@ import type { ApiRouteContext } from '../types/routes';
 import type { UiResolvedSession } from '../helpers/ui-oidc';
 import type { UiApiTypedRequest } from '../types/ui-api';
 import { resolveWilTenantProjectIds } from './helpers/wil-tenant';
-import { resolveActorIds } from './helpers/wil-actor';
+import { resolveActorMatchers } from './helpers/wil-actor';
 import { formatListResponse, mapActionToUiResponse } from './helpers/wil-response';
 import { createRequestParser } from '../utils/validation';
 import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilListQuery } from '../schemas/wil';
@@ -43,52 +43,41 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
     '/messages',
     createRequestParser(wilListQuerySchema),
     async (req: UiApiTypedRequest<WilListQuery>, res) => {
-      const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-      const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
+      const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+        req,
+        customRepositories.tenantProjectRelation,
+      );
+      const session = (req as unknown as { session: UiResolvedSession }).session;
+      const actorMatchers = resolveActorMatchers(session, tenantId);
       const { limit, since } = req.parsed.query;
 
-      let items = await services.message.list({
+      const items = await services.message.list({
         allowedProjectIds,
-        actorId: actor.primary,
+        actorMatchers,
         limit,
         since,
       });
-
-      if (items.length === 0 && actor.primary !== actor.fallback) {
-        items = await services.message.list({
-          allowedProjectIds,
-          actorId: actor.fallback,
-          limit,
-          since,
-        });
-      }
 
       OkResponse(res, formatListResponse(items, limit));
     },
   );
 
   router.get('/actions', createRequestParser(wilListQuerySchema), async (req: UiApiTypedRequest<WilListQuery>, res) => {
-    const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-    const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
+    const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+      req,
+      customRepositories.tenantProjectRelation,
+    );
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const actorMatchers = resolveActorMatchers(session, tenantId);
     const { limit, since, status } = req.parsed.query;
 
-    let items = await services.action.list({
+    const items = await services.action.list({
       allowedProjectIds,
-      actorId: actor.primary,
+      actorMatchers,
       limit,
       since,
       status,
     });
-
-    if (items.length === 0 && actor.primary !== actor.fallback) {
-      items = await services.action.list({
-        allowedProjectIds,
-        actorId: actor.fallback,
-        limit,
-        since,
-        status,
-      });
-    }
 
     const mapped = items.map(mapActionToUiResponse);
     OkResponse(res, formatListResponse(mapped, limit));
@@ -98,14 +87,20 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
     '/chefs-token',
     createRequestParser(wilChefsTokenSchema),
     async (req: UiApiTypedRequest<z.infer<typeof wilChefsTokenSchema>>, res) => {
-      const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-      const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
+      const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+        req,
+        customRepositories.tenantProjectRelation,
+      );
+      const session = (req as unknown as { session: UiResolvedSession }).session;
+      const actorMatchers = resolveActorMatchers(session, tenantId);
       const { actionId } = req.parsed.body;
 
+      // TODO: Future — implement claim process: when an action is assigned to a role/group,
+      // one user from that role/group claims the action and only they can perform it.
       const action = await services.action.getById({
         allowedProjectIds,
         actionId,
-        actorId: actor.primary,
+        actorMatchers,
       });
 
       if (action.actionType !== 'showform') {
@@ -140,14 +135,20 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
     '/callback',
     createRequestParser(wilCallbackSchema),
     async (req: UiApiTypedRequest<z.infer<typeof wilCallbackSchema>>, res) => {
-      const allowedProjectIds = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
-      const actor = resolveActorIds((req as unknown as { session: UiResolvedSession }).session);
+      const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+        req,
+        customRepositories.tenantProjectRelation,
+      );
+      const session = (req as unknown as { session: UiResolvedSession }).session;
+      const actorMatchers = resolveActorMatchers(session, tenantId);
       const { actionId, body } = req.parsed.body;
 
+      // TODO: Future — implement claim process: when an action is assigned to a role/group,
+      // one user from that role/group claims the action and only they can perform it.
       const action = await services.action.getById({
         allowedProjectIds,
         actionId,
-        actorId: actor.primary,
+        actorMatchers,
       });
 
       const callbackMethod = action.callbackMethod ?? 'POST';
@@ -158,7 +159,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
         await services.action.updateStatus({
           allowedProjectIds,
           actionId,
-          actorId: actor.primary,
+          actorMatchers,
           status: 'completed',
         });
         OkResponse(res, { success: true, message: 'Action completed' });
@@ -194,7 +195,7 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
       await services.action.updateStatus({
         allowedProjectIds,
         actionId,
-        actorId: actor.primary,
+        actorMatchers,
         status: 'completed',
       });
 

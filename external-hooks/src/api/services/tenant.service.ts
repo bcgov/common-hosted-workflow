@@ -1,9 +1,19 @@
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CstarService } from './cstar.service';
-import type { TenantRole } from '../helpers/ui-oidc-store';
-import { resolveTenantRoles, invalidateTenantRoles } from '../helpers/tenant-roles';
-import { setUiTenantRoles } from '../helpers/ui-oidc-store';
+import type { TenantRole, TenantGroup } from '../helpers/ui-oidc-store';
+import { invalidateTenantRoles } from '../helpers/tenant-roles';
+import { invalidateTenantGroups } from '../helpers/tenant-groups';
+import {
+  setUiTenantRoles,
+  setUiTenantGroups,
+  getUiTenantRoles,
+  getUiTenantGroups,
+  getUiOidcAccessTokenByEmail,
+  getUiOidcAccessTokenRecord,
+} from '../helpers/ui-oidc-store';
+import { shouldRefreshAccessToken } from '../helpers/ui-auth-token';
+import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('TenantService');
@@ -94,62 +104,165 @@ export class TenantService {
   /**
    * Resolves tenant roles for a user session (cache-aside pattern).
    * Returns cached value from Redis if available, otherwise fetches from CSTAR.
+   * On cache miss, fetches both roles and groups in a single CSTAR call and populates both caches.
    */
   async getTenantRolesForSession(params: {
     email: string;
     ssoUserId: string;
     accessToken?: string;
-  }): Promise<TenantRole[]> {
+    refreshAccessToken?: () => Promise<{ accessToken: string; refreshedToken?: string } | null>;
+  }): Promise<{ roles: TenantRole[]; refreshedToken?: string }> {
     if (!this.cstarService.isConfigured()) {
-      return [];
+      return { roles: [] };
     }
 
-    return resolveTenantRoles({
-      email: params.email,
-      ssoUserId: params.ssoUserId,
-      accessToken: params.accessToken,
-      fetchFn: (ssoUserId, accessToken) => this.fetchTenantRolesFromCstar(ssoUserId, accessToken),
-    });
+    const cached = await getUiTenantRoles(params.email);
+    if (cached) {
+      return { roles: cached };
+    }
+
+    // Cache miss — fetch both and populate both caches
+    const { roles, refreshedToken } = await this.fetchAndCacheRolesAndGroups(params);
+    return { roles, refreshedToken };
   }
 
   /**
-   * Pre-warms the tenant roles cache at login time.
+   * Resolves tenant groups for a user session (cache-aside pattern).
+   * Returns cached value from Redis if available, otherwise fetches from CSTAR.
+   * On cache miss, fetches both roles and groups in a single CSTAR call and populates both caches.
+   */
+  async getTenantGroupsForSession(params: {
+    email: string;
+    ssoUserId: string;
+    accessToken?: string;
+    refreshAccessToken?: () => Promise<{ accessToken: string; refreshedToken?: string } | null>;
+  }): Promise<{ groups: TenantGroup[]; refreshedToken?: string }> {
+    if (!this.cstarService.isConfigured()) {
+      return { groups: [] };
+    }
+
+    const cached = await getUiTenantGroups(params.email);
+    if (cached) {
+      return { groups: cached };
+    }
+
+    // Cache miss — fetch both and populate both caches
+    const { groups, refreshedToken } = await this.fetchAndCacheRolesAndGroups(params);
+    return { groups, refreshedToken };
+  }
+
+  /**
+   * Fetches roles and groups from CSTAR in a single pass and stores both in Redis.
+   * Called on cache miss from either getTenantRolesForSession or getTenantGroupsForSession.
+   */
+  private async fetchAndCacheRolesAndGroups(params: {
+    email: string;
+    ssoUserId: string;
+    accessToken?: string;
+    refreshAccessToken?: () => Promise<{ accessToken: string; refreshedToken?: string } | null>;
+  }): Promise<{ roles: TenantRole[]; groups: TenantGroup[]; refreshedToken?: string }> {
+    let token = params.accessToken ?? (await getUiOidcAccessTokenByEmail(params.email));
+    if (!token) {
+      log.debug('No access token available for tenant roles/groups fetch', { email: params.email });
+      return { roles: [], groups: [] };
+    }
+
+    let refreshedToken: string | undefined;
+
+    const tokenRecord = await getUiOidcAccessTokenRecord(token);
+    if (tokenRecord?.expiresAt && shouldRefreshAccessToken(tokenRecord.expiresAt) && params.refreshAccessToken) {
+      const refreshResult = await params.refreshAccessToken();
+      if (refreshResult) {
+        token = refreshResult.accessToken;
+        refreshedToken = refreshResult.refreshedToken;
+      } else {
+        throw new AppError(401, 'Session expired');
+      }
+    }
+
+    const { roles, groups } = await this.fetchTenantRolesAndGroupsFromCstar(params.ssoUserId, token);
+
+    // Populate both caches (even if empty, to avoid repeated upstream calls)
+    await Promise.all([setUiTenantRoles(params.email, roles), setUiTenantGroups(params.email, groups)]);
+
+    return { roles, groups, refreshedToken };
+  }
+
+  /**
+   * Pre-warms both tenant roles and tenant groups cache at login time.
+   * Uses a single CSTAR call (getUserGroupsWithRoles) per tenant to derive both.
    * Throws on failure — caller is responsible for error handling.
    */
-  async prewarmTenantRoles(params: { email: string; ssoUserId: string; accessToken: string }): Promise<void> {
+  async prewarmTenantRolesAndGroups(params: {
+    email: string;
+    ssoUserId: string;
+    accessToken: string;
+  }): Promise<{ refreshedToken?: string }> {
     if (!this.cstarService.isConfigured()) {
-      return;
+      return {};
     }
 
-    const tenantRoles = await this.fetchTenantRolesFromCstar(params.ssoUserId, params.accessToken);
-    await setUiTenantRoles(params.email, tenantRoles);
+    const { roles, groups } = await this.fetchTenantRolesAndGroupsFromCstar(params.ssoUserId, params.accessToken);
+    await Promise.all([setUiTenantRoles(params.email, roles), setUiTenantGroups(params.email, groups)]);
+    return {};
   }
 
   /**
-   * Invalidates the cached tenant roles for a user (e.g. on token refresh).
+   * @deprecated Use prewarmTenantRolesAndGroups instead.
    */
-  async invalidateTenantRoles(email: string): Promise<void> {
-    await invalidateTenantRoles(email);
+  async prewarmTenantRoles(params: { email: string; ssoUserId: string; accessToken: string }): Promise<void> {
+    await this.prewarmTenantRolesAndGroups(params);
   }
 
-  private async fetchTenantRolesFromCstar(ssoUserId: string, accessToken: string): Promise<TenantRole[]> {
+  /**
+   * Invalidates the cached tenant roles and groups for a user (e.g. on token refresh).
+   */
+  async invalidateTenantRolesAndGroups(email: string): Promise<void> {
+    await Promise.all([invalidateTenantRoles(email), invalidateTenantGroups(email)]);
+  }
+
+  /**
+   * @deprecated Use invalidateTenantRolesAndGroups instead.
+   */
+  async invalidateTenantRoles(email: string): Promise<void> {
+    return this.invalidateTenantRolesAndGroups(email);
+  }
+
+  /**
+   * Fetches groups with roles from CSTAR for all tenants and returns both
+   * TenantRole[] and TenantGroup[] derived from a single getUserGroupsWithRoles call per tenant.
+   */
+  private async fetchTenantRolesAndGroupsFromCstar(
+    ssoUserId: string,
+    accessToken: string,
+  ): Promise<{ roles: TenantRole[]; groups: TenantGroup[] }> {
     const tenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken });
     if (tenants.length === 0) {
-      return [];
+      return { roles: [], groups: [] };
     }
 
     const results = await Promise.allSettled(
       tenants.map(async (tenant) => {
-        const roles = await this.cstarService.getUserSharedServiceRoles({
+        const userGroups = await this.cstarService.getUserGroupsWithRoles({
           tenantId: tenant.id,
           ssoUserId,
           accessToken,
         });
+
+        // Extract unique role names from all groups' sharedServiceRoles
+        const roleNameSet = new Set<string>();
+        for (const group of userGroups) {
+          for (const role of group.sharedServiceRoles) {
+            roleNameSet.add(role.name);
+          }
+        }
+
         return {
           tenantId: tenant.id,
           tenantName: tenant.name,
-          roles: roles.map((r) => r.name),
-        } satisfies TenantRole;
+          roleNames: [...roleNameSet],
+          groupNames: userGroups.map((g) => g.name),
+        };
       }),
     );
 
@@ -157,13 +270,35 @@ export class TenantService {
     const rejected = results.filter((r) => r.status === 'rejected');
 
     if (rejected.length > 0) {
-      log.warn('Some tenant role fetches failed', {
+      log.warn('Some tenant roles/groups fetches failed', {
         ssoUserId,
         failedCount: rejected.length,
         totalCount: tenants.length,
       });
     }
 
-    return fulfilled;
+    const roles: TenantRole[] = fulfilled.map((f) => ({
+      tenantId: f.tenantId,
+      tenantName: f.tenantName,
+      roles: f.roleNames,
+    }));
+
+    const groups: TenantGroup[] = fulfilled.map((f) => ({
+      tenantId: f.tenantId,
+      tenantName: f.tenantName,
+      groups: f.groupNames,
+    }));
+
+    return { roles, groups };
+  }
+
+  private async fetchTenantRolesFromCstar(ssoUserId: string, accessToken: string): Promise<TenantRole[]> {
+    const { roles } = await this.fetchTenantRolesAndGroupsFromCstar(ssoUserId, accessToken);
+    return roles;
+  }
+
+  private async fetchTenantGroupsFromCstar(ssoUserId: string, accessToken: string): Promise<TenantGroup[]> {
+    const { groups } = await this.fetchTenantRolesAndGroupsFromCstar(ssoUserId, accessToken);
+    return groups;
   }
 }

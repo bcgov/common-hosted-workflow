@@ -64,7 +64,8 @@ import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 import { getRouteHandlers } from '../../helpers/test-utils';
 
 const mockTenantService = {
-  getTenantRolesForSession: vi.fn().mockResolvedValue([]),
+  getTenantRolesForSession: vi.fn().mockResolvedValue({ roles: [] }),
+  getTenantGroupsForSession: vi.fn().mockResolvedValue({ groups: [] }),
 };
 
 async function runRoute(router: any, method: string, path: string, req: any, res: any) {
@@ -92,6 +93,10 @@ async function runProtectedRoute(services: any, method: string, path: string, re
 }
 
 beforeEach(() => {
+  mockTenantService.getTenantRolesForSession.mockReset();
+  mockTenantService.getTenantGroupsForSession.mockReset();
+  mockTenantService.getTenantRolesForSession.mockResolvedValue({ roles: [] });
+  mockTenantService.getTenantGroupsForSession.mockResolvedValue({ groups: [] });
   getUiSessionMock.mockReset();
   getUiOidcIdTokenMock.mockReset();
   deleteUiOidcTokensMock.mockReset();
@@ -162,6 +167,7 @@ describe('GET /ui-api/session', () => {
         authenticated: true,
         permissions: {
           isAdmin: false,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: false,
           canShareWorkflows: true,
@@ -268,6 +274,7 @@ describe('GET /ui-api/whoami', () => {
         },
         permissions: {
           isAdmin: false,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: false,
           canShareWorkflows: true,
@@ -343,6 +350,7 @@ describe('POST /ui-api/workflows/:workflowId/share', () => {
         workflows: [],
         permissions: {
           isAdmin: true,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: true,
           canShareWorkflows: true,
@@ -390,6 +398,7 @@ describe('DELETE /ui-api/workflows/:workflowId/projects/:projectId', () => {
         workflows: [],
         permissions: {
           isAdmin: true,
+          canViewWorkflows: true,
           canRequestAccess: false,
           canReviewAccessRequests: true,
           canShareWorkflows: true,

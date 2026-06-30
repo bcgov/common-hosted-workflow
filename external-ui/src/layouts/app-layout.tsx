@@ -23,6 +23,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isLoading = useSessionLoading();
   const canRequestAccess = permissions?.canRequestAccess ?? false;
   const canReviewAccessRequests = permissions?.canReviewAccessRequests ?? false;
+  const canViewWorkflows = permissions?.canViewWorkflows ?? false;
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
@@ -57,20 +58,22 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <NavLink
-                    to="/workflows"
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                        : '!text-white hover:!text-white'
-                    }
-                  >
-                    Workflows
-                  </NavLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
+              {canViewWorkflows && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/workflows"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Workflows
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
                   <NavLink

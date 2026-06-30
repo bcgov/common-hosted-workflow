@@ -1,11 +1,13 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { message } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
+import { buildActorMatcherClause } from './actor-matcher-clause';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { ListPaginationSince } from '../types/list-pagination';
+import type { ActorMatchers } from '../types/actor-matchers';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -32,6 +34,7 @@ export type CreateMessageParams = {
 export type ListMessagesParams = {
   allowedProjectIds: string[];
   actorId?: string;
+  actorMatchers?: ActorMatchers;
   workflowInstanceId?: string;
   limit: number;
   since?: ListPaginationSince;
@@ -46,11 +49,16 @@ export class MessageService {
   private buildListWhere(params: {
     allowedProjectIds: string[];
     actorId?: string;
+    actorMatchers?: ActorMatchers;
     workflowInstanceId?: string;
     since?: ListPaginationSince;
   }): any[] {
     const clauses: any[] = [inArray(message.projectId, params.allowedProjectIds)];
-    if (params.actorId) clauses.push(eq(message.actorId, params.actorId));
+    if (params.actorMatchers) {
+      clauses.push(buildActorMatcherClause(message, params.actorMatchers));
+    } else if (params.actorId) {
+      clauses.push(eq(message.actorId, params.actorId));
+    }
     if (params.workflowInstanceId) clauses.push(eq(message.workflowInstanceId, params.workflowInstanceId));
     clauses.push(...buildPaginationClauses(message, params.since));
     return clauses;

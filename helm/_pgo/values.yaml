@@ -4,6 +4,9 @@ fullnameOverride: pgo
 # --- General Cluster Settings ---
 postgresVersion: 17
 
+# Set to false when rendering for non-OpenShift Kubernetes clusters.
+openshift: true
+
 # --- PostgreSQL Server Configuration ---
 # Maps to spec.config in the Crunchy PostgresCluster CRD.
 # Put ordinary PostgreSQL GUCs here.
@@ -32,85 +35,91 @@ config:
     max_wal_size: 128MB # conservative tiny-cluster default; increase for heavier write volume
     password_encryption: scram-sha-256 # pragma: allowlist secret
 
-databases: []
-  # - name: inventory
-  #   options: CREATEROLE
-  # - name: analytics
-  #   options: NOSUPERUSER
-  # - name: billing
-
 # --- Instance Configuration ---
 # Maps directly to spec.instances in the Crunchy PostgresCluster CRD.
 # When scaling up, increase CPU/memory here first, then raise config.parameters to match.
 # Example:
 # helm upgrade <release> ./helm/_pgo --reuse-values \
-#   --set instances[0].replicas=3 \
-#   --set instances[0].resources.requests.cpu=500m \
-#   --set instances[0].resources.requests.memory=2Gi
-instances:
-  - name: ha
-    replicas: 2
-    # affinity:
-    #   podAntiAffinity:
-    #     preferredDuringSchedulingIgnoredDuringExecution:
-    #       - weight: 1
-    #         podAffinityTerm:
-    #           topologyKey: topology.kubernetes.io/zone
-    #           labelSelector:
-    #             matchLabels:
-    #               postgres-operator.crunchydata.com/cluster: pgo
-    #               postgres-operator.crunchydata.com/instance-set: ha
-    # containers: []
-    resources:
-      requests:
-        cpu: 1m
-        memory: 256Mi
-    sidecars:
-      replicaCertCopy:
-        resources:
-          requests:
-            cpu: 1m
-            memory: 32Mi
-    dataVolumeClaimSpec:
-      accessModes:
-        - ReadWriteOnce
+#   --set instance.replicas=3 \
+#   --set instance.resources.requests.cpu=500m \
+#   --set instance.resources.requests.memory=2Gi
+#
+# For multiple instance sets, use 'instances' instead:
+# instances:
+#   - name: ha
+#     replicas: 2
+#     resources: ...
+#   - name: read
+#     replicas: 3
+#     resources: ...
+instances: []
+instance:
+  name: ha
+  replicas: 2
+  # affinity:
+  #   podAntiAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 1
+  #         podAffinityTerm:
+  #           topologyKey: topology.kubernetes.io/zone
+  #           labelSelector:
+  #             matchLabels:
+  #               postgres-operator.crunchydata.com/cluster: pgo
+  #               postgres-operator.crunchydata.com/instance-set: ha
+  # containers: []
+  resources:
+    requests:
+      cpu: 1m
+      memory: 256Mi
+  sidecars:
+    replicaCertCopy:
       resources:
         requests:
-          storage: 480Mi
-      storageClassName: netapp-block-standard
-    # metadata:
-    #   labels: {}
-    #   annotations: {}
-    # minAvailable: 1
-    # priorityClassName: postgres-ha
-    # tolerations: []
-    # topologySpreadConstraints: []
-    # volumes:
-    #   additional: []
-    # walVolumeClaimSpec:
-    #   accessModes:
-    #     - ReadWriteOnce
-    #   resources:
-    #     requests:
-    #       storage: 240Mi
-    #   storageClassName: netapp-block-standard
+          cpu: 1m
+          memory: 32Mi
+  dataVolumeClaimSpec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+    storageClassName: netapp-block-standard
+  # metadata:
+  #   labels: {}
+  #   annotations: {}
+  # minAvailable: 1
+  # priorityClassName: postgres-ha
+  # tolerations: []
+  # topologySpreadConstraints: []
+  # volumes:
+  #   additional: []
+  # walVolumeClaimSpec:
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   resources:
+  #     requests:
+  #       storage: 240Mi
+  #   storageClassName: netapp-block-standard
 
 # --- Backup Configuration (pgBackRest) ---
 # Maps to spec.backups.pgbackrest in the Crunchy PostgresCluster CRD.
-# Top-level fields below are passed through directly when set.
+# Keep repo-specific settings next to each repo entry.
+# The template derives pgBackRest global keys such as <repo>-path and
+# <repo>-retention-full automatically from each repo definition.
+# values.pgBackRest.global is reserved for advanced raw overrides and wins over
+# any auto-derived repo-specific keys when both are present.
 pgBackRest:
   image:
   # configuration:
   #   - secret:
   #       name: pgbackrest-extra-config
   # global:
-  #   process-max: "2"
+  #   process-max: "2" # advanced raw pgBackRest global overrides
   repos:
     - name: repo1
-      enabled: true
-      type: volume
-      retention: "2"
-      retentionType: count
+      retention:
+        full: "2"
+        fullType: count
       volume:
         volumeClaimSpec:
           accessModes:
@@ -124,21 +133,21 @@ pgBackRest:
         incremental: 0 0,4,12,16,20 * * *
     - name: repo2
       enabled: false
-      type: s3
       # The secret 's3-creds-secret' must contain a key named 's3.conf' with:
       # [global]
       # repo2-s3-key=<access-key>
       # repo2-s3-key-secret=<secret-key>
       # repo2-cipher-pass=<passphrase>
       secretName: s3-creds-secret # pragma: allowlist secret
-      retention: "30"
-      retentionType: full
+      retention:
+        full: "30"
+        fullType: full
+      path: /backups/cluster
+      uriStyle: host
       s3:
         bucket: my-bucket
         endpoint: s3.ca-central-1.amazonaws.com
         region: ca-central-1
-        path: /backups/cluster
-        uriStyle: host
       schedules:
         full: 0 8 * * *
         incremental: 0 0,4,12,16,20 * * *
@@ -184,15 +193,15 @@ dataSource:
   #   configuration:
   #     - secret:
   #         name: restore-creds # pragma: allowlist secret
-  #   global:
-  #     repo2-path: /backups/cluster
-  #     repo2-s3-uri-style: host
   #   repo:
   #     name: repo2
   #     s3:
   #       bucket: my-bucket
   #       endpoint: s3.ca-central-1.amazonaws.com
   #       region: ca-central-1
+  #   global:
+  #     repo2-path: /backups/cluster
+  #     repo2-s3-uri-style: host
 
 # --- High Availability & Patroni Configuration ---
 # Maps to spec.patroni in the Crunchy PostgresCluster CRD.
@@ -257,18 +266,15 @@ pgBouncer:
 # Maps directly to spec.standby.
 standby:
   enabled: false
+  # repoName defaults to the first enabled pgBackRest repo when omitted.
   repoName: repo1
   # host: source-cluster-primary.example.com
   # port: 5432
 
 # --- Database Users ---
 # Maps directly to spec.users.
-# The legacy databases helper below is still supported for compatibility.
+# The legacy databases helper above is still supported for compatibility.
 users:
-  - name: postgres
-    databases:
-      - postgres
-    options: SUPERUSER
   # - name: app
   #   databases:
   #     - app

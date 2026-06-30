@@ -15,6 +15,7 @@ type UiSessionExchangeRecord = {
 
 type RedisClient = Awaited<ReturnType<typeof createClient>>;
 type AccessTokenRecord = { email: string; expiresAt?: number };
+export type RefreshTokenRecord = { token: string; expiresAt?: number };
 
 export type TenantRole = {
   tenantId: string;
@@ -22,9 +23,16 @@ export type TenantRole = {
   roles: string[];
 };
 
+export type TenantGroup = {
+  tenantId: string;
+  tenantName: string;
+  groups: string[];
+};
+
 const REFRESH_TOKEN_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ID_TOKEN_DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const TENANT_ROLES_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const TENANT_GROUPS_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function extractJwtExpiryMs(token: string): number | undefined {
   try {
@@ -72,6 +80,10 @@ function getAccessTokenRecordKey(token: string) {
 
 function getTenantRolesKey(email: string) {
   return `${UI_OIDC_REDIS_PREFIX}tenantroles:${email}`;
+}
+
+function getTenantGroupsKey(email: string) {
+  return `${UI_OIDC_REDIS_PREFIX}tenantgroups:${email}`;
 }
 
 async function getRedisClient(): Promise<RedisClient> {
@@ -125,9 +137,44 @@ export async function setUiOidcRefreshToken(email: string, refreshToken: string,
   await client.set(getRefreshTokenKey(email), refreshToken, { PX: effectiveTtl });
 }
 
-export async function getUiOidcRefreshToken(email: string) {
+export async function setUiOidcRefreshTokenWithExpiry(
+  email: string,
+  refreshToken: string,
+  expiresAt?: number,
+  ttlMs?: number,
+) {
   const client = await getRedisClient();
-  return await client.get(getRefreshTokenKey(email));
+  const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  const record: RefreshTokenRecord = { token: refreshToken, expiresAt };
+  await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
+}
+
+export async function getUiOidcRefreshTokenRecord(email: string): Promise<RefreshTokenRecord | null> {
+  const client = await getRedisClient();
+  const raw = await client.get(getRefreshTokenKey(email));
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'string') {
+      return { token: parsed };
+    }
+    return parsed as RefreshTokenRecord;
+  } catch {
+    return { token: raw };
+  }
+}
+
+export async function getUiOidcRefreshToken(email: string) {
+  const record = await getUiOidcRefreshTokenRecord(email);
+  return record?.token ?? null;
+}
+
+export async function isRefreshTokenExpiredByEmail(email: string): Promise<boolean> {
+  const record = await getUiOidcRefreshTokenRecord(email);
+  if (!record) return true;
+  if (!record.expiresAt) return false;
+  return Date.now() > record.expiresAt;
 }
 
 export async function setUiOidcIdToken(email: string, idToken: string, ttlMs?: number) {
@@ -177,6 +224,7 @@ export async function deleteUiOidcTokens(email: string) {
     getIdTokenKey(email),
     getAccessTokenByEmailKey(email),
     getTenantRolesKey(email),
+    getTenantGroupsKey(email),
   ];
 
   if (currentAccessToken) {
@@ -202,6 +250,24 @@ export async function getUiTenantRoles(email: string): Promise<TenantRole[] | nu
 export async function deleteUiTenantRoles(email: string) {
   const client = await getRedisClient();
   await client.del(getTenantRolesKey(email));
+}
+
+export async function setUiTenantGroups(email: string, groups: TenantGroup[], ttlMs?: number) {
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? TENANT_GROUPS_DEFAULT_TTL_MS;
+  await client.set(getTenantGroupsKey(email), JSON.stringify(groups), { PX: effectiveTtl });
+}
+
+export async function getUiTenantGroups(email: string): Promise<TenantGroup[] | null> {
+  const client = await getRedisClient();
+  const raw = await client.get(getTenantGroupsKey(email));
+  if (!raw) return null;
+  return JSON.parse(raw) as TenantGroup[];
+}
+
+export async function deleteUiTenantGroups(email: string) {
+  const client = await getRedisClient();
+  await client.del(getTenantGroupsKey(email));
 }
 
 export async function getUiOidcAccessTokenByEmail(email: string): Promise<string | null> {

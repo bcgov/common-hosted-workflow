@@ -1,9 +1,14 @@
 {{- $config := .Values.config | default (dict) }}
 {{- $configFiles := get $config "files" | default (list) }}
 {{- $configParameters := get $config "parameters" | default (dict) }}
-{{- $instances := .Values.instances | default (list) }}
+{{- $instances := fromYamlArray (include "_.instances" .) }}
 {{- $dataSource := .Values.dataSource | default (dict) }}
 {{- $monitoring := .Values.monitoring | default (dict) }}
+{{- $pgmonitor := get $monitoring "pgmonitor" | default (dict) }}
+{{- $pgmonitorWithoutExporter := omit $pgmonitor "exporter" }}
+{{- $pgmonitorExporter := get $pgmonitor "exporter" | default (dict) }}
+{{- $pgmonitorExporterSanitized := $pgmonitorExporter }}
+{{- if not (get $pgmonitorExporter "image") }}{{- $pgmonitorExporterSanitized = omit $pgmonitorExporterSanitized "image" }}{{- end }}
 {{- $patroni := .Values.patroni | default (dict) }}
 {{- $patroniDynamicConfiguration := get $patroni "dynamicConfiguration" | default (dict) }}
 {{- $patroniDynamicConfigurationWithoutPostgresql := omit $patroniDynamicConfiguration "postgresql" }}
@@ -12,6 +17,16 @@
 {{- $pgBackRest := .Values.pgBackRest | default (dict) }}
 {{- $pgBouncer := .Values.pgBouncer | default (dict) }}
 {{- $users := .Values.users | default (list) }}
+{{- $hasPostgres := false }}
+{{- range $user := $users }}
+{{-   if eq $user.name "postgres" }}{{- $hasPostgres = true }}{{- end }}
+{{- end }}
+{{- $openshift := true }}
+{{- if hasKey .Values "openshift" }}{{- $openshift = .Values.openshift }}{{- end }}
+{{- $defaultRepoName := "" }}
+{{- range (get $pgBackRest "repos" | default (list)) }}
+  {{- if and (eq $defaultRepoName "") (not (eq .enabled false)) }}{{- $defaultRepoName = .name }}{{- end }}
+{{- end }}
 # See https://access.crunchydata.com/documentation/postgres-operator/latest/references/crd/6.0.x/postgrescluster-v1
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
@@ -20,11 +35,18 @@ metadata:
   labels:
     {{- include "_.labels" . | nindent 4 }}
 spec:
+  {{- $hasBackups := false }}
+  {{- if $pgBackRest }}
+    {{- if or (get $pgBackRest "repos") (get $pgBackRest "configuration") (get $pgBackRest "global") }}
+      {{- $hasBackups = true }}
+    {{- end }}
+  {{- end }}
+  {{- if $hasBackups }}
   backups:
     pgbackrest:
       {{- $configs := get $pgBackRest "configuration" | default (list) }}
       {{- range (get $pgBackRest "repos" | default (list)) }}
-        {{- if and .enabled .secretName }}
+        {{- if and (not (eq .enabled false)) .secretName }}
           {{- $configs = append $configs (dict "secret" (dict "name" .secretName)) }}
         {{- end }}
       {{- end }}
@@ -33,21 +55,53 @@ spec:
       {{- range $key, $value := (get $pgBackRest "global" | default (dict)) }}
         {{- $_ := set $global $key $value }}
       {{- end }}
-      {{- range (get $pgBackRest "repos" | default (list)) }}
-        {{- if .enabled }}
-          {{- $_ := set $global (printf "%s-retention-full" .name) (.retention | toString) }}
-          {{- $_ := set $global (printf "%s-retention-full-type" .name) .retentionType }}
-          {{- if and (eq .type "s3") .s3.path }}
-            {{- $_ := set $global (printf "%s-path" .name) .s3.path }}
-            {{- $_ := set $global (printf "%s-s3-uri-style" .name) (.s3.uriStyle | default "host") }}
+      {{- range $repo := (get $pgBackRest "repos" | default (list)) }}
+        {{- if not (eq $repo.enabled false) }}
+          {{- $repoRetention := get $repo "retention" }}
+          {{- $repoRetentionFullKey := printf "%s-retention-full" $repo.name }}
+          {{- $repoRetentionFullTypeKey := printf "%s-retention-full-type" $repo.name }}
+          {{- if kindIs "map" $repoRetention }}
+            {{- with get $repoRetention "full" }}
+              {{- if not (hasKey $global $repoRetentionFullKey) }}{{- $_ := set $global $repoRetentionFullKey (. | toString) }}{{- end }}
+            {{- end }}
+            {{- with get $repoRetention "fullType" }}
+              {{- if not (hasKey $global $repoRetentionFullTypeKey) }}{{- $_ := set $global $repoRetentionFullTypeKey . }}{{- end }}
+            {{- end }}
+          {{- else }}
+            {{- with $repoRetention }}
+              {{- if not (hasKey $global $repoRetentionFullKey) }}{{- $_ := set $global $repoRetentionFullKey (. | toString) }}{{- end }}
+            {{- end }}
+            {{- with $repo.retentionType }}
+              {{- if not (hasKey $global $repoRetentionFullTypeKey) }}{{- $_ := set $global $repoRetentionFullTypeKey . }}{{- end }}
+            {{- end }}
           {{- end }}
-          {{- if and (eq .type "azure") .azure.path }}
-            {{- $_ := set $global (printf "%s-path" .name) .azure.path }}
-            {{- $_ := set $global (printf "%s-azure-account" .name) .azure.accountName }}
+
+          {{- $repoPath := get $repo "path" }}
+          {{- if and (not $repoPath) $repo.s3 }}{{- $repoPath = get $repo.s3 "path" }}{{- end }}
+          {{- if and (not $repoPath) $repo.azure }}{{- $repoPath = get $repo.azure "path" }}{{- end }}
+          {{- if and (not $repoPath) $repo.gcs }}{{- $repoPath = get $repo.gcs "path" }}{{- end }}
+          {{- $repoPathKey := printf "%s-path" $repo.name }}
+          {{- with $repoPath }}
+            {{- if not (hasKey $global $repoPathKey) }}{{- $_ := set $global $repoPathKey . }}{{- end }}
           {{- end }}
-          {{- if and (eq .type "gcs") .gcs.path }}
-            {{- $_ := set $global (printf "%s-path" .name) .gcs.path }}
-            {{- $_ := set $global (printf "%s-gcs-key-type" .name) "service-account" }}
+
+          {{- if $repo.s3 }}
+            {{- $repoUriStyle := (get $repo "uriStyle") | default (get $repo.s3 "uriStyle") | default "host" }}
+            {{- $repoUriStyleKey := printf "%s-s3-uri-style" $repo.name }}
+            {{- if not (hasKey $global $repoUriStyleKey) }}{{- $_ := set $global $repoUriStyleKey $repoUriStyle }}{{- end }}
+          {{- end }}
+
+          {{- if $repo.azure }}
+            {{- $repoAzureAccount := (get $repo "azureAccount") | default (get $repo.azure "accountName") | default (get $repo.azure "account") }}
+            {{- $repoAzureAccountKey := printf "%s-azure-account" $repo.name }}
+            {{- with $repoAzureAccount }}
+              {{- if not (hasKey $global $repoAzureAccountKey) }}{{- $_ := set $global $repoAzureAccountKey . }}{{- end }}
+            {{- end }}
+          {{- end }}
+
+          {{- if and $repo.gcs $repoPath }}
+            {{- $repoGcsKeyTypeKey := printf "%s-gcs-key-type" $repo.name }}
+            {{- if not (hasKey $global $repoGcsKeyTypeKey) }}{{- $_ := set $global $repoGcsKeyTypeKey ((get $repo "gcsKeyType") | default "service-account") }}{{- end }}
           {{- end }}
         {{- end }}
       {{- end }}
@@ -94,7 +148,7 @@ spec:
 
       repos:
         {{- range (get $pgBackRest "repos" | default (list)) }}
-        {{- if .enabled }}
+        {{- if not (eq .enabled false) }}
         - name: {{ .name }}
           {{- with .schedules }}
           schedules:
@@ -102,23 +156,54 @@ spec:
           {{- end }}
 
           {{- with .volume }}
+          {{- $repoVolume := . }}
           volume:
-            {{- toYaml . | nindent 12 }}
+            {{- if hasKey $repoVolume "volumeClaimSpec" }}
+            {{- toYaml $repoVolume | nindent 12 }}
+            {{- else }}
+            volumeClaimSpec:
+              {{- $repoAccessModes := get $repoVolume "accessModes" | default (list "ReadWriteOnce") }}
+              accessModes:
+                {{- if kindIs "slice" $repoAccessModes }}
+                {{- toYaml $repoAccessModes | nindent 16 }}
+                {{- else }}
+                - {{ $repoAccessModes | quote }}
+                {{- end }}
+              resources:
+                {{- if hasKey $repoVolume "resources" }}
+                {{- toYaml (get $repoVolume "resources") | nindent 16 }}
+                {{- else }}
+                requests:
+                  storage: {{ get $repoVolume "size" }}
+                {{- end }}
+              {{- with get $repoVolume "storageClassName" }}
+              storageClassName: {{ . }}
+              {{- end }}
+            {{- end }}
           {{- end }}
 
           {{- with .s3 }}
+          {{- $repoS3 := omit . "path" "uriStyle" }}
+          {{- if $repoS3 }}
           s3:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml $repoS3 | nindent 12 }}
+          {{- end }}
           {{- end }}
 
           {{- with .azure }}
+          {{- $repoAzure := omit . "path" "accountName" "account" }}
+          {{- if $repoAzure }}
           azure:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml $repoAzure | nindent 12 }}
+          {{- end }}
           {{- end }}
 
           {{- with .gcs }}
+          {{- $repoGcs := omit . "path" }}
+          {{- if $repoGcs }}
           gcs:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml $repoGcs | nindent 12 }}
+          {{- end }}
           {{- end }}
 
         {{- end }}
@@ -133,6 +218,7 @@ spec:
       sidecars:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  {{- end }}
 
   {{- if or $configFiles $configParameters }}
   config:
@@ -148,7 +234,7 @@ spec:
     {{- end }}
   {{- end }}
 
-  {{- if $dataSource }}
+  {{- if or $dataSource.pgbackrest $dataSource.postgresCluster }}
   dataSource:
     {{- with $dataSource.pgbackrest }}
     pgbackrest:
@@ -228,13 +314,19 @@ spec:
     {{- end }}
   {{- end }}
 
-  {{- with $monitoring.pgmonitor }}
+  {{- if or $pgmonitorWithoutExporter $pgmonitorExporterSanitized }}
   monitoring:
     pgmonitor:
+      {{- with $pgmonitorWithoutExporter }}
       {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with $pgmonitorExporterSanitized }}
+      exporter:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   {{- end }}
 
-  openshift: true
+  openshift: {{ $openshift }}
 
   {{- if or $patroni.leaderLeaseDurationSeconds $patroni.logging $patroni.port $patroni.switchover $patroni.syncPeriodSeconds $patroniDynamicConfiguration .Values.standby.enabled }}
   patroni:
@@ -352,17 +444,20 @@ spec:
 
   {{- with .Values.standby }}
   standby:
-    {{- toYaml . | nindent 4 }}
+    {{- $standby := . }}
+    {{- if and (not (hasKey $standby "repoName")) $defaultRepoName }}
+    {{- toYaml (merge (dict "repoName" $defaultRepoName) $standby) | nindent 4 }}
+    {{- else }}
+    {{- toYaml $standby | nindent 4 }}
+    {{- end }}
   {{- end }}
 
-  {{- if or $users .Values.databases }}
+  {{- if $users }}
   users:
-    {{- range $user := $users }}{{ toYaml (list $user) | nindent 4 }}{{- end }}
-    {{- range $db := .Values.databases }}
-    - name: {{ $db.name }}
+    {{- range $user := $users }}{{ toYaml (list $user) | nindent 4 }}{{- end }}{{- if not $hasPostgres }}
+    - name: postgres
       databases:
-        - {{ $db.name }}
-      # Convenience helper for legacy chart usage; prefer values.users for CRD-shaped config.
-      options: {{ $db.options | default "CREATEROLE NOSUPERUSER" }}
+        - postgres
+      options: SUPERUSER
     {{- end }}
   {{- end }}

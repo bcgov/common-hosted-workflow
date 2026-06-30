@@ -13,17 +13,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 /*  Module mocks                                                       */
 /* ------------------------------------------------------------------ */
 
-const { resolveWilTenantProjectIdsMock, resolveActorIdsMock } = vi.hoisted(() => ({
+const { resolveWilTenantProjectIdsMock, resolveActorMatchersMock, extractTenantIdMock } = vi.hoisted(() => ({
   resolveWilTenantProjectIdsMock: vi.fn(),
-  resolveActorIdsMock: vi.fn(),
+  resolveActorMatchersMock: vi.fn(),
+  extractTenantIdMock: vi.fn(),
 }));
 
 vi.mock('../../../src/api/routes/helpers/wil-tenant', () => ({
   resolveWilTenantProjectIds: resolveWilTenantProjectIdsMock,
+  extractTenantId: extractTenantIdMock,
 }));
 
 vi.mock('../../../src/api/routes/helpers/wil-actor', () => ({
-  resolveActorIds: resolveActorIdsMock,
+  resolveActorMatchers: resolveActorMatchersMock,
 }));
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +43,13 @@ import { getRouteHandlers, runHandlerChain } from '../../helpers/test-utils';
 const ALLOWED_PROJECT_IDS = ['proj-1', 'proj-2'];
 const ACTOR_PRIMARY = 'user@example.com';
 const ACTOR_FALLBACK = 'sub-123';
+const TENANT_ID = '717626be-f59f-4e35-ac87-f84c4e11b865';
+const DEFAULT_ACTOR_MATCHERS = {
+  userId: ACTOR_PRIMARY,
+  userFallback: ACTOR_FALLBACK,
+  roleNames: [],
+  groupNames: [],
+};
 
 function createTestRouter(serviceOverrides: Record<string, any> = {}) {
   const messageService = {
@@ -69,10 +78,12 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
 
 beforeEach(() => {
   resolveWilTenantProjectIdsMock.mockReset();
-  resolveActorIdsMock.mockReset();
+  resolveActorMatchersMock.mockReset();
+  extractTenantIdMock.mockReset();
 
-  resolveWilTenantProjectIdsMock.mockResolvedValue(ALLOWED_PROJECT_IDS);
-  resolveActorIdsMock.mockReturnValue({ primary: ACTOR_PRIMARY, fallback: ACTOR_FALLBACK });
+  resolveWilTenantProjectIdsMock.mockResolvedValue({ tenantId: TENANT_ID, projectIds: ALLOWED_PROJECT_IDS });
+  extractTenantIdMock.mockReturnValue(TENANT_ID);
+  resolveActorMatchersMock.mockReturnValue(DEFAULT_ACTOR_MATCHERS);
 });
 
 /* ================================================================== */
@@ -110,7 +121,7 @@ describe('GET /wil/messages', () => {
     );
   });
 
-  it('passes primary actor ID to service', async () => {
+  it('passes actor matchers to service', async () => {
     const { router, messageService } = createTestRouter();
     const handlers = getRouteHandlers(router, 'get', '/messages');
     const req = createMockRequest({ query: {}, session: {} as any });
@@ -118,43 +129,14 @@ describe('GET /wil/messages', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(messageService.list).toHaveBeenCalledWith(expect.objectContaining({ actorId: ACTOR_PRIMARY }));
+    expect(messageService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ actorMatchers: DEFAULT_ACTOR_MATCHERS }),
+    );
   });
 
-  it('falls back to fallback actor when primary returns empty and actors differ', async () => {
-    const listMock = vi
-      .fn()
-      .mockResolvedValueOnce([]) // primary returns empty
-      .mockResolvedValueOnce([makeMessageRow()]); // fallback returns data
-
-    const { router, messageService } = createTestRouter({ message: { list: listMock } });
-    const handlers = getRouteHandlers(router, 'get', '/messages');
-    const req = createMockRequest({ query: {}, session: {} as any });
-    const res = createMockResponse();
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(listMock).toHaveBeenCalledTimes(2);
-    expect(listMock.mock.calls[0][0].actorId).toBe(ACTOR_PRIMARY);
-    expect(listMock.mock.calls[1][0].actorId).toBe(ACTOR_FALLBACK);
-  });
-
-  it('does NOT fallback when primary and fallback are the same', async () => {
-    resolveActorIdsMock.mockReturnValue({ primary: 'same@id', fallback: 'same@id' });
+  it('calls service once with actor matchers (no fallback retry)', async () => {
     const listMock = vi.fn().mockResolvedValue([]);
 
-    const { router } = createTestRouter({ message: { list: listMock } });
-    const handlers = getRouteHandlers(router, 'get', '/messages');
-    const req = createMockRequest({ query: {}, session: {} as any });
-    const res = createMockResponse();
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(listMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT fallback when primary returns results', async () => {
-    const listMock = vi.fn().mockResolvedValue([makeMessageRow()]);
     const { router } = createTestRouter({ message: { list: listMock } });
     const handlers = getRouteHandlers(router, 'get', '/messages');
     const req = createMockRequest({ query: {}, session: {} as any });
@@ -273,7 +255,7 @@ describe('GET /wil/actions', () => {
     );
   });
 
-  it('passes primary actor ID to service', async () => {
+  it('passes actor matchers to service', async () => {
     const { router, actionService } = createTestRouter();
     const handlers = getRouteHandlers(router, 'get', '/actions');
     const req = createMockRequest({ query: {}, session: {} as any });
@@ -281,43 +263,12 @@ describe('GET /wil/actions', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(actionService.list).toHaveBeenCalledWith(expect.objectContaining({ actorId: ACTOR_PRIMARY }));
+    expect(actionService.list).toHaveBeenCalledWith(expect.objectContaining({ actorMatchers: DEFAULT_ACTOR_MATCHERS }));
   });
 
-  it('falls back to fallback actor when primary returns empty and actors differ', async () => {
-    const listMock = vi
-      .fn()
-      .mockResolvedValueOnce([]) // primary returns empty
-      .mockResolvedValueOnce([makeActionRequestRow()]); // fallback returns data
-
-    const { router } = createTestRouter({ action: { list: listMock } });
-    const handlers = getRouteHandlers(router, 'get', '/actions');
-    const req = createMockRequest({ query: {}, session: {} as any });
-    const res = createMockResponse();
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(listMock).toHaveBeenCalledTimes(2);
-    expect(listMock.mock.calls[0][0].actorId).toBe(ACTOR_PRIMARY);
-    expect(listMock.mock.calls[1][0].actorId).toBe(ACTOR_FALLBACK);
-  });
-
-  it('does NOT fallback when primary and fallback are the same', async () => {
-    resolveActorIdsMock.mockReturnValue({ primary: 'same@id', fallback: 'same@id' });
+  it('calls service once with actor matchers (no fallback retry)', async () => {
     const listMock = vi.fn().mockResolvedValue([]);
 
-    const { router } = createTestRouter({ action: { list: listMock } });
-    const handlers = getRouteHandlers(router, 'get', '/actions');
-    const req = createMockRequest({ query: {}, session: {} as any });
-    const res = createMockResponse();
-
-    await runHandlerChain(handlers!, req, res);
-
-    expect(listMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT fallback when primary returns results', async () => {
-    const listMock = vi.fn().mockResolvedValue([makeActionRequestRow()]);
     const { router } = createTestRouter({ action: { list: listMock } });
     const handlers = getRouteHandlers(router, 'get', '/actions');
     const req = createMockRequest({ query: {}, session: {} as any });

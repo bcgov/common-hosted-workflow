@@ -53,11 +53,18 @@ spec:
                     secretKeyRef:
                       name: {{ .Values.conditionalRestore.s3.secretName | quote }}
                       key: secret-key
+                {{- $allDatabases := dict }}
+                {{- range $user := .Values.users }}
+                {{-   range $db := $user.databases }}
+                {{-     $_ := set $allDatabases $db "" }}
+                {{-   end }}
+                {{- end }}
+                {{- $uniqueDatabases := keys $allDatabases | sortAlpha }}
                 - name: DATABASE_COUNT
-                  value: {{ len .Values.databases | quote }}
-                {{- range $i, $db := .Values.databases }}
+                  value: {{ len $uniqueDatabases | quote }}
+                {{- range $i, $db := $uniqueDatabases }}
                 - name: DATABASE_{{ $i }}_NAME
-                  value: {{ $db.name | quote }}
+                  value: {{ $db | quote }}
                 {{- end }}
                 - name: DATABASE_HOST
                   valueFrom:

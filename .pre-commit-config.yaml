@@ -39,13 +39,37 @@ repos:
     entry: .bin/prettier.sh
     language: script
     pass_filenames: true
+    require_serial: true
     files: \.(ts|tsx|js|jsx|json|css|scss|md|html|yaml|yml)$
     exclude: .git/COMMIT_EDITMSG
+  - id: eslint-external-hooks
+    name: lint external-hooks
+    entry: .bin/eslint-external-hooks.sh
+    language: script
+    pass_filenames: true
+    require_serial: true
+    types_or: [javascript, ts]
+    files: ^external-hooks/
+  - id: eslint-external-ui
+    name: lint external-ui
+    entry: .bin/eslint-external-ui.sh
+    language: script
+    pass_filenames: true
+    require_serial: true
+    types_or: [ts, tsx]
+    files: ^external-ui/
   - id: python-format
     name: lint Python
     entry: black
     language: system
     types: [python]
+  - id: commitlint
+    name: commitlint
+    entry: .bin/commitlint.sh
+    language: script
+    verbose: true
+    pass_filenames: false
+    stages: [commit-msg]
 
 exclude: |
   (?x)^(

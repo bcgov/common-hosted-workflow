@@ -1,31 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  getUiOidcRefreshTokenMock,
+  getUiOidcRefreshTokenRecordMock,
   getUiOidcIdTokenMock,
   getUiOidcAccessTokenRecordMock,
-  setUiOidcRefreshTokenMock,
+  setUiOidcRefreshTokenWithExpiryMock,
   setUiOidcIdTokenMock,
   setUiOidcAccessTokenRecordMock,
   deleteUiTenantRolesMock,
+  deleteUiTenantGroupsMock,
 } = vi.hoisted(() => ({
-  getUiOidcRefreshTokenMock: vi.fn(),
+  getUiOidcRefreshTokenRecordMock: vi.fn(),
   getUiOidcIdTokenMock: vi.fn(),
   getUiOidcAccessTokenRecordMock: vi.fn(),
-  setUiOidcRefreshTokenMock: vi.fn(),
+  setUiOidcRefreshTokenWithExpiryMock: vi.fn(),
   setUiOidcIdTokenMock: vi.fn(),
   setUiOidcAccessTokenRecordMock: vi.fn(),
   deleteUiTenantRolesMock: vi.fn(),
+  deleteUiTenantGroupsMock: vi.fn(),
 }));
 
 vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
-  getUiOidcRefreshToken: getUiOidcRefreshTokenMock,
+  getUiOidcRefreshTokenRecord: getUiOidcRefreshTokenRecordMock,
   getUiOidcIdToken: getUiOidcIdTokenMock,
   getUiOidcAccessTokenRecord: getUiOidcAccessTokenRecordMock,
-  setUiOidcRefreshToken: setUiOidcRefreshTokenMock,
+  setUiOidcRefreshTokenWithExpiry: setUiOidcRefreshTokenWithExpiryMock,
   setUiOidcIdToken: setUiOidcIdTokenMock,
   setUiOidcAccessTokenRecord: setUiOidcAccessTokenRecordMock,
   deleteUiTenantRoles: deleteUiTenantRolesMock,
+  deleteUiTenantGroups: deleteUiTenantGroupsMock,
 }));
 
 const { refreshOidcTokensMock, fetchOidcDiscoveryDocumentMock, fetchOidcUserInfoMock, extractOidcIdentityMock } =
@@ -109,15 +112,15 @@ describe('ui-oidc-session refresh/logout behavior', () => {
     });
   });
 
-  describe('near-expiry token triggers refresh', () => {
-    it('returns refreshed token when access token is near expiry', async () => {
-      const nearExpiryTime = Date.now() + 30_000;
+  describe('expired token triggers refresh', () => {
+    it('returns refreshed token when access token is expired', async () => {
+      const expiredTime = Date.now() - 1_000;
       getUiOidcAccessTokenRecordMock.mockResolvedValue({
         email: 'user@example.com',
-        expiresAt: nearExpiryTime,
+        expiresAt: expiredTime,
       });
 
-      getUiOidcRefreshTokenMock.mockResolvedValue('stored-refresh-token');
+      getUiOidcRefreshTokenRecordMock.mockResolvedValue({ token: 'stored-refresh-token' });
       refreshOidcTokensMock.mockResolvedValue({
         access_token: 'new-access-token',
         refresh_token: 'new-refresh-token',
@@ -156,13 +159,13 @@ describe('ui-oidc-session refresh/logout behavior', () => {
 
   describe('refreshed token returned in X-UI-Auth-Token', () => {
     it('sets refreshedToken in result when refresh occurs', async () => {
-      const nearExpiryTime = Date.now() + 30_000;
+      const expiredTime = Date.now() - 1_000;
       getUiOidcAccessTokenRecordMock.mockResolvedValue({
         email: 'user@example.com',
-        expiresAt: nearExpiryTime,
+        expiresAt: expiredTime,
       });
 
-      getUiOidcRefreshTokenMock.mockResolvedValue('stored-refresh-token');
+      getUiOidcRefreshTokenRecordMock.mockResolvedValue({ token: 'stored-refresh-token' });
       refreshOidcTokensMock.mockResolvedValue({
         access_token: 'refreshed-access-token',
         refresh_token: 'new-refresh-token',
@@ -222,12 +225,12 @@ describe('ui-oidc-session refresh/logout behavior', () => {
 
   describe('refresh failure handling', () => {
     it('returns null when refresh token is missing', async () => {
-      const nearExpiryTime = Date.now() + 30_000;
+      const expiredTime = Date.now() - 1_000;
       getUiOidcAccessTokenRecordMock.mockResolvedValue({
         email: 'user@example.com',
-        expiresAt: nearExpiryTime,
+        expiresAt: expiredTime,
       });
-      getUiOidcRefreshTokenMock.mockResolvedValue(null);
+      getUiOidcRefreshTokenRecordMock.mockResolvedValue(null);
 
       const req = createMockRequest({
         authorization: 'Bearer old-access-token',
@@ -237,15 +240,16 @@ describe('ui-oidc-session refresh/logout behavior', () => {
       const result = await getUiSession(req);
 
       expect(refreshOidcTokensMock).not.toHaveBeenCalled();
+      expect(result).toBeNull();
     });
 
-    it('falls back to session when refresh response has no access_token', async () => {
-      const nearExpiryTime = Date.now() + 30_000;
+    it('returns null when refresh response has no access_token', async () => {
+      const expiredTime = Date.now() - 1_000;
       getUiOidcAccessTokenRecordMock.mockResolvedValue({
         email: 'user@example.com',
-        expiresAt: nearExpiryTime,
+        expiresAt: expiredTime,
       });
-      getUiOidcRefreshTokenMock.mockResolvedValue('stored-refresh-token');
+      getUiOidcRefreshTokenRecordMock.mockResolvedValue({ token: 'stored-refresh-token' });
       refreshOidcTokensMock.mockResolvedValue({});
 
       const req = createMockRequest({
@@ -255,9 +259,7 @@ describe('ui-oidc-session refresh/logout behavior', () => {
       const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
       const result = await getUiSession(req);
 
-      expect(result).not.toBeNull();
-      expect(result?.session.email).toBe('user@example.com');
-      expect(result?.refreshedToken).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 });

@@ -33,26 +33,12 @@ redis:
 
 pgo:
   enabled: true
+  instance:
+    dataVolumeClaimSpec:
+      resources:
+        requests:
+          storage: 1.5Gi
   pgBackRest:
-    repos:
-      - name: repo1
-        enabled: true
-        type: volume
-        retention: "2"
-        retentionType: count
-        volume:
-          size: 512Mi
-          accessModes: ReadWriteOnce
-          storageClassName: netapp-file-standard
-        schedules:
-          full: 0 8 * * *
-          incremental: 0 0,4,12,16,20 * * *
-  dataSource:
-    enabled: false
-    repo:
-      s3:
-        bucket: workflow-test
-
   conditionalRestore:
     enabled: false  # enable when dns-probe is enabled for test-golddr
     s3:

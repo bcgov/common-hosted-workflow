@@ -136,7 +136,7 @@ Exchanges a FormAPIKey (stored in the action record) for a short-lived CHEFS JWT
 
 1. Validates request body via Zod schema
 2. Resolves tenant → project IDs
-3. Fetches action via `ActionService.getById({ allowedProjectIds, actionId, actorId })`
+3. Fetches action via `ActionService.getById({ allowedProjectIds, actionId, actorMatchers })`
 4. Verifies `actionType === 'showform'`
 5. Extracts `formApiKey` and `formId` from payload
 6. Calls `ChefsService.getFormToken({ formId, formApiKey })`
@@ -261,20 +261,49 @@ All subsequent service calls use these project IDs as `allowedProjectIds` to enf
 **File:** `external-hooks/src/api/routes/helpers/wil-actor.ts`
 
 ```typescript
-export function resolveActorIds(session: UiAuthenticatedSession): ResolvedActorIds {
+export function resolveActorMatchers(session: UiResolvedSession, tenantId: string): ActorMatchers {
+  const tenantRoleEntry = session.tenantRoles.find((tr) => tr.tenantId === tenantId);
+  const tenantGroupEntry = session.tenantGroups.find((tg) => tg.tenantId === tenantId);
+
   return {
-    primary: session.email,
-    fallback: session.subject,
+    userId: session.email,
+    userFallback: session.subject,
+    roleNames: tenantRoleEntry?.roles ?? [],
+    groupNames: tenantGroupEntry?.groups ?? [],
   };
 }
 ```
 
-Used in list endpoints with a fallback strategy:
+**Type:**
 
-1. Query with `actorId = primary` (email)
-2. If zero results and `primary !== fallback` → retry with `actorId = fallback` (subject)
+```typescript
+type ActorMatchers = {
+  userId: string; // user's email — matches actor_type = 'user'
+  userFallback: string; // Keycloak subject — legacy fallback for actor_type = 'user'
+  roleNames: string[]; // CSTAR role names — matches actor_type = 'role'
+  groupNames: string[]; // CSTAR group names — matches actor_type = 'group'
+};
+```
 
-This handles the case where actions were created referencing the user by different identifiers.
+`resolveActorMatchers` takes the current `tenantId` from the `X-TENANT-ID` header so it can look up the correct role and group entries for that specific tenant.
+
+### OR-Based Query
+
+The `actorMatchers` are passed to `buildActorMatcherClause` in both `ActionService` and `MessageService`, which generates a single OR clause:
+
+```sql
+(actor_type = 'user' AND actor_id IN ('user@example.com', 'oidc-subject'))
+OR (actor_type = 'role' AND actor_id IN ('project:editor', 'ui:actor'))
+OR (actor_type = 'group' AND actor_id IN ('UI Actor', 'Ministry Editors'))
+```
+
+This means a workflow can assign an action or message to:
+
+- A **specific user** by email or OIDC subject
+- A **role** (e.g. `project:editor`) — visible to all users holding that role in the tenant
+- A **group** (e.g. `UI Actor`) — visible to all members of that group in the tenant
+
+The role and group clauses are omitted from the query when the user has no roles or groups in the tenant (avoids empty `IN` lists).
 
 ## Response Shaping
 
