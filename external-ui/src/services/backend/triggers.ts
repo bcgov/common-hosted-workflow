@@ -1,90 +1,68 @@
-export type TriggerType = 'chefs-form' | 'button';
-export type TriggerActorType = '' | 'role' | 'user' | 'group' | 'other';
-export type TriggerMethod = 'POST' | 'GET';
-
-export interface ChefsFormTriggerPayload {
-  type: 'chefs-form';
-  formId: string;
-  formName: string;
-  apiKey: string;
-  allowedActors: string;
-  allowedActorsType: TriggerActorType;
-  callbackWebhookUrl: string;
-  triggerMethod: TriggerMethod;
-  includeActorId: boolean;
-}
-
-export interface ButtonTriggerPayload {
-  type: 'button';
-  buttonText: string;
-  webhookUrl: string;
-  postBody: string;
-  allowedActors: string;
-  allowedActorsType: TriggerActorType;
-  triggerMethod: TriggerMethod;
-  includeActorId: boolean;
-}
-
-export type TriggerPayload = ChefsFormTriggerPayload | ButtonTriggerPayload;
-
-export interface Trigger {
-  id: string;
-  tenantId: string;
-  createdAt: string;
-  updatedAt: string;
-  config: TriggerPayload;
-}
-
-export interface TriggerListResponse {
-  data: Trigger[];
-}
+import { instance } from './axios';
+import type {
+  ApiTriggerItem,
+  Trigger,
+  TriggerChefsTokenResponse,
+  TriggerListResponse,
+  TriggerPayload,
+} from './trigger-types';
+import { apiItemToTrigger, payloadToCreateBody, payloadToUpdateBody } from './trigger-mappers';
 
 export function getTriggers(params: { tenantId: string; signal?: AbortSignal }): Promise<TriggerListResponse> {
-  // replace with real API call when backend is ready:
-  // return instance
-  //   .get<TriggerListResponse>('/ui-api/triggers', {
-  //     headers: { 'X-TENANT-ID': params.tenantId },
-  //     signal: params.signal,
-  //   })
-  //   .then((res) => res.data);
-  console.log('[getTriggers] tenantId:', params.tenantId);
-  return Promise.resolve({ data: [] });
+  return instance
+    .get<{ data: ApiTriggerItem[] }>('/ui-api/wil/triggers', {
+      headers: { 'X-TENANT-ID': params.tenantId },
+      signal: params.signal,
+    })
+    .then((res) => ({ data: res.data.data.map((item) => apiItemToTrigger(item, params.tenantId)) }));
 }
 
-export function createTrigger(params: { tenantId: string; config: TriggerPayload }): Promise<Trigger> {
-  // replace with real API call when backend is ready:
-  // return instance
-  //   .post<Trigger>('/ui-api/triggers', { config: params.config }, { headers: { 'X-TENANT-ID': params.tenantId } })
-  //   .then((res) => res.data);
-  console.log('[createTrigger] tenantId:', params.tenantId, 'config:', params.config);
-  return Promise.resolve({
-    id: `trigger-${Date.now()}`,
-    tenantId: params.tenantId,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    config: params.config,
-  });
+export function createTrigger(params: { tenantId: string; config: TriggerPayload; actorId: string }): Promise<Trigger> {
+  return instance
+    .post<ApiTriggerItem>('/ui-api/wil/triggers', payloadToCreateBody(params.config, params.actorId), {
+      headers: { 'X-TENANT-ID': params.tenantId },
+    })
+    .then((res) => apiItemToTrigger(res.data, params.tenantId));
 }
 
 export function updateTrigger(params: {
   tenantId: string;
   triggerId: string;
   config: TriggerPayload;
+  actorId: string;
 }): Promise<Trigger> {
-  // replace with real API call when backend is ready:
-  // return instance
-  //   .put<Trigger>(
-  //     `/ui-api/triggers/${params.triggerId}`,
-  //     { config: params.config },
-  //     { headers: { 'X-TENANT-ID': params.tenantId } },
-  //   )
-  //   .then((res) => res.data);
-  console.log('[updateTrigger] tenantId:', params.tenantId, 'triggerId:', params.triggerId, 'config:', params.config);
-  return Promise.resolve({
-    id: params.triggerId,
-    tenantId: params.tenantId,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    config: params.config,
-  });
+  return instance
+    .put<ApiTriggerItem>(
+      `/ui-api/wil/triggers/${params.triggerId}`,
+      payloadToUpdateBody(params.config, params.actorId),
+      { headers: { 'X-TENANT-ID': params.tenantId } },
+    )
+    .then((res) => apiItemToTrigger(res.data, params.tenantId));
+}
+
+export function getTriggerChefsToken(params: {
+  tenantId: string;
+  triggerId: string;
+}): Promise<TriggerChefsTokenResponse> {
+  return instance
+    .post<TriggerChefsTokenResponse>(
+      `/ui-api/wil/triggers/${params.triggerId}/chefs-token`,
+      {},
+      {
+        headers: { 'X-TENANT-ID': params.tenantId },
+      },
+    )
+    .then((res) => res.data);
+}
+
+export function callbackTrigger(params: {
+  tenantId: string;
+  triggerId: string;
+  body?: Record<string, unknown>;
+}): Promise<{ success: boolean }> {
+  return instance
+    .post<{ success: boolean }>(`/ui-api/wil/triggers/${params.triggerId}/callback`, params.body ?? {}, {
+      headers: { 'X-TENANT-ID': params.tenantId },
+    })
+    .then((res) => res.data);
 }

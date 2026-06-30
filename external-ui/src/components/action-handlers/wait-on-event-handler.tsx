@@ -4,7 +4,7 @@ import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
-import { extractErrorMessage } from './shared/error-utils';
+import { extractErrorMessage } from '../shared/error-utils';
 
 const TERMINAL_STATUSES: ReadonlySet<WilActionItem['status']> = new Set([
   'completed',

@@ -8,24 +8,28 @@ import {
   listTriggersSchema,
   createTriggerSchema,
   updateTriggerSchema,
-  fireTriggerSchema,
+  callbackTriggerSchema,
   getTriggerChefsTokenSchema,
   getTriggerChefsTokenResponseSchema,
   mapTriggerRowToResponse,
   listTriggersResponseSchema,
   createTriggerResponseSchema,
   updateTriggerResponseSchema,
-  fireTriggerResponseSchema,
+  callbackTriggerResponseSchema,
 } from '../schemas/trigger';
 import { OkResponse, CreatedResponse, ForbiddenResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { X_TENANT_ID_HEADER } from '../constants/headers';
 import { decrypt } from '../utils/secret-box';
 import { WIL_ENCRYPTION_KEY } from '@config';
+import { createLogger } from '../utils/logger';
+import { shortenIdForLog } from '../utils/string';
 import type { z } from 'zod';
 
+const log = createLogger('TriggerRoutes');
 const TRIGGER_MANAGE_ROLE = 'project:editor';
 const FIRE_TIMEOUT_MS = 30_000;
+const TRIGGER_FAILED_MESSAGE = 'Unable to trigger the workflow. Please try again or contact your administrator.';
 
 /**
  * Returns true if the user may create or edit triggers for the given tenant.
@@ -240,23 +244,17 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
   );
 
   /**
-   * POST /wil/triggers/:triggerId/fire — execute a trigger's webhook URL.
+   * POST /wil/triggers/:triggerId/callback — execute a trigger's webhook URL.
    *
    * Accessible to managers and any actor explicitly listed in allowed_actors.
    * Forwards the request to trigger_url using trigger_method, optionally appending
    * the actor's email when includeActorId is set in the trigger's metadata.
    *
-   * DEBUGGING THE 401: If you see 401 here, check two things:
-   * 1. If the backend logs reach this handler → the 401 is proxied from the trigger_url
-   *    itself (the n8n webhook requires authentication). Fix: disable auth on the webhook
-   *    in n8n, or use a test webhook that accepts unauthenticated requests.
-   * 2. If no server logs appear for this request → the 401 comes from requireUiRequestContext
-   *    (session token expired). Fix: refresh the page to obtain a new token.
    */
   router.post(
-    '/triggers/:triggerId/fire',
-    createRequestParser(fireTriggerSchema),
-    async (req: UiApiTypedRequest<z.infer<typeof fireTriggerSchema>>, res: Response) => {
+    '/triggers/:triggerId/callback',
+    createRequestParser(callbackTriggerSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof callbackTriggerSchema>>, res: Response) => {
       const session = (req as unknown as { session: UiResolvedSession }).session;
       const tenantId = req.header(X_TENANT_ID_HEADER)?.trim();
       const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
@@ -296,9 +294,19 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
 
       const method = trigger.triggerMethod.toUpperCase();
 
+      // GET requests carry no body — forward formId/submission_id/actorId as query params instead.
+      let requestUrl = trigger.triggerUrl;
+      if (method === 'GET' && Object.keys(outboundBody).length > 0) {
+        const url = new URL(trigger.triggerUrl);
+        for (const [key, value] of Object.entries(outboundBody)) {
+          url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+        }
+        requestUrl = url.toString();
+      }
+
       let upstreamResponse: globalThis.Response;
       try {
-        upstreamResponse = await fetch(trigger.triggerUrl, {
+        upstreamResponse = await fetch(requestUrl, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: method === 'GET' ? undefined : JSON.stringify(outboundBody),
@@ -313,18 +321,26 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
 
       if (!upstreamResponse.ok) {
         const upstreamText = await upstreamResponse.text();
+        // Log the raw upstream detail for debugging, but never forward it to the FE —
+        // webhook error bodies (e.g. n8n's "webhook not registered") expose internal
+        // implementation details that aren't meaningful to an end user.
+        log.warn('Trigger webhook returned an error response', {
+          triggerId: shortenIdForLog(triggerId),
+          status: upstreamResponse.status,
+          upstreamText,
+        });
         // Return 502 so the FE always knows the error is from the upstream webhook,
         // not from our authentication layer (which would return 401/403 directly).
         res.status(502).json({
           error: {
-            message: upstreamText || `Trigger webhook returned ${upstreamResponse.status}`,
+            message: TRIGGER_FAILED_MESSAGE,
             upstreamStatus: upstreamResponse.status,
           },
         });
         return;
       }
 
-      OkResponse(res, { success: true }, fireTriggerResponseSchema);
+      OkResponse(res, { success: true }, callbackTriggerResponseSchema);
     },
   );
 
