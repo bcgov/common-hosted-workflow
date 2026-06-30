@@ -36,6 +36,7 @@ export function buildActionRouter({
       const created = await services.action.create({
         allowedProjectIds,
         actionType: body.actionType,
+        actionTitle: body.actionTitle ?? null,
         payload: body.payload,
         callbackUrl: body.callbackUrl,
         callbackMethod: body.callbackMethod,

@@ -22,6 +22,7 @@ export type ActionServiceDependencies = {
 export type CreateActionParams = {
   allowedProjectIds: string[];
   actionType: string;
+  actionTitle?: string | null;
   payload: Record<string, unknown>;
   callbackUrl?: string;
   callbackMethod?: string;
@@ -68,6 +69,15 @@ export class ActionService {
     private readonly customRepositories: CustomRepositories,
   ) {}
 
+  private buildActorWhere(params: { actorId?: string; actorMatchers?: ActorMatchers }): any[] {
+    if (params.actorMatchers) {
+      return [buildActorMatcherClause(actionRequest, params.actorMatchers)];
+    } else if (params.actorId) {
+      return [eq(actionRequest.actorId, params.actorId)];
+    }
+    return [];
+  }
+
   private buildListWhere(params: {
     allowedProjectIds: string[];
     actorId?: string;
@@ -76,12 +86,10 @@ export class ActionService {
     since?: ListPaginationSince;
     status?: string[];
   }): any[] {
-    const clauses: any[] = [inArray(actionRequest.projectId, params.allowedProjectIds)];
-    if (params.actorMatchers) {
-      clauses.push(buildActorMatcherClause(actionRequest, params.actorMatchers));
-    } else if (params.actorId) {
-      clauses.push(eq(actionRequest.actorId, params.actorId));
-    }
+    const clauses: any[] = [
+      inArray(actionRequest.projectId, params.allowedProjectIds),
+      ...this.buildActorWhere(params),
+    ];
     if (params.workflowInstanceId) clauses.push(eq(actionRequest.workflowInstanceId, params.workflowInstanceId));
     if (params.status && params.status.length > 0) clauses.push(inArray(actionRequest.status, params.status));
     clauses.push(...buildPaginationClauses(actionRequest, params.since));
@@ -105,6 +113,7 @@ export class ActionService {
     try {
       return await this.customRepositories.actionRequest.create({
         actionType: params.actionType,
+        actionTitle: params.actionTitle ?? null,
         payload: params.payload,
         callbackUrl,
         callbackMethod,
@@ -155,33 +164,23 @@ export class ActionService {
   }
 
   async getById(params: GetActionByIdParams) {
+    const actorWhereClauses = this.buildActorWhere(params);
+
     const row = await this.customRepositories.actionRequest.getById({
       actionId: params.actionId,
-      where: [
-        inArray(actionRequest.projectId, params.allowedProjectIds),
-        ...(params.actorMatchers
-          ? [buildActorMatcherClause(actionRequest, params.actorMatchers)]
-          : params.actorId
-            ? [eq(actionRequest.actorId, params.actorId)]
-            : []),
-      ],
+      where: [inArray(actionRequest.projectId, params.allowedProjectIds), ...actorWhereClauses],
     });
     if (!row) throw new AppError(404, 'Action not found');
     return row;
   }
 
   async updateStatus(params: UpdateActionStatusParams) {
+    const actorWhereClauses = this.buildActorWhere(params);
+
     const row = await this.customRepositories.actionRequest.updateStatus({
       actionId: params.actionId,
       status: params.status,
-      where: [
-        inArray(actionRequest.projectId, params.allowedProjectIds),
-        ...(params.actorMatchers
-          ? [buildActorMatcherClause(actionRequest, params.actorMatchers)]
-          : params.actorId
-            ? [eq(actionRequest.actorId, params.actorId)]
-            : []),
-      ],
+      where: [inArray(actionRequest.projectId, params.allowedProjectIds), ...actorWhereClauses],
     });
     if (!row) throw new AppError(404, 'Action not found');
     return params.status;

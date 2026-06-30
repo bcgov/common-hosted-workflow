@@ -1,9 +1,30 @@
 import type { Request } from 'express';
 import type { TenantProjectRelationRepository } from '../../../db/repository/custom/tenant-project-relation';
+import { X_TENANT_ID_HEADER } from '../../constants/headers';
+import { tenantUuidRegex } from '../../constants/regex';
 import { AppError } from '../../utils/errors';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const X_TENANT_ID_HEADER = 'x-tenant-id';
+/**
+ * Validates the tenant ID and resolves its linked project IDs.
+ * Throws `AppError` when the tenant ID is missing, not a valid UUID, or has no linked projects.
+ * Used directly by route handlers that need both the tenantId and the projectIds.
+ */
+export async function resolveTenantProjectIds(
+  tenantId: string | undefined,
+  tenantProjectRelationRepository: TenantProjectRelationRepository,
+): Promise<string[]> {
+  if (!tenantId) {
+    throw new AppError(400, `Missing ${X_TENANT_ID_HEADER} header`);
+  }
+  if (!tenantUuidRegex.test(tenantId)) {
+    throw new AppError(400, `Invalid ${X_TENANT_ID_HEADER} (expected UUID)`);
+  }
+  const projectIds = await tenantProjectRelationRepository.getProjectIdsByTenantId(tenantId);
+  if (projectIds.length === 0) {
+    throw new AppError(403, 'No projects linked to this tenant. Please contact your tenant admin');
+  }
+  return projectIds;
+}
 
 /**
  * Extracts and validates the tenant ID from the request header.
@@ -14,7 +35,7 @@ export function extractTenantId(req: Request): string {
   if (!tenantId) {
     throw new AppError(400, `Missing ${X_TENANT_ID_HEADER} header`);
   }
-  if (!UUID_REGEX.test(tenantId)) {
+  if (!tenantUuidRegex.test(tenantId)) {
     throw new AppError(400, `Invalid ${X_TENANT_ID_HEADER} (expected UUID)`);
   }
   return tenantId;
