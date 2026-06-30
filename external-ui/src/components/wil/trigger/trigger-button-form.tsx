@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import type { ButtonTriggerPayload } from '../../../services/backend/triggers';
+import type { ButtonTriggerPayload } from '../../../services/backend/trigger-types';
 import {
   ActorIdBanner,
   AllowedActorsField,

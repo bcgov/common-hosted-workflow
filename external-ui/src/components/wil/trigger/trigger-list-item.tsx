@@ -1,18 +1,29 @@
-import { IconEdit } from '@tabler/icons-react';
+import { IconEdit, IconPlayerPlay, IconForms } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import type { Trigger } from '../../../services/backend/triggers';
+import type { Trigger } from '../../../services/backend/trigger-types';
 
 interface TriggerListItemProps {
   trigger: Trigger;
   isSelected: boolean;
-  /** True for project:editor, global:admin, global:owner — shows the Edit button */
+  /** True for project:editor — shows the Edit button */
   canManage: boolean;
+  /** True while this specific trigger's callback request is in flight */
+  isCallbackPending: boolean;
   onClick: () => void;
   onEdit: () => void;
+  onTriggerCallback: () => void;
 }
 
-export function TriggerListItem({ trigger, isSelected, canManage, onClick, onEdit }: Readonly<TriggerListItemProps>) {
+export function TriggerListItem({
+  trigger,
+  isSelected,
+  canManage,
+  isCallbackPending,
+  onClick,
+  onEdit,
+  onTriggerCallback,
+}: Readonly<TriggerListItemProps>) {
   const label =
     trigger.config.type === 'chefs-form'
       ? trigger.config.formName || 'CHEFS Form Trigger'
@@ -29,20 +40,50 @@ export function TriggerListItem({ trigger, isSelected, canManage, onClick, onEdi
           <p className="text-sm font-semibold text-[var(--bc-text)] truncate">{label}</p>
           <p className="text-xs text-[var(--bc-muted)]">{typeLabel}</p>
         </div>
-        {canManage && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-          >
-            <IconEdit size={14} aria-hidden="true" />
-            Edit
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {trigger.config.type === 'chefs-form' ? (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTriggerCallback();
+              }}
+            >
+              <IconForms size={14} aria-hidden="true" />
+              Open Form
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              disabled={isCallbackPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTriggerCallback();
+              }}
+            >
+              <IconPlayerPlay size={14} aria-hidden="true" />
+              {isCallbackPending ? 'Triggering…' : 'Trigger'}
+            </Button>
+          )}
+          {canManage && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            >
+              <IconEdit size={14} aria-hidden="true" />
+              Edit
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

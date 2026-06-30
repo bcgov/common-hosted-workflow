@@ -1,11 +1,19 @@
 import { IconBolt, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import type { ChefsFormTriggerPayload, ButtonTriggerPayload, TriggerType } from '../../../services/backend/triggers';
+import type {
+  ChefsFormTriggerPayload,
+  ButtonTriggerPayload,
+  TriggerType,
+  Trigger,
+} from '../../../services/backend/trigger-types';
 import { Select } from './trigger-shared';
 import type { FormMode } from './trigger-shared';
 import { ChefsFormFields } from './trigger-chefs-form';
 import { ButtonTriggerFields } from './trigger-button-form';
+import { TriggerChefsPreview } from './trigger-chefs-preview';
+import { TriggerButtonResult } from './trigger-button-result';
+import type { ButtonCallbackStatus } from './trigger-button-result';
 
 interface TriggerFormPaneProps {
   mode: FormMode;
@@ -19,6 +27,10 @@ interface TriggerFormPaneProps {
   onCancel: () => void;
   isSaving: boolean;
   actorsLocked: boolean;
+  selectedTrigger: Trigger | null;
+  tenantId: string;
+  buttonCallbackStatus: ButtonCallbackStatus;
+  buttonCallbackError: Error | null;
 }
 
 export function TriggerFormPane({
@@ -33,6 +45,10 @@ export function TriggerFormPane({
   onCancel,
   isSaving,
   actorsLocked,
+  selectedTrigger,
+  tenantId,
+  buttonCallbackStatus,
+  buttonCallbackError,
 }: Readonly<TriggerFormPaneProps>) {
   if (mode === 'idle') {
     return (
@@ -45,13 +61,26 @@ export function TriggerFormPane({
     );
   }
 
+  if (mode === 'view' && selectedTrigger?.config.type === 'chefs-form') {
+    return <TriggerChefsPreview trigger={selectedTrigger} tenantId={tenantId} />;
+  }
+
+  if (mode === 'view' && selectedTrigger?.config.type === 'button') {
+    return <TriggerButtonResult status={buttonCallbackStatus} error={buttonCallbackError} />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
         <Label htmlFor="trigger-type">
-          Trigger Type <span className="text-red-500">*</span>
+          Trigger Type {mode === 'create' && <span className="text-red-500">*</span>}
         </Label>
-        <Select id="trigger-type" value={triggerType ?? ''} onChange={(v) => onTriggerTypeChange(v as TriggerType)}>
+        <Select
+          id="trigger-type"
+          value={triggerType ?? ''}
+          onChange={(v) => onTriggerTypeChange(v as TriggerType)}
+          disabled={mode === 'edit'}
+        >
           <option value="" disabled>
             Select a trigger type...
           </option>

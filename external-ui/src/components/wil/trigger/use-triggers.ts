@@ -1,17 +1,11 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  Trigger,
-  TriggerPayload,
-  TriggerType,
-  ChefsFormTriggerPayload,
-  ButtonTriggerPayload,
-} from '../../../services/backend/triggers';
-import { getTriggers, createTrigger, updateTrigger } from '../../../services/backend/triggers';
+import { useQuery } from '@tanstack/react-query';
+import type { Trigger, TriggerPayload } from '../../../services/backend/trigger-types';
+import { getTriggers } from '../../../services/backend/triggers';
 import type { FormMode } from './trigger-shared';
-import { DEFAULT_CHEFS_FORM } from './trigger-chefs-form';
-import { DEFAULT_BUTTON } from './trigger-button-form';
-import { applyPersonalActorDefaults } from './trigger-utils';
+import { useTriggerMutations } from './use-trigger-mutations';
+import { useTriggerFormState } from './use-trigger-form-state';
+import { useTriggerCallbackStatus } from './use-trigger-callback-status';
 
 interface UseTriggersOptions {
   tenantId: string;
@@ -20,9 +14,6 @@ interface UseTriggersOptions {
 }
 
 export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTriggersOptions) {
-  const queryClient = useQueryClient();
-
-  // Backend API: List Triggers
   const triggersQuery = useQuery({
     queryKey: ['triggers', tenantId],
     queryFn: ({ signal }) => getTriggers({ tenantId, signal }),
@@ -35,87 +26,66 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
 
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('idle');
-  const [triggerType, setTriggerType] = useState<TriggerType | null>(null);
-  const [chefsForm, setChefsForm] = useState<ChefsFormTriggerPayload>(
-    applyPersonalActorDefaults({ ...DEFAULT_CHEFS_FORM }, isPersonalTenant, userEmail),
-  );
-  const [buttonForm, setButtonForm] = useState<ButtonTriggerPayload>(
-    applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail),
-  );
   const [isSaving, setIsSaving] = useState(false);
 
-  // Backend API: Create Trigger
-  const createMutation = useMutation({
-    mutationFn: (config: TriggerPayload) => createTrigger({ tenantId, config }),
-    onSuccess: (t) => {
+  const formState = useTriggerFormState({ isPersonalTenant, userEmail });
+  const callbackStatus = useTriggerCallbackStatus();
+
+  const { createMutation, updateMutation, callbackMutation } = useTriggerMutations({
+    tenantId,
+    userEmail,
+    onCreated: (t) => {
       setLocalTriggers((prev) => [...prev, t]);
       setSelectedTriggerId(t.id);
-      queryClient.invalidateQueries({ queryKey: ['triggers', tenantId] });
     },
-  });
-
-  // Backend API: Update Trigger
-  const updateMutation = useMutation({
-    mutationFn: ({ triggerId, config }: { triggerId: string; config: TriggerPayload }) =>
-      updateTrigger({ tenantId, triggerId, config }),
-    onSuccess: (updated) => {
+    onUpdated: (updated) => {
       setLocalTriggers((prev) =>
         prev.map((t) => (t.id === updated.id ? { ...t, updatedAt: updated.updatedAt, config: updated.config } : t)),
       );
-      queryClient.invalidateQueries({ queryKey: ['triggers', tenantId] });
     },
+    onCallbackSuccess: callbackStatus.succeed,
+    onCallbackError: callbackStatus.fail,
+    onCallbackSettled: callbackStatus.settle,
   });
 
   function openCreate() {
     setSelectedTriggerId(null);
     setFormMode('create');
-    setTriggerType(null);
-    setChefsForm(applyPersonalActorDefaults({ ...DEFAULT_CHEFS_FORM }, isPersonalTenant, userEmail));
-    setButtonForm(applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail));
+    formState.resetForCreate();
+    callbackStatus.reset();
   }
 
   function openEdit(trigger: Trigger) {
     setSelectedTriggerId(trigger.id);
     setFormMode('edit');
-    if (trigger.config.type === 'chefs-form') {
-      setTriggerType('chefs-form');
-      setChefsForm({ ...trigger.config });
-    } else {
-      setTriggerType('button');
-      setButtonForm({ ...trigger.config });
-    }
+    formState.loadForEdit(trigger);
+    callbackStatus.reset();
   }
 
   function selectTrigger(trigger: Trigger, canManage: boolean) {
+    const isSameTrigger = trigger.id === selectedTriggerId;
     setSelectedTriggerId(trigger.id);
-    if (!canManage && (formMode !== 'edit' || trigger.id !== selectedTriggerId)) {
+    if (!isSameTrigger) callbackStatus.reset();
+    // Keep edit mode when clicking the trigger already being edited
+    if (formMode === 'edit' && isSameTrigger) return;
+    // Show the live CHEFS form when a CHEFS form trigger is selected
+    if (trigger.config.type === 'chefs-form') {
+      setFormMode('view');
+      return;
+    }
+    if (!canManage) {
       setFormMode('idle');
     }
   }
 
   function cancel() {
     setFormMode('idle');
-    setTriggerType(null);
     setSelectedTriggerId(null);
-  }
-
-  function changeTriggerType(t: TriggerType) {
-    setTriggerType(t);
-    if (t === 'chefs-form') {
-      setChefsForm(applyPersonalActorDefaults({ ...DEFAULT_CHEFS_FORM }, isPersonalTenant, userEmail));
-    }
-    if (t === 'button') {
-      setButtonForm(applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail));
-    }
+    callbackStatus.reset();
   }
 
   async function save() {
-    let payload: TriggerPayload | null = null;
-    if (triggerType === 'chefs-form') {
-      payload = chefsForm;
-    } else if (triggerType === 'button') {
-      payload = buttonForm;
-    }
+    const payload: TriggerPayload | null = formState.activePayload;
     if (!payload) return;
     setIsSaving(true);
     try {
@@ -123,34 +93,51 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
       else if (formMode === 'edit' && selectedTriggerId)
         await updateMutation.mutateAsync({ triggerId: selectedTriggerId, config: payload });
       setFormMode('idle');
-      setTriggerType(null);
     } finally {
       setIsSaving(false);
     }
   }
 
+  /** Fires a button trigger's callback and shows its pending/success/error result in the detail pane. */
+  function triggerCallback(trigger: Trigger) {
+    setSelectedTriggerId(trigger.id);
+    setFormMode('view');
+    callbackStatus.start(trigger.id);
+    callbackMutation.mutate(trigger.id);
+  }
+
   function getFormPaneTitle(): string {
     if (formMode === 'create') return 'Create Trigger';
     if (formMode === 'edit') return 'Edit Trigger';
+    if (formMode === 'view') {
+      const t = triggers.find((tr) => tr.id === selectedTriggerId);
+      if (t?.config.type === 'chefs-form') return t.config.formName || 'CHEFS Form';
+      if (t?.config.type === 'button') return t.config.buttonText || 'Trigger';
+    }
     return 'Details';
   }
 
   return {
     triggers,
     selectedTriggerId,
+    selectedTrigger: triggers.find((t) => t.id === selectedTriggerId) ?? null,
+    callbackTriggerId: callbackStatus.callbackTriggerId,
     formMode,
-    triggerType,
-    chefsForm,
-    buttonForm,
+    triggerType: formState.triggerType,
+    chefsForm: formState.chefsForm,
+    buttonForm: formState.buttonForm,
     isSaving,
+    buttonCallbackStatus: callbackStatus.buttonCallbackStatus,
+    buttonCallbackError: callbackStatus.buttonCallbackError,
     formPaneTitle: getFormPaneTitle(),
     openCreate,
     openEdit,
     selectTrigger,
     cancel,
-    changeTriggerType,
-    setChefsForm,
-    setButtonForm,
+    changeTriggerType: formState.changeTriggerType,
+    setChefsForm: formState.setChefsForm,
+    setButtonForm: formState.setButtonForm,
     save,
+    triggerCallback,
   };
 }
