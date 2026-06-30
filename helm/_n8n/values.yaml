@@ -18,7 +18,6 @@ customDatabase:
 envSecretName:
 env: {}
 extraEnv: {}
-
 #   WEBHOOK_URL:
 #     value: "http://webhook.domain.tld"
 
