@@ -71,14 +71,14 @@ export const listTriggersSchema = z.object({
   body: z.record(z.string(), z.unknown()).optional(),
 });
 
-/** POST /ui-api/wil/triggers/:triggerId/fire */
-export const fireTriggerSchema = z.object({
+/** POST /ui-api/wil/triggers/:triggerId/callback */
+export const callbackTriggerSchema = z.object({
   params: z.object({ triggerId: z.string().trim().min(1) }),
   query: z.record(z.string(), z.unknown()).optional(),
   body: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const fireTriggerResponseSchema = z.object({ success: z.boolean() });
+export const callbackTriggerResponseSchema = z.object({ success: z.boolean() });
 
 /** POST /ui-api/wil/triggers/:triggerId/chefs-token */
 export const getTriggerChefsTokenSchema = z.object({

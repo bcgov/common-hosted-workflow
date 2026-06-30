@@ -6,9 +6,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { TriggerActorType, TriggerMethod } from '../../../services/backend/triggers';
+import type { TriggerActorType, TriggerMethod } from '../../../services/backend/trigger-types';
 
-export type FormMode = 'idle' | 'create' | 'edit';
+export type FormMode = 'idle' | 'view' | 'create' | 'edit';
 
 // ---------------------------------------------------------------------------
 // Select — BC-themed native <select> wrapper

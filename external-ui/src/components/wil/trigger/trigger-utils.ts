@@ -1,4 +1,4 @@
-import type { Trigger, TriggerActorType } from '../../../services/backend/triggers';
+import type { Trigger, TriggerActorType } from '../../../services/backend/trigger-types';
 
 /**
  * Returns true if the logged-in user matches a trigger's allowed_actors configuration.
