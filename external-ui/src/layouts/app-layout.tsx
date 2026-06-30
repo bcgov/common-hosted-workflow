@@ -4,6 +4,7 @@ import { login, logout } from '../auth/session-actions';
 import { withAppBasePath } from '../config/base-path';
 import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
 import { useFeatureFlag } from '../state/feature-flags';
+import { FEATURE } from '../constants/feature';
 import { ToastContainer } from '../components/toast-container';
 import { IconLogin2, IconLogout } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -25,9 +26,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const canRequestAccess = permissions?.canRequestAccess ?? false;
   const canReviewAccessRequests = permissions?.canReviewAccessRequests ?? false;
   const canViewWorkflows = permissions?.canViewWorkflows ?? false;
-  const isWorkflowShareEnabled = useFeatureFlag('WORKFLOW_SHARE_FEATURE');
-  const isWilEnabled = useFeatureFlag('WIL_FEATURE');
-  const isProjectEnabled = useFeatureFlag('PROJECT_FEATURE');
+  const isWorkflowShareEnabled = useFeatureFlag(FEATURE.WORKFLOW_SHARE);
+  const isWilEnabled = useFeatureFlag(FEATURE.WIL);
+  const isProjectEnabled = useFeatureFlag(FEATURE.PROJECT);
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">

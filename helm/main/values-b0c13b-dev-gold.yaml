@@ -15,6 +15,7 @@ n8n:
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
     AUTHZ_ENVIRONMENT: dev
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
+    FEATURES_ENABLED: "workflow-share"
 
   route:
     enabled: true

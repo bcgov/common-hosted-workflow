@@ -1,9 +1,8 @@
-import { FEATURES_ENABLED } from '../../config';
-import { parseFeatureFlagConfig } from '../helpers/config-resolver';
-
 /**
  * Canonical feature flag names. Use FEATURE.<key> instead of raw strings
  * to keep flag references traceable and refactor-safe.
+ *
+ * Must stay in sync with external-hooks/src/api/constants/feature-flag.ts
  */
 export const FEATURE = {
   WIL: 'wil',
@@ -13,5 +12,3 @@ export const FEATURE = {
 } as const;
 
 export type FeatureName = (typeof FEATURE)[keyof typeof FEATURE];
-
-export const FEATURE_FLAG_REGISTRY: Record<string, boolean> = parseFeatureFlagConfig(FEATURES_ENABLED);

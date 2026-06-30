@@ -8,6 +8,7 @@ import { WorkflowInteraction } from './pages/workflow-interaction';
 import { Projects } from './pages/projects';
 import { usePermissions, useSessionLoading } from './state/session';
 import { useFeatureFlag } from './state/feature-flags';
+import { FEATURE } from './constants/feature';
 import type { ReactNode } from 'react';
 
 function FeatureFlagRoute({ flag, children }: { flag: string; children: ReactNode }) {
@@ -44,7 +45,7 @@ export function App() {
         <Route
           path="/workflows"
           element={
-            <FeatureFlagRoute flag="WORKFLOW_SHARE_FEATURE">
+            <FeatureFlagRoute flag={FEATURE.WORKFLOW_SHARE}>
               <Workflows />
             </FeatureFlagRoute>
           }
@@ -54,7 +55,7 @@ export function App() {
         <Route
           path="/workflow-interaction"
           element={
-            <FeatureFlagRoute flag="WIL_FEATURE">
+            <FeatureFlagRoute flag={FEATURE.WIL}>
               <WorkflowInteraction />
             </FeatureFlagRoute>
           }
@@ -62,7 +63,7 @@ export function App() {
         <Route
           path="/projects"
           element={
-            <FeatureFlagRoute flag="PROJECT_FEATURE">
+            <FeatureFlagRoute flag={FEATURE.PROJECT}>
               <Projects />
             </FeatureFlagRoute>
           }

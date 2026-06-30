@@ -64,6 +64,8 @@ n8n:
     N8N_LICENSE_AUTO_RENEW_ENABLED: "false"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/insights/#insights-environment-variables
     N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
+    # Feature flags — comma-separated list of enabled features
+    FEATURES_ENABLED: "tenant-project-sync"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/timezone-localization/
     GENERIC_TIMEZONE: "America/Vancouver"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/deployment

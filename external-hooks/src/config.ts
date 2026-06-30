@@ -21,7 +21,7 @@ export const IS_DEVELOPMENT = NODE_ENV === 'development';
 
 // Feature flags
 export const ENABLE_SWAGGER_UI = process.env.ENABLE_SWAGGER_UI;
-export const FEATURE_FLAG_CONFIG = process.env.FEATURE_FLAG_CONFIG ?? '';
+export const FEATURES_ENABLED = process.env.FEATURES_ENABLED ?? '';
 
 // External UI / Assets
 export const EXTERNAL_UI_PATH = process.env.EXTERNAL_UI_PATH ?? '';

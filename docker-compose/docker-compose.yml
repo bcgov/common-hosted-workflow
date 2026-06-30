@@ -76,7 +76,7 @@ x-n8n-env: &n8n-env
   # CSTAR tenant management service
   CSTAR_BASE_URL: ${CSTAR_BASE_URL}
   # Feature flags
-  FEATURE_FLAG_CONFIG: ${FEATURE_FLAG_CONFIG}
+  FEATURES_ENABLED: ${FEATURES_ENABLED}
 
 services:
   sdg-mock-app:

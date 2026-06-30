@@ -9,6 +9,7 @@ import {
   isManagedProjectRole,
   type ManagedProjectRole,
 } from '../constants/project-roles';
+import { FEATURE } from '../constants/feature-flag';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('TenantProjectSyncService');
@@ -40,8 +41,8 @@ export class TenantProjectSyncService {
    * 4. Adds/updates/removes the user's project relation based on current CSTAR roles
    */
   async syncTenantsForUser(params: SyncTenantsForUserParams): Promise<void> {
-    if (!this.featureFlagService.isFeatureEnabled('TENANT_PROJECT_SYNC')) {
-      log.debug('Tenant project sync disabled via TENANT_PROJECT_SYNC feature flag');
+    if (!this.featureFlagService.isFeatureEnabled(FEATURE.TENANT_PROJECT_SYNC)) {
+      log.debug('Tenant project sync disabled via tenant-project-sync feature flag');
       return;
     }
 
