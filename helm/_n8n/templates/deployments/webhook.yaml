@@ -84,6 +84,8 @@ spec:
                   name: {{ include "_.fullname" . }}-shared
                   key: runners-auth-token
           {{- $env := merge (.Values.env | default dict) (.Values.webhook.env | default dict) -}}
+          {{- $nodesExclude := include "_.nodesExclude" . -}}
+          {{- if $nodesExclude -}}{{- $_ := set $env "NODES_EXCLUDE" $nodesExclude -}}{{- end -}}
             {{- range $k, $v := $env }}
             - name: {{ $k | quote }}
               value: {{ $v | quote }}

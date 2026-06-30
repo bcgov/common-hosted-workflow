@@ -51,6 +51,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Merge baseExcludedNodes + extraExcludedNodes
+*/}}
+{{- define "_.nodesExclude" -}}
+{{- $nodes := concat (.Values.baseExcludedNodes | default list) (.Values.extraExcludedNodes | default list) -}}
+{{- if $nodes -}}{{- toJson $nodes -}}{{- end -}}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "_.serviceAccountName" -}}
