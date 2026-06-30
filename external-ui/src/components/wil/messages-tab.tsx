@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getWilMessages } from '../../services/backend/wil';
 import type { WilMessageItem } from '../../services/backend/wil';
-import { extractErrorMessage } from '../action-handlers/shared/error-utils';
+import { extractErrorMessage } from '../shared/error-utils';
 
 function MessageStatusBadge({ status }: Readonly<{ status: WilMessageItem['status'] }>) {
   if (status === 'active') {

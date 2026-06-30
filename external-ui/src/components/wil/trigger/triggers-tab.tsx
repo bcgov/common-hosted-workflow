@@ -21,11 +21,15 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
   const {
     triggers,
     selectedTriggerId,
+    selectedTrigger,
+    callbackTriggerId,
     formMode,
     triggerType,
     chefsForm,
     buttonForm,
     isSaving,
+    buttonCallbackStatus,
+    buttonCallbackError,
     formPaneTitle,
     openCreate,
     openEdit,
@@ -35,6 +39,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
     setChefsForm,
     setButtonForm,
     save,
+    triggerCallback,
   } = useTriggers({ tenantId, isPersonalTenant, userEmail });
 
   const visibleTriggers = canManage
@@ -60,8 +65,16 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
               trigger={trigger}
               isSelected={selectedTriggerId === trigger.id}
               canManage={canManage}
+              isCallbackPending={callbackTriggerId === trigger.id}
               onClick={() => selectTrigger(trigger, canManage)}
               onEdit={() => openEdit(trigger)}
+              onTriggerCallback={() => {
+                if (trigger.config.type === 'chefs-form') {
+                  selectTrigger(trigger, canManage);
+                } else {
+                  triggerCallback(trigger);
+                }
+              }}
             />
           ))
         )}
@@ -82,6 +95,10 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
           onCancel={cancel}
           isSaving={isSaving}
           actorsLocked={isPersonalTenant}
+          selectedTrigger={selectedTrigger}
+          tenantId={tenantId}
+          buttonCallbackStatus={buttonCallbackStatus}
+          buttonCallbackError={buttonCallbackError}
         />
       </div>
     </div>

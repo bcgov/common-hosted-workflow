@@ -5,7 +5,7 @@ import { IconLoader2, IconCheck } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
-import { extractErrorMessage } from './shared/error-utils';
+import { extractErrorMessage } from '../shared/error-utils';
 
 interface GetApprovalHandlerProps {
   action: WilActionItem;
