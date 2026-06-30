@@ -18,6 +18,13 @@ customDatabase:
 envSecretName:
 env: {}
 extraEnv: {}
+
+# Nodes disabled in all environments
+baseExcludedNodes:
+  - "n8n-nodes-base.readWriteFile"  # Read/Write Files from Disk — no persistent local filesystem in containers
+
+# Additional nodes to exclude on top of baseExcludedNodes
+extraExcludedNodes: []
 #   WEBHOOK_URL:
 #     value: "http://webhook.domain.tld"
 
