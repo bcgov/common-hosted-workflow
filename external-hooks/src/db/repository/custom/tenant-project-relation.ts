@@ -30,7 +30,7 @@ export class TenantProjectRelationRepository {
   }
 
   /** Inserts a tenant/project mapping. Caller must handle unique constraint violations. */
-  async insert(params: { tenantId: string; projectId: string }): Promise<void> {
+  async insert(params: { tenantId: string; projectId: string; projectType?: string }): Promise<void> {
     await this.db.insert(tenantProjectRelation).values(params);
   }
 
@@ -39,7 +39,7 @@ export class TenantProjectRelationRepository {
    * Used during concurrent login scenarios where multiple requests may try
    * to create the same tenant-to-project mapping simultaneously.
    */
-  async insertIgnoreConflict(params: { tenantId: string; projectId: string }): Promise<void> {
+  async insertIgnoreConflict(params: { tenantId: string; projectId: string; projectType?: string }): Promise<void> {
     await this.db
       .insert(tenantProjectRelation)
       .values(params)
@@ -54,13 +54,13 @@ export class TenantProjectRelationRepository {
   }
 
   /** Upserts a tenant-project mapping. Uses the unique index on project_id for conflict resolution. */
-  async upsertByProjectId(params: { tenantId: string; projectId: string }): Promise<void> {
+  async upsertByProjectId(params: { tenantId: string; projectId: string; projectType?: string }): Promise<void> {
     await this.db
       .insert(tenantProjectRelation)
       .values(params)
       .onConflictDoUpdate({
         target: tenantProjectRelation.projectId,
-        set: { tenantId: params.tenantId },
+        set: { tenantId: params.tenantId, projectType: params.projectType ?? null },
       });
   }
 
@@ -73,5 +73,15 @@ export class TenantProjectRelationRepository {
       })
       .from(tenantProjectRelation);
     return new Map(rows.map((r: { projectId: string; tenantId: string }) => [r.projectId, r.tenantId]));
+  }
+
+  /** Returns the first relation row for a tenant, including projectType. */
+  async getRowByTenantId(tenantId: string): Promise<typeof tenantProjectRelation.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(tenantProjectRelation)
+      .where(eq(tenantProjectRelation.tenantId, tenantId))
+      .limit(1);
+    return row ?? null;
   }
 }

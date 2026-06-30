@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { credentialEntity, type CredentialEntityType } from '../../schema/credential-entity';
 import { triggerCredentialRelation } from '../../schema/trigger-credential-relation';
 
@@ -100,5 +100,18 @@ export class TriggerCredentialRelationRepository {
       )
       .returning();
     return row ?? null;
+  }
+
+  /**
+   * Returns the set of trigger IDs (from the given list) that have at least one linked credential.
+   * Used to determine which chefs-form triggers should show the API key placeholder in responses.
+   */
+  async listTriggerIdsWithCredentials(triggerIds: string[]): Promise<Set<string>> {
+    if (triggerIds.length === 0) return new Set();
+    const rows = await this.db
+      .selectDistinct({ triggerId: triggerCredentialRelation.triggerId })
+      .from(triggerCredentialRelation)
+      .where(inArray(triggerCredentialRelation.triggerId, triggerIds));
+    return new Set(rows.map((r: { triggerId: string }) => r.triggerId));
   }
 }
