@@ -35,3 +35,18 @@ export const actionRequestPriorityZodEnum = z.enum(ACTION_REQUEST_PRIORITY_VALUE
 export const CALLBACK_HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'NONE'] as const;
 export type CallbackHttpMethod = (typeof CALLBACK_HTTP_METHODS)[number];
 export const callbackHttpMethodZodEnum = z.enum(CALLBACK_HTTP_METHODS);
+
+/** Workflow trigger types. */
+export const WORKFLOW_TRIGGER_TYPES = ['chefs-form', 'button'] as const;
+export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
+export const workflowTriggerTypeZodEnum = z.enum(WORKFLOW_TRIGGER_TYPES);
+
+/** Allowed HTTP methods for workflow trigger invocation. */
+export const TRIGGER_HTTP_METHODS = ['GET', 'POST'] as const;
+export type TriggerHttpMethod = (typeof TRIGGER_HTTP_METHODS)[number];
+export const triggerHttpMethodZodEnum = z.enum(TRIGGER_HTTP_METHODS);
+
+/** Actor types for workflow trigger visibility/access control. */
+export const TRIGGER_ACTOR_TYPES = ['role', 'user', 'group', 'other'] as const;
+export type TriggerActorType = (typeof TRIGGER_ACTOR_TYPES)[number];
+export const triggerActorTypeZodEnum = z.enum(TRIGGER_ACTOR_TYPES);
