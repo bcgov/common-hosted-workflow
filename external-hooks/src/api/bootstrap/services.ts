@@ -1,5 +1,6 @@
 import { AccessRequestService } from '../services/access-request';
 import { ActionService } from '../services/action.service';
+import { TriggerService } from '../services/trigger.service';
 import { AuthService, type BaseAuthService } from '../services/auth';
 import { ChefsService } from '../services/chefs.service';
 import { CstarService } from '../services/cstar.service';
@@ -60,6 +61,7 @@ export async function buildApiServices(
   return {
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
+    trigger: new TriggerService(customRepositories),
     chefs: new ChefsService(),
     cstar: cstarService,
     featureFlag,

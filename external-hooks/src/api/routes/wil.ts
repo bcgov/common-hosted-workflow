@@ -10,11 +10,13 @@ import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilLis
 import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { getBearerToken } from '../helpers/ui-oidc-session';
+import { buildTriggerRouter } from './triggers';
 import type { z } from 'zod';
 
 const CALLBACK_TIMEOUT_MS = 30_000;
 
-export function buildWilRouter({ services, customRepositories }: ApiRouteContext) {
+export function buildWilRouter(routeContext: ApiRouteContext) {
+  const { services, customRepositories } = routeContext;
   const router = Router();
 
   /**
@@ -202,6 +204,8 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
       OkResponse(res, { success: true, message: 'Action completed' });
     },
   );
+
+  router.use(buildTriggerRouter(routeContext));
 
   return router;
 }
