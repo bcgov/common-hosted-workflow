@@ -20,6 +20,7 @@ export const tenantProjectRelation = pgTable(
   {
     tenantId: uuid('tenant_id').notNull(),
     projectId: varchar('project_id', { length: 50 }).notNull(),
+    projectType: varchar('project_type', { length: 50 }),
   },
   (table) => [
     primaryKey({ columns: [table.tenantId, table.projectId] }),
@@ -99,6 +100,7 @@ export const actionRequest = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     status: varchar('status', { length: 50 }).notNull().default('pending'),
+    actionTitle: varchar('action_title', { length: 255 }),
     priority: varchar('priority', { length: 20 }).notNull().default('normal'),
     dueDate: timestamp('due_date', { withTimezone: true }),
     checkIn: timestamp('check_in', { withTimezone: true }),
