@@ -1,8 +1,9 @@
 import { inArray } from 'drizzle-orm';
 import { workflowTrigger } from '../../db/schema/workflow-trigger';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
-import { encrypt } from '../utils/secret-box';
+import { encrypt, decrypt } from '../utils/secret-box';
 import { WIL_ENCRYPTION_KEY, WIL_ENCRYPTION_KEY_ACTIVE, CHEFS_API_KEY_PLACEHOLDER } from '@config';
+import { WorkflowTriggerTypeEnum } from '../constants/enum';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { formatDbErrorForLog } from '../helpers/db-helper';
@@ -64,7 +65,7 @@ export class TriggerService {
   }
 
   async create(params: CreateTriggerParams) {
-    const isChefsForm = params.triggerType === 'chefs-form';
+    const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
     const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
 
@@ -106,7 +107,7 @@ export class TriggerService {
     });
     if (!existing) throw new AppError(404, 'Trigger not found');
 
-    const isChefsForm = existing.triggerType === 'chefs-form';
+    const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
     const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
 
@@ -140,6 +141,23 @@ export class TriggerService {
       });
       throw new AppError(500, 'Internal Server Error');
     }
+  }
+
+  async getChefsApiKeyForTrigger(triggerId: string): Promise<string> {
+    if (!WIL_ENCRYPTION_KEY) {
+      throw new AppError(500, 'Encryption key not configured');
+    }
+
+    const credential = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
+      triggerId,
+      type: 'chefs_api_key',
+    });
+
+    if (!credential) {
+      throw new AppError(400, 'No CHEFS API key credential found for this trigger');
+    }
+
+    return decrypt(credential.data as string, WIL_ENCRYPTION_KEY);
   }
 
   private async persistChefsCredential(triggerId: string, apiKey: string): Promise<void> {

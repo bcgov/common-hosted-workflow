@@ -2,6 +2,7 @@ import { IconEdit, IconPlayerPlay, IconForms } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Trigger } from '../../../services/backend/trigger-types';
+import { TRIGGER_TYPES } from '../../../constants/constants';
 
 interface TriggerListItemProps {
   trigger: Trigger;
@@ -25,10 +26,10 @@ export function TriggerListItem({
   onTriggerCallback,
 }: Readonly<TriggerListItemProps>) {
   const label =
-    trigger.config.type === 'chefs-form'
+    trigger.config.type === TRIGGER_TYPES.CHEFS_FORM
       ? trigger.config.formName || 'CHEFS Form Trigger'
       : trigger.config.buttonText || 'Button Trigger';
-  const typeLabel = trigger.config.type === 'chefs-form' ? 'CHEFS Form' : 'Button';
+  const typeLabel = trigger.config.type === TRIGGER_TYPES.CHEFS_FORM ? 'CHEFS Form' : 'Button';
 
   return (
     <Card
@@ -41,7 +42,7 @@ export function TriggerListItem({
           <p className="text-xs text-[var(--bc-muted)]">{typeLabel}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {trigger.config.type === 'chefs-form' ? (
+          {trigger.config.type === TRIGGER_TYPES.CHEFS_FORM ? (
             <Button
               type="button"
               variant="default"

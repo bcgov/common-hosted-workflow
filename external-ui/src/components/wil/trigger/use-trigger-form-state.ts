@@ -5,6 +5,7 @@ import type {
   Trigger,
   TriggerType,
 } from '../../../services/backend/trigger-types';
+import { TRIGGER_TYPES } from '../../../constants/constants';
 import { DEFAULT_CHEFS_FORM } from './trigger-chefs-form';
 import { DEFAULT_BUTTON } from './trigger-button-form';
 import { applyPersonalActorDefaults } from './trigger-utils';
@@ -32,25 +33,25 @@ export function useTriggerFormState({ isPersonalTenant, userEmail }: UseTriggerF
   }
 
   function loadForEdit(trigger: Trigger) {
-    if (trigger.config.type === 'chefs-form') {
-      setTriggerType('chefs-form');
+    if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
+      setTriggerType(TRIGGER_TYPES.CHEFS_FORM);
       setChefsForm({ ...trigger.config });
     } else {
-      setTriggerType('button');
+      setTriggerType(TRIGGER_TYPES.BUTTON);
       setButtonForm({ ...trigger.config });
     }
   }
 
   function changeTriggerType(t: TriggerType) {
     setTriggerType(t);
-    if (t === 'chefs-form') setChefsForm(freshChefsForm());
-    if (t === 'button') setButtonForm(freshButtonForm());
+    if (t === TRIGGER_TYPES.CHEFS_FORM) setChefsForm(freshChefsForm());
+    if (t === TRIGGER_TYPES.BUTTON) setButtonForm(freshButtonForm());
   }
 
   let activePayload = null;
-  if (triggerType === 'chefs-form') {
+  if (triggerType === TRIGGER_TYPES.CHEFS_FORM) {
     activePayload = chefsForm;
-  } else if (triggerType === 'button') {
+  } else if (triggerType === TRIGGER_TYPES.BUTTON) {
     activePayload = buttonForm;
   }
 
