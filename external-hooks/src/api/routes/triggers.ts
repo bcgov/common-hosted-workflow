@@ -104,6 +104,33 @@ function appendBodyAsQueryParams(baseUrl: string, body: Record<string, unknown>)
   return url.toString();
 }
 
+/**
+ * Resolves the trigger for the given triggerId, checks that the caller is either a manager
+ * or an explicitly allowed actor, and sends a 403 + returns null if not.
+ * Returns the session, tenantId, and trigger row on success.
+ */
+async function resolveTriggerAccess(
+  req: Request,
+  res: Response,
+  triggerId: string,
+  services: ApiRouteContext['services'],
+  customRepositories: ApiRouteContext['customRepositories'],
+) {
+  const session = (req as unknown as { session: UiResolvedSession }).session;
+  const tenantId = req.header(X_TENANT_ID_HEADER)?.trim() ?? '';
+  const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
+
+  const trigger = await services.trigger.getById({ triggerId, projectIds: allowedProjectIds });
+
+  const isManager = await canManageTriggers(tenantId, session, customRepositories);
+  if (!isManager && !isActorAllowed(trigger, session, tenantId)) {
+    ForbiddenResponse(res);
+    return null;
+  }
+
+  return { session, tenantId, trigger };
+}
+
 export function buildTriggerRouter(routeContext: ApiRouteContext) {
   const { services, customRepositories } = routeContext;
   const router = Router();
@@ -224,18 +251,10 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     '/triggers/:triggerId/chefs-token',
     createRequestParser(getTriggerChefsTokenSchema),
     async (req: UiApiTypedRequest<z.infer<typeof getTriggerChefsTokenSchema>>, res: Response) => {
-      const session = (req as unknown as { session: UiResolvedSession }).session;
-      const tenantId = req.header(X_TENANT_ID_HEADER)?.trim();
-      const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
-
       const { triggerId } = req.parsed.params;
-      const trigger = await services.trigger.getById({ triggerId, projectIds: allowedProjectIds });
-
-      const isManager = await canManageTriggers(tenantId ?? '', session, customRepositories);
-      if (!isManager && !isActorAllowed(trigger, session, tenantId ?? '')) {
-        ForbiddenResponse(res);
-        return;
-      }
+      const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories);
+      if (!ctx) return;
+      const { trigger } = ctx;
 
       if (trigger.triggerType !== WorkflowTriggerTypeEnum.CHEFS_FORM) {
         throw new AppError(400, 'Trigger is not a CHEFS form trigger');
@@ -271,18 +290,10 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     '/triggers/:triggerId/callback',
     createRequestParser(callbackTriggerSchema),
     async (req: UiApiTypedRequest<z.infer<typeof callbackTriggerSchema>>, res: Response) => {
-      const session = (req as unknown as { session: UiResolvedSession }).session;
-      const tenantId = req.header(X_TENANT_ID_HEADER)?.trim();
-      const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
-
       const { triggerId } = req.parsed.params;
-      const trigger = await services.trigger.getById({ triggerId, projectIds: allowedProjectIds });
-
-      const isManager = await canManageTriggers(tenantId ?? '', session, customRepositories);
-      if (!isManager && !isActorAllowed(trigger, session, tenantId ?? '')) {
-        ForbiddenResponse(res);
-        return;
-      }
+      const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories);
+      if (!ctx) return;
+      const { session, trigger } = ctx;
 
       const outboundBody = buildTriggerOutboundBody(
         trigger,
