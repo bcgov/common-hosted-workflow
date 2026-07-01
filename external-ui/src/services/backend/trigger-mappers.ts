@@ -1,4 +1,5 @@
 import type { ApiTriggerItem, Trigger, TriggerActorType, TriggerMethod, TriggerPayload } from './trigger-types';
+import { TRIGGER_TYPES } from '../../constants/constants';
 
 /** Converts the FE's comma-separated allowedActors string to the array the API expects. */
 export function splitActors(raw: string): string[] {
@@ -19,9 +20,9 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
 
   let config: TriggerPayload;
 
-  if (item.triggerType === 'chefs-form') {
+  if (item.triggerType === TRIGGER_TYPES.CHEFS_FORM) {
     config = {
-      type: 'chefs-form',
+      type: TRIGGER_TYPES.CHEFS_FORM,
       formId: (meta.formId as string) ?? '',
       formName: (meta.formName as string) ?? '',
       // A non-empty placeholder value signals that a credential exists on the server.
@@ -35,7 +36,7 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
     };
   } else {
     config = {
-      type: 'button',
+      type: TRIGGER_TYPES.BUTTON,
       buttonText: (meta.buttonText as string) ?? '',
       webhookUrl: item.triggerUrl,
       postBody: (meta.postBody as string) ?? '',
@@ -51,9 +52,9 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
 
 /** Builds the POST /triggers request body from the FE payload. */
 export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
-  if (config.type === 'chefs-form') {
+  if (config.type === TRIGGER_TYPES.CHEFS_FORM) {
     return {
-      triggerType: 'chefs-form' as const,
+      triggerType: TRIGGER_TYPES.CHEFS_FORM,
       triggerUrl: config.callbackWebhookUrl,
       triggerMethod: config.triggerMethod,
       metadata: {
@@ -68,7 +69,7 @@ export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
     };
   }
   return {
-    triggerType: 'button' as const,
+    triggerType: TRIGGER_TYPES.BUTTON,
     triggerUrl: config.webhookUrl,
     triggerMethod: config.triggerMethod,
     metadata: {
@@ -84,7 +85,7 @@ export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
 
 /** Builds the PUT /triggers/:id request body from the FE payload. */
 export function payloadToUpdateBody(config: TriggerPayload, actorId: string) {
-  if (config.type === 'chefs-form') {
+  if (config.type === TRIGGER_TYPES.CHEFS_FORM) {
     // Always send apiKey as-is; the backend decides whether it's a placeholder
     // (keep existing credential), empty (no change), or a real new value to persist.
     const metadata: Record<string, unknown> = {

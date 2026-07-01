@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { workflowTrigger } from '../../db/schema/workflow-trigger';
-import { workflowTriggerTypeZodEnum, triggerHttpMethodZodEnum, triggerActorTypeZodEnum } from '../constants/enum';
+import {
+  workflowTriggerTypeZodEnum,
+  triggerHttpMethodZodEnum,
+  triggerActorTypeZodEnum,
+  WorkflowTriggerTypeEnum,
+} from '../constants/enum';
 import { CHEFS_API_KEY_PLACEHOLDER } from '@config';
 
 /** Shape of a trigger as returned by the API (no raw credentials). */
@@ -113,7 +118,7 @@ export function mapTriggerRowToResponse(row: typeof workflowTrigger.$inferSelect
   }
 
   // Placeholder for chefs-form when a credential is stored server-side
-  if (row.triggerType === 'chefs-form' && hasCredential) {
+  if (row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM && hasCredential) {
     metadata.apiKey = CHEFS_API_KEY_PLACEHOLDER;
   }
 

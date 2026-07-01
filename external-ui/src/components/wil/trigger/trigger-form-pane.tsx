@@ -7,6 +7,7 @@ import type {
   TriggerType,
   Trigger,
 } from '../../../services/backend/trigger-types';
+import { TRIGGER_TYPES } from '../../../constants/constants';
 import { Select } from './trigger-shared';
 import type { FormMode } from './trigger-shared';
 import { ChefsFormFields } from './trigger-chefs-form';
@@ -61,11 +62,11 @@ export function TriggerFormPane({
     );
   }
 
-  if (mode === 'view' && selectedTrigger?.config.type === 'chefs-form') {
+  if (mode === 'view' && selectedTrigger?.config.type === TRIGGER_TYPES.CHEFS_FORM) {
     return <TriggerChefsPreview trigger={selectedTrigger} tenantId={tenantId} />;
   }
 
-  if (mode === 'view' && selectedTrigger?.config.type === 'button') {
+  if (mode === 'view' && selectedTrigger?.config.type === TRIGGER_TYPES.BUTTON) {
     return <TriggerButtonResult status={buttonCallbackStatus} error={buttonCallbackError} />;
   }
 
@@ -84,11 +85,11 @@ export function TriggerFormPane({
           <option value="" disabled>
             Select a trigger type...
           </option>
-          <option value="chefs-form">CHEFS Form</option>
-          <option value="button">Button</option>
+          <option value={TRIGGER_TYPES.CHEFS_FORM}>CHEFS Form</option>
+          <option value={TRIGGER_TYPES.BUTTON}>Button</option>
         </Select>
       </div>
-      {triggerType === 'chefs-form' && (
+      {triggerType === TRIGGER_TYPES.CHEFS_FORM && (
         <ChefsFormFields
           value={chefsForm}
           onChange={onChefsFormChange}
@@ -98,7 +99,7 @@ export function TriggerFormPane({
           actorsLocked={actorsLocked}
         />
       )}
-      {triggerType === 'button' && (
+      {triggerType === TRIGGER_TYPES.BUTTON && (
         <ButtonTriggerFields
           value={buttonForm}
           onChange={onButtonFormChange}
