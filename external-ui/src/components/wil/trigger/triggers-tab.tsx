@@ -4,6 +4,7 @@ import { TRIGGER_MANAGE_ROLE_VALUES } from '../../../lib/trigger-manage-roles';
 import { useHasTenantRoles, useTenantRolesById } from '../../../state/session';
 import { useTriggers } from './use-triggers';
 import { canUserSeeTrigger } from './trigger-utils';
+import { TRIGGER_TYPES } from '../../../constants/constants';
 import { TriggerListItem } from './trigger-list-item';
 import { TriggerFormPane } from './trigger-form-pane';
 
@@ -69,7 +70,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
               onClick={() => selectTrigger(trigger, canManage)}
               onEdit={() => openEdit(trigger)}
               onTriggerCallback={() => {
-                if (trigger.config.type === 'chefs-form') {
+                if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
                   selectTrigger(trigger, canManage);
                 } else {
                   triggerCallback(trigger);
