@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Trigger, TriggerPayload } from '../../../services/backend/trigger-types';
+import { TRIGGER_TYPES } from '../../../constants/constants';
 import { getTriggers } from '../../../services/backend/triggers';
 import type { FormMode } from './trigger-shared';
 import { useTriggerMutations } from './use-trigger-mutations';
@@ -69,7 +70,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     // Keep edit mode when clicking the trigger already being edited
     if (formMode === 'edit' && isSameTrigger) return;
     // Show the live CHEFS form when a CHEFS form trigger is selected
-    if (trigger.config.type === 'chefs-form') {
+    if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
       setFormMode('view');
       return;
     }
@@ -111,8 +112,8 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     if (formMode === 'edit') return 'Edit Trigger';
     if (formMode === 'view') {
       const t = triggers.find((tr) => tr.id === selectedTriggerId);
-      if (t?.config.type === 'chefs-form') return t.config.formName || 'CHEFS Form';
-      if (t?.config.type === 'button') return t.config.buttonText || 'Trigger';
+      if (t?.config.type === TRIGGER_TYPES.CHEFS_FORM) return t.config.formName || 'CHEFS Form';
+      if (t?.config.type === TRIGGER_TYPES.BUTTON) return t.config.buttonText || 'Trigger';
     }
     return 'Details';
   }

@@ -20,20 +20,16 @@ import {
 import { OkResponse, CreatedResponse, ForbiddenResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { X_TENANT_ID_HEADER } from '../constants/headers';
-import { decrypt } from '../utils/secret-box';
-import { WIL_ENCRYPTION_KEY } from '@config';
+import { WorkflowTriggerTypeEnum } from '../constants/enum';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
+import { callWebhook } from './helpers/webhook-fire';
+import { CALLBACK_TIMEOUT_MS, TRIGGER_MANAGE_ROLE, TRIGGER_FAILED_MESSAGE } from './constants/constants';
 import type { z } from 'zod';
 
 const log = createLogger('TriggerRoutes');
-const TRIGGER_MANAGE_ROLE = 'project:editor';
-const FIRE_TIMEOUT_MS = 30_000;
-const TRIGGER_FAILED_MESSAGE = 'Unable to trigger the workflow. Please try again or contact your administrator.';
 
-/**
- * Returns true if the user may create or edit triggers for the given tenant.
- */
+/** Returns true if the user may create or edit triggers for the given tenant. */
 async function canManageTriggers(
   tenantId: string,
   session: UiResolvedSession,
@@ -70,6 +66,44 @@ function isActorAllowed(
   return false;
 }
 
+/**
+ * Builds the outbound request body for a trigger callback.
+ * actorId is always included so downstream workflows can identify the initiating user.
+ */
+function buildTriggerOutboundBody(
+  trigger: { triggerType: string; metadata: Record<string, unknown> },
+  requestBody: Record<string, unknown>,
+  actorEmail: string,
+): Record<string, unknown> {
+  const outbound: Record<string, unknown> = {};
+  const meta = trigger.metadata;
+
+  if (trigger.triggerType === WorkflowTriggerTypeEnum.BUTTON && typeof meta.postBody === 'string' && meta.postBody) {
+    try {
+      Object.assign(outbound, JSON.parse(meta.postBody));
+    } catch {
+      outbound.body = meta.postBody;
+    }
+  }
+
+  if (trigger.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM && Object.keys(requestBody).length > 0) {
+    Object.assign(outbound, requestBody);
+  }
+
+  outbound.actorId = actorEmail;
+
+  return outbound;
+}
+
+/** Appends body fields as query params for GET requests; returns the modified URL string. */
+function appendBodyAsQueryParams(baseUrl: string, body: Record<string, unknown>): string {
+  const url = new URL(baseUrl);
+  for (const [key, value] of Object.entries(body)) {
+    url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+  }
+  return url.toString();
+}
+
 export function buildTriggerRouter(routeContext: ApiRouteContext) {
   const { services, customRepositories } = routeContext;
   const router = Router();
@@ -82,9 +116,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     );
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
 
-    // Batch-check which chefs-form triggers have a stored credential so the response
-    // can include the placeholder instead of returning an empty apiKey field.
-    const chefsFormIds = rows.filter((r) => r.triggerType === 'chefs-form').map((r) => r.id);
+    const chefsFormIds = rows.filter((r) => r.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM).map((r) => r.id);
     const triggerIdsWithCreds =
       chefsFormIds.length > 0
         ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials(chefsFormIds)
@@ -135,9 +167,8 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         createdBy: createdBy ?? session.email ?? null,
       });
 
-      // After create, check if credential was linked (for the placeholder in the response)
       const triggerIdsWithCreds =
-        row.triggerType === 'chefs-form'
+        row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM
           ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials([row.id])
           : new Set<string>();
 
@@ -176,9 +207,8 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         updatedBy: updatedBy ?? session.email ?? '',
       });
 
-      // Check credential presence after update (apiKey may have been added or remained)
       const triggerIdsWithCreds =
-        row.triggerType === 'chefs-form'
+        row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM
           ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials([row.id])
           : new Set<string>();
 
@@ -207,7 +237,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         return;
       }
 
-      if (trigger.triggerType !== 'chefs-form') {
+      if (trigger.triggerType !== WorkflowTriggerTypeEnum.CHEFS_FORM) {
         throw new AppError(400, 'Trigger is not a CHEFS form trigger');
       }
 
@@ -219,20 +249,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         throw new AppError(400, 'Missing formId in trigger metadata');
       }
 
-      if (!WIL_ENCRYPTION_KEY) {
-        throw new AppError(500, 'Encryption key not configured');
-      }
-
-      const credential = await customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
-        triggerId,
-        type: 'chefs_api_key',
-      });
-
-      if (!credential) {
-        throw new AppError(400, 'No CHEFS API key credential found for this trigger');
-      }
-
-      const formApiKey = decrypt(credential.data as string, WIL_ENCRYPTION_KEY);
+      const formApiKey = await services.trigger.getChefsApiKeyForTrigger(triggerId);
       const tokenResult = await services.chefs.getFormToken({ formId, formApiKey });
 
       OkResponse(
@@ -247,9 +264,8 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
    * POST /wil/triggers/:triggerId/callback — execute a trigger's webhook URL.
    *
    * Accessible to managers and any actor explicitly listed in allowed_actors.
-   * Forwards the request to trigger_url using trigger_method, optionally appending
-   * the actor's email when includeActorId is set in the trigger's metadata.
-   *
+   * Always appends the actor's email as actorId so downstream workflows can identify the initiator.
+   * For GET triggers, body fields are forwarded as query params instead.
    */
   router.post(
     '/triggers/:triggerId/callback',
@@ -268,73 +284,38 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         return;
       }
 
-      const meta = trigger.metadata as Record<string, unknown>;
-      const includeActorId = (meta.includeActorId as boolean) ?? false;
-
-      // Build the outbound body
-      const outboundBody: Record<string, unknown> = {};
-
-      if (trigger.triggerType === 'button' && typeof meta.postBody === 'string' && meta.postBody) {
-        try {
-          Object.assign(outboundBody, JSON.parse(meta.postBody));
-        } catch {
-          // postBody is not valid JSON — send as-is under a key
-          outboundBody.body = meta.postBody;
-        }
-      }
-
-      // For CHEFS form triggers, merge any form submission data provided in the request body
-      if (trigger.triggerType === 'chefs-form' && req.parsed.body && Object.keys(req.parsed.body).length > 0) {
-        Object.assign(outboundBody, req.parsed.body);
-      }
-
-      if (includeActorId) {
-        outboundBody.actorId = session.email;
-      }
+      const outboundBody = buildTriggerOutboundBody(
+        trigger,
+        (req.parsed.body ?? {}) as Record<string, unknown>,
+        session.email,
+      );
 
       const method = trigger.triggerMethod.toUpperCase();
+      const requestUrl =
+        method === 'GET' && Object.keys(outboundBody).length > 0
+          ? appendBodyAsQueryParams(trigger.triggerUrl, outboundBody)
+          : trigger.triggerUrl;
 
-      // GET requests carry no body — forward formId/submission_id/actorId as query params instead.
-      let requestUrl = trigger.triggerUrl;
-      if (method === 'GET' && Object.keys(outboundBody).length > 0) {
-        const url = new URL(trigger.triggerUrl);
-        for (const [key, value] of Object.entries(outboundBody)) {
-          url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
-        }
-        requestUrl = url.toString();
-      }
+      const upstream = await callWebhook({
+        url: requestUrl,
+        method,
+        body: method === 'GET' ? undefined : JSON.stringify(outboundBody),
+        timeoutMs: CALLBACK_TIMEOUT_MS,
+        timeoutMessage: 'Trigger execution timed out',
+        unreachableMessage: 'Trigger URL unreachable',
+      });
 
-      let upstreamResponse: globalThis.Response;
-      try {
-        upstreamResponse = await fetch(requestUrl, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: method === 'GET' ? undefined : JSON.stringify(outboundBody),
-          signal: AbortSignal.timeout(FIRE_TIMEOUT_MS),
-        });
-      } catch (err) {
-        if (err instanceof Error && err.name === 'TimeoutError') {
-          throw new AppError(504, 'Trigger execution timed out');
-        }
-        throw new AppError(502, 'Trigger URL unreachable');
-      }
-
-      if (!upstreamResponse.ok) {
-        const upstreamText = await upstreamResponse.text();
-        // Log the raw upstream detail for debugging, but never forward it to the FE —
-        // webhook error bodies (e.g. n8n's "webhook not registered") expose internal
-        // implementation details that aren't meaningful to an end user.
+      if (!upstream.ok) {
+        const upstreamText = await upstream.text();
         log.warn('Trigger webhook returned an error response', {
           triggerId: shortenIdForLog(triggerId),
-          status: upstreamResponse.status,
+          status: upstream.status,
           upstreamText,
         });
-        // Return 502 so the FE always knows the error is from the upstream webhook,
-        // not from our authentication layer (which would return 401/403 directly).
         res.status(502).json({
           error: {
             message: TRIGGER_FAILED_MESSAGE,
-            upstreamStatus: upstreamResponse.status,
+            upstreamStatus: upstream.status,
           },
         });
         return;

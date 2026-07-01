@@ -41,6 +41,12 @@ export const WORKFLOW_TRIGGER_TYPES = ['chefs-form', 'button'] as const;
 export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
 export const workflowTriggerTypeZodEnum = z.enum(WORKFLOW_TRIGGER_TYPES);
 
+/** Named constants for workflow trigger types — prefer these over inline string literals. */
+export const WorkflowTriggerTypeEnum = {
+  CHEFS_FORM: 'chefs-form' as WorkflowTriggerType,
+  BUTTON: 'button' as WorkflowTriggerType,
+} as const;
+
 /** Allowed HTTP methods for workflow trigger invocation. */
 export const TRIGGER_HTTP_METHODS = ['GET', 'POST'] as const;
 export type TriggerHttpMethod = (typeof TRIGGER_HTTP_METHODS)[number];
