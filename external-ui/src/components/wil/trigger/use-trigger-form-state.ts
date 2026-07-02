@@ -23,47 +23,67 @@ export function useTriggerFormState({ isPersonalTenant, userEmail }: UseTriggerF
     applyPersonalActorDefaults({ ...DEFAULT_BUTTON }, isPersonalTenant, userEmail);
 
   const [triggerType, setTriggerType] = useState<TriggerType | null>(null);
-  const [chefsForm, setChefsForm] = useState<ChefsFormTriggerPayload>(freshChefsForm());
-  const [buttonForm, setButtonForm] = useState<ButtonTriggerPayload>(freshButtonForm());
+  const [chefsFormRaw, setChefsFormRaw] = useState<ChefsFormTriggerPayload>(freshChefsForm());
+  const [buttonFormRaw, setButtonFormRaw] = useState<ButtonTriggerPayload>(freshButtonForm());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  function setChefsForm(v: ChefsFormTriggerPayload) {
+    setChefsFormRaw(v);
+    setHasUnsavedChanges(true);
+  }
+
+  function setButtonForm(v: ButtonTriggerPayload) {
+    setButtonFormRaw(v);
+    setHasUnsavedChanges(true);
+  }
 
   function resetForCreate() {
     setTriggerType(null);
-    setChefsForm(freshChefsForm());
-    setButtonForm(freshButtonForm());
+    setChefsFormRaw(freshChefsForm());
+    setButtonFormRaw(freshButtonForm());
+    setHasUnsavedChanges(false);
   }
 
   function loadForEdit(trigger: Trigger) {
     if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
       setTriggerType(TRIGGER_TYPES.CHEFS_FORM);
-      setChefsForm({ ...trigger.config });
+      setChefsFormRaw({ ...trigger.config });
     } else {
       setTriggerType(TRIGGER_TYPES.BUTTON);
-      setButtonForm({ ...trigger.config });
+      setButtonFormRaw({ ...trigger.config });
     }
+    setHasUnsavedChanges(false);
   }
 
   function changeTriggerType(t: TriggerType) {
     setTriggerType(t);
-    if (t === TRIGGER_TYPES.CHEFS_FORM) setChefsForm(freshChefsForm());
-    if (t === TRIGGER_TYPES.BUTTON) setButtonForm(freshButtonForm());
+    if (t === TRIGGER_TYPES.CHEFS_FORM) setChefsFormRaw(freshChefsForm());
+    if (t === TRIGGER_TYPES.BUTTON) setButtonFormRaw(freshButtonForm());
+    setHasUnsavedChanges(true);
+  }
+
+  function clearUnsavedChanges() {
+    setHasUnsavedChanges(false);
   }
 
   let activePayload = null;
   if (triggerType === TRIGGER_TYPES.CHEFS_FORM) {
-    activePayload = chefsForm;
+    activePayload = chefsFormRaw;
   } else if (triggerType === TRIGGER_TYPES.BUTTON) {
-    activePayload = buttonForm;
+    activePayload = buttonFormRaw;
   }
 
   return {
     triggerType,
-    chefsForm,
-    buttonForm,
+    chefsForm: chefsFormRaw,
+    buttonForm: buttonFormRaw,
     activePayload,
+    hasUnsavedChanges,
     setChefsForm,
     setButtonForm,
     resetForCreate,
     loadForEdit,
     changeTriggerType,
+    clearUnsavedChanges,
   };
 }
