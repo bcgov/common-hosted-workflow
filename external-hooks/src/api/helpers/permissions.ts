@@ -18,37 +18,21 @@ export function computePermissions(
   n8nUser: { disabled: boolean; role: { slug: string } | null } | null,
   featureFlagService: FeatureFlagService,
 ): Permissions {
-  if (!n8nUser) {
-    return {
-      isAdmin: false,
-      canViewWorkflows: false,
-      canRequestAccess: true,
-      canReviewAccessRequests: false,
-      canShareWorkflows: false,
-      canUnshareWorkflows: false,
-      canManageWil: false,
-      canManageProject: false,
-    };
-  }
+  const isAdmin = n8nUser?.role != null && ADMIN_ROLE_SLUGS.has(n8nUser.role.slug);
+  const hasNoRole = n8nUser?.role == null;
+  const isDisabled = n8nUser?.disabled ?? false;
+  const userIsValid = !!n8nUser && !isDisabled && !hasNoRole;
 
-  const isAdmin = n8nUser.role != null && ADMIN_ROLE_SLUGS.has(n8nUser.role.slug);
-  const hasNoRole = n8nUser.role == null;
-  const isDisabled = n8nUser.disabled;
-
-  const isWorkflowShareEnabled = featureFlagService.isFeatureEnabled(FEATURE.WORKFLOW_SHARE);
-  const userIsValid = !isDisabled && !hasNoRole;
-
-  const isWilEnabled = featureFlagService.isFeatureEnabled(FEATURE.WIL);
-  const isProjectEnabled = featureFlagService.isFeatureEnabled(FEATURE.PROJECT);
+  const canShareWorkflows = userIsValid && featureFlagService.isFeatureEnabled(FEATURE.WORKFLOW_SHARE);
 
   return {
     isAdmin,
-    canViewWorkflows: isWorkflowShareEnabled && userIsValid,
+    canViewWorkflows: canShareWorkflows,
     canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
-    canShareWorkflows: isWorkflowShareEnabled && userIsValid,
+    canShareWorkflows,
     canUnshareWorkflows: isAdmin,
-    canManageWil: isWilEnabled,
-    canManageProject: isProjectEnabled,
+    canManageWil: !!n8nUser && featureFlagService.isFeatureEnabled(FEATURE.WIL),
+    canManageProject: !!n8nUser && featureFlagService.isFeatureEnabled(FEATURE.PROJECT),
   };
 }
