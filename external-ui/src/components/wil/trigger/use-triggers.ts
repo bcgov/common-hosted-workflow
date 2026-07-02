@@ -28,6 +28,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('idle');
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingNav, setPendingNav] = useState<{ fn: () => void } | null>(null);
 
   const formState = useTriggerFormState({ isPersonalTenant, userEmail });
   const callbackStatus = useTriggerCallbackStatus();
@@ -49,11 +50,26 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     onCallbackSettled: callbackStatus.settle,
   });
 
-  function openCreate() {
+  const hasUnsavedEdits = formState.hasUnsavedChanges && (formMode === 'edit' || formMode === 'create');
+
+  /** Runs `action` immediately, or queues it behind the unsaved-changes dialog. */
+  function guard(action: () => void) {
+    if (hasUnsavedEdits) {
+      setPendingNav({ fn: action });
+    } else {
+      action();
+    }
+  }
+
+  function _doOpenCreate() {
     setSelectedTriggerId(null);
     setFormMode('create');
     formState.resetForCreate();
     callbackStatus.reset();
+  }
+
+  function openCreate() {
+    guard(_doOpenCreate);
   }
 
   function openEdit(trigger: Trigger) {
@@ -65,23 +81,41 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
 
   function selectTrigger(trigger: Trigger, canManage: boolean) {
     const isSameTrigger = trigger.id === selectedTriggerId;
-    setSelectedTriggerId(trigger.id);
-    if (!isSameTrigger) callbackStatus.reset();
-    // Keep edit mode when clicking the trigger already being edited
+    // Already editing this exact trigger — do nothing.
     if (formMode === 'edit' && isSameTrigger) return;
-    // Show the live CHEFS form when a CHEFS form trigger is selected
+
+    if (canManage) {
+      guard(() => {
+        if (!isSameTrigger) callbackStatus.reset();
+        openEdit(trigger);
+      });
+      return;
+    }
+
+    // Non-manage users: view-only behaviour (unchanged).
+    if (!isSameTrigger) callbackStatus.reset();
+    setSelectedTriggerId(trigger.id);
     if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
       setFormMode('view');
       return;
     }
-    if (!canManage) {
-      setFormMode('idle');
-    }
+    setFormMode('idle');
+  }
+
+  /** Opens the CHEFS form live-preview in the detail pane (used by the "Open Form" action button). */
+  function openChefsPreview(trigger: Trigger) {
+    const isSameTrigger = trigger.id === selectedTriggerId;
+    guard(() => {
+      if (!isSameTrigger) callbackStatus.reset();
+      setSelectedTriggerId(trigger.id);
+      setFormMode('view');
+    });
   }
 
   function cancel() {
     setFormMode('idle');
     setSelectedTriggerId(null);
+    formState.clearUnsavedChanges();
     callbackStatus.reset();
   }
 
@@ -94,17 +128,30 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
       else if (formMode === 'edit' && selectedTriggerId)
         await updateMutation.mutateAsync({ triggerId: selectedTriggerId, config: payload });
       setFormMode('idle');
+      formState.clearUnsavedChanges();
     } finally {
       setIsSaving(false);
     }
   }
 
-  /** Fires a button trigger's callback and shows its pending/success/error result in the detail pane. */
   function triggerCallback(trigger: Trigger) {
-    setSelectedTriggerId(trigger.id);
-    setFormMode('view');
-    callbackStatus.start(trigger.id);
-    callbackMutation.mutate(trigger.id);
+    guard(() => {
+      setSelectedTriggerId(trigger.id);
+      setFormMode('view');
+      callbackStatus.start(trigger.id);
+      callbackMutation.mutate(trigger.id);
+    });
+  }
+
+  function confirmNavigation() {
+    const nav = pendingNav;
+    setPendingNav(null);
+    formState.clearUnsavedChanges();
+    nav?.fn();
+  }
+
+  function cancelNavigation() {
+    setPendingNav(null);
   }
 
   function getFormPaneTitle(): string {
@@ -131,8 +178,10 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     buttonCallbackStatus: callbackStatus.buttonCallbackStatus,
     buttonCallbackError: callbackStatus.buttonCallbackError,
     formPaneTitle: getFormPaneTitle(),
+    hasPendingNav: pendingNav !== null,
     openCreate,
     openEdit,
+    openChefsPreview,
     selectTrigger,
     cancel,
     changeTriggerType: formState.changeTriggerType,
@@ -140,5 +189,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     setButtonForm: formState.setButtonForm,
     save,
     triggerCallback,
+    confirmNavigation,
+    cancelNavigation,
   };
 }
