@@ -27,8 +27,23 @@ export const triggerItemSchema = z.object({
 
 export type TriggerItem = z.infer<typeof triggerItemSchema>;
 
+/** Minimal trigger shape returned to non-editor users — no sensitive fields. */
+export const triggerLimitedItemSchema = z.object({
+  id: z.string(),
+  triggerType: workflowTriggerTypeZodEnum,
+  triggerName: z.string(),
+  allowedActorsType: z.string(),
+  allowedActors: z.array(z.string()),
+});
+
+export type TriggerLimitedItem = z.infer<typeof triggerLimitedItemSchema>;
+
 export const listTriggersResponseSchema = z.object({
   data: z.array(triggerItemSchema),
+});
+
+export const listTriggersLimitedResponseSchema = z.object({
+  data: z.array(triggerLimitedItemSchema),
 });
 
 export const createTriggerResponseSchema = triggerItemSchema;
@@ -98,6 +113,26 @@ export const getTriggerChefsTokenResponseSchema = z.object({
   formName: z.string(),
   baseUrl: z.string(),
 });
+
+/**
+ * Maps a DB trigger row to the limited wire response (for non-editor users).
+ * Returns only the display name, type, and actor access fields — no URLs, credentials, or metadata.
+ */
+export function mapTriggerRowToLimitedResponse(row: typeof workflowTrigger.$inferSelect): TriggerLimitedItem {
+  const metadata = row.metadata as Record<string, unknown>;
+  const triggerName =
+    row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM
+      ? ((metadata.formName as string) ?? '')
+      : ((metadata.buttonText as string) ?? '');
+
+  return triggerLimitedItemSchema.parse({
+    id: row.id,
+    triggerType: row.triggerType,
+    triggerName,
+    allowedActorsType: row.allowedActorsType,
+    allowedActors: row.allowedActors,
+  });
+}
 
 /**
  * Maps a DB trigger row to the wire response shape.

@@ -12,7 +12,9 @@ import {
   getTriggerChefsTokenSchema,
   getTriggerChefsTokenResponseSchema,
   mapTriggerRowToResponse,
+  mapTriggerRowToLimitedResponse,
   listTriggersResponseSchema,
+  listTriggersLimitedResponseSchema,
   createTriggerResponseSchema,
   updateTriggerResponseSchema,
   callbackTriggerResponseSchema,
@@ -135,25 +137,43 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
   const { services, customRepositories } = routeContext;
   const router = Router();
 
-  /** GET /wil/triggers — list all triggers for the tenant. All authenticated users may list. */
+  /**
+   * GET /wil/triggers — list triggers for the tenant.
+   * project:editor users receive full trigger data.
+   * All other authenticated users receive only display name, type, and actor access fields,
+   * and only for triggers they are explicitly allowed to fire.
+   */
   router.get('/triggers', createRequestParser(listTriggersSchema), async (req: Request, res: Response) => {
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const tenantId = req.header(X_TENANT_ID_HEADER)?.trim() ?? '';
     const { projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
       req,
       customRepositories.tenantProjectRelation,
     );
+
+    const isManager = await canManageTriggers(tenantId, session, customRepositories);
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
 
-    const chefsFormIds = rows.filter((r) => r.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM).map((r) => r.id);
-    const triggerIdsWithCreds =
-      chefsFormIds.length > 0
-        ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials(chefsFormIds)
-        : new Set<string>();
+    if (isManager) {
+      const chefsFormIds = rows.filter((r) => r.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM).map((r) => r.id);
+      const triggerIdsWithCreds =
+        chefsFormIds.length > 0
+          ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials(chefsFormIds)
+          : new Set<string>();
 
-    OkResponse(
-      res,
-      { data: rows.map((r) => mapTriggerRowToResponse(r, triggerIdsWithCreds.has(r.id))) },
-      listTriggersResponseSchema,
-    );
+      OkResponse(
+        res,
+        { data: rows.map((r) => mapTriggerRowToResponse(r, triggerIdsWithCreds.has(r.id))) },
+        listTriggersResponseSchema,
+      );
+    } else {
+      const visibleRows = rows.filter((r) => isActorAllowed(r, session, tenantId));
+      OkResponse(
+        res,
+        { data: visibleRows.map((r) => mapTriggerRowToLimitedResponse(r)) },
+        listTriggersLimitedResponseSchema,
+      );
+    }
   });
 
   /** POST /wil/triggers — create a trigger. Requires project:editor role or personal project. */

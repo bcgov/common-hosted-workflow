@@ -1,4 +1,11 @@
-import type { ApiTriggerItem, Trigger, TriggerActorType, TriggerMethod, TriggerPayload } from './trigger-types';
+import type {
+  ApiTriggerItem,
+  LimitedApiTriggerItem,
+  Trigger,
+  TriggerActorType,
+  TriggerMethod,
+  TriggerPayload,
+} from './trigger-types';
 import { TRIGGER_TYPES } from '../../constants/constants';
 
 /** Converts the FE's comma-separated allowedActors string to the array the API expects. */
@@ -49,6 +56,39 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
   }
 
   return { id: item.id, tenantId, createdAt: item.createdAt, updatedAt: item.updatedAt, config };
+}
+
+/** Converts a limited API response (non-editor users) to a Trigger with minimal config for display. */
+export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: string): Trigger {
+  const allowedActors = item.allowedActors.join(',');
+  const allowedActorsType = item.allowedActorsType as TriggerActorType;
+
+  const config: TriggerPayload =
+    item.triggerType === TRIGGER_TYPES.CHEFS_FORM
+      ? {
+          type: TRIGGER_TYPES.CHEFS_FORM,
+          formId: '',
+          formName: item.triggerName,
+          apiKey: '',
+          postBody: '',
+          allowedActors,
+          allowedActorsType,
+          callbackWebhookUrl: '',
+          triggerMethod: 'POST',
+          includeActorId: true,
+        }
+      : {
+          type: TRIGGER_TYPES.BUTTON,
+          buttonText: item.triggerName,
+          webhookUrl: '',
+          postBody: '',
+          allowedActors,
+          allowedActorsType,
+          triggerMethod: 'POST',
+          includeActorId: true,
+        };
+
+  return { id: item.id, tenantId, createdAt: '', updatedAt: '', config };
 }
 
 /** Builds the POST /triggers request body from the FE payload. */
