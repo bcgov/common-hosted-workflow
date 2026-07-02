@@ -28,6 +28,7 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
       // A non-empty placeholder value signals that a credential exists on the server.
       // An empty string means no credential is stored yet.
       apiKey: (meta.apiKey as string) ?? '',
+      postBody: (meta.postBody as string) ?? '',
       allowedActors,
       allowedActorsType,
       callbackWebhookUrl: item.triggerUrl,
@@ -62,6 +63,7 @@ export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
         formName: config.formName,
         apiKey: config.apiKey,
         includeActorId: config.includeActorId,
+        postBody: config.postBody,
       },
       allowedActorsType: config.allowedActorsType,
       allowedActors: splitActors(config.allowedActors),
@@ -93,6 +95,7 @@ export function payloadToUpdateBody(config: TriggerPayload, actorId: string) {
       formName: config.formName,
       includeActorId: config.includeActorId,
       apiKey: config.apiKey,
+      postBody: config.postBody,
     };
     return {
       triggerUrl: config.callbackWebhookUrl,
