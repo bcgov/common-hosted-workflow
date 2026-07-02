@@ -76,13 +76,13 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
   const sessionRefreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
+  const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
   const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
-    id: session.subject,
+    id: ssoUserId,
     email: session.email,
     disabled: false,
     role: null,
   };
-  const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
 
   const refreshAccessToken = async () => {
     const result = await refreshSessionByEmail(session.email);
@@ -109,7 +109,7 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
     session: {
       ...session,
       n8nUser: resolvedN8nUser,
-      permissions: computePermissions(resolvedN8nUser),
+      permissions: computePermissions(resolvedN8nUser, services.featureFlag),
       tenantRoles: tenantRolesResult.roles,
       tenantGroups: tenantGroupsResult.groups,
     },
@@ -459,7 +459,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   );
 
   // List user personal project and their tenant projects (non-admin API)
-  router.get('/projects', requireUiRequestContext, async (req, res) => {
+  router.get('/projects', requireUiRequestContext, checkPermission('canManageProject'), async (req, res) => {
     const session = (req as UiApiRequest).session;
     const accessToken = getBearerToken(req) ?? '';
     const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
@@ -474,16 +474,17 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     OkResponse(res, { data });
   });
 
-  // Mount admin project-tenant sub-router (UI session auth + admin role)
+  // Mount admin project-tenant sub-router (UI session auth + admin role + canManageProject)
   router.use(
     '/admin',
     requireUiRequestContext,
+    checkPermission('canManageProject'),
     checkRole('global:owner', 'global:admin'),
     buildAdminProjectRouter(routeContext),
   );
 
-  // Mount WIL sub-router (protected by requireUiRequestContext)
-  router.use('/wil', requireUiRequestContext, buildWilRouter(routeContext));
+  // Mount WIL sub-router (protected by requireUiRequestContext + canManageWil)
+  router.use('/wil', requireUiRequestContext, checkPermission('canManageWil'), buildWilRouter(routeContext));
 
   return router;
 }

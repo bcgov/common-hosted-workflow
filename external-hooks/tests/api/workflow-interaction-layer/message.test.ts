@@ -48,6 +48,7 @@ function createTestRouter() {
       accessRequest: {} as any,
       chefs: {} as any,
       cstar: {} as any,
+      featureFlag: {} as any,
       tenant: {} as any,
       tenantProjectSync: {} as any,
       projectTenant: {} as any,

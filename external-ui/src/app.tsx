@@ -7,6 +7,7 @@ import { AccessRequests } from './pages/access-requests';
 import { WorkflowInteraction } from './pages/workflow-interaction';
 import { Projects } from './pages/projects';
 import { usePermissions, useSessionLoading } from './state/session';
+import { PermissionRoute } from './components/permission-route';
 
 function AccessRequestRoute() {
   const permissions = usePermissions();
@@ -29,11 +30,32 @@ export function App() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/workflows" element={<Workflows />} />
+        <Route
+          path="/workflows"
+          element={
+            <PermissionRoute permissionKey="canViewWorkflows">
+              <Workflows />
+            </PermissionRoute>
+          }
+        />
         <Route path="/access-request" element={<AccessRequestRoute />} />
         <Route path="/access-requests" element={<AccessRequests />} />
-        <Route path="/workflow-interaction" element={<WorkflowInteraction />} />
-        <Route path="/projects" element={<Projects />} />
+        <Route
+          path="/workflow-interaction"
+          element={
+            <PermissionRoute permissionKey="canManageWil">
+              <WorkflowInteraction />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            <PermissionRoute permissionKey="canManageProject">
+              <Projects />
+            </PermissionRoute>
+          }
+        />
       </Routes>
     </AppLayout>
   );

@@ -52,6 +52,9 @@ export type Permissions = {
   canReviewAccessRequests: boolean;
   canShareWorkflows: boolean;
   canUnshareWorkflows: boolean;
+  isCstarTenantProjectSyncEnabled: boolean;
+  canManageWil: boolean;
+  canManageProject: boolean;
 };
 
 export type TenantRole = {

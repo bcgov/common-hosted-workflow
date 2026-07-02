@@ -24,6 +24,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const canRequestAccess = permissions?.canRequestAccess ?? false;
   const canReviewAccessRequests = permissions?.canReviewAccessRequests ?? false;
   const canViewWorkflows = permissions?.canViewWorkflows ?? false;
+  const canManageWil = permissions?.canManageWil ?? false;
+  const canManageProject = permissions?.canManageProject ?? false;
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
@@ -74,34 +76,38 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               )}
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <NavLink
-                    to="/workflow-interaction"
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                        : '!text-white hover:!text-white'
-                    }
-                  >
-                    Workflow Interaction
-                  </NavLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <NavLink
-                    to="/projects"
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
-                        : '!text-white hover:!text-white'
-                    }
-                  >
-                    Projects
-                  </NavLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
+              {canManageWil && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/workflow-interaction"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Workflow Interaction
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
+              {canManageProject && (
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <NavLink
+                      to="/projects"
+                      className={({ isActive }) =>
+                        isActive
+                          ? 'font-semibold !text-white underline decoration-[var(--bc-gold)] decoration-2 underline-offset-8'
+                          : '!text-white hover:!text-white'
+                      }
+                    >
+                      Projects
+                    </NavLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              )}
               {canRequestAccess && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
