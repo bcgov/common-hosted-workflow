@@ -5,8 +5,8 @@ on:
     branches:
     - main
     paths-ignore:
-    - workflows/merge.yml
     - docs/**
+    - scripts/**
     - terraform/**
 
 concurrency:
@@ -49,10 +49,10 @@ jobs:
       environment: dev
       tag: ${{ github.sha }}
 
-  deploy-sdg-dev:
-    name: Deploys SDG (Dev)
-    uses: ./.github/workflows/deploy-sdg.yml
-    needs: [build-push-n8n, build-push-sdg-mock-app]
+  deploy-standard-dev:
+    name: Deploys Standard (Dev)
+    uses: ./.github/workflows/deploy-standard.yml
+    needs: [build-push-n8n, build-push-dns-probe, build-push-sdg-mock-app]
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}

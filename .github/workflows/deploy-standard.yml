@@ -1,4 +1,4 @@
-name: Deploy SDG
+name: Deploy Standard
 
 on:
   workflow_dispatch:
@@ -39,22 +39,22 @@ permissions:
   contents: read
 
 jobs:
-  deploy-sdg:
-    name: Deploy SDG-${{ inputs.environment }}
+  deploy-standard:
+    name: Deploy Standard-${{ inputs.environment }}
     uses: ./.github/workflows/_deploy.yml
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
     with:
-      environment: sdg-${{ inputs.environment }}
+      environment: standard-${{ inputs.environment }}
       tag: ${{ inputs.tag }}
 
-  deploy-sdg-dr:
-    name: Deploy SDG-${{ inputs.environment }}dr
+  deploy-standard-dr:
+    name: Deploy Standard-${{ inputs.environment }}dr
     uses: ./.github/workflows/_deploy.yml
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
     with:
-      environment: sdg-${{ inputs.environment }}dr
+      environment: standard-${{ inputs.environment }}dr
       tag: ${{ inputs.tag }}
