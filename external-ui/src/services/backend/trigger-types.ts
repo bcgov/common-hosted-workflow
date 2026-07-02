@@ -10,6 +10,7 @@ export interface ChefsFormTriggerPayload {
   allowedActors: string;
   allowedActorsType: TriggerActorType;
   callbackWebhookUrl: string;
+  postBody: string;
   triggerMethod: TriggerMethod;
   includeActorId: boolean;
 }

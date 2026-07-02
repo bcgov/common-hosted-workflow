@@ -8,6 +8,7 @@ import {
   ActorIdBanner,
   AllowedActorsField,
   AllowedActorsTypeField,
+  PostBodyField,
   TriggerFormActions,
   TriggerMethodField,
   TriggerUrlField,
@@ -21,6 +22,7 @@ export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   allowedActors: '*',
   allowedActorsType: '',
   callbackWebhookUrl: '',
+  postBody: '',
   triggerMethod: 'POST',
   includeActorId: true,
 };
@@ -133,6 +135,12 @@ export function ChefsFormFields({
         label="Callback Webhook URL"
         value={value.callbackWebhookUrl}
         onChange={(v) => set('callbackWebhookUrl', v)}
+      />
+      <PostBodyField
+        id="chefs-post-body"
+        value={value.postBody}
+        onChange={(v) => set('postBody', v)}
+        method={value.triggerMethod}
       />
       <ActorIdBanner method={value.triggerMethod} />
       <TriggerFormActions onSave={onSave} onCancel={onCancel} isSaving={isSaving} isValid={!!isValid} />

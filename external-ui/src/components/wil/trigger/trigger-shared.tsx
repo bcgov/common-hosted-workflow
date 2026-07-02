@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import type { TriggerActorType, TriggerMethod } from '../../../services/backend/trigger-types';
 
 export type FormMode = 'idle' | 'view' | 'create' | 'edit';
@@ -105,6 +106,28 @@ export function AllowedActorsField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+      />
+    </div>
+  );
+}
+
+export function PostBodyField({
+  id,
+  value,
+  onChange,
+  method,
+}: Readonly<{ id: string; value: string; onChange: (v: string) => void; method: TriggerMethod }>) {
+  if (method !== 'POST') return null;
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>POST Body (optional JSON)</Label>
+      <Textarea
+        id={id}
+        placeholder={'e.g. {"time": "today"}'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        className="font-mono text-xs"
       />
     </div>
   );
