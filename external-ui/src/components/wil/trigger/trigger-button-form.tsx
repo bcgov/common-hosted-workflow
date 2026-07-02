@@ -1,11 +1,11 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import type { ButtonTriggerPayload } from '../../../services/backend/trigger-types';
 import {
   ActorIdBanner,
   AllowedActorsField,
   AllowedActorsTypeField,
+  PostBodyField,
   TriggerFormActions,
   TriggerMethodField,
   TriggerUrlField,
@@ -73,17 +73,12 @@ export function ButtonTriggerFields({
         onChange={(v) => set('webhookUrl', v)}
         placeholder="e.g. http://n8n:5678/webhook/my-trigger"
       />
-      <div className="space-y-1.5">
-        <Label htmlFor="btn-post-body">POST Body (optional JSON)</Label>
-        <Textarea
-          id="btn-post-body"
-          placeholder={'e.g. {"time": "today"}'}
-          value={value.postBody}
-          onChange={(e) => set('postBody', e.target.value)}
-          rows={3}
-          className="font-mono text-xs"
-        />
-      </div>
+      <PostBodyField
+        id="btn-post-body"
+        value={value.postBody}
+        onChange={(v) => set('postBody', v)}
+        method={value.triggerMethod}
+      />
       <div className="grid grid-cols-2 gap-4">
         <AllowedActorsTypeField
           id="btn-actors-type"
