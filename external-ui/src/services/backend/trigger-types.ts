@@ -40,7 +40,7 @@ export interface TriggerListResponse {
   data: Trigger[];
 }
 
-/** Shape of a single trigger as returned by the backend API. */
+/** Shape of a single trigger as returned by the backend API (project:editor users). */
 export type ApiTriggerItem = {
   id: string;
   projectId: string;
@@ -55,6 +55,15 @@ export type ApiTriggerItem = {
   updatedAt: string;
   createdBy: string | null;
   updatedBy: string | null;
+};
+
+/** Minimal trigger item returned to non-editor users — display name + actor access fields only. */
+export type LimitedApiTriggerItem = {
+  id: string;
+  triggerType: TriggerType;
+  triggerName: string;
+  allowedActorsType: string;
+  allowedActors: string[];
 };
 
 export type TriggerChefsTokenResponse = {

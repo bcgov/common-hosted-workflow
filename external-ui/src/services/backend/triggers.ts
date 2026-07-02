@@ -1,20 +1,27 @@
 import { instance } from './axios';
 import type {
   ApiTriggerItem,
+  LimitedApiTriggerItem,
   Trigger,
   TriggerChefsTokenResponse,
   TriggerListResponse,
   TriggerPayload,
 } from './trigger-types';
-import { apiItemToTrigger, payloadToCreateBody, payloadToUpdateBody } from './trigger-mappers';
+import { apiItemToTrigger, limitedApiItemToTrigger, payloadToCreateBody, payloadToUpdateBody } from './trigger-mappers';
 
 export function getTriggers(params: { tenantId: string; signal?: AbortSignal }): Promise<TriggerListResponse> {
   return instance
-    .get<{ data: ApiTriggerItem[] }>('/ui-api/wil/triggers', {
+    .get<{ data: (ApiTriggerItem | LimitedApiTriggerItem)[] }>('/ui-api/wil/triggers', {
       headers: { 'X-TENANT-ID': params.tenantId },
       signal: params.signal,
     })
-    .then((res) => ({ data: res.data.data.map((item) => apiItemToTrigger(item, params.tenantId)) }));
+    .then((res) => ({
+      data: res.data.data.map((item) =>
+        'triggerUrl' in item
+          ? apiItemToTrigger(item as ApiTriggerItem, params.tenantId)
+          : limitedApiItemToTrigger(item as LimitedApiTriggerItem, params.tenantId),
+      ),
+    }));
 }
 
 export function createTrigger(params: { tenantId: string; config: TriggerPayload; actorId: string }): Promise<Trigger> {
