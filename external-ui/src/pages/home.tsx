@@ -35,18 +35,26 @@ export function Home() {
           } satisfies NavCard,
         ]
       : []),
-    {
-      to: '/workflow-interaction',
-      icon: IconPlugConnected,
-      title: 'Workflow Interaction',
-      description: 'Interact with active workflow instances.',
-    },
-    {
-      to: '/projects',
-      icon: IconFolder,
-      title: 'Projects',
-      description: 'View and manage project-to-tenant mappings.',
-    },
+    ...(permissions?.canManageWil
+      ? [
+          {
+            to: '/workflow-interaction',
+            icon: IconPlugConnected,
+            title: 'Workflow Interaction',
+            description: 'Interact with active workflow instances.',
+          } satisfies NavCard,
+        ]
+      : []),
+    ...(permissions?.canManageProject
+      ? [
+          {
+            to: '/projects',
+            icon: IconFolder,
+            title: 'Projects',
+            description: 'View and manage project-to-tenant mappings.',
+          } satisfies NavCard,
+        ]
+      : []),
     ...(permissions?.canRequestAccess
       ? [
           {

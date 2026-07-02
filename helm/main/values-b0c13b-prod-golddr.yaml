@@ -14,6 +14,7 @@ n8n:
     AUTHZ_ENVIRONMENT: prod
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:prod:"
     CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
+    FEATURES_ENABLED: "workflow-share"
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"

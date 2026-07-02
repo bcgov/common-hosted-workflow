@@ -68,6 +68,14 @@ const mockTenantService = {
   getTenantGroupsForSession: vi.fn().mockResolvedValue({ groups: [] }),
 };
 
+const mockFeatureFlagService = {
+  isFeatureEnabled: vi.fn((flag: string) => {
+    // Default: all flags enabled for tests
+    return ['workflow-share', 'wil', 'project', 'tenant-project-sync'].includes(flag);
+  }),
+  getAllFlags: vi.fn().mockReturnValue({}),
+};
+
 async function runRoute(router: any, method: string, path: string, req: any, res: any) {
   const handlers = getRouteHandlers(router, method, path) ?? [];
   let index = 0;
@@ -87,7 +95,7 @@ async function runRoute(router: any, method: string, path: string, req: any, res
 }
 
 async function runProtectedRoute(services: any, method: string, path: string, req: any, res: any) {
-  const servicesWithDefaults = { tenant: mockTenantService, ...services };
+  const servicesWithDefaults = { tenant: mockTenantService, featureFlag: mockFeatureFlagService, ...services };
   const router = buildUiApiRouter({ services: servicesWithDefaults } as any);
   await runRoute(router, method, path, req, res);
 }
@@ -97,6 +105,10 @@ beforeEach(() => {
   mockTenantService.getTenantGroupsForSession.mockReset();
   mockTenantService.getTenantRolesForSession.mockResolvedValue({ roles: [] });
   mockTenantService.getTenantGroupsForSession.mockResolvedValue({ groups: [] });
+  mockFeatureFlagService.isFeatureEnabled.mockReset();
+  mockFeatureFlagService.isFeatureEnabled.mockImplementation((flag: string) =>
+    ['workflow-share', 'wil', 'project', 'tenant-project-sync'].includes(flag),
+  );
   getUiSessionMock.mockReset();
   getUiOidcIdTokenMock.mockReset();
   deleteUiOidcTokensMock.mockReset();
@@ -172,6 +184,8 @@ describe('GET /ui-api/session', () => {
           canReviewAccessRequests: false,
           canShareWorkflows: true,
           canUnshareWorkflows: false,
+          canManageWil: true,
+          canManageProject: true,
         },
       }),
     );
@@ -279,6 +293,8 @@ describe('GET /ui-api/whoami', () => {
           canReviewAccessRequests: false,
           canShareWorkflows: true,
           canUnshareWorkflows: false,
+          canManageWil: true,
+          canManageProject: true,
         },
       }),
     );

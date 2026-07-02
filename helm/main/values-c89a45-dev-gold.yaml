@@ -14,8 +14,8 @@ n8n:
     EXTERNAL_UI_ENABLED: 'true'
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
+    FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev-workflow-mock.apps.gold.devops.gov.bc.ca
-    IS_TENANT_PROJECT_SYNC_ENABLED: "true"
 
   route:
     enabled: true
