@@ -7,19 +7,7 @@ import { AccessRequests } from './pages/access-requests';
 import { WorkflowInteraction } from './pages/workflow-interaction';
 import { Projects } from './pages/projects';
 import { usePermissions, useSessionLoading } from './state/session';
-import { useFeatureFlag } from './state/feature-flags';
-import { FEATURE } from './constants/feature';
-import type { ReactNode } from 'react';
-
-function FeatureFlagRoute({ flag, children }: { flag: string; children: ReactNode }) {
-  const isEnabled = useFeatureFlag(flag);
-
-  if (!isEnabled) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-}
+import { PermissionRoute } from './components/permission-route';
 
 function AccessRequestRoute() {
   const permissions = usePermissions();
@@ -45,9 +33,9 @@ export function App() {
         <Route
           path="/workflows"
           element={
-            <FeatureFlagRoute flag={FEATURE.WORKFLOW_SHARE}>
+            <PermissionRoute permissionKey="canViewWorkflows">
               <Workflows />
-            </FeatureFlagRoute>
+            </PermissionRoute>
           }
         />
         <Route path="/access-request" element={<AccessRequestRoute />} />
@@ -55,17 +43,17 @@ export function App() {
         <Route
           path="/workflow-interaction"
           element={
-            <FeatureFlagRoute flag={FEATURE.WIL}>
+            <PermissionRoute permissionKey="canManageWil">
               <WorkflowInteraction />
-            </FeatureFlagRoute>
+            </PermissionRoute>
           }
         />
         <Route
           path="/projects"
           element={
-            <FeatureFlagRoute flag={FEATURE.PROJECT}>
+            <PermissionRoute permissionKey="canManageProject">
               <Projects />
-            </FeatureFlagRoute>
+            </PermissionRoute>
           }
         />
       </Routes>

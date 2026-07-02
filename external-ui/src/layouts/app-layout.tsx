@@ -3,8 +3,6 @@ import { NavLink } from 'react-router';
 import { login, logout } from '../auth/session-actions';
 import { withAppBasePath } from '../config/base-path';
 import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
-import { useFeatureFlag } from '../state/feature-flags';
-import { FEATURE } from '../constants/feature';
 import { ToastContainer } from '../components/toast-container';
 import { IconLogin2, IconLogout } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -26,9 +24,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const canRequestAccess = permissions?.canRequestAccess ?? false;
   const canReviewAccessRequests = permissions?.canReviewAccessRequests ?? false;
   const canViewWorkflows = permissions?.canViewWorkflows ?? false;
-  const isWorkflowShareEnabled = useFeatureFlag(FEATURE.WORKFLOW_SHARE);
-  const isWilEnabled = useFeatureFlag(FEATURE.WIL);
-  const isProjectEnabled = useFeatureFlag(FEATURE.PROJECT);
+  const canManageWil = permissions?.canManageWil ?? false;
+  const canManageProject = permissions?.canManageProject ?? false;
 
   return (
     <div className="flex min-h-svh flex-col bg-[var(--bc-surface)]">
@@ -63,7 +60,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
-              {isWorkflowShareEnabled && canViewWorkflows && (
+              {canViewWorkflows && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <NavLink
@@ -79,7 +76,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               )}
-              {isWilEnabled && (
+              {canManageWil && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <NavLink
@@ -95,7 +92,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               )}
-              {isProjectEnabled && (
+              {canManageProject && (
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <NavLink

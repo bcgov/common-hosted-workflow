@@ -132,7 +132,8 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByText('Access Request')).toBeInTheDocument();
+      const nav = screen.getByRole('navigation', { name: 'Main' });
+      expect(nav).toHaveTextContent('Access Request');
     });
 
     it('hides Access Request link when canRequestAccess is false', () => {
@@ -188,7 +189,8 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByText('Review Requests')).toBeInTheDocument();
+      const nav = screen.getByRole('navigation', { name: 'Main' });
+      expect(nav).toHaveTextContent('Review Requests');
     });
 
     it('hides Review Requests link when canReviewAccessRequests is false', () => {

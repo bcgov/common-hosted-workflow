@@ -1,8 +1,6 @@
 import { Link } from 'react-router';
 import { login } from '../auth/session-actions';
 import { useAuthUser, usePermissions } from '../state/session';
-import { useFeatureFlag } from '../state/feature-flags';
-import { FEATURE } from '../constants/feature';
 import {
   IconLogin2,
   IconArrowsRightLeft,
@@ -25,12 +23,9 @@ interface NavCard {
 export function Home() {
   const user = useAuthUser();
   const permissions = usePermissions();
-  const isWorkflowShareEnabled = useFeatureFlag(FEATURE.WORKFLOW_SHARE);
-  const isWilEnabled = useFeatureFlag(FEATURE.WIL);
-  const isProjectEnabled = useFeatureFlag(FEATURE.PROJECT);
 
   const cards: NavCard[] = [
-    ...(isWorkflowShareEnabled && permissions?.canViewWorkflows
+    ...(permissions?.canViewWorkflows
       ? [
           {
             to: '/workflows',
@@ -40,7 +35,7 @@ export function Home() {
           } satisfies NavCard,
         ]
       : []),
-    ...(isWilEnabled
+    ...(permissions?.canManageWil
       ? [
           {
             to: '/workflow-interaction',
@@ -50,7 +45,7 @@ export function Home() {
           } satisfies NavCard,
         ]
       : []),
-    ...(isProjectEnabled
+    ...(permissions?.canManageProject
       ? [
           {
             to: '/projects',
