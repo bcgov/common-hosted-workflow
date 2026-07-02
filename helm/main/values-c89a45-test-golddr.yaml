@@ -1,7 +1,7 @@
 n8n:
   enabled: true
   env:
-    WEBHOOK_URL: "https://test-chwf-sdg.apps.golddr.devops.gov.bc.ca"
+    WEBHOOK_URL: "https://test-workflow.apps.golddr.devops.gov.bc.ca"
     N8N_SMTP_HOST: "apps.smtp.gov.bc.ca"
     N8N_SMTP_PORT: "25"
     N8N_SMTP_SSL: "false"
@@ -9,7 +9,7 @@ n8n:
     N8N_SMTP_USER: ""
     N8N_SMTP_PASS: ""
     N8N_SMTP_SENDER: "DoNotReplyCITZ@gov.bc.ca"
-    N8N_BASE_URL: https://test-chwf-sdg.apps.golddr.devops.gov.bc.ca
+    N8N_BASE_URL: https://test-workflow.apps.golddr.devops.gov.bc.ca
     OIDC_ISSUER: https://test.loginproxy.gov.bc.ca/auth/realms/standard
     CHEFS_GATEWAY_URL: https://chefs-test.apps.silver.devops.gov.bc.ca/app/gateway/v1
     CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
@@ -17,7 +17,7 @@ n8n:
 
   route:
     enabled: true
-    host: test-chwf-sdg.apps.golddr.devops.gov.bc.ca
+    host: test-workflow.apps.golddr.devops.gov.bc.ca
 
   worker:
     enabled: true
