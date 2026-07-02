@@ -17,6 +17,18 @@ n8n:
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
     FEATURES_ENABLED: "workflow-share"
 
+  extraExcludedNodes:
+    - "n8n-nodes-base.scheduleTrigger"
+    - "n8n-nodes-base.rabbitmqTrigger"
+    - "n8n-nodes-base.mqttTrigger"
+    - "n8n-nodes-base.amqpTrigger"
+    - "n8n-nodes-base.kafkaTrigger"
+    - "n8n-nodes-base.redisTrigger"
+    - "n8n-nodes-base.emailReadImap"
+    - "n8n-nodes-base.rssFeedReadTrigger"
+    - "n8n-nodes-base.sseTrigger"
+    - "n8n-nodes-base.postgresTrigger"
+
   route:
     enabled: true
     host: dev-chwf.apps.golddr.devops.gov.bc.ca
