@@ -3,6 +3,7 @@ import { ActionService } from '../services/action.service';
 import { AuthService, type BaseAuthService } from '../services/auth';
 import { ChefsService } from '../services/chefs.service';
 import { CstarService } from '../services/cstar.service';
+import { FeatureFlagService } from '../services/feature-flag.service';
 import { MessageService } from '../services/message.service';
 import { ProjectTenantService } from '../services/project-tenant.service';
 import { TenantService } from '../services/tenant.service';
@@ -53,6 +54,7 @@ export async function buildApiServices(
   const cssSsoConfig = getCssSsoConfig();
   const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
   const cstarService = new CstarService();
+  const featureFlag = new FeatureFlagService();
   const tenantService = new TenantService(customRepositories, n8nRepositories, cstarService);
 
   return {
@@ -60,6 +62,7 @@ export async function buildApiServices(
     action: new ActionService(n8nRepositories, customRepositories),
     chefs: new ChefsService(),
     cstar: cstarService,
+    featureFlag,
     message: new MessageService(n8nRepositories, customRepositories),
     accessRequest: new AccessRequestService(
       n8nRepositories,
@@ -73,6 +76,7 @@ export async function buildApiServices(
       n8nRepositories,
       customRepositories,
       cstarService,
+      featureFlag,
       globalOwnerRoleSlug,
     ),
     projectTenant: new ProjectTenantService(n8nRepositories, customRepositories, tenantService, cstarService),

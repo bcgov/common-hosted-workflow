@@ -1,3 +1,6 @@
+import type { FeatureFlagService } from '../services/feature-flag.service';
+import { FEATURE } from '../constants/feature-flag';
+
 const ADMIN_ROLE_SLUGS = new Set(['global:owner', 'global:admin']);
 
 export type Permissions = {
@@ -7,30 +10,29 @@ export type Permissions = {
   canReviewAccessRequests: boolean;
   canShareWorkflows: boolean;
   canUnshareWorkflows: boolean;
+  canManageWil: boolean;
+  canManageProject: boolean;
 };
 
-export function computePermissions(n8nUser: { disabled: boolean; role: { slug: string } | null } | null): Permissions {
-  if (!n8nUser) {
-    return {
-      isAdmin: false,
-      canViewWorkflows: false,
-      canRequestAccess: true,
-      canReviewAccessRequests: false,
-      canShareWorkflows: false,
-      canUnshareWorkflows: false,
-    };
-  }
+export function computePermissions(
+  n8nUser: { disabled: boolean; role: { slug: string } | null } | null,
+  featureFlagService: FeatureFlagService,
+): Permissions {
+  const isAdmin = n8nUser?.role != null && ADMIN_ROLE_SLUGS.has(n8nUser.role.slug);
+  const hasNoRole = n8nUser?.role == null;
+  const isDisabled = n8nUser?.disabled ?? false;
+  const userIsValid = !!n8nUser && !isDisabled && !hasNoRole;
 
-  const isAdmin = n8nUser.role != null && ADMIN_ROLE_SLUGS.has(n8nUser.role.slug);
-  const hasNoRole = n8nUser.role == null;
-  const isDisabled = n8nUser.disabled;
+  const canShareWorkflows = userIsValid && featureFlagService.isFeatureEnabled(FEATURE.WORKFLOW_SHARE);
 
   return {
     isAdmin,
-    canViewWorkflows: !isDisabled && !hasNoRole,
+    canViewWorkflows: canShareWorkflows,
     canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
-    canShareWorkflows: !isDisabled && !hasNoRole,
+    canShareWorkflows,
     canUnshareWorkflows: isAdmin,
+    canManageWil: !!n8nUser && featureFlagService.isFeatureEnabled(FEATURE.WIL),
+    canManageProject: !!n8nUser && featureFlagService.isFeatureEnabled(FEATURE.PROJECT),
   };
 }

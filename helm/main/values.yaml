@@ -64,6 +64,8 @@ n8n:
     N8N_LICENSE_AUTO_RENEW_ENABLED: "false"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/insights/#insights-environment-variables
     N8N_DISABLED_MODULES: "external-secrets,mcp,chat-hub"
+    # Feature flags — comma-separated list of enabled features
+    FEATURES_ENABLED: "tenant-project-sync"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/timezone-localization/
     GENERIC_TIMEZONE: "America/Vancouver"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/deployment
@@ -80,8 +82,6 @@ n8n:
     UI_OIDC_REDIS_URL: redis://chwf-redis-master:6379
     AUTHZ_SERVICE_URL: https://api.loginproxy.gov.bc.ca/api/v1
     AUTHZ_TOKEN_ENDPOINT: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
-    # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
-    IS_TENANT_PROJECT_SYNC_ENABLED: "false"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
