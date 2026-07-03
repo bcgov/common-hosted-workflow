@@ -33,7 +33,7 @@ describe('TenantProjectRelationRepository', () => {
   });
 
   describe('upsertByProjectId', () => {
-    it('should insert with onConflictDoUpdate on projectId', async () => {
+    it('should insert with onConflictDoUpdate on projectId including projectType', async () => {
       const params = { tenantId: 'tenant-abc', projectId: 'proj-123' };
 
       await repo.upsertByProjectId(params);
@@ -42,7 +42,19 @@ describe('TenantProjectRelationRepository', () => {
       expect(db.values).toHaveBeenCalledWith(params);
       expect(db.onConflictDoUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          set: { tenantId: params.tenantId },
+          set: { tenantId: params.tenantId, projectType: null },
+        }),
+      );
+    });
+
+    it('should include projectType in the conflict update when provided', async () => {
+      const params = { tenantId: 'tenant-abc', projectId: 'proj-123', projectType: 'personal' };
+
+      await repo.upsertByProjectId(params);
+
+      expect(db.onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: { tenantId: params.tenantId, projectType: 'personal' },
         }),
       );
     });
@@ -71,6 +83,36 @@ describe('TenantProjectRelationRepository', () => {
 
       expect(result).toBeInstanceOf(Map);
       expect(result.size).toBe(0);
+    });
+  });
+
+  describe('getRowByTenantId', () => {
+    it('should return the relation row when found', async () => {
+      const mockRow = { tenantId: 'tenant-abc', projectId: 'proj-123', projectType: 'team' };
+      db.limit.mockResolvedValue([mockRow]);
+
+      const result = await repo.getRowByTenantId('tenant-abc');
+
+      expect(db.select).toHaveBeenCalled();
+      expect(db.where).toHaveBeenCalled();
+      expect(result).toEqual(mockRow);
+    });
+
+    it('should return null when no row exists for the tenant', async () => {
+      db.limit.mockResolvedValue([]);
+
+      const result = await repo.getRowByTenantId('nonexistent-tenant');
+
+      expect(result).toBeNull();
+    });
+
+    it('should return row with null projectType for personal projects', async () => {
+      const mockRow = { tenantId: 'tenant-abc', projectId: 'proj-123', projectType: 'personal' };
+      db.limit.mockResolvedValue([mockRow]);
+
+      const result = await repo.getRowByTenantId('tenant-abc');
+
+      expect(result?.projectType).toBe('personal');
     });
   });
 });

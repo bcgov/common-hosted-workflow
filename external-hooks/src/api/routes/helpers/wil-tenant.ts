@@ -1,9 +1,8 @@
 import type { Request } from 'express';
 import type { TenantProjectRelationRepository } from '../../../db/repository/custom/tenant-project-relation';
+import { X_TENANT_ID_HEADER } from '../../constants/headers';
+import { tenantUuidRegex } from '../../constants/regex';
 import { AppError } from '../../utils/errors';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const X_TENANT_ID_HEADER = 'x-tenant-id';
 
 /**
  * Extracts and validates the tenant ID from the request header.
@@ -14,7 +13,7 @@ export function extractTenantId(req: Request): string {
   if (!tenantId) {
     throw new AppError(400, `Missing ${X_TENANT_ID_HEADER} header`);
   }
-  if (!UUID_REGEX.test(tenantId)) {
+  if (!tenantUuidRegex.test(tenantId)) {
     throw new AppError(400, `Invalid ${X_TENANT_ID_HEADER} (expected UUID)`);
   }
   return tenantId;

@@ -5,7 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getWilActions } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
 import { ActionItem } from './action-item';
-import { extractErrorMessage } from '../action-handlers/shared/error-utils';
+import { extractErrorMessage } from '../shared/error-utils';
 
 interface ActionsTabProps {
   tenantId: string;

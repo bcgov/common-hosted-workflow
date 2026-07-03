@@ -10,11 +10,13 @@ import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilLis
 import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { getBearerToken } from '../helpers/ui-oidc-session';
+import { buildTriggerRouter } from './triggers';
+import { callWebhook } from './helpers/webhook-fire';
+import { CALLBACK_TIMEOUT_MS } from './constants/constants';
 import type { z } from 'zod';
 
-const CALLBACK_TIMEOUT_MS = 30_000;
-
-export function buildWilRouter({ services, customRepositories }: ApiRouteContext) {
+export function buildWilRouter(routeContext: ApiRouteContext) {
+  const { services, customRepositories } = routeContext;
   const router = Router();
 
   /**
@@ -167,20 +169,14 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
       }
 
       // Forward body to callbackUrl with 30s timeout
-      let upstreamResponse: Response;
-      try {
-        upstreamResponse = await fetch(callbackUrl, {
-          method: callbackMethod,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(CALLBACK_TIMEOUT_MS),
-        });
-      } catch (err) {
-        if (err instanceof Error && err.name === 'TimeoutError') {
-          throw new AppError(504, 'Upstream timeout');
-        }
-        throw new AppError(502, 'Upstream request failed');
-      }
+      const upstreamResponse = await callWebhook({
+        url: callbackUrl,
+        method: callbackMethod,
+        body: JSON.stringify(body),
+        timeoutMs: CALLBACK_TIMEOUT_MS,
+        timeoutMessage: 'Upstream timeout',
+        unreachableMessage: 'Upstream request failed',
+      });
 
       // Non-2xx → return upstream error without updating status
       if (!upstreamResponse.ok) {
@@ -202,6 +198,8 @@ export function buildWilRouter({ services, customRepositories }: ApiRouteContext
       OkResponse(res, { success: true, message: 'Action completed' });
     },
   );
+
+  router.use(buildTriggerRouter(routeContext));
 
   return router;
 }
