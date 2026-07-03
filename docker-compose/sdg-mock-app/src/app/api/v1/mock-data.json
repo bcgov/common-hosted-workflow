@@ -25,8 +25,8 @@
     "717626be-f59f-4e35-ac87-f84c4e11b865": [
       {
         "id": "560c4de2-a0d4-4c7c-a500-75650475403d",
-        "name": "project:editor",
-        "description": "Can edit workflows in the SDG tenant project",
+        "name": "ui:actor",
+        "description": "Only actor in UI",
         "allowedIdentityProviders": ["idir"],
         "groups": [
           {
@@ -39,10 +39,15 @@
     "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a": [
       {
         "id": "660c5de3-b1e5-5d8d-b611-86761586514e",
-        "name": "project:viewer",
-        "description": "Can view workflows in the DEVX tenant project",
+        "name": "project:editor",
+        "description": "Can edit workflows in the DEVX tenant project",
         "allowedIdentityProviders": ["idir"],
-        "groups": []
+        "groups": [
+          {
+            "id": "59416d31-bec4-420d-9f4a-c04eb146ba75",
+            "name": "Project Editor"
+          }
+        ]
       }
     ]
   },
@@ -69,6 +74,27 @@
         ]
       }
     ],
-    "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a": []
+    "e8d27b42-ef5b-4d14-b6ee-8f592ec4df9a": [
+      {
+        "id": "59416d31-bec4-420d-9f4a-c04eb146ba75",
+        "name": "Project Editor",
+        "description": "Project Editor",
+        "createdDateTime": "2026-06-19",
+        "updatedDateTime": "2026-06-19",
+        "sharedServiceRoles": [
+          {
+            "id": "560c4de2-a0d4-4c7c-a500-75650475403d",
+            "name": "project:editor",
+            "description": "Project editor role",
+            "allowedIdentityProviders": ["idir"],
+            "isDeleted": false,
+            "createdDateTime": "2026-06-19",
+            "updatedDateTime": "2026-06-19",
+            "createdBy": "F45AFBBD68C44D6F956BA3A1D91878AD",
+            "updatedBy": "F45AFBBD68C44D6F956BA3A1D91878AD"
+          }
+        ]
+      }
+    ]
   }
 }
