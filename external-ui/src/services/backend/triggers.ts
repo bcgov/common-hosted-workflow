@@ -62,6 +62,14 @@ export function getTriggerChefsToken(params: {
     .then((res) => res.data);
 }
 
+export function deleteTrigger(params: { tenantId: string; triggerId: string }): Promise<void> {
+  return instance
+    .delete(`/ui-api/wil/triggers/${params.triggerId}`, {
+      headers: { 'X-TENANT-ID': params.tenantId },
+    })
+    .then(() => undefined);
+}
+
 export function callbackTrigger(params: {
   tenantId: string;
   triggerId: string;

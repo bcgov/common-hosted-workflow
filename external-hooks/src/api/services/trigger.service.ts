@@ -45,6 +45,11 @@ export type UpdateTriggerParams = {
   updatedBy: string;
 };
 
+export type DeleteTriggerParams = {
+  triggerId: string;
+  projectIds: string[];
+};
+
 export class TriggerService {
   constructor(private readonly customRepositories: CustomRepositories) {}
 
@@ -134,6 +139,44 @@ export class TriggerService {
       if (error instanceof AppError) throw error;
       const dbDetail = formatDbErrorForLog(error);
       log.error('Update trigger error', {
+        statusCode: 500,
+        triggerId: shortenIdForLog(params.triggerId),
+        dbDetail,
+        error: String(error),
+      });
+      throw new AppError(500, 'Internal Server Error');
+    }
+  }
+
+  async delete(params: DeleteTriggerParams) {
+    const existing = await this.customRepositories.workflowTrigger.getById({
+      triggerId: params.triggerId,
+      where: [inArray(workflowTrigger.projectId, params.projectIds)],
+    });
+    if (!existing) throw new AppError(404, 'Trigger not found');
+
+    if (existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM) {
+      const relations = await this.customRepositories.triggerCredentialRelation.listByTriggerId(params.triggerId);
+      for (const relation of relations) {
+        await this.customRepositories.triggerCredentialRelation.deleteById({
+          triggerId: params.triggerId,
+          credentialId: relation.credentialId,
+        });
+        await this.customRepositories.credentialEntity.deleteById({ credentialId: relation.credentialId });
+      }
+    }
+
+    try {
+      const deleted = await this.customRepositories.workflowTrigger.deleteById({
+        triggerId: params.triggerId,
+        where: [inArray(workflowTrigger.projectId, params.projectIds)],
+      });
+      if (!deleted) throw new AppError(404, 'Trigger not found');
+      return deleted;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const dbDetail = formatDbErrorForLog(error);
+      log.error('Delete trigger error', {
         statusCode: 500,
         triggerId: shortenIdForLog(params.triggerId),
         dbDetail,

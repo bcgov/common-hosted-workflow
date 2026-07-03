@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Trigger, TriggerPayload } from '../../../services/backend/trigger-types';
 import { TRIGGER_TYPES } from '../../../constants/constants';
 import { getTriggers } from '../../../services/backend/triggers';
+import { toast } from '../../../hooks/use-toasts';
 import type { FormMode } from './trigger-shared';
 import { useTriggerMutations } from './use-trigger-mutations';
 import { useTriggerFormState } from './use-trigger-form-state';
@@ -28,12 +29,14 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('idle');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [pendingNav, setPendingNav] = useState<{ fn: () => void } | null>(null);
 
   const formState = useTriggerFormState({ isPersonalTenant, userEmail });
   const callbackStatus = useTriggerCallbackStatus();
 
-  const { createMutation, updateMutation, callbackMutation } = useTriggerMutations({
+  const { createMutation, updateMutation, callbackMutation, deleteMutation } = useTriggerMutations({
     tenantId,
     userEmail,
     onCreated: (t) => {
@@ -48,6 +51,15 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     onCallbackSuccess: callbackStatus.succeed,
     onCallbackError: callbackStatus.fail,
     onCallbackSettled: callbackStatus.settle,
+    onDeleted: (triggerId) => {
+      setLocalTriggers((prev) => prev.filter((t) => t.id !== triggerId));
+      setSelectedTriggerId(null);
+      setFormMode('idle');
+      toast.success('Trigger deleted successfully.');
+    },
+    onDeleteError: () => {
+      toast.error('Failed to delete trigger. Please try again.');
+    },
   });
 
   const hasUnsavedEdits = formState.hasUnsavedChanges && (formMode === 'edit' || formMode === 'create');
@@ -134,6 +146,25 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     }
   }
 
+  function requestDelete(trigger: Trigger) {
+    setPendingDelete(trigger.id);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteMutation.mutateAsync(pendingDelete);
+    } finally {
+      setIsDeleting(false);
+      setPendingDelete(null);
+    }
+  }
+
+  function cancelDelete() {
+    setPendingDelete(null);
+  }
+
   function triggerCallback(trigger: Trigger) {
     guard(() => {
       setSelectedTriggerId(trigger.id);
@@ -175,6 +206,8 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     chefsForm: formState.chefsForm,
     buttonForm: formState.buttonForm,
     isSaving,
+    isDeleting,
+    pendingDeleteTrigger: pendingDelete ? (triggers.find((t: Trigger) => t.id === pendingDelete) ?? null) : null,
     buttonCallbackStatus: callbackStatus.buttonCallbackStatus,
     buttonCallbackError: callbackStatus.buttonCallbackError,
     formPaneTitle: getFormPaneTitle(),
@@ -189,6 +222,9 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     setButtonForm: formState.setButtonForm,
     save,
     triggerCallback,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
     confirmNavigation,
     cancelNavigation,
   };
