@@ -54,7 +54,7 @@ function isActorAllowed(
 ): boolean {
   const { allowedActors, allowedActorsType } = trigger;
   const actorsLower = new Set(allowedActors.map((a) => a.toLowerCase()));
-  if (actorsLower.has('*')) return true;
+  if (actorsLower.has('*') || allowedActorsType === 'all') return true;
 
   if (allowedActorsType === 'user') {
     return actorsLower.has(session.email.toLowerCase());
