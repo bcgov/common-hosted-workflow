@@ -72,6 +72,7 @@ export class TriggerService {
   async create(params: CreateTriggerParams) {
     const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
+    if (isChefsForm && apiKey) requireEncryptionKey();
     const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
 
     try {
@@ -114,6 +115,7 @@ export class TriggerService {
 
     const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
+    if (isChefsForm && apiKey) requireEncryptionKey();
     const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
 
     try {
@@ -187,9 +189,7 @@ export class TriggerService {
   }
 
   async getChefsApiKeyForTrigger(triggerId: string): Promise<string> {
-    if (!WIL_ENCRYPTION_KEY) {
-      throw new AppError(500, 'Encryption key not configured');
-    }
+    const key = requireEncryptionKey();
 
     const credential = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
       triggerId,
@@ -200,16 +200,13 @@ export class TriggerService {
       throw new AppError(400, 'No CHEFS API key credential found for this trigger');
     }
 
-    return decrypt(credential.data as string, WIL_ENCRYPTION_KEY);
+    return decrypt(credential.data as string, key);
   }
 
   private async persistChefsCredential(triggerId: string, apiKey: string): Promise<void> {
-    if (!WIL_ENCRYPTION_KEY) {
-      log.warn('WIL_ENCRYPTION_KEY not configured — CHEFS API key will not be stored');
-      return;
-    }
+    const key = requireEncryptionKey();
 
-    const encrypted = encrypt(apiKey, WIL_ENCRYPTION_KEY);
+    const encrypted = encrypt(apiKey, key);
 
     const existing = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
       triggerId,
@@ -231,6 +228,13 @@ export class TriggerService {
       });
     }
   }
+}
+
+function requireEncryptionKey(): string {
+  if (!WIL_ENCRYPTION_KEY) {
+    throw new AppError(500, 'Encryption key not configured');
+  }
+  return WIL_ENCRYPTION_KEY;
 }
 
 function extractChefsApiKey(metadata: Record<string, unknown>): string | null {
