@@ -73,6 +73,7 @@ export function AllowedActorsTypeField({
         <option value="" disabled>
           Select an actor type
         </option>
+        <option value="all">All</option>
         <option value="role">Role</option>
         <option value="user">User</option>
         <option value="group">Group</option>

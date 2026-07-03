@@ -83,7 +83,17 @@ export function ButtonTriggerFields({
         <AllowedActorsTypeField
           id="btn-actors-type"
           value={value.allowedActorsType}
-          onChange={(v) => set('allowedActorsType', v)}
+          onChange={(v) => {
+            if (v === 'all') {
+              onChange({ ...value, allowedActorsType: 'all', allowedActors: '*' });
+            } else {
+              onChange({
+                ...value,
+                allowedActorsType: v,
+                allowedActors: value.allowedActorsType === 'all' ? '' : value.allowedActors,
+              });
+            }
+          }}
           disabled={actorsLocked}
         />
         <AllowedActorsField
@@ -91,7 +101,7 @@ export function ButtonTriggerFields({
           value={value.allowedActors}
           onChange={(v) => set('allowedActors', v)}
           placeholder="e.g. * or specific role/user"
-          disabled={actorsLocked}
+          disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
       </div>
       <ActorIdBanner method={value.triggerMethod} />

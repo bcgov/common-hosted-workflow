@@ -53,6 +53,6 @@ export type TriggerHttpMethod = (typeof TRIGGER_HTTP_METHODS)[number];
 export const triggerHttpMethodZodEnum = z.enum(TRIGGER_HTTP_METHODS);
 
 /** Actor types for workflow trigger visibility/access control. */
-export const TRIGGER_ACTOR_TYPES = ['role', 'user', 'group', 'other'] as const;
+export const TRIGGER_ACTOR_TYPES = ['all', 'role', 'user', 'group', 'other'] as const;
 export type TriggerActorType = (typeof TRIGGER_ACTOR_TYPES)[number];
 export const triggerActorTypeZodEnum = z.enum(TRIGGER_ACTOR_TYPES);

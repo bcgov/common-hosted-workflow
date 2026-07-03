@@ -1,5 +1,5 @@
 export type TriggerType = 'chefs-form' | 'button';
-export type TriggerActorType = '' | 'role' | 'user' | 'group' | 'other';
+export type TriggerActorType = '' | 'all' | 'role' | 'user' | 'group' | 'other';
 export type TriggerMethod = 'POST' | 'GET';
 
 export interface ChefsFormTriggerPayload {

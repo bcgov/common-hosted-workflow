@@ -119,7 +119,17 @@ export function ChefsFormFields({
         <AllowedActorsTypeField
           id="chefs-actors-type"
           value={value.allowedActorsType}
-          onChange={(v) => set('allowedActorsType', v)}
+          onChange={(v) => {
+            if (v === 'all') {
+              onChange({ ...value, allowedActorsType: 'all', allowedActors: '*' });
+            } else {
+              onChange({
+                ...value,
+                allowedActorsType: v,
+                allowedActors: value.allowedActorsType === 'all' ? '' : value.allowedActors,
+              });
+            }
+          }}
           disabled={actorsLocked}
         />
         <AllowedActorsField
@@ -127,7 +137,7 @@ export function ChefsFormFields({
           value={value.allowedActors}
           onChange={(v) => set('allowedActors', v)}
           required
-          disabled={actorsLocked}
+          disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
       </div>
       <TriggerUrlField

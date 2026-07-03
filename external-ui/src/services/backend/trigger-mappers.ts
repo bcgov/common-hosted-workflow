@@ -20,8 +20,9 @@ export function splitActors(raw: string): string[] {
 /** Reconstructs the FE Trigger shape from a flat API response item. */
 export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigger {
   const meta = item.metadata;
-  const allowedActors = item.allowedActors.join(',');
-  const allowedActorsType = item.allowedActorsType as TriggerActorType;
+  const isAllActors = item.allowedActors.includes('*');
+  const allowedActors = isAllActors ? '*' : item.allowedActors.join(',');
+  const allowedActorsType: TriggerActorType = isAllActors ? 'all' : (item.allowedActorsType as TriggerActorType);
   const triggerMethod = item.triggerMethod as TriggerMethod;
   const includeActorId = (meta.includeActorId as boolean) ?? false;
 
@@ -60,8 +61,9 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
 
 /** Converts a limited API response (non-editor users) to a Trigger with minimal config for display. */
 export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: string): Trigger {
-  const allowedActors = item.allowedActors.join(',');
-  const allowedActorsType = item.allowedActorsType as TriggerActorType;
+  const isAllActors = item.allowedActors.includes('*');
+  const allowedActors = isAllActors ? '*' : item.allowedActors.join(',');
+  const allowedActorsType: TriggerActorType = isAllActors ? 'all' : (item.allowedActorsType as TriggerActorType);
 
   const config: TriggerPayload =
     item.triggerType === TRIGGER_TYPES.CHEFS_FORM
