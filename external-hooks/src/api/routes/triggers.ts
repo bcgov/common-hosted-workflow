@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { ApiRouteContext } from '../types/routes';
 import type { UiResolvedSession } from '../helpers/ui-oidc';
 import type { UiApiTypedRequest } from '../types/ui-api';
-import { resolveWilTenantProjectIds, resolveTenantProjectIds } from './helpers/wil-tenant';
+import { resolveWilTenantProjectIds } from './helpers/wil-tenant';
 import { createRequestParser } from '../utils/validation';
 import {
   listTriggersSchema,
@@ -21,7 +21,6 @@ import {
 } from '../schemas/trigger';
 import { OkResponse, CreatedResponse, ForbiddenResponse } from './responses';
 import { AppError } from '../utils/errors';
-import { X_TENANT_ID_HEADER } from '../constants/headers';
 import { WorkflowTriggerTypeEnum } from '../constants/enum';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -36,10 +35,14 @@ async function canManageTriggers(
   tenantId: string,
   session: UiResolvedSession,
   customRepositories: ApiRouteContext['customRepositories'],
+  n8nRepositories: ApiRouteContext['n8nRepositories'],
 ): Promise<boolean> {
   const tenantRow = await customRepositories.tenantProjectRelation.getRowByTenantId(tenantId);
   if (!tenantRow) return false;
-  if (tenantRow.projectType === 'personal') return true;
+  if (tenantRow.projectType === 'personal') {
+    const personalProject = await n8nRepositories.project.getPersonalProjectForUser(session.n8nUser.id);
+    return personalProject?.id === tenantRow.projectId;
+  }
   return session.tenantRoles.some((tr) => tr.tenantId === tenantId && tr.roles.includes(TRIGGER_MANAGE_ROLE));
 }
 
@@ -117,14 +120,17 @@ async function resolveTriggerAccess(
   triggerId: string,
   services: ApiRouteContext['services'],
   customRepositories: ApiRouteContext['customRepositories'],
+  n8nRepositories: ApiRouteContext['n8nRepositories'],
 ) {
   const session = (req as unknown as { session: UiResolvedSession }).session;
-  const tenantId = req.header(X_TENANT_ID_HEADER)?.trim() ?? '';
-  const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
+  const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+    req,
+    customRepositories.tenantProjectRelation,
+  );
 
   const trigger = await services.trigger.getById({ triggerId, projectIds: allowedProjectIds });
 
-  const isManager = await canManageTriggers(tenantId, session, customRepositories);
+  const isManager = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
   if (!isManager && !isActorAllowed(trigger, session, tenantId)) {
     ForbiddenResponse(res);
     return null;
@@ -134,7 +140,7 @@ async function resolveTriggerAccess(
 }
 
 export function buildTriggerRouter(routeContext: ApiRouteContext) {
-  const { services, customRepositories } = routeContext;
+  const { services, customRepositories, n8nRepositories } = routeContext;
   const router = Router();
 
   /**
@@ -145,13 +151,12 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
    */
   router.get('/triggers', createRequestParser(listTriggersSchema), async (req: Request, res: Response) => {
     const session = (req as unknown as { session: UiResolvedSession }).session;
-    const tenantId = req.header(X_TENANT_ID_HEADER)?.trim() ?? '';
-    const { projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+    const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
       req,
       customRepositories.tenantProjectRelation,
     );
 
-    const isManager = await canManageTriggers(tenantId, session, customRepositories);
+    const isManager = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
 
     if (isManager) {
@@ -182,10 +187,12 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     createRequestParser(createTriggerSchema),
     async (req: UiApiTypedRequest<z.infer<typeof createTriggerSchema>>, res: Response) => {
       const session = (req as unknown as { session: UiResolvedSession }).session;
-      const tenantId = req.header(X_TENANT_ID_HEADER)?.trim();
-      const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
+      const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+        req,
+        customRepositories.tenantProjectRelation,
+      );
 
-      const allowed = await canManageTriggers(tenantId ?? '', session, customRepositories);
+      const allowed = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
       if (!allowed) {
         ForbiddenResponse(res);
         return;
@@ -229,10 +236,12 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     createRequestParser(updateTriggerSchema),
     async (req: UiApiTypedRequest<z.infer<typeof updateTriggerSchema>>, res: Response) => {
       const session = (req as unknown as { session: UiResolvedSession }).session;
-      const tenantId = req.header(X_TENANT_ID_HEADER)?.trim();
-      const allowedProjectIds = await resolveTenantProjectIds(tenantId, customRepositories.tenantProjectRelation);
+      const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+        req,
+        customRepositories.tenantProjectRelation,
+      );
 
-      const allowed = await canManageTriggers(tenantId ?? '', session, customRepositories);
+      const allowed = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
       if (!allowed) {
         ForbiddenResponse(res);
         return;
@@ -272,7 +281,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     createRequestParser(getTriggerChefsTokenSchema),
     async (req: UiApiTypedRequest<z.infer<typeof getTriggerChefsTokenSchema>>, res: Response) => {
       const { triggerId } = req.parsed.params;
-      const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories);
+      const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories, n8nRepositories);
       if (!ctx) return;
       const { trigger } = ctx;
 
@@ -311,7 +320,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     createRequestParser(callbackTriggerSchema),
     async (req: UiApiTypedRequest<z.infer<typeof callbackTriggerSchema>>, res: Response) => {
       const { triggerId } = req.parsed.params;
-      const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories);
+      const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories, n8nRepositories);
       if (!ctx) return;
       const { session, trigger } = ctx;
 
