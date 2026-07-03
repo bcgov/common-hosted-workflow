@@ -161,17 +161,18 @@ export class AccessRequestService {
   private async applyApprovalSideEffects(requesterEmail: string): Promise<void> {
     await this.assignGlobalMemberRole(requesterEmail);
 
-    const { user } = this.n8nRepositories;
-    const targetUser = await user.findByEmail(requesterEmail, ['role']);
+    const { user, project } = this.n8nRepositories;
+    let targetUser = await user.findByEmail(requesterEmail, ['role']);
 
     if (!targetUser) {
-      await user.createUserWithProject({
+      const result = await user.createUserWithProject({
         email: requesterEmail,
         firstName: '',
         lastName: '',
         password: crypto.randomBytes(32).toString('hex'),
         role: { slug: 'global:member' },
       });
+      targetUser = result.user;
     } else {
       if (!targetUser.role) {
         await this.userRoleService.changeUserRole(targetUser, { newRoleName: 'global:member' });
@@ -180,6 +181,42 @@ export class AccessRequestService {
         await user.setUserDisabled(targetUser.id, false);
       }
     }
+
+    // Add Unique Generated Tenant Id to Personal Project
+    await this.assignTenantToPersonalProject(targetUser.id, project);
+  }
+
+  /**
+   * Assigns a unique generated tenant ID to the user's personal project.
+   * Skips assignment if the project already has a tenant mapping (idempotent).
+   * Uses insertIgnoreConflict to handle concurrent race conditions gracefully.
+   */
+  private async assignTenantToPersonalProject(userId: string, projectRepo: N8nRepositories['project']): Promise<void> {
+    const personalProject = await projectRepo.getPersonalProjectForUser(userId);
+    if (!personalProject) {
+      log.warn('No personal project found for user after approval, skipping tenant assignment', { userId });
+      return;
+    }
+
+    const existingTenantId = await this.customRepositories.tenantProjectRelation.getTenantIdByProjectId(
+      personalProject.id,
+    );
+    if (existingTenantId) {
+      log.info('Personal project already has a tenant mapping, skipping', { userId, tenantId: existingTenantId });
+      return;
+    }
+
+    const tenantId = crypto.randomUUID();
+    await this.customRepositories.tenantProjectRelation.insertIgnoreConflict({
+      tenantId,
+      projectId: personalProject.id,
+    });
+
+    log.info('Assigned tenant to personal project after access request approval', {
+      userId,
+      projectId: personalProject.id,
+      tenantId,
+    });
   }
 
   private async assignGlobalMemberRole(email: string): Promise<void> {

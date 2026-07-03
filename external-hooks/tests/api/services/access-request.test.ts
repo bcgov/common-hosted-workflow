@@ -17,6 +17,8 @@ function createMockCssSsoService(overrides?: {
 function createService(overrides?: {
   accessRequest?: Record<string, unknown>;
   user?: Record<string, unknown>;
+  project?: Record<string, unknown>;
+  tenantProjectRelation?: Record<string, unknown>;
   userRoleService?: Record<string, unknown>;
   cssSsoService?: ReturnType<typeof createMockCssSsoService> | null;
   nodeMailerService?: { sender: string; sendMail: ReturnType<typeof vi.fn> } | null;
@@ -34,10 +36,21 @@ function createService(overrides?: {
 
   const user = {
     findByEmail: vi.fn(),
-    createUserWithProject: vi.fn(),
+    createUserWithProject: vi.fn().mockResolvedValue({ user: { id: 'new-user-id', email: 'user@example.com' } }),
     setUserDisabled: vi.fn(),
     findAdminEmails: vi.fn(),
     ...overrides?.user,
+  };
+
+  const project = {
+    getPersonalProjectForUser: vi.fn().mockResolvedValue({ id: 'personal-project-id' }),
+    ...overrides?.project,
+  };
+
+  const tenantProjectRelation = {
+    getTenantIdByProjectId: vi.fn().mockResolvedValue(null),
+    insertIgnoreConflict: vi.fn().mockResolvedValue(undefined),
+    ...overrides?.tenantProjectRelation,
   };
 
   const userRoleService = {
@@ -55,12 +68,14 @@ function createService(overrides?: {
   return {
     accessRequest,
     user,
+    project,
+    tenantProjectRelation,
     userRoleService,
     cssSsoService,
     nodeMailerService,
     service: new AccessRequestService(
-      { user } as any,
-      { accessRequest } as any,
+      { user, project } as any,
+      { accessRequest, tenantProjectRelation } as any,
       userRoleService as any,
       cssSsoService as any,
       nodeMailerService as any,
