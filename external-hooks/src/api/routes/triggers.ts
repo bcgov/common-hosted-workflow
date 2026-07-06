@@ -8,6 +8,7 @@ import {
   listTriggersSchema,
   createTriggerSchema,
   updateTriggerSchema,
+  deleteTriggerSchema,
   callbackTriggerSchema,
   getTriggerChefsTokenSchema,
   getTriggerChefsTokenResponseSchema,
@@ -19,7 +20,7 @@ import {
   updateTriggerResponseSchema,
   callbackTriggerResponseSchema,
 } from '../schemas/trigger';
-import { OkResponse, CreatedResponse, ForbiddenResponse } from './responses';
+import { OkResponse, CreatedResponse, ForbiddenResponse, NoContentResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { WorkflowTriggerTypeEnum } from '../constants/enum';
 import { createLogger } from '../utils/logger';
@@ -269,6 +270,29 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
           : new Set<string>();
 
       OkResponse(res, mapTriggerRowToResponse(row, triggerIdsWithCreds.has(row.id)), updateTriggerResponseSchema);
+    },
+  );
+
+  /** DELETE /wil/triggers/:triggerId — permanently deletes a trigger. Requires project:editor role. */
+  router.delete(
+    '/triggers/:triggerId',
+    createRequestParser(deleteTriggerSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof deleteTriggerSchema>>, res: Response) => {
+      const session = (req as unknown as { session: UiResolvedSession }).session;
+      const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+        req,
+        customRepositories.tenantProjectRelation,
+      );
+
+      const allowed = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
+      if (!allowed) {
+        ForbiddenResponse(res);
+        return;
+      }
+
+      const { triggerId } = req.parsed.params;
+      await services.trigger.delete({ triggerId, projectIds: allowedProjectIds });
+      NoContentResponse(res);
     },
   );
 

@@ -102,6 +102,11 @@ export class TriggerCredentialRelationRepository {
     return row ?? null;
   }
 
+  /** Bulk-deletes all relation rows for a trigger. */
+  async deleteByAssociatedTriggerId(triggerId: string): Promise<void> {
+    await this.db.delete(triggerCredentialRelation).where(eq(triggerCredentialRelation.triggerId, triggerId));
+  }
+
   /**
    * Returns the set of trigger IDs (from the given list) that have at least one linked credential.
    * Used to determine which chefs-form triggers should show the API key placeholder in responses.

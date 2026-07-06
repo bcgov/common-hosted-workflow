@@ -45,6 +45,11 @@ export type UpdateTriggerParams = {
   updatedBy: string;
 };
 
+export type DeleteTriggerParams = {
+  triggerId: string;
+  projectIds: string[];
+};
+
 export class TriggerService {
   constructor(private readonly customRepositories: CustomRepositories) {}
 
@@ -67,6 +72,7 @@ export class TriggerService {
   async create(params: CreateTriggerParams) {
     const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
+    if (isChefsForm && apiKey) requireEncryptionKey();
     const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
 
     try {
@@ -109,6 +115,7 @@ export class TriggerService {
 
     const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
+    if (isChefsForm && apiKey) requireEncryptionKey();
     const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
 
     try {
@@ -143,10 +150,44 @@ export class TriggerService {
     }
   }
 
-  async getChefsApiKeyForTrigger(triggerId: string): Promise<string> {
-    if (!WIL_ENCRYPTION_KEY) {
-      throw new AppError(500, 'Encryption key not configured');
+  async delete(params: DeleteTriggerParams) {
+    const existing = await this.customRepositories.workflowTrigger.getById({
+      triggerId: params.triggerId,
+      where: [inArray(workflowTrigger.projectId, params.projectIds)],
+    });
+    if (!existing) throw new AppError(404, 'Trigger not found');
+
+    if (existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM) {
+      const relations = await this.customRepositories.triggerCredentialRelation.listByTriggerId(params.triggerId);
+      if (relations.length > 0) {
+        const credentialIds = relations.map((r) => r.credentialId);
+        await this.customRepositories.triggerCredentialRelation.deleteByAssociatedTriggerId(params.triggerId);
+        await this.customRepositories.credentialEntity.deleteByAssociatedTriggerId(credentialIds);
+      }
     }
+
+    try {
+      const deleted = await this.customRepositories.workflowTrigger.deleteById({
+        triggerId: params.triggerId,
+        where: [inArray(workflowTrigger.projectId, params.projectIds)],
+      });
+      if (!deleted) throw new AppError(404, 'Trigger not found');
+      return deleted;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const dbDetail = formatDbErrorForLog(error);
+      log.error('Delete trigger error', {
+        statusCode: 500,
+        triggerId: shortenIdForLog(params.triggerId),
+        dbDetail,
+        error: String(error),
+      });
+      throw new AppError(500, 'Internal Server Error');
+    }
+  }
+
+  async getChefsApiKeyForTrigger(triggerId: string): Promise<string> {
+    const key = requireEncryptionKey();
 
     const credential = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
       triggerId,
@@ -157,16 +198,13 @@ export class TriggerService {
       throw new AppError(400, 'No CHEFS API key credential found for this trigger');
     }
 
-    return decrypt(credential.data as string, WIL_ENCRYPTION_KEY);
+    return decrypt(credential.data as string, key);
   }
 
   private async persistChefsCredential(triggerId: string, apiKey: string): Promise<void> {
-    if (!WIL_ENCRYPTION_KEY) {
-      log.warn('WIL_ENCRYPTION_KEY not configured — CHEFS API key will not be stored');
-      return;
-    }
+    const key = requireEncryptionKey();
 
-    const encrypted = encrypt(apiKey, WIL_ENCRYPTION_KEY);
+    const encrypted = encrypt(apiKey, key);
 
     const existing = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
       triggerId,
@@ -188,6 +226,13 @@ export class TriggerService {
       });
     }
   }
+}
+
+function requireEncryptionKey(): string {
+  if (!WIL_ENCRYPTION_KEY) {
+    throw new AppError(500, 'Encryption key not configured');
+  }
+  return WIL_ENCRYPTION_KEY;
 }
 
 function extractChefsApiKey(metadata: Record<string, unknown>): string | null {

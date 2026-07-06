@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { credentialEntity, type CredentialEntityType } from '../../schema/credential-entity';
 
 export type CredentialPayload =
@@ -78,6 +78,11 @@ export class CredentialEntityRepository {
       })
       .returning();
     return row;
+  }
+
+  /** Bulk-deletes credential entities by their IDs. */
+  async deleteByAssociatedTriggerId(credentialIds: string[]): Promise<void> {
+    await this.db.delete(credentialEntity).where(inArray(credentialEntity.id, credentialIds));
   }
 
   /** Deletes one credential entity by id. Returns the deleted row or null. */

@@ -84,6 +84,13 @@ export const updateTriggerSchema = z.object({
     .strict(),
 });
 
+/** DELETE /ui-api/wil/triggers/:triggerId */
+export const deleteTriggerSchema = z.object({
+  params: z.object({ triggerId: z.string().trim().min(1) }),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
 /** GET /ui-api/wil/triggers */
 export const listTriggersSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),

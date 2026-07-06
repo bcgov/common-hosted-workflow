@@ -1,13 +1,6 @@
 import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TRIGGER_MANAGE_ROLE_VALUES } from '../../../lib/trigger-manage-roles';
 import { useHasTenantRoles, useTenantRolesById } from '../../../state/session';
 import { useTriggers } from './use-triggers';
@@ -37,6 +30,8 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
     chefsForm,
     buttonForm,
     isSaving,
+    isDeleting,
+    pendingDeleteTrigger,
     buttonCallbackStatus,
     buttonCallbackError,
     formPaneTitle,
@@ -50,6 +45,9 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
     setButtonForm,
     save,
     triggerCallback,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
     confirmNavigation,
     cancelNavigation,
   } = useTriggers({ tenantId, isPersonalTenant, userEmail });
@@ -57,6 +55,11 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
   const visibleTriggers = canManage
     ? triggers
     : triggers.filter((t) => canUserSeeTrigger(t, userTenantRoles, userEmail));
+
+  const deleteTriggerLabel =
+    pendingDeleteTrigger?.config.type === TRIGGER_TYPES.CHEFS_FORM
+      ? pendingDeleteTrigger.config.formName || 'this trigger'
+      : pendingDeleteTrigger?.config.buttonText || 'this trigger';
 
   return (
     <>
@@ -81,6 +84,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
                 isCallbackPending={callbackTriggerId === trigger.id}
                 onClick={() => selectTrigger(trigger, canManage)}
                 onEdit={() => selectTrigger(trigger, canManage)}
+                onDelete={() => requestDelete(trigger)}
                 onTriggerCallback={() => {
                   if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
                     openChefsPreview(trigger);
@@ -118,29 +122,27 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
         </div>
       </div>
 
-      <Dialog
+      <ConfirmDialog
         open={hasPendingNav}
-        onOpenChange={(open) => {
-          if (!open) cancelNavigation();
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Unsaved changes</DialogTitle>
-            <DialogDescription>
-              You have unsaved changes. Please save or cancel before switching triggers.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={cancelNavigation}>
-              Stay
-            </Button>
-            <Button type="button" variant="destructive" onClick={confirmNavigation}>
-              Discard changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Unsaved changes"
+        description="You have unsaved changes. Please save or cancel before switching triggers."
+        confirmLabel="Discard changes"
+        cancelLabel="Stay"
+        confirmVariant="destructive"
+        onConfirm={confirmNavigation}
+        onCancel={cancelNavigation}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteTrigger !== null}
+        title="Delete trigger"
+        description={`Are you sure you want to delete "${deleteTriggerLabel}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </>
   );
 }
