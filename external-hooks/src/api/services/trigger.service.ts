@@ -159,12 +159,10 @@ export class TriggerService {
 
     if (existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM) {
       const relations = await this.customRepositories.triggerCredentialRelation.listByTriggerId(params.triggerId);
-      for (const relation of relations) {
-        await this.customRepositories.triggerCredentialRelation.deleteById({
-          triggerId: params.triggerId,
-          credentialId: relation.credentialId,
-        });
-        await this.customRepositories.credentialEntity.deleteById({ credentialId: relation.credentialId });
+      if (relations.length > 0) {
+        const credentialIds = relations.map((r) => r.credentialId);
+        await this.customRepositories.triggerCredentialRelation.deleteByAssociatedTriggerId(params.triggerId);
+        await this.customRepositories.credentialEntity.deleteByAssociatedTriggerId(credentialIds);
       }
     }
 
