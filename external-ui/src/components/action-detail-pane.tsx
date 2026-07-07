@@ -3,8 +3,10 @@ import { GetApprovalHandler } from './action-handlers/get-approval-handler';
 import { ShowFormHandler } from './action-handlers/show-form-handler';
 import { WaitOnEventHandler } from './action-handlers/wait-on-event-handler';
 import { CompletedActionView } from './action-handlers/completed-action-view';
+import { ClaimGate } from './action-handlers/claim-gate';
 import { Badge } from '@/components/ui/badge';
 import { IconAlertTriangle } from '@tabler/icons-react';
+import { useAuthUser } from '../state/session';
 
 const TERMINAL_STATUSES: ReadonlySet<WilActionItem['status']> = new Set([
   'completed',
@@ -59,9 +61,26 @@ interface ActionDetailPaneProps {
 }
 
 export function ActionDetailPane({ action, tenantId, onInteractionSuccess }: Readonly<ActionDetailPaneProps>) {
+  const user = useAuthUser();
+  const userEmail = user?.email ?? '';
+
   if (!action) return <Placeholder />;
   if (isTerminalStatus(action.status)) return <CompletedActionView action={action} />;
 
+  const handler = renderActionHandler(action, tenantId, onInteractionSuccess);
+
+  return (
+    <ClaimGate action={action} tenantId={tenantId} userEmail={userEmail} onInteractionSuccess={onInteractionSuccess}>
+      {handler}
+    </ClaimGate>
+  );
+}
+
+function renderActionHandler(
+  action: WilActionItem,
+  tenantId: string,
+  onInteractionSuccess?: () => void,
+): React.ReactNode {
   switch (action.actionType) {
     case 'getapproval':
       return <GetApprovalHandler action={action} tenantId={tenantId} onInteractionSuccess={onInteractionSuccess} />;

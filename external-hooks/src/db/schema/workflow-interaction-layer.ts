@@ -104,12 +104,16 @@ export const actionRequest = pgTable(
     priority: varchar('priority', { length: 20 }).notNull().default('normal'),
     dueDate: timestamp('due_date', { withTimezone: true }),
     checkIn: timestamp('check_in', { withTimezone: true }),
+    claimedBy: varchar('claimed_by', { length: 255 }),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    completedBy: varchar('completed_by', { length: 255 }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
     metadata: jsonb('metadata'),
   },
   (table) => [
     check(
       'chk_action_request_status',
-      sql`${table.status} IN ('pending', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted')`,
+      sql`${table.status} IN ('pending', 'claimed', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted')`,
     ),
     check('chk_ar_priority', sql`${table.priority} IN ('critical', 'normal')`),
     check('chk_ar_actor_type', sql`${table.actorType} IN ('user', 'role', 'group', 'system', 'other')`),
@@ -132,6 +136,9 @@ export const actionRequest = pgTable(
     index('idx_ar_check_in')
       .on(table.checkIn)
       .where(sql`${table.checkIn} IS NOT NULL`),
+    index('idx_ar_pending_claims')
+      .on(table.id, table.status)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );
 

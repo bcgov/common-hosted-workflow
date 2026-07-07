@@ -25,10 +25,15 @@ function makeActionRequest(overrides: Partial<ActionRequest> = {}): ActionReques
     createdAt: new Date('2025-06-01T12:00:00.000Z'),
     updatedAt: new Date('2025-06-01T13:00:00.000Z'),
     status: 'pending',
+    actionTitle: null,
     priority: 'normal',
     dueDate: null,
     checkIn: new Date('2025-06-02T10:00:00.000Z'),
     metadata: { source: 'n8n' },
+    claimedBy: null,
+    claimedAt: null,
+    completedBy: null,
+    completedAt: null,
     ...overrides,
   };
 }

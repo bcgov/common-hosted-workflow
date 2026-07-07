@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
+import type { DirectUpdateParams } from '../services/action.service';
 import {
   createActionRequestResponseSchema,
   createActionRequestSchema,
@@ -11,7 +11,6 @@ import {
   listActionsSchema,
   mapActionRequestRowToResponse,
   patchActionStatusByIdSchema,
-  patchActionStatusResponseSchema,
 } from '../schemas/action-request';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
@@ -104,20 +103,23 @@ export function buildActionRouter({
     async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(patchActionStatusByIdSchema, req);
       const allowedProjectIds = getTenantScopedProjectIds(res, 'PATCH /v1/actions/:actionId', 'actions');
-      const patchStatus = parsed.body.status;
-      await services.action.updateStatus({
+      const { status, claimedBy, claimedAt, completedBy, completedAt } = parsed.body;
+
+      // WIL API is trusted — bypass state machine validation via directUpdate.
+      // Build setValues only with fields that were explicitly provided.
+      const setValues: DirectUpdateParams['setValues'] = { updatedAt: new Date() };
+      if (status !== undefined) setValues.status = status;
+      if (claimedBy !== undefined) setValues.claimedBy = claimedBy;
+      if (claimedAt !== undefined) setValues.claimedAt = claimedAt ? new Date(claimedAt) : null;
+      if (completedBy !== undefined) setValues.completedBy = completedBy;
+      if (completedAt !== undefined) setValues.completedAt = completedAt ? new Date(completedAt) : null;
+
+      const row = await services.action.directUpdate({
         allowedProjectIds,
         actionId: parsed.params.actionId,
-        status: patchStatus,
+        setValues,
       });
-      OkResponse(
-        res,
-        {
-          status: patchStatus,
-          message: formatPatchActionStatusMessage(patchStatus),
-        },
-        patchActionStatusResponseSchema,
-      );
+      OkResponse(res, mapActionRequestRowToResponse(row), createActionRequestResponseSchema);
     },
   );
 

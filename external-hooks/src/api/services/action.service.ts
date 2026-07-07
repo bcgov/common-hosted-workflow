@@ -1,9 +1,10 @@
 import { eq, inArray } from 'drizzle-orm';
-import { actionRequest } from '../../db/schema/workflow-interaction-layer';
+import { actionRequest, type ActionRequest } from '../../db/schema/workflow-interaction-layer';
 import { buildPaginationClauses } from '../../db/repository/custom/pagination';
 import { formatDbErrorForLog, normalizeCreateActionTimestamps } from '../helpers/db-helper';
 import { requireExecutionInTenantScope, resolveProjectIdForCreate } from './project-access';
 import { buildActorMatcherClause } from './actor-matcher-clause';
+import { ACTION_STATUS_COMPLETED, isSharedActorType, isValidTransition } from './action-state-machine';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { ListPaginationSince } from '../types/list-pagination';
@@ -60,7 +61,24 @@ export type UpdateActionStatusParams = {
   actionId: string;
   actorId?: string;
   actorMatchers?: ActorMatchers;
+  actorEmail?: string;
   status: string;
+  /** Pre-fetched action row — skips the internal getById when provided. */
+  currentAction?: ActionRequest;
+};
+
+export type DirectUpdateParams = {
+  allowedProjectIds: string[];
+  actionId: string;
+  actorId?: string;
+  setValues: {
+    status?: string;
+    claimedBy?: string | null;
+    claimedAt?: Date | null;
+    completedBy?: string | null;
+    completedAt?: Date | null;
+    updatedAt: Date;
+  };
 };
 
 export class ActionService {
@@ -176,13 +194,59 @@ export class ActionService {
 
   async updateStatus(params: UpdateActionStatusParams) {
     const actorWhereClauses = this.buildActorWhere(params);
+    const scopeClauses = [inArray(actionRequest.projectId, params.allowedProjectIds), ...actorWhereClauses];
 
+    // 1. Use pre-fetched action if provided, otherwise fetch from DB
+    const current =
+      params.currentAction ??
+      (await this.customRepositories.actionRequest.getById({
+        actionId: params.actionId,
+        where: scopeClauses,
+      }));
+    if (!current) throw new AppError(404, 'Action not found');
+
+    // 2. Validate transition is allowed
+    if (!isValidTransition(current.status, params.status)) {
+      throw new AppError(409, `Invalid state transition from ${current.status} to ${params.status}`);
+    }
+
+    // 3. For role/group actions transitioning to completed: validate caller = claimed_by
+    if (params.status === ACTION_STATUS_COMPLETED && isSharedActorType(current.actorType)) {
+      if (params.actorEmail !== current.claimedBy) {
+        throw new AppError(403, 'Only the claiming actor can complete this action');
+      }
+    }
+
+    // 4. Build additional fields for completion
+    const additionalFields =
+      params.status === ACTION_STATUS_COMPLETED
+        ? { completedBy: params.actorEmail, completedAt: new Date() }
+        : undefined;
+
+    // 5. Update with optimistic locking on current status
     const row = await this.customRepositories.actionRequest.updateStatus({
       actionId: params.actionId,
       status: params.status,
-      where: [inArray(actionRequest.projectId, params.allowedProjectIds), ...actorWhereClauses],
+      expectedStatus: current.status,
+      additionalFields,
+      where: scopeClauses,
+    });
+
+    if (!row) throw new AppError(409, 'Action state changed concurrently');
+    return row;
+  }
+
+  async directUpdate(params: DirectUpdateParams) {
+    const whereClauses = [inArray(actionRequest.projectId, params.allowedProjectIds)];
+    if (params.actorId) {
+      whereClauses.push(eq(actionRequest.actorId, params.actorId));
+    }
+    const row = await this.customRepositories.actionRequest.directUpdate({
+      actionId: params.actionId,
+      setValues: params.setValues,
+      where: whereClauses,
     });
     if (!row) throw new AppError(404, 'Action not found');
-    return params.status;
+    return row;
   }
 }

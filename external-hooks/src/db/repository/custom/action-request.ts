@@ -1,11 +1,11 @@
-import { and, desc, eq } from 'drizzle-orm';
-import { actionRequest } from '../../schema/workflow-interaction-layer';
+import { and, desc, eq, type SQL } from 'drizzle-orm';
+import { actionRequest, type ActionRequest } from '../../schema/workflow-interaction-layer';
 
 export class ActionRequestRepository {
   constructor(private readonly db: any) {}
 
   /** List action requests matching the provided where clauses. */
-  async list(params: { where: any[]; limit: number }): Promise<Array<typeof actionRequest.$inferSelect>> {
+  async list(params: { where: any[]; limit: number }): Promise<ActionRequest[]> {
     return await this.db
       .select()
       .from(actionRequest)
@@ -15,7 +15,7 @@ export class ActionRequestRepository {
   }
 
   /** Returns one action request by id, optionally scoped by where clauses. */
-  async getById(params: { actionId: string; where?: any[] }): Promise<typeof actionRequest.$inferSelect | null> {
+  async getById(params: { actionId: string; where?: any[] }): Promise<ActionRequest | null> {
     const clauses = [eq(actionRequest.id, params.actionId), ...(params.where ?? [])];
     const [row] = await this.db
       .select()
@@ -43,7 +43,7 @@ export class ActionRequestRepository {
     dueDate: Date | null;
     checkIn: Date | null;
     metadata: Record<string, unknown> | null;
-  }): Promise<typeof actionRequest.$inferSelect> {
+  }): Promise<ActionRequest> {
     const now = new Date();
     const [row] = await this.db
       .insert(actionRequest)
@@ -56,19 +56,105 @@ export class ActionRequestRepository {
     return row;
   }
 
-  /** Updates status by id, optionally scoped by where clauses. Returns the updated row or null. */
+  /** Updates status by id with optimistic locking and optional additional fields. */
   async updateStatus(params: {
     actionId: string;
     status: string;
+    expectedStatus?: string;
+    additionalFields?: {
+      completedBy?: string;
+      completedAt?: Date;
+    };
     where?: any[];
-  }): Promise<typeof actionRequest.$inferSelect | null> {
-    const clauses = [eq(actionRequest.id, params.actionId), ...(params.where ?? [])];
+  }): Promise<ActionRequest | null> {
+    const clauses = [
+      eq(actionRequest.id, params.actionId),
+      ...(params.expectedStatus ? [eq(actionRequest.status, params.expectedStatus)] : []),
+      ...(params.where ?? []),
+    ];
+    const setValues: Record<string, any> = {
+      status: params.status,
+      updatedAt: new Date(),
+      ...(params.additionalFields ?? {}),
+    };
+    const [row] = await this.db
+      .update(actionRequest)
+      .set(setValues)
+      .where(and(...clauses))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Atomically claims an action (pending → claimed). Returns updated row or null if preconditions not met. */
+  async claim(params: { actionId: string; claimedBy: string; where?: SQL[] }): Promise<ActionRequest | null> {
+    const clauses = [
+      eq(actionRequest.id, params.actionId),
+      eq(actionRequest.status, 'pending'),
+      ...(params.where ?? []),
+    ];
     const [row] = await this.db
       .update(actionRequest)
       .set({
-        status: params.status,
+        status: 'claimed',
+        claimedBy: params.claimedBy,
+        claimedAt: new Date(),
         updatedAt: new Date(),
       })
+      .where(and(...clauses))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Atomically unclaims an action (claimed → pending). Returns updated row or null if preconditions not met. */
+  async unclaim(params: { actionId: string; where?: SQL[] }): Promise<ActionRequest | null> {
+    const clauses = [
+      eq(actionRequest.id, params.actionId),
+      eq(actionRequest.status, 'claimed'),
+      ...(params.where ?? []),
+    ];
+    const [row] = await this.db
+      .update(actionRequest)
+      .set({
+        status: 'pending',
+        claimedBy: null,
+        claimedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(and(...clauses))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Atomically starts an action (claimed → in_progress). Returns updated row or null if preconditions not met. */
+  async startAction(params: { actionId: string; claimedBy: string; where?: SQL[] }): Promise<ActionRequest | null> {
+    const clauses = [
+      eq(actionRequest.id, params.actionId),
+      eq(actionRequest.status, 'claimed'),
+      eq(actionRequest.claimedBy, params.claimedBy),
+      ...(params.where ?? []),
+    ];
+    const [row] = await this.db
+      .update(actionRequest)
+      .set({
+        status: 'in_progress',
+        updatedAt: new Date(),
+      })
+      .where(and(...clauses))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Directly updates any combination of fields without state machine validation.
+   *  Used by the WIL API (trusted service account) to set claim/completion fields directly. */
+  async directUpdate(params: {
+    actionId: string;
+    setValues: Record<string, any>;
+    where?: SQL[];
+  }): Promise<ActionRequest | null> {
+    const clauses = [eq(actionRequest.id, params.actionId), ...(params.where ?? [])];
+    const [row] = await this.db
+      .update(actionRequest)
+      .set(params.setValues)
       .where(and(...clauses))
       .returning();
     return row ?? null;

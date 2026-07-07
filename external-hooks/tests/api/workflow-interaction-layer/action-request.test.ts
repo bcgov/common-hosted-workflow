@@ -51,6 +51,8 @@ function createTestRouter() {
       tenant: {} as any,
       tenantProjectSync: {} as any,
       projectTenant: {} as any,
+      claim: {} as any,
+      trigger: {} as any,
     },
   });
   const router = buildActionRouter(routeContext);
@@ -248,7 +250,7 @@ describe('GET /actions/:actionId', () => {
 describe('PATCH /actions/:actionId', () => {
   it('returns 200 with updated status', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
+    actionRequestRepo.directUpdate.mockResolvedValue(makeActionRequestRow({ status: 'completed' }));
 
     const handlers = getRouteHandlers(router, 'patch', '/actions/:actionId');
     const req = createMockRequest({ params: { actionId: VALID_ACTION_ID }, query: {}, body: { status: 'completed' } });
@@ -260,12 +262,12 @@ describe('PATCH /actions/:actionId', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     const payload = res.json.mock.calls[0][0];
     expect(payload.status).toBe('completed');
-    expect(payload.message).toContain('completed');
+    expect(payload.id).toBe(VALID_ACTION_ID);
   });
 
   it('throws 404 when action not found', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(null);
+    actionRequestRepo.directUpdate.mockResolvedValue(null);
 
     const handlers = getRouteHandlers(router, 'patch', '/actions/:actionId');
     const req = createMockRequest({ params: { actionId: 'missing' }, query: {}, body: { status: 'completed' } });
@@ -277,9 +279,9 @@ describe('PATCH /actions/:actionId', () => {
     expect((error as any).statusCode).toBe(404);
   });
 
-  it('formats "deleted" status message correctly', async () => {
+  it('returns full action response with "deleted" status', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
+    actionRequestRepo.directUpdate.mockResolvedValue(makeActionRequestRow({ status: 'deleted' }));
 
     const handlers = getRouteHandlers(router, 'patch', '/actions/:actionId');
     const req = createMockRequest({ params: { actionId: VALID_ACTION_ID }, query: {}, body: { status: 'deleted' } });
@@ -287,7 +289,9 @@ describe('PATCH /actions/:actionId', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(res.json.mock.calls[0][0].message).toBe('The action has been deleted.');
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.status).toBe('deleted');
+    expect(payload.id).toBe(VALID_ACTION_ID);
   });
 
   it('returns validation error for invalid status', async () => {

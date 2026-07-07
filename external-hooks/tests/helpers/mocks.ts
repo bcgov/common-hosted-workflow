@@ -174,6 +174,10 @@ export function createMockActionRequestRepository() {
     getById: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(makeActionRequestRow()),
     updateStatus: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    claim: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    unclaim: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    startAction: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    directUpdate: vi.fn().mockResolvedValue(makeActionRequestRow()),
   };
 }
 

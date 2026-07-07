@@ -1,4 +1,12 @@
-export const STATUS_OPTIONS = ['pending', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted'] as const;
+export const STATUS_OPTIONS = [
+  'pending',
+  'claimed',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'expired',
+  'deleted',
+] as const;
 
 function formatStatusLabel(status: string): string {
   return status

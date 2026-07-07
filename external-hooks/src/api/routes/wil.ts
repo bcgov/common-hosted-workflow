@@ -13,6 +13,7 @@ import { getBearerToken } from '../helpers/ui-oidc-session';
 import { buildTriggerRouter } from './triggers';
 import { callWebhook } from './helpers/webhook-fire';
 import { CALLBACK_TIMEOUT_MS } from './constants/constants';
+import { isSharedActorType } from '../services/action-state-machine';
 import type { z } from 'zod';
 
 export function buildWilRouter(routeContext: ApiRouteContext) {
@@ -97,8 +98,6 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       const actorMatchers = resolveActorMatchers(session, tenantId);
       const { actionId } = req.parsed.body;
 
-      // TODO: Future — implement claim process: when an action is assigned to a role/group,
-      // one user from that role/group claims the action and only they can perform it.
       const action = await services.action.getById({
         allowedProjectIds,
         actionId,
@@ -145,13 +144,16 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       const actorMatchers = resolveActorMatchers(session, tenantId);
       const { actionId, body } = req.parsed.body;
 
-      // TODO: Future — implement claim process: when an action is assigned to a role/group,
-      // one user from that role/group claims the action and only they can perform it.
       const action = await services.action.getById({
         allowedProjectIds,
         actionId,
         actorMatchers,
       });
+
+      // Claim gate: role/group actions require the claiming actor to complete
+      if (isSharedActorType(action.actorType) && action.claimedBy !== session.email) {
+        throw new AppError(403, 'Only the claiming actor can complete this action');
+      }
 
       const callbackMethod = action.callbackMethod ?? 'POST';
       const callbackUrl = action.callbackUrl ?? '';
@@ -163,6 +165,8 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
           actionId,
           actorMatchers,
           status: 'completed',
+          actorEmail: session.email,
+          currentAction: action,
         });
         OkResponse(res, { success: true, message: 'Action completed' });
         return;
@@ -193,11 +197,65 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
         actionId,
         actorMatchers,
         status: 'completed',
+        actorEmail: session.email,
+        currentAction: action,
       });
 
       OkResponse(res, { success: true, message: 'Action completed' });
     },
   );
+
+  // POST /actions/:actionId/claim
+  router.post('/actions/:actionId/claim', async (req, res) => {
+    const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+      req,
+      customRepositories.tenantProjectRelation,
+    );
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const actorMatchers = resolveActorMatchers(session, tenantId);
+
+    const row = await services.claim.claim({
+      actionId: req.params.actionId,
+      actorEmail: session.email,
+      actorMatchers,
+      allowedProjectIds,
+    });
+    OkResponse(res, mapActionToUiResponse(row));
+  });
+
+  // POST /actions/:actionId/unclaim
+  router.post('/actions/:actionId/unclaim', async (req, res) => {
+    const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+      req,
+      customRepositories.tenantProjectRelation,
+    );
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const actorMatchers = resolveActorMatchers(session, tenantId);
+
+    const row = await services.claim.unclaim({
+      actionId: req.params.actionId,
+      actorEmail: session.email,
+      actorMatchers,
+      allowedProjectIds,
+    });
+    OkResponse(res, mapActionToUiResponse(row));
+  });
+
+  // POST /actions/:actionId/start
+  router.post('/actions/:actionId/start', async (req, res) => {
+    const { projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+      req,
+      customRepositories.tenantProjectRelation,
+    );
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+
+    const row = await services.claim.start({
+      actionId: req.params.actionId,
+      actorEmail: session.email,
+      allowedProjectIds,
+    });
+    OkResponse(res, mapActionToUiResponse(row));
+  });
 
   router.use(buildTriggerRouter(routeContext));
 
