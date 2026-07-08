@@ -1,4 +1,4 @@
-import { and, desc, eq, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { actionRequest, type ActionRequest } from '../../schema/workflow-interaction-layer';
 
 export class ActionRequestRepository {
@@ -12,6 +12,21 @@ export class ActionRequestRepository {
       .where(and(...params.where))
       .orderBy(desc(actionRequest.createdAt), desc(actionRequest.id))
       .limit(params.limit);
+  }
+
+  /** Returns counts grouped by status for actions matching the provided where clauses. */
+  async countByStatus(params: { where: any[] }): Promise<Record<string, number>> {
+    const rows = await this.db
+      .select({ status: actionRequest.status, count: count() })
+      .from(actionRequest)
+      .where(and(...params.where))
+      .groupBy(actionRequest.status);
+
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.status] = Number(row.count);
+    }
+    return result;
   }
 
   /** Returns one action request by id, optionally scoped by where clauses. */
@@ -105,11 +120,11 @@ export class ActionRequestRepository {
     return row ?? null;
   }
 
-  /** Atomically unclaims an action (claimed → pending). Returns updated row or null if preconditions not met. */
+  /** Atomically unclaims an action (claimed|in_progress → pending). Returns updated row or null if preconditions not met. */
   async unclaim(params: { actionId: string; where?: SQL[] }): Promise<ActionRequest | null> {
     const clauses = [
       eq(actionRequest.id, params.actionId),
-      eq(actionRequest.status, 'claimed'),
+      inArray(actionRequest.status, ['claimed', 'in_progress']),
       ...(params.where ?? []),
     ];
     const [row] = await this.db

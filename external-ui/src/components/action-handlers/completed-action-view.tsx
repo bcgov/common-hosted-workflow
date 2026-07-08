@@ -91,7 +91,15 @@ export function CompletedActionView({ action }: Readonly<CompletedActionViewProp
 
       <p className="text-sm font-medium text-[var(--bc-text)]">{formatActionType(action.actionType)}</p>
 
-      <p className="text-xs text-[var(--bc-muted)]">{formatCompletionTime(action.updatedAt)}</p>
+      {action.completedBy && (
+        <p className="text-xs text-[var(--bc-muted)]">
+          Completed by <span className="font-medium text-[var(--bc-text)]">{action.completedBy}</span>
+        </p>
+      )}
+
+      <p className="text-xs text-[var(--bc-muted)]">
+        {action.completedAt ? formatCompletionTime(action.completedAt) : formatCompletionTime(action.updatedAt)}
+      </p>
 
       {payloadSummary && <p className="text-xs text-[var(--bc-muted)]">{payloadSummary}</p>}
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconLoader2, IconHandGrab, IconHandOff, IconPlayerPlay, IconUser } from '@tabler/icons-react';
+import { IconLoader2, IconHandGrab, IconHandOff, IconPlayerPlay, IconUser, IconRefresh } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { WilActionItem } from '../../services/backend/wil';
@@ -12,11 +12,32 @@ interface ClaimGateProps {
   tenantId: string;
   userEmail: string;
   onInteractionSuccess?: () => void;
+  onActionUpdated?: (action: WilActionItem | null) => void;
   children: React.ReactNode;
 }
 
 function isSharedActorType(actorType: string | undefined): boolean {
   return actorType === 'role' || actorType === 'group';
+}
+
+/** Inline error block with a Refresh button — reused across claim gate states. */
+function MutationErrorBlock({
+  error,
+  fallback,
+  onRefresh,
+}: Readonly<{ error: Error | null; fallback: string; onRefresh: () => void }>) {
+  if (!error) return null;
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <p className="text-sm text-red-600" role="alert">
+        {extractErrorMessage(error, fallback)}
+      </p>
+      <Button variant="outline" size="sm" onClick={onRefresh}>
+        <IconRefresh size={14} aria-hidden="true" />
+        Refresh
+      </Button>
+    </div>
+  );
 }
 
 /**
@@ -29,33 +50,48 @@ function isSharedActorType(actorType: string | undefined): boolean {
  * - in_progress + current user is NOT claimer: shows in-progress indicator
  * - direct-user actions: renders children immediately (no claim gate)
  */
-export function ClaimGate({ action, tenantId, userEmail, onInteractionSuccess, children }: Readonly<ClaimGateProps>) {
+export function ClaimGate({
+  action,
+  tenantId,
+  userEmail,
+  onInteractionSuccess,
+  onActionUpdated,
+  children,
+}: Readonly<ClaimGateProps>) {
   const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
+  const onActionUpdatedRef = useRef(onActionUpdated);
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
+    onActionUpdatedRef.current = onActionUpdated;
   });
 
   const claimMutation = useMutation({
     mutationFn: () => postWilClaimAction({ tenantId, actionId: action.id }),
-    onSuccess: () => {
+    onSuccess: (updatedAction) => {
       queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+      onActionUpdatedRef.current?.(updatedAction);
       onInteractionSuccessRef.current?.();
     },
   });
 
   const unclaimMutation = useMutation({
     mutationFn: () => postWilUnclaimAction({ tenantId, actionId: action.id }),
-    onSuccess: () => {
+    onSuccess: (updatedAction) => {
       queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+      onActionUpdatedRef.current?.(updatedAction);
       onInteractionSuccessRef.current?.();
     },
   });
 
   const startMutation = useMutation({
     mutationFn: () => postWilStartAction({ tenantId, actionId: action.id }),
-    onSuccess: () => {
+    onSuccess: (updatedAction) => {
       queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+      onActionUpdatedRef.current?.(updatedAction);
       onInteractionSuccessRef.current?.();
     },
   });
@@ -63,6 +99,12 @@ export function ClaimGate({ action, tenantId, userEmail, onInteractionSuccess, c
   // Direct-user actions bypass the claim gate entirely
   if (!isSharedActorType(action.actorType)) {
     return <>{children}</>;
+  }
+
+  function refresh() {
+    queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+    onActionUpdatedRef.current?.(null);
   }
 
   const isClaimingActor = action.claimedBy === userEmail;
@@ -77,9 +119,11 @@ export function ClaimGate({ action, tenantId, userEmail, onInteractionSuccess, c
         </p>
 
         {claimMutation.isError && (
-          <p className="text-sm text-red-600" role="alert">
-            {extractErrorMessage(claimMutation.error, 'Failed to claim action. Please try again.')}
-          </p>
+          <MutationErrorBlock
+            error={claimMutation.error}
+            fallback="Failed to claim action. Please try again."
+            onRefresh={refresh}
+          />
         )}
 
         <Button onClick={() => claimMutation.mutate()} disabled={claimMutation.isPending}>
@@ -100,14 +144,18 @@ export function ClaimGate({ action, tenantId, userEmail, onInteractionSuccess, c
         {isClaimingActor ? (
           <div className="flex flex-col items-center gap-3">
             {startMutation.isError && (
-              <p className="text-sm text-red-600" role="alert">
-                {extractErrorMessage(startMutation.error, 'Failed to start action. Please try again.')}
-              </p>
+              <MutationErrorBlock
+                error={startMutation.error}
+                fallback="Failed to start action. Please try again."
+                onRefresh={refresh}
+              />
             )}
             {unclaimMutation.isError && (
-              <p className="text-sm text-red-600" role="alert">
-                {extractErrorMessage(unclaimMutation.error, 'Failed to unclaim action. Please try again.')}
-              </p>
+              <MutationErrorBlock
+                error={unclaimMutation.error}
+                fallback="Failed to unclaim action. Please try again."
+                onRefresh={refresh}
+              />
             )}
 
             <div className="flex gap-2">
@@ -131,13 +179,29 @@ export function ClaimGate({ action, tenantId, userEmail, onInteractionSuccess, c
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[var(--bc-muted)]">Waiting for the claiming actor to start this action.</p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-[var(--bc-muted)]">Waiting for the claiming actor to start this action.</p>
+
+            {unclaimMutation.isError && (
+              <MutationErrorBlock
+                error={unclaimMutation.error}
+                fallback="Failed to unclaim action. Please try again."
+                onRefresh={refresh}
+              />
+            )}
+
+            <Button variant="outline" onClick={() => unclaimMutation.mutate()} disabled={unclaimMutation.isPending}>
+              {unclaimMutation.isPending && <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />}
+              <IconHandOff size={16} aria-hidden="true" />
+              Unclaim
+            </Button>
+          </div>
         )}
       </div>
     );
   }
 
-  // In progress: only the claiming actor sees the action handler
+  // In progress: the claiming actor sees the action handler; others can unclaim to take over
   if (action.status === 'in_progress') {
     if (isClaimingActor) {
       return <>{children}</>;
@@ -150,6 +214,20 @@ export function ClaimGate({ action, tenantId, userEmail, onInteractionSuccess, c
           In progress by {action.claimedBy}
         </Badge>
         <p className="text-sm text-[var(--bc-muted)]">This action is being handled by another actor.</p>
+
+        {unclaimMutation.isError && (
+          <MutationErrorBlock
+            error={unclaimMutation.error}
+            fallback="Failed to unclaim action. Please try again."
+            onRefresh={refresh}
+          />
+        )}
+
+        <Button variant="outline" onClick={() => unclaimMutation.mutate()} disabled={unclaimMutation.isPending}>
+          {unclaimMutation.isPending && <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />}
+          <IconHandOff size={16} aria-hidden="true" />
+          Unclaim
+        </Button>
       </div>
     );
   }

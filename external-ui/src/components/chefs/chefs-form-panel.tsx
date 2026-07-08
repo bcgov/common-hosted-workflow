@@ -38,6 +38,8 @@ interface ChefsFormPanelProps {
   submitErrorFallback?: string;
 
   onSubmissionComplete: (detail: unknown) => void;
+  /** Called before submission. Return false or reject to block. */
+  onBeforeSubmit?: () => Promise<boolean>;
 }
 
 /**
@@ -59,6 +61,7 @@ export function ChefsFormPanel({
   errorTitle = 'Submission Error',
   submitErrorFallback = 'Failed to submit form. Please try again.',
   onSubmissionComplete,
+  onBeforeSubmit,
 }: Readonly<ChefsFormPanelProps>) {
   if (initPending) return <StatusPending label="Loading form…" />;
 
@@ -97,6 +100,7 @@ export function ChefsFormPanel({
         user={initData.user}
         headers={initData.headers}
         onSubmissionComplete={onSubmissionComplete}
+        onBeforeSubmit={onBeforeSubmit}
       />
     </div>
   );

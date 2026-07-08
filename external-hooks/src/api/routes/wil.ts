@@ -65,6 +65,21 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
     },
   );
 
+  router.get('/actions/counts', async (req, res) => {
+    const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+      req,
+      customRepositories.tenantProjectRelation,
+    );
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const actorMatchers = resolveActorMatchers(session, tenantId);
+
+    const counts = await services.action.countByStatus({
+      allowedProjectIds,
+      actorMatchers,
+    });
+    OkResponse(res, { counts });
+  });
+
   router.get('/actions', createRequestParser(wilListQuerySchema), async (req: UiApiTypedRequest<WilListQuery>, res) => {
     const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
       req,
@@ -239,6 +254,26 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       allowedProjectIds,
     });
     OkResponse(res, mapActionToUiResponse(row));
+  });
+
+  // GET /actions/:actionId/verify-claim — checks the action is still claimed by the calling user
+  router.get('/actions/:actionId/verify-claim', async (req, res) => {
+    const { tenantId, projectIds: allowedProjectIds } = await resolveWilTenantProjectIds(
+      req,
+      customRepositories.tenantProjectRelation,
+    );
+    const session = (req as unknown as { session: UiResolvedSession }).session;
+    const actorMatchers = resolveActorMatchers(session, tenantId);
+
+    const action = await services.action.getById({
+      allowedProjectIds,
+      actionId: req.params.actionId,
+      actorMatchers,
+    });
+
+    const valid =
+      action.claimedBy === session.email && (action.status === 'claimed' || action.status === 'in_progress');
+    OkResponse(res, { valid, status: action.status, claimedBy: action.claimedBy });
   });
 
   // POST /actions/:actionId/start

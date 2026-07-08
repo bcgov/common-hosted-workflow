@@ -9,7 +9,15 @@ const MAX_LIMIT = 200;
  * - `limit`: optional positive integer, clamped to MAX_LIMIT, defaults to DEFAULT_LIMIT.
  * - `since`: optional keyset cursor string in the format `ISO|uuid` or a plain ISO-8601 date.
  */
-const VALID_ACTION_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled', 'expired', 'deleted'] as const;
+const VALID_ACTION_STATUSES = [
+  'pending',
+  'claimed',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'expired',
+  'deleted',
+] as const;
 
 export const wilListQuerySchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),

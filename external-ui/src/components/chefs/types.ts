@@ -12,6 +12,8 @@ export interface ChefsFormViewerProps {
   onFormReady?: (detail: { formio: unknown }) => void;
   onSubmissionComplete?: (detail: unknown) => void;
   onSubmissionError?: (detail: unknown) => void;
+  /** Called before submission. Return false or reject to block. */
+  onBeforeSubmit?: () => Promise<boolean>;
 }
 
 export type ScriptStatus = 'idle' | 'loading' | 'ready' | 'error';

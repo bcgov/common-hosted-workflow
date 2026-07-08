@@ -18,14 +18,16 @@ export const ACTOR_TYPE_GROUP = 'group' as const;
 /**
  * Allowed state transitions for the action lifecycle.
  *
- * - pending → claimed (via ClaimService.claim)
+ * - pending → claimed (via ClaimService.claim — role/group only)
+ * - pending → in_progress (direct-user actions skip claim)
+ * - pending → completed (direct-user actions with instant completion)
  * - claimed → in_progress (via ClaimService.start)
  * - claimed → pending (via ClaimService.unclaim)
  * - in_progress → completed (via ActionService.updateStatus callback)
  * - completed is a terminal state with no outbound transitions
  */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  [ACTION_STATUS_PENDING]: [ACTION_STATUS_CLAIMED],
+  [ACTION_STATUS_PENDING]: [ACTION_STATUS_CLAIMED, ACTION_STATUS_IN_PROGRESS, ACTION_STATUS_COMPLETED],
   [ACTION_STATUS_CLAIMED]: [ACTION_STATUS_IN_PROGRESS, ACTION_STATUS_PENDING],
   [ACTION_STATUS_IN_PROGRESS]: [ACTION_STATUS_COMPLETED],
   [ACTION_STATUS_COMPLETED]: [],

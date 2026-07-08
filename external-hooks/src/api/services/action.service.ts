@@ -192,6 +192,17 @@ export class ActionService {
     return row;
   }
 
+  async countByStatus(params: {
+    allowedProjectIds: string[];
+    actorMatchers?: ActorMatchers;
+  }): Promise<Record<string, number>> {
+    const clauses: any[] = [inArray(actionRequest.projectId, params.allowedProjectIds)];
+    if (params.actorMatchers) {
+      clauses.push(buildActorMatcherClause(actionRequest, params.actorMatchers));
+    }
+    return await this.customRepositories.actionRequest.countByStatus({ where: clauses });
+  }
+
   async updateStatus(params: UpdateActionStatusParams) {
     const actorWhereClauses = this.buildActorWhere(params);
     const scopeClauses = [inArray(actionRequest.projectId, params.allowedProjectIds), ...actorWhereClauses];

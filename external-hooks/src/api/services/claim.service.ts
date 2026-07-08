@@ -58,7 +58,9 @@ export class ClaimService {
     return result;
   }
 
-  /** claimed → pending: clears claimed_by + claimed_at atomically */
+  /** claimed|in_progress → pending: clears claimed_by + claimed_at atomically.
+   *  Any eligible actor in the same role/group can unclaim — not just the claimer.
+   */
   async unclaim(params: UnclaimParams): Promise<ActionRequest> {
     const action = await this.fetchAndValidateEligibility(
       params.actionId,
@@ -66,8 +68,12 @@ export class ClaimService {
       params.actorMatchers,
     );
 
-    if (action.status !== 'claimed') {
-      throw new AppError(409, 'Action is not in a claimed state');
+    if (!isSharedActorType(action.actorType)) {
+      throw new AppError(409, 'Action does not support unclaiming');
+    }
+
+    if (action.status !== 'claimed' && action.status !== 'in_progress') {
+      throw new AppError(409, 'Action is not in a claimed or in-progress state');
     }
 
     const result = await this.actionRequestRepository.unclaim({
@@ -76,7 +82,7 @@ export class ClaimService {
     });
 
     if (!result) {
-      throw new AppError(409, 'Action is no longer in a claimed state');
+      throw new AppError(409, 'Action is no longer available for unclaiming');
     }
 
     return result;

@@ -58,6 +58,10 @@ export type WilChefsTokenResponse = {
   baseUrl: string;
 };
 
+export type WilActionCountsResponse = {
+  counts: Record<string, number>;
+};
+
 export function getWilMessages(params: WilListParams) {
   return instance
     .get<WilListResponse<WilMessageItem>>('/ui-api/wil/messages', {
@@ -72,6 +76,15 @@ export function getWilActions(params: WilListParams) {
   return instance
     .get<WilListResponse<WilActionItem>>('/ui-api/wil/actions', {
       params: { limit: params.limit, since: params.since, status: params.status },
+      headers: { 'X-TENANT-ID': params.tenantId },
+      signal: params.signal,
+    })
+    .then((res) => res.data);
+}
+
+export function getWilActionCounts(params: { tenantId: string; signal?: AbortSignal }) {
+  return instance
+    .get<WilActionCountsResponse>('/ui-api/wil/actions/counts', {
       headers: { 'X-TENANT-ID': params.tenantId },
       signal: params.signal,
     })
@@ -103,6 +116,20 @@ export function postWilChefsToken(params: { tenantId: string; actionId: string }
         headers: { 'X-TENANT-ID': params.tenantId },
       },
     )
+    .then((res) => res.data);
+}
+
+export type WilVerifyClaimResponse = {
+  valid: boolean;
+  status: string;
+  claimedBy: string | null;
+};
+
+export function getWilVerifyClaim(params: { tenantId: string; actionId: string }) {
+  return instance
+    .get<WilVerifyClaimResponse>(`/ui-api/wil/actions/${params.actionId}/verify-claim`, {
+      headers: { 'X-TENANT-ID': params.tenantId },
+    })
     .then((res) => res.data);
 }
 
