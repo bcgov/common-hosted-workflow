@@ -36,7 +36,7 @@ jobs:
       uses: ./.github/actions/setup-tools
 
     - name: Build and Push
-      uses: egose/actions/docker-build-push@68448c0027aeafe0a824f6c9b33fd875e77b844c
+      uses: egose/actions/docker-build-push@ef042a54d9446c85fdd1044d342c614b5353f812
       with:
         registry-url: ${{ env.GITHUB_REGISTRY }}
         registry-username: ${{ github.actor }}

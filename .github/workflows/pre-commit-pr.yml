@@ -28,7 +28,7 @@ jobs:
       run: npx commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
     - name: Run pre-commit
-      uses: egose/actions/precommit@68448c0027aeafe0a824f6c9b33fd875e77b844c
+      uses: egose/actions/precommit@ef042a54d9446c85fdd1044d342c614b5353f812
       with:
         config: .pre-commit-config.yaml
         commit-on-push: false
