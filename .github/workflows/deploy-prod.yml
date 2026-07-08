@@ -1,0 +1,39 @@
+name: Deploy Prod Environment
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-tag:
+    name: Prepare Image Tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    if: startsWith(github.event.release.tag_name, 'v')
+    outputs:
+      tag: ${{ steps.set-tag.outputs.tag }}
+    steps:
+    - name: Strip v prefix
+      id: set-tag
+      env:
+        TAG_NAME: ${{ github.event.release.tag_name }}
+      run: echo "tag=${TAG_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  deploy-standard-prod:
+    name: Deploys Standard (Prod)
+    uses: ./.github/workflows/deploy-standard.yml
+    needs: [prepare-tag]
+    if: ${{ needs.prepare-tag.result == 'success' }}
+    secrets:
+      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+    with:
+      environment: prod
+      tag: ${{ needs.prepare-tag.outputs.tag }}
