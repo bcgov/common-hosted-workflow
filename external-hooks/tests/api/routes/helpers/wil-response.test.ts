@@ -103,7 +103,6 @@ describe('mapActionToUiResponse', () => {
     expect(result).not.toHaveProperty('workflowInstanceId');
     expect(result).not.toHaveProperty('workflowId');
     expect(result).not.toHaveProperty('projectId');
-    expect(result).not.toHaveProperty('actorType');
     expect(result).not.toHaveProperty('checkIn');
   });
 
@@ -114,6 +113,7 @@ describe('mapActionToUiResponse', () => {
     expect(result.id).toBe(action.id);
     expect(result.actionType).toBe(action.actionType);
     expect(result.actorId).toBe(action.actorId);
+    expect(result.actorType).toBe(action.actorType);
     expect(result.status).toBe(action.status);
     expect(result.priority).toBe(action.priority);
     expect(result.dueDate).toBe(action.dueDate);
