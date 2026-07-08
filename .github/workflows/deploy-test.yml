@@ -1,0 +1,61 @@
+name: Deploy Test
+
+on:
+  push:
+    tags:
+    - v*.*.*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+  security-events: write
+
+jobs:
+  prepare-tag:
+    name: Prepare Image Tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    outputs:
+      tag: ${{ steps.set-tag.outputs.tag }}
+    steps:
+    - name: Strip v prefix
+      id: set-tag
+      env:
+        TAG_NAME: ${{ github.ref_name }}
+      run: echo "tag=${TAG_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  build-push-n8n:
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      image-name: bcgov/chwf
+      docker-path: .
+      metadata-tags: |
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=semver,pattern={{major}}
+
+  build-push-dns-probe:
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      image-name: bcgov/chwf-dns-probe
+      docker-path: dns-probe
+      metadata-tags: |
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=semver,pattern={{major}}
+
+  deploy-standard-test:
+    name: Deploys Standard (Test)
+    uses: ./.github/workflows/deploy-standard.yml
+    needs: [build-push-n8n, build-push-dns-probe, prepare-tag]
+    secrets:
+      OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+      OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+    with:
+      environment: test
+      tag: ${{ needs.prepare-tag.outputs.tag }}

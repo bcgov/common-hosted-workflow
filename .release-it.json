@@ -1,0 +1,25 @@
+{
+  "git": {
+    "commitMessage": "chore: release candidate v${version}",
+    "tagName": "v${version}",
+    "tagAnnotation": "${name}\n${changelog}",
+    "addUntrackedFiles": true
+  },
+  "npm": {
+    "publish": false
+  },
+  "hooks": {
+    "after:bump": "pnpm changelog"
+  },
+  "plugins": {
+    "@release-it/bumper": {
+      "out": [
+        {
+          "file": "VERSION",
+          "type": "text/plain",
+          "consumeWholeFile": true
+        }
+      ]
+    }
+  }
+}

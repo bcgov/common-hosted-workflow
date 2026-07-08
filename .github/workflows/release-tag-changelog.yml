@@ -1,0 +1,41 @@
+name: Create Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: Tag Version (e.g. 1.2.3). Leave empty to auto-determine based on conventional commits.
+        required: false
+        default: ''
+
+jobs:
+  tag-changelog:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v6.0.3
+      with:
+        ssh-key: ${{ secrets.SSH_KEY }}
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Setup NPM Packages
+      uses: ./.github/actions/setup-npm
+
+    - name: Create Release Tag
+      uses: egose/actions/release-tag@68448c0027aeafe0a824f6c9b33fd875e77b844c
+      with:
+        tag: ${{ github.event.inputs.tag }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-merge-pr: true
+        delete-merged-branch: true

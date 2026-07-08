@@ -9,6 +9,12 @@ on:
       docker-path:
         required: true
         type: string
+      metadata-tags:
+        required: false
+        type: string
+        default: |
+          type=ref,event=branch
+          type=sha,format=long,prefix=,suffix=
 
 env:
   GITHUB_REGISTRY: ghcr.io
@@ -39,7 +45,5 @@ jobs:
         docker-context: ${{ inputs.docker-path }}
         docker-file: ${{ inputs.docker-path }}/Dockerfile
         docker-outputs: type=image,push=true,compression=gzip,force-compression=true
-        metadata-tags: |
-          type=ref,event=branch
-          type=sha,format=long,prefix=,suffix=
+        metadata-tags: ${{ inputs.metadata-tags }}
         trivy: false
