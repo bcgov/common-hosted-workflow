@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconRefresh } from '@tabler/icons-react';
-import { Button } from '@/components/ui/button';
 import type { WilActionItem } from '../../services/backend/wil';
-import { postWilChefsToken, postWilCallback, getWilVerifyClaim } from '../../services/backend/wil';
+import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
 import { getStoredAppToken } from '../../services/backend/axios';
 import { useSessionSnapshot } from '../../state/session';
 import { ChefsFormPanel } from '../chefs/chefs-form-panel';
 import type { ChefsFormPanelInitData } from '../chefs/chefs-form-panel';
 import { buildTokenObject, buildUserObject, buildUserProfile } from '../chefs/user-claims-utils';
 import { extractSubmissionId } from '../chefs/submission-utils';
+import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
+import { ClaimErrorView } from './claim-error-view';
 
 interface ShowFormHandlerProps {
   action: WilActionItem;
@@ -46,28 +46,14 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
   const { session } = useSessionSnapshot();
   const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
-  const [claimError, setClaimError] = useState<string | null>(null);
+  const { claimError, setClaimError } = useClaimVerification({
+    tenantId,
+    actionId: action.id,
+    actorType: action.actorType,
+  });
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
   }, [onInteractionSuccess]);
-
-  // Verify claim on mount for role/group actions
-  useEffect(() => {
-    if (action.actorType !== 'role' && action.actorType !== 'group') return;
-    let cancelled = false;
-    getWilVerifyClaim({ tenantId, actionId: action.id })
-      .then((result) => {
-        if (!cancelled && !result.valid) {
-          setClaimError('This action is no longer assigned to you. Another user may have unclaimed it.');
-        }
-      })
-      .catch(() => {
-        // Silently ignore verify errors on mount — the submit check will catch it
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [action.id, action.actorType, tenantId]);
 
   const initMutation = useMutation({ mutationFn: initializeForm });
 
@@ -106,35 +92,24 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
 
   const handleBeforeSubmit = useCallback(async (): Promise<boolean> => {
     // For role/group actions, verify the action is still claimed by this user before allowing submission
-    if (action.actorType === 'role' || action.actorType === 'group') {
-      try {
-        const result = await getWilVerifyClaim({ tenantId, actionId: action.id });
-        if (!result.valid) {
-          setClaimError('This action is no longer assigned to you. Another user may have unclaimed it.');
-          return false;
-        }
-      } catch {
-        setClaimError('Unable to verify your claim on this action. Please refresh and try again.');
-        return false;
-      }
+    try {
+      const valid = await verifyClaimBeforeSubmit({
+        tenantId,
+        actionId: action.id,
+        actorType: action.actorType,
+        setClaimError,
+      });
+      if (!valid) return false;
+    } catch {
+      setClaimError('Unable to verify your claim on this action. Please refresh and try again.');
+      return false;
     }
     setClaimError(null);
     return true;
-  }, [action.id, action.actorType, tenantId]);
+  }, [action.id, action.actorType, tenantId, setClaimError]);
 
   if (claimError) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
-          {claimError}
-        </div>
-        <p className="text-sm text-[var(--bc-muted)]">Please refresh to see the current state of this action.</p>
-        <Button variant="outline" onClick={handleRefresh}>
-          <IconRefresh size={14} aria-hidden="true" />
-          Refresh
-        </Button>
-      </div>
-    );
+    return <ClaimErrorView message={claimError} onRefresh={handleRefresh} />;
   }
 
   return (

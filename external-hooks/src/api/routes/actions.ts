@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
-import type { DirectUpdateParams } from '../services/action.service';
+import { buildPatchSetValues } from './helpers/patch-action-set-values';
 import {
   createActionRequestResponseSchema,
   createActionRequestSchema,
@@ -103,16 +103,8 @@ export function buildActionRouter({
     async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(patchActionStatusByIdSchema, req);
       const allowedProjectIds = getTenantScopedProjectIds(res, 'PATCH /v1/actions/:actionId', 'actions');
-      const { status, claimedBy, claimedAt, completedBy, completedAt } = parsed.body;
-
       // WIL API is trusted — bypass state machine validation via directUpdate.
-      // Build setValues only with fields that were explicitly provided.
-      const setValues: DirectUpdateParams['setValues'] = { updatedAt: new Date() };
-      if (status !== undefined) setValues.status = status;
-      if (claimedBy !== undefined) setValues.claimedBy = claimedBy;
-      if (claimedAt !== undefined) setValues.claimedAt = claimedAt ? new Date(claimedAt) : null;
-      if (completedBy !== undefined) setValues.completedBy = completedBy;
-      if (completedAt !== undefined) setValues.completedAt = completedAt ? new Date(completedAt) : null;
+      const setValues = buildPatchSetValues(parsed.body);
 
       const row = await services.action.directUpdate({
         allowedProjectIds,
