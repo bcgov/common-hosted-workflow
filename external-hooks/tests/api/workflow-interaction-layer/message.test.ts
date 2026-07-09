@@ -52,6 +52,8 @@ function createTestRouter() {
       tenant: {} as any,
       tenantProjectSync: {} as any,
       projectTenant: {} as any,
+      claim: {} as any,
+      trigger: {} as any,
     },
   });
   const router = buildMessageRouter(routeContext);

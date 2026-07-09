@@ -43,6 +43,13 @@
       "when": 1782748044230,
       "tag": "0005_action_workflow_trigger_update",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783500000000,
+      "tag": "0006_action_claim_columns",
+      "breakpoints": true
     }
   ]
 }

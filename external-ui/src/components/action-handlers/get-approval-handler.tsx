@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
 import { IconLoader2, IconCheck } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
 import { extractErrorMessage } from '../shared/error-utils';
+import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
+import { ClaimErrorView } from './claim-error-view';
 
 interface GetApprovalHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
+  onRefresh?: () => void;
 }
 
 const ALLOWED_TAGS = [
@@ -58,15 +61,36 @@ function sanitizeHtml(html: string): string {
   });
 }
 
-export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: Readonly<GetApprovalHandlerProps>) {
+export function GetApprovalHandler({
+  action,
+  tenantId,
+  onInteractionSuccess,
+  onRefresh,
+}: Readonly<GetApprovalHandlerProps>) {
   const [clickedOption, setClickedOption] = useState<string | null>(null);
+  const { claimError, setClaimError } = useClaimVerification({
+    tenantId,
+    actionId: action.id,
+    actorType: action.actorType,
+  });
+  const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
   });
 
   const approvalMutation = useMutation({
-    mutationFn: (option: string) => postWilCallback({ tenantId, actionId: action.id, body: { option } }),
+    mutationFn: async (option: string) => {
+      // Pre-submit claim verification for role/group actions
+      const valid = await verifyClaimBeforeSubmit({
+        tenantId,
+        actionId: action.id,
+        actorType: action.actorType,
+        setClaimError,
+      });
+      if (!valid) throw new Error('Claim lost');
+      return postWilCallback({ tenantId, actionId: action.id, body: { option } });
+    },
     onSuccess: () => {
       onInteractionSuccessRef.current?.();
     },
@@ -82,6 +106,16 @@ export function GetApprovalHandler({ action, tenantId, onInteractionSuccess }: R
   function handleOptionClick(option: string) {
     setClickedOption(option);
     approvalMutation.mutate(option);
+  }
+
+  function handleRefresh() {
+    queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+    onRefresh?.();
+  }
+
+  if (claimError) {
+    return <ClaimErrorView message={claimError} onRefresh={handleRefresh} />;
   }
 
   return (

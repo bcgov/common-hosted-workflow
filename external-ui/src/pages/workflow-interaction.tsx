@@ -1,7 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { login } from '../auth/session-actions';
 import type { WilActionItem, WilTenantItem } from '../services/backend/wil';
+import { getWilActionCounts } from '../services/backend/wil';
 import { useAuthUser } from '../state/session';
 import { isPersonalTenant } from '../lib/tenant';
 import { IconLogin2 } from '@tabler/icons-react';
@@ -30,7 +31,7 @@ export function WorkflowInteraction() {
   const [selectedTenant, setSelectedTenant] = useState<WilTenantItem | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
-  const [statusFilter, setStatusFilter] = useState<string[]>(['pending']);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [actionsCursor, setActionsCursor] = useState<string | null>(null);
   const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<WilActionItem | null>(null);
@@ -39,9 +40,16 @@ export function WorkflowInteraction() {
   const personalTenant = isPersonalTenant(selectedTenant);
   const sinceDate = computeSinceDate(dateFilter);
 
+  const countsQuery = useQuery({
+    queryKey: ['wil-action-counts', tenantId],
+    queryFn: ({ signal }) => getWilActionCounts({ tenantId, signal }),
+    enabled: Boolean(tenantId),
+  });
+
   const onInteractionSuccess = useCallback(() => {
     setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
     }, ACTION_LIST_REFRESH_DELAY_MS);
   }, [queryClient]);
 
@@ -73,7 +81,7 @@ export function WorkflowInteraction() {
     if (activeTab === 'actions') {
       return (
         <div className="space-y-5">
-          <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} />
+          <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} counts={countsQuery.data?.counts} />
           <hr className="border-[var(--bc-border)] mt-4" />
           <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
             <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
@@ -92,6 +100,7 @@ export function WorkflowInteraction() {
                 action={selectedAction}
                 tenantId={tenantId}
                 onInteractionSuccess={onInteractionSuccess}
+                onActionUpdated={setSelectedAction}
               />
             </div>
           </div>

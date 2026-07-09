@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
+import { buildPatchSetValues } from './helpers/patch-action-set-values';
 import {
   createActionRequestResponseSchema,
   createActionRequestSchema,
@@ -11,7 +11,6 @@ import {
   listActionsSchema,
   mapActionRequestRowToResponse,
   patchActionStatusByIdSchema,
-  patchActionStatusResponseSchema,
 } from '../schemas/action-request';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestSchemaValidator, parseValidatedRequest } from '../utils/validation';
@@ -104,20 +103,15 @@ export function buildActionRouter({
     async (req: Request, res: Response) => {
       const parsed = parseValidatedRequest(patchActionStatusByIdSchema, req);
       const allowedProjectIds = getTenantScopedProjectIds(res, 'PATCH /v1/actions/:actionId', 'actions');
-      const patchStatus = parsed.body.status;
-      await services.action.updateStatus({
+      // WIL API is trusted — bypass state machine validation via directUpdate.
+      const setValues = buildPatchSetValues(parsed.body);
+
+      const row = await services.action.directUpdate({
         allowedProjectIds,
         actionId: parsed.params.actionId,
-        status: patchStatus,
+        setValues,
       });
-      OkResponse(
-        res,
-        {
-          status: patchStatus,
-          message: formatPatchActionStatusMessage(patchStatus),
-        },
-        patchActionStatusResponseSchema,
-      );
+      OkResponse(res, mapActionRequestRowToResponse(row), createActionRequestResponseSchema);
     },
   );
 

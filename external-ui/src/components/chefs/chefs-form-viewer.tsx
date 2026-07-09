@@ -18,6 +18,7 @@ export function ChefsFormViewer({
   onFormReady,
   onSubmissionComplete,
   onSubmissionError,
+  onBeforeSubmit,
 }: Readonly<ChefsFormViewerProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptStatus = useChefsScript(baseUrl);
@@ -32,6 +33,7 @@ export function ChefsFormViewer({
   const onFormReadyRef = useRef(onFormReady);
   const onSubmissionCompleteRef = useRef(onSubmissionComplete);
   const onSubmissionErrorRef = useRef(onSubmissionError);
+  const onBeforeSubmitRef = useRef(onBeforeSubmit);
   const prefillDataRef = useRef(prefillData);
 
   useEffect(() => {
@@ -43,6 +45,9 @@ export function ChefsFormViewer({
   useEffect(() => {
     onSubmissionErrorRef.current = onSubmissionError;
   }, [onSubmissionError]);
+  useEffect(() => {
+    onBeforeSubmitRef.current = onBeforeSubmit;
+  }, [onBeforeSubmit]);
   useEffect(() => {
     prefillDataRef.current = prefillData;
   }, [prefillData]);
@@ -102,7 +107,19 @@ export function ChefsFormViewer({
       onSubmissionErrorRef.current?.(customEvent.detail);
     };
 
+    const handleBeforeSubmit = (event: Event) => {
+      const handler = onBeforeSubmitRef.current;
+      if (!handler) return;
+      const customEvent = event as CustomEvent;
+      customEvent.detail.waitUntil(
+        handler()
+          .then((allowed) => allowed)
+          .catch(() => false),
+      );
+    };
+
     formViewer.addEventListener('formio:ready', handleFormReady);
+    formViewer.addEventListener('formio:beforeSubmit', handleBeforeSubmit);
     formViewer.addEventListener('formio:submitDone', handleSubmit);
     formViewer.addEventListener('formio:submitError', handleSubmitError);
 
@@ -114,6 +131,7 @@ export function ChefsFormViewer({
 
     return () => {
       formViewer.removeEventListener('formio:ready', handleFormReady);
+      formViewer.removeEventListener('formio:beforeSubmit', handleBeforeSubmit);
       formViewer.removeEventListener('formio:submitDone', handleSubmit);
       formViewer.removeEventListener('formio:submitError', handleSubmitError);
 

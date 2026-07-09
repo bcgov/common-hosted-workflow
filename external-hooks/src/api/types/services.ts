@@ -10,6 +10,7 @@ import type { FeatureFlagService } from '../services/feature-flag.service';
 import type { MessageService } from '../services/message.service';
 import type { ProjectTenantService } from '../services/project-tenant.service';
 import type { TenantService } from '../services/tenant.service';
+import type { ClaimService } from '../services/claim.service';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 
 export type N8nUiUser = N8nUser;
@@ -39,6 +40,7 @@ export type UiApiServiceContract = {
 export type ApiServices = {
   uiApi: UiApiServiceContract;
   action: ActionService;
+  claim: ClaimService;
   trigger: TriggerService;
   chefs: ChefsService;
   cstar: CstarService;

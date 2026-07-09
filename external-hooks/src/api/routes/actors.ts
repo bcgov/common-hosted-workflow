@@ -1,15 +1,14 @@
 import { Router, Request, Response } from 'express';
-import { formatPatchActionStatusMessage } from '../helpers/http-helper';
 import { nextCursorFromPagedItems } from '../helpers/list-query';
 import { OkResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
+import { buildPatchSetValues } from './helpers/patch-action-set-values';
 import {
   createActionRequestResponseSchema,
   getActorActionByIdSchema,
   listActionsResponseSchema,
   listActorActionsSchema,
   mapActionRequestRowToResponse,
-  patchActionStatusResponseSchema,
   patchActorActionStatusSchema,
 } from '../schemas/action-request';
 import { listActorMessagesResponseSchema, listActorMessagesSchema, mapMessageRowToResponse } from '../schemas/message';
@@ -97,21 +96,16 @@ export function buildActorRouter({
         'PATCH /v1/actors/:actorId/actions/:actionId',
         'actions',
       );
-      const patchStatus = parsed.body.status;
-      await services.action.updateStatus({
+      // WIL API is trusted — bypass state machine validation via directUpdate.
+      const setValues = buildPatchSetValues(parsed.body);
+
+      const row = await services.action.directUpdate({
         allowedProjectIds,
         actionId: parsed.params.actionId,
         actorId: parsed.params.actorId,
-        status: patchStatus,
+        setValues,
       });
-      OkResponse(
-        res,
-        {
-          status: patchStatus,
-          message: formatPatchActionStatusMessage(patchStatus),
-        },
-        patchActionStatusResponseSchema,
-      );
+      OkResponse(res, mapActionRequestRowToResponse(row), createActionRequestResponseSchema);
     },
   );
 

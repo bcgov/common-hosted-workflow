@@ -29,6 +29,10 @@ export const actionRequestItemSchema = z.object({
   dueDate: z.date().nullable(),
   checkIn: z.date().nullable(),
   metadata: z.unknown().nullable(),
+  claimedBy: z.string().nullable(),
+  claimedAt: z.date().nullable(),
+  completedBy: z.string().nullable(),
+  completedAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -91,7 +95,11 @@ export const patchActionStatusByIdSchema = z.object({
   params: z.preprocess(asParamRecord, z.object({ actionId: z.string().trim().min(1) }).strict()),
   query: z.record(z.string(), z.unknown()).optional(),
   body: z.object({
-    status: applyLowercaseToZodEnum(actionRequestStatusZodEnum),
+    status: applyLowercaseToZodEnum(actionRequestStatusZodEnum).optional(),
+    claimedBy: z.string().nullable().optional(),
+    claimedAt: z.string().nullable().optional(),
+    completedBy: z.string().nullable().optional(),
+    completedAt: z.string().nullable().optional(),
   }),
 });
 
@@ -108,7 +116,11 @@ export const patchActorActionStatusSchema = z.object({
   ),
   query: z.record(z.string(), z.unknown()).optional(),
   body: z.object({
-    status: applyLowercaseToZodEnum(actionRequestStatusZodEnum),
+    status: applyLowercaseToZodEnum(actionRequestStatusZodEnum).optional(),
+    claimedBy: z.string().nullable().optional(),
+    claimedAt: z.string().nullable().optional(),
+    completedBy: z.string().nullable().optional(),
+    completedAt: z.string().nullable().optional(),
   }),
 });
 
@@ -200,6 +212,10 @@ export function mapActionRequestRowToResponse(item: typeof actionRequest.$inferS
     dueDate: item.dueDate,
     checkIn: item.checkIn,
     metadata: item.metadata,
+    claimedBy: item.claimedBy ?? null,
+    claimedAt: item.claimedAt ?? null,
+    completedBy: item.completedBy ?? null,
+    completedAt: item.completedAt ?? null,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   });

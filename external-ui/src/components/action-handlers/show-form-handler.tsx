@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
 import { getStoredAppToken } from '../../services/backend/axios';
@@ -8,11 +8,14 @@ import { ChefsFormPanel } from '../chefs/chefs-form-panel';
 import type { ChefsFormPanelInitData } from '../chefs/chefs-form-panel';
 import { buildTokenObject, buildUserObject, buildUserProfile } from '../chefs/user-claims-utils';
 import { extractSubmissionId } from '../chefs/submission-utils';
+import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
+import { ClaimErrorView } from './claim-error-view';
 
 interface ShowFormHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
+  onRefresh?: () => void;
 }
 
 async function initializeForm(params: {
@@ -39,9 +42,15 @@ async function initializeForm(params: {
 }
 
 /** Renders a CHEFS form for a `showform` action and posts the submission to the WIL callback API. */
-export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Readonly<ShowFormHandlerProps>) {
+export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefresh }: Readonly<ShowFormHandlerProps>) {
   const { session } = useSessionSnapshot();
+  const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
+  const { claimError, setClaimError } = useClaimVerification({
+    tenantId,
+    actionId: action.id,
+    actorType: action.actorType,
+  });
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
   }, [onInteractionSuccess]);
@@ -59,8 +68,15 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
     if (!session?.oidc.claims) return;
     initMutation.mutate({ tenantId, actionId: action.id, payload: action.payload, claims: session.oidc.claims });
     callbackMutation.reset();
+    setClaimError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action.id, action.payload, session?.oidc.claims, tenantId]);
+
+  function handleRefresh() {
+    queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+    onRefresh?.();
+  }
 
   const handleSubmissionComplete = useCallback(
     (detail: unknown) => {
@@ -74,6 +90,28 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
     [action.id, tenantId, callbackMutation, initMutation.data?.formId],
   );
 
+  const handleBeforeSubmit = useCallback(async (): Promise<boolean> => {
+    // For role/group actions, verify the action is still claimed by this user before allowing submission
+    try {
+      const valid = await verifyClaimBeforeSubmit({
+        tenantId,
+        actionId: action.id,
+        actorType: action.actorType,
+        setClaimError,
+      });
+      if (!valid) return false;
+    } catch {
+      setClaimError('Unable to verify your claim on this action. Please refresh and try again.');
+      return false;
+    }
+    setClaimError(null);
+    return true;
+  }, [action.id, action.actorType, tenantId, setClaimError]);
+
+  if (claimError) {
+    return <ClaimErrorView message={claimError} onRefresh={handleRefresh} />;
+  }
+
   return (
     <ChefsFormPanel
       initPending={initMutation.isPending}
@@ -84,6 +122,7 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess }: Read
       submitError={callbackMutation.isError ? callbackMutation.error : null}
       submitErrorFallback="Failed to submit form response. Please try again."
       onSubmissionComplete={handleSubmissionComplete}
+      onBeforeSubmit={handleBeforeSubmit}
     />
   );
 }

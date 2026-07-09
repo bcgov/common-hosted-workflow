@@ -48,6 +48,8 @@ function createTestRouter() {
       tenant: {} as any,
       tenantProjectSync: {} as any,
       projectTenant: {} as any,
+      claim: {} as any,
+      trigger: {} as any,
     },
   });
 
@@ -209,7 +211,7 @@ describe('GET /actors/:actorId/actions', () => {
 describe('PATCH /actors/:actorId/actions/:actionId', () => {
   it('returns 200 scoped to actor', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(makeActionRequestRow());
+    actionRequestRepo.directUpdate.mockResolvedValue(makeActionRequestRow({ status: 'completed' }));
 
     const handlers = getRouteHandlers(router, 'patch', '/actors/:actorId/actions/:actionId');
     const req = createMockRequest({
@@ -223,17 +225,16 @@ describe('PATCH /actors/:actorId/actions/:actionId', () => {
 
     expect(error).toBeNull();
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(actionRequestRepo.updateStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ actionId: VALID_ACTION_ID, status: 'completed' }),
-    );
-    const callArg = actionRequestRepo.updateStatus.mock.calls[0][0];
+    expect(actionRequestRepo.directUpdate).toHaveBeenCalledWith(expect.objectContaining({ actionId: VALID_ACTION_ID }));
+    const callArg = actionRequestRepo.directUpdate.mock.calls[0][0];
+    expect(callArg.setValues.status).toBe('completed');
     expect(callArg.where).toBeInstanceOf(Array);
     expect(callArg.where.length).toBeGreaterThanOrEqual(2);
   });
 
   it('throws 404 when not found for that actor', async () => {
     const { router, actionRequestRepo } = createTestRouter();
-    actionRequestRepo.updateStatus.mockResolvedValue(false);
+    actionRequestRepo.directUpdate.mockResolvedValue(null);
 
     const handlers = getRouteHandlers(router, 'patch', '/actors/:actorId/actions/:actionId');
     const req = createMockRequest({

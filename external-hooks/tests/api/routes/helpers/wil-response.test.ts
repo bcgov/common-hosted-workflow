@@ -25,10 +25,15 @@ function makeActionRequest(overrides: Partial<ActionRequest> = {}): ActionReques
     createdAt: new Date('2025-06-01T12:00:00.000Z'),
     updatedAt: new Date('2025-06-01T13:00:00.000Z'),
     status: 'pending',
+    actionTitle: null,
     priority: 'normal',
     dueDate: null,
     checkIn: new Date('2025-06-02T10:00:00.000Z'),
     metadata: { source: 'n8n' },
+    claimedBy: null,
+    claimedAt: null,
+    completedBy: null,
+    completedAt: null,
     ...overrides,
   };
 }
@@ -98,7 +103,6 @@ describe('mapActionToUiResponse', () => {
     expect(result).not.toHaveProperty('workflowInstanceId');
     expect(result).not.toHaveProperty('workflowId');
     expect(result).not.toHaveProperty('projectId');
-    expect(result).not.toHaveProperty('actorType');
     expect(result).not.toHaveProperty('checkIn');
   });
 
@@ -109,6 +113,7 @@ describe('mapActionToUiResponse', () => {
     expect(result.id).toBe(action.id);
     expect(result.actionType).toBe(action.actionType);
     expect(result.actorId).toBe(action.actorId);
+    expect(result.actorType).toBe(action.actorType);
     expect(result.status).toBe(action.status);
     expect(result.priority).toBe(action.priority);
     expect(result.dueDate).toBe(action.dueDate);

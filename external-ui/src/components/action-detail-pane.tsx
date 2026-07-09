@@ -3,8 +3,10 @@ import { GetApprovalHandler } from './action-handlers/get-approval-handler';
 import { ShowFormHandler } from './action-handlers/show-form-handler';
 import { WaitOnEventHandler } from './action-handlers/wait-on-event-handler';
 import { CompletedActionView } from './action-handlers/completed-action-view';
+import { ClaimGate } from './action-handlers/claim-gate';
 import { Badge } from '@/components/ui/badge';
 import { IconAlertTriangle } from '@tabler/icons-react';
+import { useAuthUser } from '../state/session';
 
 const TERMINAL_STATUSES: ReadonlySet<WilActionItem['status']> = new Set([
   'completed',
@@ -56,19 +58,71 @@ interface ActionDetailPaneProps {
   action: WilActionItem | null;
   tenantId: string;
   onInteractionSuccess?: () => void;
+  onActionUpdated?: (action: WilActionItem | null) => void;
 }
 
-export function ActionDetailPane({ action, tenantId, onInteractionSuccess }: Readonly<ActionDetailPaneProps>) {
+export function ActionDetailPane({
+  action,
+  tenantId,
+  onInteractionSuccess,
+  onActionUpdated,
+}: Readonly<ActionDetailPaneProps>) {
+  const user = useAuthUser();
+  const userEmail = user?.email ?? '';
+
   if (!action) return <Placeholder />;
   if (isTerminalStatus(action.status)) return <CompletedActionView action={action} />;
 
+  const handleRefresh = () => onActionUpdated?.(null);
+  const handler = renderActionHandler(action, tenantId, onInteractionSuccess, handleRefresh);
+
+  return (
+    <ClaimGate
+      action={action}
+      tenantId={tenantId}
+      userEmail={userEmail}
+      onInteractionSuccess={onInteractionSuccess}
+      onActionUpdated={onActionUpdated}
+    >
+      {handler}
+    </ClaimGate>
+  );
+}
+
+function renderActionHandler(
+  action: WilActionItem,
+  tenantId: string,
+  onInteractionSuccess?: () => void,
+  onRefresh?: () => void,
+): React.ReactNode {
   switch (action.actionType) {
     case 'getapproval':
-      return <GetApprovalHandler action={action} tenantId={tenantId} onInteractionSuccess={onInteractionSuccess} />;
+      return (
+        <GetApprovalHandler
+          action={action}
+          tenantId={tenantId}
+          onInteractionSuccess={onInteractionSuccess}
+          onRefresh={onRefresh}
+        />
+      );
     case 'showform':
-      return <ShowFormHandler action={action} tenantId={tenantId} onInteractionSuccess={onInteractionSuccess} />;
+      return (
+        <ShowFormHandler
+          action={action}
+          tenantId={tenantId}
+          onInteractionSuccess={onInteractionSuccess}
+          onRefresh={onRefresh}
+        />
+      );
     case 'waitonevent':
-      return <WaitOnEventHandler action={action} tenantId={tenantId} onInteractionSuccess={onInteractionSuccess} />;
+      return (
+        <WaitOnEventHandler
+          action={action}
+          tenantId={tenantId}
+          onInteractionSuccess={onInteractionSuccess}
+          onRefresh={onRefresh}
+        />
+      );
     default:
       return <UnsupportedAction action={action} />;
   }

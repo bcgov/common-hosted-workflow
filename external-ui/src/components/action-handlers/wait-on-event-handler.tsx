@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
 import { extractErrorMessage } from '../shared/error-utils';
+import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
+import { ClaimErrorView } from './claim-error-view';
 
 const TERMINAL_STATUSES: ReadonlySet<WilActionItem['status']> = new Set([
   'completed',
@@ -17,20 +19,52 @@ interface WaitOnEventHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
+  onRefresh?: () => void;
 }
 
-export function WaitOnEventHandler({ action, tenantId, onInteractionSuccess }: Readonly<WaitOnEventHandlerProps>) {
+export function WaitOnEventHandler({
+  action,
+  tenantId,
+  onInteractionSuccess,
+  onRefresh,
+}: Readonly<WaitOnEventHandlerProps>) {
+  const { claimError, setClaimError } = useClaimVerification({
+    tenantId,
+    actionId: action.id,
+    actorType: action.actorType,
+  });
+  const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
   });
 
   const eventMutation = useMutation({
-    mutationFn: () => postWilCallback({ tenantId, actionId: action.id, body: { eventName: 'clicked' } }),
+    mutationFn: async () => {
+      // Pre-submit claim verification for role/group actions
+      const valid = await verifyClaimBeforeSubmit({
+        tenantId,
+        actionId: action.id,
+        actorType: action.actorType,
+        setClaimError,
+      });
+      if (!valid) throw new Error('Claim lost');
+      return postWilCallback({ tenantId, actionId: action.id, body: { eventName: 'clicked' } });
+    },
     onSuccess: () => {
       onInteractionSuccessRef.current?.();
     },
   });
+
+  function handleRefresh() {
+    queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+    onRefresh?.();
+  }
+
+  if (claimError) {
+    return <ClaimErrorView message={claimError} onRefresh={handleRefresh} />;
+  }
 
   const isTerminal = TERMINAL_STATUSES.has(action.status);
   const isDisabled = isTerminal || eventMutation.isPending || eventMutation.isSuccess;

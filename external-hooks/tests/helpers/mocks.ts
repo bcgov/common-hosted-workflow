@@ -130,6 +130,10 @@ export function makeActionRequestRow(overrides: Record<string, unknown> = {}) {
     dueDate: null,
     checkIn: null,
     metadata: null,
+    claimedBy: null,
+    claimedAt: null,
+    completedBy: null,
+    completedAt: null,
     createdAt: BASE_DATE,
     updatedAt: BASE_DATE,
     ...overrides,
@@ -174,6 +178,10 @@ export function createMockActionRequestRepository() {
     getById: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(makeActionRequestRow()),
     updateStatus: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    claim: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    unclaim: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    startAction: vi.fn().mockResolvedValue(makeActionRequestRow()),
+    directUpdate: vi.fn().mockResolvedValue(makeActionRequestRow()),
   };
 }
 

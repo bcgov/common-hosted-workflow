@@ -1,7 +1,7 @@
 import type { WilActionItem } from '../../services/backend/wil';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { IconClock, IconPlayerPlay, IconAlertTriangle } from '@tabler/icons-react';
+import { IconClock, IconPlayerPlay, IconAlertTriangle, IconHandGrab } from '@tabler/icons-react';
 
 function ActionStatusBadge({ status }: Readonly<{ status: WilActionItem['status'] }>) {
   switch (status) {
@@ -10,6 +10,13 @@ function ActionStatusBadge({ status }: Readonly<{ status: WilActionItem['status'
         <Badge variant="secondary" className="gap-1">
           <IconClock size={12} aria-hidden="true" />
           Pending
+        </Badge>
+      );
+    case 'claimed':
+      return (
+        <Badge className="gap-1 bg-amber-100 text-amber-800 border-amber-200">
+          <IconHandGrab size={12} aria-hidden="true" />
+          Claimed
         </Badge>
       );
     case 'in_progress':
@@ -44,7 +51,7 @@ interface ActionItemProps {
 
 export function ActionItem({ action, isSelected, onClick }: Readonly<ActionItemProps>) {
   const title = (action.payload?.title as string) || action.actionType;
-  const isOpen = action.status === 'pending' || action.status === 'in_progress';
+  const isOpen = action.status === 'pending' || action.status === 'claimed' || action.status === 'in_progress';
 
   return (
     <Card

@@ -5,9 +5,14 @@ export type UiActionResponse = {
   actionType: string;
   payload: Record<string, unknown>;
   actorId: string;
+  actorType: string;
   status: string;
   priority: string;
   dueDate: Date | null;
+  claimedBy: string | null;
+  claimedAt: Date | null;
+  completedBy: string | null;
+  completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -34,9 +39,14 @@ export function mapActionToUiResponse(action: ActionRequest): UiActionResponse {
     actionType: action.actionType,
     payload,
     actorId: action.actorId,
+    actorType: action.actorType,
     status: action.status,
     priority: action.priority,
     dueDate: action.dueDate,
+    claimedBy: action.claimedBy,
+    claimedAt: action.claimedAt,
+    completedBy: action.completedBy,
+    completedAt: action.completedAt,
     createdAt: action.createdAt,
     updatedAt: action.updatedAt,
   };
