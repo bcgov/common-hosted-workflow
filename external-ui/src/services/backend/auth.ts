@@ -35,6 +35,7 @@ export type AuthSessionResponse = {
   n8nUser: AuthSessionN8nUser | null;
   permissions: Permissions | null;
   tenantRoles: TenantRole[] | null;
+  tenantGroups: TenantGroup[] | null;
 };
 
 export type AuthenticatedSession = {
@@ -43,6 +44,7 @@ export type AuthenticatedSession = {
   n8nUser: AuthSessionN8nUser;
   permissions: Permissions;
   tenantRoles: TenantRole[];
+  tenantGroups: TenantGroup[];
 };
 
 export type Permissions = {
@@ -61,6 +63,12 @@ export type TenantRole = {
   tenantId: string;
   tenantName: string;
   roles: readonly string[];
+};
+
+export type TenantGroup = {
+  tenantId: string;
+  tenantName: string;
+  groups: readonly string[];
 };
 
 export type WhoamiResponse = {

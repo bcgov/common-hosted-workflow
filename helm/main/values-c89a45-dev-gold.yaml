@@ -15,7 +15,7 @@ n8n:
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
-    CSTAR_BASE_URL: https://dev-workflow-mock.apps.gold.devops.gov.bc.ca
+    CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
 
   route:
     enabled: true
