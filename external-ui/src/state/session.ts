@@ -1,5 +1,5 @@
 import { proxy, useSnapshot } from 'valtio';
-import type { AuthenticatedSession, TenantRole } from '../services/backend/auth';
+import type { AuthenticatedSession, TenantGroup, TenantRole } from '../services/backend/auth';
 
 type SessionState = {
   session: AuthenticatedSession | null;
@@ -63,6 +63,22 @@ export function useTenantRoles(): readonly TenantRole[] {
  */
 export function useTenantRolesById(tenantId: string): readonly string[] {
   return useTenantRoles().find((t) => t.tenantId === tenantId)?.roles ?? [];
+}
+
+/**
+ * Hook to get the current authenticated user's tenants with groups.
+ * Returns an empty array if the user is not logged in or has no tenant groups.
+ */
+export function useTenantGroups(): readonly TenantGroup[] {
+  return useSnapshot(sessionState).session?.tenantGroups ?? [];
+}
+
+/**
+ * Hook to get the current authenticated user's groups for a specific tenant.
+ * Returns an empty array if the user is not logged in or has no groups for the specified tenant.
+ */
+export function useTenantGroupsById(tenantId: string): readonly string[] {
+  return useTenantGroups().find((t) => t.tenantId === tenantId)?.groups ?? [];
 }
 
 /**

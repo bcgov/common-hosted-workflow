@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
 import { getStoredAppToken } from '../../services/backend/axios';
-import { useSessionSnapshot } from '../../state/session';
+import { useSessionSnapshot, useTenantGroupsById, useTenantRolesById } from '../../state/session';
 import { ChefsFormPanel } from '../chefs/chefs-form-panel';
 import type { ChefsFormPanelInitData } from '../chefs/chefs-form-panel';
 import { buildTokenObject, buildUserObject, buildUserProfile } from '../chefs/user-claims-utils';
@@ -23,6 +23,8 @@ async function initializeForm(params: {
   actionId: string;
   payload: Record<string, unknown>;
   claims: Record<string, unknown>;
+  tenantRoles: readonly string[];
+  tenantGroups: readonly string[];
 }): Promise<ChefsFormPanelInitData> {
   const tokenResponse = await postWilChefsToken({ tenantId: params.tenantId, actionId: params.actionId });
   const formPreFillData = (params.payload.formPreFillData as Record<string, unknown>) ?? {};
@@ -36,7 +38,7 @@ async function initializeForm(params: {
     submissionId,
     prefillData: { ...formPreFillData, ...buildUserProfile(params.claims) },
     token: buildTokenObject(params.claims),
-    user: buildUserObject(params.claims),
+    user: buildUserObject(params.claims, { roles: params.tenantRoles, groups: params.tenantGroups }),
     headers: userToken ? { Authorization: `Bearer ${userToken}` } : {},
   };
 }
@@ -44,6 +46,8 @@ async function initializeForm(params: {
 /** Renders a CHEFS form for a `showform` action and posts the submission to the WIL callback API. */
 export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefresh }: Readonly<ShowFormHandlerProps>) {
   const { session } = useSessionSnapshot();
+  const tenantRoles = useTenantRolesById(tenantId);
+  const tenantGroups = useTenantGroupsById(tenantId);
   const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
   const { claimError, setClaimError } = useClaimVerification({
@@ -66,11 +70,18 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
   // Re-initialize whenever the action or session claims change
   useEffect(() => {
     if (!session?.oidc.claims) return;
-    initMutation.mutate({ tenantId, actionId: action.id, payload: action.payload, claims: session.oidc.claims });
+    initMutation.mutate({
+      tenantId,
+      actionId: action.id,
+      payload: action.payload,
+      claims: session.oidc.claims,
+      tenantRoles,
+      tenantGroups,
+    });
     callbackMutation.reset();
     setClaimError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action.id, action.payload, session?.oidc.claims, tenantId]);
+  }, [action.id, action.payload, session?.oidc.claims, tenantId, tenantRoles, tenantGroups]);
 
   function handleRefresh() {
     queryClient.invalidateQueries({ queryKey: ['wil-actions'] });

@@ -12,7 +12,10 @@ export function buildTokenObject(claims: Record<string, unknown>): Record<string
   };
 }
 
-export function buildUserObject(claims: Record<string, unknown>): Record<string, unknown> {
+export function buildUserObject(
+  claims: Record<string, unknown>,
+  tenant?: { roles: readonly string[]; groups: readonly string[] },
+): Record<string, unknown> {
   return {
     name: claims.display_name,
     firstName: claims.given_name,
@@ -20,6 +23,8 @@ export function buildUserObject(claims: Record<string, unknown>): Record<string,
     email: claims.email,
     username: claims.idir_username ?? claims.preferred_username,
     idp: claims.identity_provider,
+    tenantRoles: tenant?.roles ?? [],
+    tenantGroups: tenant?.groups ?? [],
   };
 }
 
