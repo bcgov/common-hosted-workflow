@@ -230,7 +230,7 @@ Shown for any action in a terminal status, regardless of type.
 - Formatted action type label
 - Completion timestamp (`updatedAt` formatted as locale date/time)
 - Payload summary (if available):
-  - `showform` → "Form: {FormName}"
+  - `showform` → `"Form: {FormName}"`
   - Other types → no summary
 
 ### No Interactive Elements
