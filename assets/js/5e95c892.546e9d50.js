@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkcommon_hosted_workflow_docs=self.webpackChunkcommon_hosted_workflow_docs||[]).push([[9647],{7121(e,o,s){s.r(o),s.d(o,{default:()=>a});s(6540);var r=s(4164),c=s(7559),d=s(5500),n=s(2831),t=s(6250),u=s(4848);function a(e){return(0,u.jsx)(d.e3,{className:(0,r.A)(c.G.wrapper.docsPages),children:(0,u.jsx)(t.A,{children:(0,n.v)(e.route.routes)})})}}}]);
