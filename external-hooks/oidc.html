@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-external-hooks/oidc" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.1">
+<title data-rh="true">OIDC external hook | Common Hosted Workflow</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="OIDC external hook | Common Hosted Workflow"><meta data-rh="true" name="description" content="Custom OIDC authentication for n8n is implemented in external-hooks/src/api/hooks.ts and related helpers/routes."><meta data-rh="true" property="og:description" content="Custom OIDC authentication for n8n is implemented in external-hooks/src/api/hooks.ts and related helpers/routes."><link data-rh="true" rel="icon" href="/common-hosted-workflow/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc" hreflang="en"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"OIDC external hook","item":"https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"}]}</script><link rel="stylesheet" href="/common-hosted-workflow/assets/css/styles.d3623b55.css">
+<script src="/common-hosted-workflow/assets/js/runtime~main.e52ec43a.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/main.c414695e.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||"light"),document.documentElement.setAttribute("data-theme-choice",t||"light")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><link rel="preload" as="image" href="/common-hosted-workflow/img/logo.png"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/common-hosted-workflow/development-setup/local-development-environment"><div class="navbar__logo"><img src="/common-hosted-workflow/img/logo.png" alt="BC Government Logo" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/common-hosted-workflow/img/logo.png" alt="BC Government Logo" class="themedComponent_mlkZ themedComponent--dark_xIcU"></div><b class="navbar__title text--truncate">Common Hosted Workflow</b></a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><a href="https://github.com/bcgov/common-hosted-workflow" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link header-github-link" aria-label="GitHub repository"></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><div class="navbar__search searchBarContainer_NW3z" dir="ltr"><input placeholder="Search" aria-label="Search" class="navbar__search-input" value=""><div class="loadingRing_RJI3 searchBarLoadingRing_YnHq"><div></div><div></div><div></div><div></div></div></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/development-setup/local-development-environment"><span title="Getting Started" class="categoryLinkLabel_W154">Getting Started</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/common-hosted-workflow/external-hooks/architecture"><span title="External Hooks" class="categoryLinkLabel_W154">External Hooks</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/common-hosted-workflow/external-hooks/architecture"><span title="Backend Architecture" class="linkLabel_WmDU">Backend Architecture</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/common-hosted-workflow/external-hooks/custom-api"><span title="n8n custom admin API" class="linkLabel_WmDU">n8n custom admin API</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/common-hosted-workflow/external-hooks/oidc"><span title="OIDC external hook" class="linkLabel_WmDU">OIDC external hook</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/common-hosted-workflow/external-hooks/workflow-interaction-api-validations"><span title="Workflow interaction layer — headers and n8n validations" class="linkLabel_WmDU">Workflow interaction layer — headers and n8n validations</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/common-hosted-workflow/external-hooks/workflow-interaction-layer"><span title="Workflow interaction layer — API reference (messages &amp; actions)" class="linkLabel_WmDU">Workflow interaction layer — API reference (messages &amp; actions)</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/external-ui/WIL"><span title="External UI" class="categoryLinkLabel_W154">External UI</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/community-nodes/devx-message-connector/local-testing"><span title="Community Nodes" class="categoryLinkLabel_W154">Community Nodes</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/ci-cd/cd/failed-deployment"><span title="CI / CD" class="categoryLinkLabel_W154">CI / CD</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/technologies/terraform"><span title="Technologies" class="categoryLinkLabel_W154">Technologies</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/early-adaptors/FOI/camunda-bpmn-outboud-integrations"><span title="Early Adopters" class="categoryLinkLabel_W154">Early Adopters</span></a></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/research/observability"><span title="Research" class="categoryLinkLabel_W154">Research</span></a></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/common-hosted-workflow/architecture"><span title="High-Level Architecture" class="linkLabel_WmDU">High-Level Architecture</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/common-hosted-workflow/internal-sla"><span title="Internal Service Agreement (ISA) — Common Hosted Workflow Platform" class="linkLabel_WmDU">Internal Service Agreement (ISA) — Common Hosted Workflow Platform</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/common-hosted-workflow/pod-resource-audit"><span title="pod-resource-audit" class="linkLabel_WmDU">pod-resource-audit</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/common-hosted-workflow/rocketchat-migration"><span title="Rocket.Chat migration" class="linkLabel_WmDU">Rocket.Chat migration</span></a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/common-hosted-workflow/workflow-instructions/devx-teams-message"><span title="workflow-instructions" class="categoryLinkLabel_W154">workflow-instructions</span></a></div></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><span class="breadcrumbs__link">External Hooks</span></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">OIDC external hook</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>OIDC external hook</h1></header>
+<p>Custom OIDC authentication for n8n is implemented in <code>external-hooks/src/api/hooks.ts</code> and related helpers/routes.</p>
+<p>This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:</p>
+<ul>
+<li class="">OIDC discovery or manually configured endpoints.</li>
+<li class="">Authorization code login flow.</li>
+<li class="">Just-in-time user provisioning.</li>
+<li class="">Role sync from OIDC claims.</li>
+<li class="">Frontend sign-in customization to expose an SSO button.</li>
+</ul>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="source-layout">Source layout<a href="#source-layout" class="hash-link" aria-label="Direct link to Source layout" title="Direct link to Source layout" translate="no">​</a></h2>
+<table><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>external-hooks/src/api/hooks.ts</code></td><td>Serves the OIDC frontend assets under <code>/assets</code>.</td></tr><tr><td><code>external-hooks/src/api/routes/oidc.ts</code></td><td>Registers the OIDC login and callback routes.</td></tr><tr><td><code>external-hooks/src/api/helpers/oidc-provider.ts</code></td><td>Shared OIDC discovery, PKCE, token exchange, and identity flow.</td></tr><tr><td><code>external-hooks/src/api/helpers/n8n-oidc.ts</code></td><td>n8n-specific OIDC config, cookies, and role helpers.</td></tr><tr><td><code>external-hooks/src/api/assets/oidc-frontend-hook.js</code></td><td>Standalone browser script for the sign-in page.</td></tr><tr><td><code>external-hooks/src/api/utils/logger.ts</code></td><td>Structured request, response, and error logging helpers.</td></tr></tbody></table>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="routes">Routes<a href="#routes" class="hash-link" aria-label="Direct link to Routes" title="Direct link to Routes" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="1-start-login">1. Start login<a href="#1-start-login" class="hash-link" aria-label="Direct link to 1. Start login" title="Direct link to 1. Start login" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>URL:</strong> <code>GET /rest/auth/oidc/login</code></li>
+<li class=""><strong>Implementation:</strong> registered in <code>external-hooks/src/api/routes/oidc.ts</code></li>
+<li class=""><strong>Behavior:</strong></li>
+<li class="">Fetches the OIDC discovery document, unless endpoints are provided directly by environment variables.</li>
+<li class="">Generates <code>state</code> and <code>nonce</code> values.</li>
+<li class="">Stores both values in signed cookies.</li>
+<li class="">Redirects the browser to the provider authorization endpoint.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="2-oidc-callback">2. OIDC callback<a href="#2-oidc-callback" class="hash-link" aria-label="Direct link to 2. OIDC callback" title="Direct link to 2. OIDC callback" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>URL:</strong> <code>GET /rest/auth/oidc/callback</code></li>
+<li class=""><strong>Implementation:</strong> registered in <code>external-hooks/src/api/routes/oidc.ts</code></li>
+<li class=""><strong>Behavior:</strong></li>
+<li class="">Validates <code>state</code> and provider errors.</li>
+<li class="">Exchanges the authorization code for tokens.</li>
+<li class="">Verifies the <code>nonce</code> from the ID token when present.</li>
+<li class="">Fetches user claims from the <code>userinfo</code> endpoint, with fallback to ID token claims.</li>
+<li class="">Resolves the n8n user by email, creates the user if needed, syncs role, then issues the n8n auth cookie.</li>
+<li class="">Redirects to <code>/</code> on success or back to <code>/signin?error=...</code> on failure.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="3-frontend-helper-script">3. Frontend helper script<a href="#3-frontend-helper-script" class="hash-link" aria-label="Direct link to 3. Frontend helper script" title="Direct link to 3. Frontend helper script" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>URL:</strong> <code>GET /assets/oidc-frontend-hook.js</code></li>
+<li class=""><strong>Behavior:</strong></li>
+<li class="">Injects an SSO button into the sign-in page.</li>
+<li class="">Hides the normal email/password form by default.</li>
+<li class="">Allows fallback to the normal form with <code>?showLogin=true</code>.</li>
+<li class=""><strong>Implementation:</strong> served as a static file from <code>external-hooks/src/api/assets</code>.</li>
+</ul>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="environment-variables">Environment variables<a href="#environment-variables" class="hash-link" aria-label="Direct link to Environment variables" title="Direct link to Environment variables" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="required">Required<a href="#required" class="hash-link" aria-label="Direct link to Required" title="Direct link to Required" translate="no">​</a></h3>
+<ul>
+<li class=""><code>OIDC_CLIENT_ID</code></li>
+<li class=""><code>OIDC_CLIENT_SECRET</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="discovery-mode">Discovery mode<a href="#discovery-mode" class="hash-link" aria-label="Direct link to Discovery mode" title="Direct link to Discovery mode" translate="no">​</a></h3>
+<ul>
+<li class=""><code>OIDC_ISSUER</code></li>
+</ul>
+<p>If <code>OIDC_ISSUER</code> is set, the hook resolves provider metadata from:</p>
+<ul>
+<li class=""><code>/.well-known/openid-configuration</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="manual-endpoint-mode">Manual endpoint mode<a href="#manual-endpoint-mode" class="hash-link" aria-label="Direct link to Manual endpoint mode" title="Direct link to Manual endpoint mode" translate="no">​</a></h3>
+<p>When <code>OIDC_ISSUER</code> is not set, all of the following must be provided:</p>
+<ul>
+<li class=""><code>OIDC_AUTHORIZATION_ENDPOINT</code></li>
+<li class=""><code>OIDC_TOKEN_ENDPOINT</code></li>
+<li class=""><code>OIDC_USERINFO_ENDPOINT</code></li>
+<li class=""><code>OIDC_JWKS_URI</code></li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="optional">Optional<a href="#optional" class="hash-link" aria-label="Direct link to Optional" title="Direct link to Optional" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><code>OIDC_SCOPES</code>
+Default: <code>openid email profile</code></p>
+</li>
+<li class="">
+<p><code>OIDC_ROLES_CLAIM</code>
+Default: <code>roles</code></p>
+</li>
+<li class="">
+<p><code>OIDC_END_SESSION_ENDPOINT</code>
+When <code>OIDC_ISSUER</code> is not set, this provides the IDP logout URL for upstream single-logout. If not set, logout redirects directly without IDP involvement.</p>
+</li>
+<li class="">
+<p><code>SSO_RESTRICT_NO_ROLE</code>
+When <code>true</code>, users without a mapped OIDC role cannot be newly provisioned, and existing users are synced to an empty role when the token carries no valid role.</p>
+</li>
+</ul>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="authentication-flow">Authentication flow<a href="#authentication-flow" class="hash-link" aria-label="Direct link to Authentication flow" title="Direct link to Authentication flow" translate="no">​</a></h2>
+<ol>
+<li class="">User opens <code>/rest/auth/oidc/login</code>.</li>
+<li class="">The hook creates signed <code>state</code> and <code>nonce</code> cookies.</li>
+<li class="">The browser is redirected to the OIDC provider.</li>
+<li class="">The provider returns to <code>/rest/auth/oidc/callback</code> with an authorization code.</li>
+<li class="">The hook exchanges the code for tokens.</li>
+<li class="">The hook loads user claims from <code>userinfo</code> or falls back to the ID token.</li>
+<li class="">The hook validates <code>email</code> and resolves the user in n8n.</li>
+<li class="">The hook provisions or updates the user role.</li>
+<li class="">The hook signs the n8n auth token using n8n <code>JwtService</code> and sets the <code>n8n-auth</code> cookie.</li>
+</ol>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="user-provisioning">User provisioning<a href="#user-provisioning" class="hash-link" aria-label="Direct link to User provisioning" title="Direct link to User provisioning" translate="no">​</a></h2>
+<p>The callback uses email as the primary identity key.</p>
+<ul>
+<li class="">If the user already exists, the hook reuses that account.</li>
+<li class="">If the user does not exist, the hook creates the user with <code>User.createUserWithProject(...)</code> so the personal project is created at the same time.</li>
+<li class="">A random password is generated for provisioned users. It is not intended for password-based login.</li>
+</ul>
+<p>Default role assignment during creation:</p>
+<ul>
+<li class="">First user in the system: <code>global:owner</code></li>
+<li class="">Later users: <code>global:member</code></li>
+<li class="">If a valid OIDC role exists, it overrides the default above.</li>
+</ul>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="role-mapping-and-sync">Role mapping and sync<a href="#role-mapping-and-sync" class="hash-link" aria-label="Direct link to Role mapping and sync" title="Direct link to Role mapping and sync" translate="no">​</a></h2>
+<p>The hook reads roles from the configured claim:</p>
+<ul>
+<li class="">Source claim: <code>userInfo[OIDC_ROLES_CLAIM]</code></li>
+<li class="">Parsing: comma-separated string</li>
+<li class="">Accepted values: <code>global:owner</code>, <code>global:admin</code>, <code>global:member</code></li>
+<li class="">Only the first valid role is used</li>
+</ul>
+<p>Examples:</p>
+<ul>
+<li class=""><code>roles: &quot;global:admin&quot;</code> -&gt; <code>global:admin</code></li>
+<li class=""><code>roles: &quot;global:member,other-role&quot;</code> -&gt; <code>global:member</code></li>
+<li class="">Missing or unsupported role -&gt; empty role mapping</li>
+</ul>
+<p>Role sync behavior:</p>
+<ul>
+<li class="">If <code>SSO_RESTRICT_NO_ROLE=false</code>, the next role becomes the mapped OIDC role, or <code>global:member</code> when the token has no valid role.</li>
+<li class="">If <code>SSO_RESTRICT_NO_ROLE=true</code>, the next role becomes the mapped OIDC role, or an empty string when the token has no valid role.</li>
+<li class="">A role change is applied only when the current and next roles differ.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="sso_restrict_no_role-behavior"><code>SSO_RESTRICT_NO_ROLE</code> behavior<a href="#sso_restrict_no_role-behavior" class="hash-link" aria-label="Direct link to sso_restrict_no_role-behavior" title="Direct link to sso_restrict_no_role-behavior" translate="no">​</a></h3>
+<p>When <code>SSO_RESTRICT_NO_ROLE=true</code>:</p>
+<ul>
+<li class="">New users are not created if no valid OIDC role is present.</li>
+<li class="">Existing users are still allowed to authenticate.</li>
+<li class="">Existing users are synced to an empty role if the token has no valid role.</li>
+</ul>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="last-owner-protection">Last owner protection<a href="#last-owner-protection" class="hash-link" aria-label="Direct link to Last owner protection" title="Direct link to Last owner protection" translate="no">​</a></h2>
+<p>The hook prevents OIDC role sync from demoting the last <code>global:owner</code> in the system.</p>
+<p>Before changing a user from <code>global:owner</code> to any other role:</p>
+<ul>
+<li class="">It counts other users that still have <code>global:owner</code>.</li>
+<li class="">If no other owner exists, the role change is blocked.</li>
+<li class="">The user is redirected back to sign-in with an error message instead of changing the role.</li>
+</ul>
+<p>This prevents accidental lockout of the instance through upstream role changes.</p>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="frontend-integration">Frontend integration<a href="#frontend-integration" class="hash-link" aria-label="Direct link to Frontend integration" title="Direct link to Frontend integration" translate="no">​</a></h2>
+<p>The hook also modifies frontend settings through the <code>frontend.settings</code> external hook:</p>
+<ul>
+<li class=""><code>frontendSettings.sso.oidc.loginEnabled = true</code></li>
+<li class=""><code>frontendSettings.sso.oidc.loginUrl = &#x27;/rest/auth/oidc/login&#x27;</code></li>
+<li class=""><code>frontendSettings.sso.oidc.callbackUrl = OIDC_REDIRECT_URI</code></li>
+<li class=""><code>frontendSettings.userManagement.authenticationMethod = &#x27;oidc&#x27;</code></li>
+<li class=""><code>frontendSettings.enterprise.oidc = true</code></li>
+</ul>
+<p>This makes the frontend treat OIDC as the primary authentication method.</p>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="security-notes">Security notes<a href="#security-notes" class="hash-link" aria-label="Direct link to Security notes" title="Direct link to Security notes" translate="no">​</a></h2>
+<ul>
+<li class=""><code>state</code> and <code>nonce</code> are stored in signed cookies to mitigate CSRF and replay attacks.</li>
+<li class="">Cookie signing is derived from <code>N8N_ENCRYPTION_KEY</code> when available, otherwise falls back to <code>OIDC_CLIENT_SECRET</code>.</li>
+<li class="">The hook validates that the resolved user has a syntactically valid email address before provisioning.</li>
+<li class="">The hook decodes JWTs for claim extraction but does not implement signature verification itself; token trust relies on the provider token exchange flow.</li>
+</ul>
+<hr>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="operational-notes">Operational notes<a href="#operational-notes" class="hash-link" aria-label="Direct link to Operational notes" title="Direct link to Operational notes" translate="no">​</a></h2>
+<ul>
+<li class="">If required environment variables are missing, the hook logs a warning and does not register OIDC routes.</li>
+<li class="">Discovery results are cached in memory for one hour.</li>
+<li class="">Callback failures are surfaced to the UI through <code>/signin?error=...</code>.</li>
+<li class="">Logging uses the shared logger helpers from <code>external-hooks/src/api/utils/logger.ts</code>.</li>
+</ul></div></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/common-hosted-workflow/external-hooks/custom-api"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">n8n custom admin API</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/common-hosted-workflow/external-hooks/workflow-interaction-api-validations"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Workflow interaction layer — headers and n8n validations</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#source-layout" class="table-of-contents__link toc-highlight">Source layout</a></li><li><a href="#routes" class="table-of-contents__link toc-highlight">Routes</a><ul><li><a href="#1-start-login" class="table-of-contents__link toc-highlight">1. Start login</a></li><li><a href="#2-oidc-callback" class="table-of-contents__link toc-highlight">2. OIDC callback</a></li><li><a href="#3-frontend-helper-script" class="table-of-contents__link toc-highlight">3. Frontend helper script</a></li></ul></li><li><a href="#environment-variables" class="table-of-contents__link toc-highlight">Environment variables</a><ul><li><a href="#required" class="table-of-contents__link toc-highlight">Required</a></li><li><a href="#discovery-mode" class="table-of-contents__link toc-highlight">Discovery mode</a></li><li><a href="#manual-endpoint-mode" class="table-of-contents__link toc-highlight">Manual endpoint mode</a></li><li><a href="#optional" class="table-of-contents__link toc-highlight">Optional</a></li></ul></li><li><a href="#authentication-flow" class="table-of-contents__link toc-highlight">Authentication flow</a></li><li><a href="#user-provisioning" class="table-of-contents__link toc-highlight">User provisioning</a></li><li><a href="#role-mapping-and-sync" class="table-of-contents__link toc-highlight">Role mapping and sync</a><ul><li><a href="#sso_restrict_no_role-behavior" class="table-of-contents__link toc-highlight"><code>SSO_RESTRICT_NO_ROLE</code> behavior</a></li></ul></li><li><a href="#last-owner-protection" class="table-of-contents__link toc-highlight">Last owner protection</a></li><li><a href="#frontend-integration" class="table-of-contents__link toc-highlight">Frontend integration</a></li><li><a href="#security-notes" class="table-of-contents__link toc-highlight">Security notes</a></li><li><a href="#operational-notes" class="table-of-contents__link toc-highlight">Operational notes</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 Government of British Columbia</div></div></div></footer></div>
+</body>
+</html>
