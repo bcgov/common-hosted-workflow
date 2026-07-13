@@ -1,0 +1,48 @@
+name: gh-pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    paths:
+    - docs/**
+    - doc-site/**
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Publish
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
+        cache-dependency-path: doc-site/package-lock.json
+
+    - run: |
+        cd doc-site
+        npm ci
+        npm run build
+      env:
+        DOCS_URL: https://bcgov.github.io
+        DOCS_BASE_URL: /common-hosted-workflow/
+
+    - name: Deploy to gh-pages branch
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./doc-site/build
+        publish_branch: gh-pages

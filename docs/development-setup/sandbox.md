@@ -17,16 +17,10 @@ Depending on your organization's procurement policies (e.g., BC Government restr
 
 If you are using the Docker CLI without the Desktop GUI, ensure your environment is linked:
 
-| OS        | Installation / Setup Command                            |
-| --------- | ------------------------------------------------------- |
-| **macOS** | `brew install docker docker-compose docker-buildx` <br> |
-
-<br>
-
-<br> `mkdir -p ~/.docker/cli-plugins` <br>
-
-<br> `ln -s $HOMEBREW_PREFIX/lib/docker/cli-plugins/docker-compose ~/.docker/cli-plugins/docker-compose` |
-| **Windows** | Follow the [WSL2 + Native Docker Guide](https://gist.github.com/martinsam16/4492957e3bbea34046f2c8b49c3e5ac0) |
+| OS          | Installation / Setup Command                                                                                                                                                                          |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **macOS**   | `brew install docker docker-compose docker-buildx` <br /> `mkdir -p ~/.docker/cli-plugins` <br /> `ln -s $HOMEBREW_PREFIX/lib/docker/cli-plugins/docker-compose ~/.docker/cli-plugins/docker-compose` |
+| **Windows** | Follow the [WSL2 + Native Docker Guide](https://gist.github.com/martinsam16/4492957e3bbea34046f2c8b49c3e5ac0)                                                                                         |
 
 ## Getting Started
 

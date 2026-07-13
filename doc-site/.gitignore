@@ -1,0 +1,12 @@
+# Dependencies
+/node_modules
+
+# Production
+/build
+
+# Generated files
+.docusaurus
+
+# Misc
+.DS_Store
+npm-debug.log*
