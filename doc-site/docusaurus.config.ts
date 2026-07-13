@@ -15,6 +15,10 @@ const config: Config = {
   trailingSlash: false,
 
   onBrokenLinks: 'warn',
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
 
   i18n: {
     defaultLocale: 'en',
