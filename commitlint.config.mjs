@@ -30,7 +30,7 @@ const Configuration = {
       Option.ALWAYS,
       ['build', 'chore', 'ci', 'docs', 'feat', 'fix', 'perf', 'refactor', 'revert', 'style', 'test', 'e2e'],
     ],
-    'scope-empty': [Severity.ERROR, Option.NEVER],
+    'scope-empty': [Severity.OFF],
     'scope-min-length': [Severity.ERROR, Option.ALWAYS, 2],
     'scope-max-length': [Severity.ERROR, Option.ALWAYS, 10],
   },
