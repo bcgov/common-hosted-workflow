@@ -13,7 +13,8 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   publish:
@@ -33,9 +34,9 @@ jobs:
         cache-dependency-path: doc-site/package-lock.json
 
     - run: |
-        cd doc-site
         npm ci
         npm run build
+      working-directory: doc-site
       env:
         DOCS_URL: https://bcgov.github.io
         DOCS_BASE_URL: /common-hosted-workflow/
