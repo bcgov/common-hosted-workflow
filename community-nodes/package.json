@@ -29,12 +29,14 @@
       "dist/credentials/ChefsApi.credentials.js",
       "dist/credentials/ChefsFormAuth.credentials.js",
       "dist/credentials/DevXConnector.credentials.js",
+      "dist/credentials/OidcToken.credentials.js",
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/CHEFS/CHEFS.node.js",
       "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
       "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.js",
+      "dist/nodes/OidcToken/OidcToken.node.js",
       "dist/nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node.js"
     ]
   },

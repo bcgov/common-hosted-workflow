@@ -1,0 +1,11 @@
+{
+  "node": "community-nodes.oidcToken",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Development", "Transform"],
+  "resources": {
+    "primaryDocumentation": [
+      { "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/oidc-token" }
+    ]
+  }
+}
