@@ -358,6 +358,11 @@ backup-storage:
 seaweedfs:
   enabled: false
 
+  # Allow ingress to SeaweedFS S3 (port 8333) from other namespaces (e.g. dev/test/prod observability stack)
+  s3CrossNamespaceAccess:
+    enabled: false
+    namespaces: []
+
   global:
     enableReplication: false
     replicationPlacement: '000'

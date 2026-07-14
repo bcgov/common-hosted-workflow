@@ -13,6 +13,12 @@ pgo:
 
 seaweedfs:
   enabled: true
+  s3CrossNamespaceAccess:
+    enabled: true
+    namespaces:
+      - c89a45-dev
+      - c89a45-test
+      - c89a45-prod
   admin:
     secret:
       existingSecret: chwf-seaweedfs-admin-credentials # pragma: allowlist secret
