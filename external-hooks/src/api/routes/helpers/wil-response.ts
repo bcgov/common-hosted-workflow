@@ -3,6 +3,7 @@ import type { ActionRequest } from '../../../db/schema/workflow-interaction-laye
 export type UiActionResponse = {
   id: string;
   actionType: string;
+  actionTitle: string | null;
   payload: Record<string, unknown>;
   actorId: string;
   actorType: string;
@@ -37,6 +38,7 @@ export function mapActionToUiResponse(action: ActionRequest): UiActionResponse {
   return {
     id: action.id,
     actionType: action.actionType,
+    actionTitle: action.actionTitle ?? null,
     payload,
     actorId: action.actorId,
     actorType: action.actorType,

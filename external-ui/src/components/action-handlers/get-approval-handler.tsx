@@ -120,12 +120,7 @@ export function GetApprovalHandler({
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      {html && (
-        <div
-          className="prose prose-sm max-w-none text-[var(--bc-text)]"
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
-        />
-      )}
+      {html && <div className="approval-html" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />}
 
       <div aria-live="polite">
         {approvalMutation.isSuccess && (

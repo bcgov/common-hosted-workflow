@@ -1,8 +1,8 @@
 # API Reference
 
-All endpoints live under `/rest/custom/v1` and require the standard authentication headers described in [Architecture — Authentication Model](./architecture.md#authentication-model).
+All endpoints live under `/rest/custom/v1` and require the standard authentication headers described in [Architecture - Authentication Model](./architecture.md#authentication-model).
 
-## Common Headers (All Requests)
+## Common Headers
 
 | Header          | Required | Description                                  |
 | --------------- | -------- | -------------------------------------------- |
@@ -12,230 +12,77 @@ All endpoints live under `/rest/custom/v1` and require the standard authenticati
 | `Content-Type`  | Yes      | `application/json`                           |
 | `Accept`        | Yes      | `application/json`                           |
 
-The `workflowId` is included in the request body on create operations, not as a header.
+## Create Action
 
----
+`POST /rest/custom/v1/actions`
 
-## Message Endpoints
+| Field                 | Type   | Required | Description                                       |
+| --------------------- | ------ | -------- | ------------------------------------------------- |
+| `workflowInstanceId`  | string | Yes      | Current execution ID                              |
+| `actorId`             | string | Yes      | Target actor identifier                           |
+| `actorType`           | string | Yes      | One of `user`, `group`, `role`, `system`, `other` |
+| `actionType`          | string | Yes      | One of `getapproval`, `showform`, `waitonevent`   |
+| `actionTitle`         | string | No       | Optional title for the action                     |
+| `payload`             | object | Yes      | Action-specific data                              |
+| `callbackUrl`         | string | No       | URL to call when action completes                 |
+| `callbackMethod`      | string | No       | `POST`, `PUT`, `PATCH`, or `none`                 |
+| `callbackPayloadSpec` | object | No       | Template describing expected callback body        |
+| `workflowId`          | string | Yes      | Source workflow ID                                |
+| `dueDate`             | string | No       | RFC 3339 timestamp                                |
+| `priority`            | string | No       | `normal` or `critical`                            |
+| `checkIn`             | string | No       | RFC 3339 reminder timestamp                       |
+| `metadata`            | object | No       | Arbitrary JSON metadata                           |
 
-### Create Message
+## Payload by Action Type
 
-```
-POST /rest/custom/v1/messages
-```
+| Action Type   | Payload Shape                                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `getapproval` | `{ "html": "<p>Do you want to approve?</p>", "options": ["Yes", "No"] }`                                    |
+| `showform`    | `{ "formName": "...", "formId": "...", "formApiKey": "...", "submissionId": "...", "formPreFillData": {} }` |
+| `waitonevent` | Free-form JSON, preserving the previous behavior, for example `{ "eventName": "clicked" }`                  |
 
-**Request Body:**
+### getapproval Payload
 
-| Field                | Type   | Required | Description                                        |
-| -------------------- | ------ | -------- | -------------------------------------------------- |
-| `workflowInstanceId` | string | Yes      | Current execution ID                               |
-| `actorId`            | string | Yes      | Target actor identifier (max 50 chars)             |
-| `actorType`          | string | Yes      | One of: `user`, `group`, `role`, `system`, `other` |
-| `title`              | string | Yes      | Message title (max 255 chars)                      |
-| `body`               | string | Yes      | Message body text                                  |
-| `workflowId`         | string | Yes      | Source workflow ID                                 |
-| `metadata`           | object | No       | Arbitrary JSON metadata                            |
-
-**Response (201):**
-
-```json
-{
-  "id": "msg-1",
-  "workflowInstanceId": "exec-1001",
-  "actorId": "alice@example.com",
-  "actorType": "user",
-  "title": "Application Submitted",
-  "body": "Your application has been submitted.",
-  "workflowId": "wf-demo-1",
-  "projectId": "project-for-wf-demo-1",
-  "tenantId": "tenant-demo",
-  "status": "active",
-  "metadata": { "formId": "intake" },
-  "createdAt": "2026-03-26T00:00:00.000Z",
-  "updatedAt": "2026-03-26T00:00:00.000Z"
-}
-```
-
-### Read Message
-
-```
-GET /rest/custom/v1/messages/:id
-```
-
-This endpoint exists in the API but is not exposed as a node operation. Use the List Messages or Get Messages by Actor ID operations instead.
-
-### List Messages
-
-```
-GET /rest/custom/v1/messages
-```
-
-**Query Parameters:**
-
-| Parameter            | Type   | Default | Description                                                 |
-| -------------------- | ------ | ------- | ----------------------------------------------------------- |
-| `actorId`            | string | —       | Filter by actor ID                                          |
-| `workflowInstanceId` | string | —       | Filter by execution ID                                      |
-| `since`              | string | —       | RFC 3339 timestamp; return messages created after this time |
-| `limit`              | number | `50`    | Max results per page (1–200)                                |
-
-**Response (200):** Array of message objects.
-
-### Get Messages by Actor ID
-
-```
-GET /rest/custom/v1/actors/:actorId/messages
-```
-
-Returns all messages for a specific actor within the caller's project and tenant.
-
-**Query Parameters:**
-
-| Parameter            | Type   | Default | Description                                                 |
-| -------------------- | ------ | ------- | ----------------------------------------------------------- |
-| `since`              | string | —       | RFC 3339 timestamp; return messages created after this time |
-| `limit`              | number | `50`    | Max results per page (1–200)                                |
-| `workflowInstanceId` | string | —       | Filter by execution ID                                      |
-
-**Response (200):** Array of message objects.
-
----
-
-## Action Endpoints
-
-### Create Action
-
-```
-POST /rest/custom/v1/actions
-```
-
-**Request Body:**
-
-| Field                 | Type   | Required | Description                                               |
-| --------------------- | ------ | -------- | --------------------------------------------------------- |
-| `workflowInstanceId`  | string | Yes      | Current execution ID                                      |
-| `actorId`             | string | Yes      | Target actor identifier (max 50 chars)                    |
-| `actorType`           | string | Yes      | One of: `user`, `group`, `role`, `system`, `other`        |
-| `actionType`          | string | Yes      | One of: `getapproval`, `showform`, `waitonevent`          |
-| `payload`             | object | Yes      | Action-specific data (see below)                          |
-| `callbackUrl`         | string | No       | URL to call when action completes (omit when no callback) |
-| `callbackMethod`      | string | No       | `POST` (default), `PUT`, `PATCH`, or `none`               |
-| `callbackPayloadSpec` | object | No       | Template describing expected callback body                |
-| `workflowId`          | string | Yes      | Source workflow ID                                        |
-| `dueDate`             | string | No       | RFC 3339 timestamp                                        |
-| `priority`            | string | No       | `normal` (default) or `critical`                          |
-| `checkIn`             | string | No       | RFC 3339 reminder timestamp                               |
-| `metadata`            | object | No       | Arbitrary JSON metadata                                   |
-
-> **Note:** When `callbackMethod` is `none` (or omitted along with `callbackUrl`), no callback will be issued upon action completion. The `callbackUrl` and `callbackPayloadSpec` fields should be omitted from the request body in this case.
-
-**Payload by Action Type:**
-
-| Action Type   | Recommended Payload Fields                                                                                     |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| `getapproval` | Free-form JSON (e.g. `{ "applicationId": 42 }`)                                                                |
-| `showform`    | `formId` (required), `FormAPIKey` (required), `FormName`, `FormPreFillData`, `FormSubmissionId`, `formVersion` |
-| `waitonevent` | `eventName`                                                                                                    |
-
-**showform Payload Details:**
-
-For `showform` actions, the payload controls which CHEFS form is rendered and how it is pre-populated:
-
-- `formId` / `FormID` — (required) The CHEFS form UUID.
-- `FormAPIKey` / `formApiKey` — (required) API key for server-side JWT exchange. Stripped before reaching the browser.
-- `FormName` / `formName` — Display name for the action card UI.
-- `FormPreFillData` / `formPreFillData` — Object of key-value pairs matching CHEFS form field API names. Pre-populates the form when opened.
-- `FormSubmissionId` / `formSubmissionId` — Existing submission ID to load for editing. When present, `FormPreFillData` is ignored.
-- `formVersion` — Optional form version string.
-
-**Response (201):**
+`getapproval` actions render sanitized HTML followed by one button per option. When a user chooses an option, the UI sends the callback body:
 
 ```json
 {
-  "id": "act-1",
-  "workflowInstanceId": "exec-1001",
-  "actorId": "bob@example.com",
-  "actorType": "user",
-  "actionType": "getapproval",
-  "payload": { "applicationId": 42 },
-  "callbackUrl": "http://localhost:5678/webhook/approval-callback",
-  "callbackMethod": "POST",
-  "callbackPayloadSpec": { "approved": "boolean", "comments": "string" },
-  "workflowId": "wf-demo-1",
-  "projectId": "project-for-wf-demo-1",
-  "tenantId": "tenant-demo",
-  "status": "pending",
-  "priority": "normal",
-  "dueDate": "2026-04-01T00:00:00Z",
-  "checkIn": null,
-  "metadata": null,
-  "createdAt": "2026-03-26T00:00:00.000Z",
-  "updatedAt": "2026-03-26T00:00:00.000Z"
+  "option": "Yes"
 }
 ```
 
-### Get Action
+HTML and at least one option are required for `getapproval`; missing HTML or empty options are rejected by the node before the action is created.
 
-```
-GET /rest/custom/v1/actions/:id
-```
+Allowed HTML is intentionally limited. Inline `style` attributes, scripts, event handlers, and data attributes are not allowed. The UI applies controlled styling for common elements such as headings, paragraphs, lists, tables, links, images, blockquotes, and code blocks.
 
-**Response (200):** Single action object.
+Allowed tags include `h1`-`h6`, `p`, `br`, `ul`, `ol`, `li`, `a`, `strong`, `em`, `b`, `i`, `u`, `s`, `code`, `pre`, `blockquote`, `table`, `thead`, `tbody`, `tr`, `th`, `td`, `img`, `span`, `div`, and `hr`.
 
-**Response (404):** `{ "error": "Action not found" }`
+Allowed attributes include `href`, `target`, `rel`, `src`, `alt`, `width`, `height`, `colspan`, `rowspan`, `class`, and `id`.
 
-### List Actions
-
-```
-GET /rest/custom/v1/actions
-```
-
-**Query Parameters:**
-
-| Parameter            | Type   | Default | Description                                                |
-| -------------------- | ------ | ------- | ---------------------------------------------------------- |
-| `actorId`            | string | —       | Filter by actor ID                                         |
-| `workflowInstanceId` | string | —       | Filter by execution ID                                     |
-| `since`              | string | —       | RFC 3339 timestamp; return actions created after this time |
-| `limit`              | number | `50`    | Max results per page (1–200)                               |
-
-**Response (200):** Array of action objects.
-
-### Update Action
-
-```
-PATCH /rest/custom/v1/actions/:id
-```
-
-**Request Body:**
-
-| Field    | Type   | Required | Description                                                                          |
-| -------- | ------ | -------- | ------------------------------------------------------------------------------------ |
-| `status` | string | Yes      | New status: `pending`, `in_progress`, `completed`, `cancelled`, `expired`, `deleted` |
-
-**Response (200):**
+#### Example: Consent Table
 
 ```json
 {
-  "status": "completed",
-  "message": "Action status updated to completed"
+  "html": "<h2>Consent to Share Income Information</h2><p>By selecting <b>Yes</b>, you authorize us to collect and share your income information.</p><table><tr><th colspan=\"2\">Consent Summary</th></tr><tr><td><b>Purpose</b></td><td>Determine eligibility and process your request.</td></tr><tr><td><b>If you choose No</b></td><td>We may not be able to complete your eligibility assessment.</td></tr></table>",
+  "options": ["Yes", "No"]
 }
 ```
 
-> **Note:** To delete an action, send a PATCH with `{ "status": "deleted" }`.
+#### Example: Checklist
 
-### Get Actions by Actor ID
-
+```json
+{
+  "html": "<h3>Review Required</h3><p>Confirm that these checks are complete:</p><ul><li>Identity verified.</li><li>Documents reviewed.</li><li>No duplicate request is active.</li></ul>",
+  "options": ["Approve", "Needs Changes", "Reject"]
+}
 ```
-GET /rest/custom/v1/actors/:actorId/actions
-```
 
-Returns all actions for a specific actor within the caller's project and tenant.
+For `showform`, `formName`, `formId`, and `formApiKey` are required by the n8n node. `formName` is the CHEFS form name, `formId` is the CHEFS form ID, and `formApiKey` is the CHEFS form API key. `submissionId` is an optional CHEFS form submission ID used to prefill the form from prior submission data. `formPreFillData` is an optional object used to prefill over rendered form data. When `submissionId` is provided, it takes full priority over `formPreFillData`. The backend strips `formApiKey` before returning actions to the browser.
 
-**Query Parameters:**
+## Other Endpoints
 
-| Parameter            | Type   | Default | Description                                                |
-| -------------------- | ------ | ------- | ---------------------------------------------------------- |
-| `since`              | string | —       | RFC 3339 timestamp; return actions created after this time |
-| `limit`              | number | `50`    | Max results per page (1–200)                               |
-| `workflowInstanceId` | string | —       | Filter by execution ID                                     |
+- `GET /rest/custom/v1/actions/:id` returns a single action.
+- `GET /rest/custom/v1/actions` lists actions.
+- `PATCH /rest/custom/v1/actions/:id` updates action status.
+- `GET /rest/custom/v1/actors/:actorId/actions` lists actions for an actor.
+- Message endpoints remain under `/messages` and `/actors/:actorId/messages`.
