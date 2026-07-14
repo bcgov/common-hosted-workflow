@@ -27,6 +27,7 @@ export interface ActionCreatePayload {
   actorId: string;
   actorType: 'user' | 'group' | 'role' | 'system' | 'other';
   actionType: string;
+  actionTitle?: string;
   payload: Record<string, unknown>;
   callbackUrl?: string;
   callbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'none';

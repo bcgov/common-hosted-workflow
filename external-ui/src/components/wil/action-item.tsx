@@ -9,25 +9,25 @@ function ActionStatusBadge({ status }: Readonly<{ status: WilActionItem['status'
       return (
         <Badge variant="secondary" className="gap-1">
           <IconClock size={12} aria-hidden="true" />
-          Pending
+          Status: Pending
         </Badge>
       );
     case 'claimed':
       return (
         <Badge className="gap-1 bg-amber-100 text-amber-800 border-amber-200">
           <IconHandGrab size={12} aria-hidden="true" />
-          Claimed
+          Status: Claimed
         </Badge>
       );
     case 'in_progress':
       return (
         <Badge className="gap-1 bg-[var(--bc-blue)] text-white">
           <IconPlayerPlay size={12} aria-hidden="true" />
-          In Progress
+          Status: In Progress
         </Badge>
       );
     default:
-      return <Badge variant="outline">{status}</Badge>;
+      return <Badge variant="outline">Status: {status}</Badge>;
   }
 }
 
@@ -36,11 +36,11 @@ function ActionPriorityBadge({ priority }: Readonly<{ priority: WilActionItem['p
     return (
       <Badge variant="destructive" className="gap-1">
         <IconAlertTriangle size={12} aria-hidden="true" />
-        Critical
+        Priority: Critical
       </Badge>
     );
   }
-  return <Badge variant="secondary">Normal</Badge>;
+  return <Badge variant="secondary">Priority: Normal</Badge>;
 }
 
 interface ActionItemProps {
@@ -50,27 +50,19 @@ interface ActionItemProps {
 }
 
 export function ActionItem({ action, isSelected, onClick }: Readonly<ActionItemProps>) {
-  const title = (action.payload?.title as string) || action.actionType;
-  const isOpen = action.status === 'pending' || action.status === 'claimed' || action.status === 'in_progress';
+  const title = action.actionTitle || action.actionType;
 
   return (
     <Card
       className={`cursor-pointer transition-all duration-150 shadow-sm ${isSelected ? 'ring-2 ring-[var(--bc-blue)] border-[var(--bc-blue)]' : 'hover:border-[var(--bc-blue)]/50 hover:shadow-md'}`}
       onClick={onClick}
     >
-      <CardContent className="flex items-start justify-between gap-4 p-4">
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--bc-text)] truncate">{title}</span>
-            {isOpen && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700 bg-green-50 rounded-full px-2 py-0.5">
-                Open
-              </span>
-            )}
-          </div>
+      <CardContent className="space-y-3 p-4">
+        <div className="min-w-0 space-y-1.5">
+          <p className="text-sm font-semibold leading-snug text-[var(--bc-text)] break-words">{title}</p>
           <p className="text-xs text-[var(--bc-muted)]">{new Date(action.createdAt).toLocaleString()}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ActionPriorityBadge priority={action.priority} />
           <ActionStatusBadge status={action.status} />
         </div>

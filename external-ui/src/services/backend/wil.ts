@@ -14,6 +14,7 @@ export type WilTenantsResponse = {
 export type WilActionItem = {
   id: string;
   actionType: string;
+  actionTitle: string | null;
   payload: Record<string, unknown>;
   actorId: string;
   actorType?: string;

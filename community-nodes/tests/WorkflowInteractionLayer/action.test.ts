@@ -8,6 +8,7 @@ import {
   MOCK_EXECUTION_ID,
   MOCK_WORKFLOW,
 } from './helpers';
+import { actionCreateProperties } from '../../nodes/WorkflowInteractionLayer/shared/properties';
 
 describe('WorkflowInteractionLayer — Action', () => {
   describe('create', () => {
@@ -22,7 +23,8 @@ describe('WorkflowInteractionLayer — Action', () => {
           actionType: 'getapproval',
           callbackUrl: 'https://example.com/callback',
           callbackMethod: 'POST',
-          payload: '{}',
+          approvalHtml: '<p>Approve?</p>',
+          approvalOptions: { option: [{ label: 'Approve' }] },
           callbackPayloadSpec: '{}',
           dueDate: '',
           priority: 'normal',
@@ -54,10 +56,11 @@ describe('WorkflowInteractionLayer — Action', () => {
         params: {
           actorId: 'user-1',
           actorType: 'user',
-          actionType: 'showform',
+          actionType: 'getapproval',
           callbackUrl: 'https://example.com/cb',
           callbackMethod: 'PUT',
-          payload: '{"formId":"f1"}',
+          approvalHtml: '<p>Approve?</p>',
+          approvalOptions: { option: [{ label: 'Yes' }] },
           callbackPayloadSpec: '{"key":"val"}',
           dueDate: '2025-12-31T00:00:00Z',
           priority: 'critical',
@@ -67,13 +70,209 @@ describe('WorkflowInteractionLayer — Action', () => {
         httpResponse: makeActionResponse(),
       }).then(({ httpRequest }) => {
         const body = lastHttpBody(httpRequest);
-        expect(body.payload).toEqual({ formId: 'f1' });
+        expect(body.payload).toEqual({ html: '<p>Approve?</p>', options: ['Yes'] });
         expect(body.callbackPayloadSpec).toEqual({ key: 'val' });
         expect(body.dueDate).toBe('2025-12-31T00:00:00Z');
         expect(body.priority).toBe('critical');
         expect(body.checkIn).toBe('2025-12-15T00:00:00Z');
         expect(body.metadata).toEqual({ env: 'prod' });
       });
+    });
+
+    it('sends actionTitle as a top-level field when provided', async () => {
+      const { httpRequest } = await executeWith({
+        resource: 'action',
+        operation: 'create',
+        params: {
+          actorId: 'user-1',
+          actorType: 'user',
+          actionType: 'getapproval',
+          actionTitle: 'Review Purchase Order',
+          callbackUrl: 'https://example.com/callback',
+          callbackMethod: 'POST',
+          approvalHtml: '<p>Approve?</p>',
+          approvalOptions: { option: [{ label: 'Approve' }] },
+          callbackPayloadSpec: '{}',
+          dueDate: '',
+          priority: 'normal',
+          checkIn: '',
+          metadata: '{}',
+        },
+        httpResponse: makeActionResponse(),
+      });
+
+      expect(lastHttpBody(httpRequest)).toMatchObject({ actionTitle: 'Review Purchase Order' });
+      expect(lastHttpBody(httpRequest).payload).not.toHaveProperty('actionTitle');
+    });
+
+    it('builds a getapproval payload from html and repeated options', async () => {
+      const { httpRequest } = await executeWith({
+        resource: 'action',
+        operation: 'create',
+        params: {
+          actorId: 'user-1',
+          actorType: 'user',
+          actionType: 'getapproval',
+          callbackUrl: 'https://example.com/callback',
+          callbackMethod: 'POST',
+          approvalHtml: '<p>Approve?</p>',
+          approvalOptions: { option: [{ label: 'Yes' }, { label: 'No' }, { label: '' }] },
+          callbackPayloadSpec: '{}',
+          dueDate: '',
+          priority: 'normal',
+          checkIn: '',
+          metadata: '{}',
+        },
+        httpResponse: makeActionResponse(),
+      });
+
+      expect(lastHttpBody(httpRequest).payload).toEqual({ html: '<p>Approve?</p>', options: ['Yes', 'No'] });
+    });
+
+    it('throws when getapproval has no approval options', async () => {
+      await expect(
+        executeWith({
+          resource: 'action',
+          operation: 'create',
+          params: {
+            actorId: 'user-1',
+            actorType: 'user',
+            actionType: 'getapproval',
+            callbackUrl: 'https://example.com/callback',
+            callbackMethod: 'POST',
+            approvalHtml: '<p>Approve?</p>',
+            approvalOptions: {},
+            callbackPayloadSpec: '{}',
+            dueDate: '',
+            priority: 'normal',
+            checkIn: '',
+            metadata: '{}',
+          },
+          httpResponse: makeActionResponse(),
+        }),
+      ).rejects.toThrow('At least one approval option is required');
+    });
+
+    it('throws when getapproval has no HTML', async () => {
+      await expect(
+        executeWith({
+          resource: 'action',
+          operation: 'create',
+          params: {
+            actorId: 'user-1',
+            actorType: 'user',
+            actionType: 'getapproval',
+            callbackUrl: 'https://example.com/callback',
+            callbackMethod: 'POST',
+            approvalHtml: '',
+            approvalOptions: { option: [{ label: 'Approve' }] },
+            callbackPayloadSpec: '{}',
+            dueDate: '',
+            priority: 'normal',
+            checkIn: '',
+            metadata: '{}',
+          },
+          httpResponse: makeActionResponse(),
+        }),
+      ).rejects.toThrow('HTML is required for getapproval actions');
+    });
+
+    it('builds a getapproval payload from alternate html and options parameter names', async () => {
+      const { httpRequest } = await executeWith({
+        resource: 'action',
+        operation: 'create',
+        params: {
+          actorId: 'user-1',
+          actorType: 'user',
+          actionType: 'getapproval',
+          callbackUrl: 'https://example.com/callback',
+          callbackMethod: 'POST',
+          html: 'Are you giving consent?',
+          options: { option: [{ label: 'Yes' }, { label: 'No' }] },
+          callbackPayloadSpec: '{}',
+          dueDate: '',
+          priority: 'normal',
+          checkIn: '',
+          metadata: '{}',
+        },
+        httpResponse: makeActionResponse(),
+      });
+
+      expect(lastHttpBody(httpRequest).payload).toEqual({ html: 'Are you giving consent?', options: ['Yes', 'No'] });
+    });
+
+    it('builds a showform payload from structured fields', async () => {
+      const { httpRequest } = await executeWith({
+        resource: 'action',
+        operation: 'create',
+        params: {
+          actorId: 'user-1',
+          actorType: 'user',
+          actionType: 'showform',
+          callbackUrl: 'https://example.com/cb',
+          callbackMethod: 'POST',
+          formName: 'Income Disclosure',
+          formId: 'form-123',
+          formApiKey: 'chefs-secret', // pragma: allowlist secret
+          submissionId: 'submission-456',
+          formPreFillData: '{"firstName":"Alice"}',
+          callbackPayloadSpec: '{}',
+          dueDate: '',
+          priority: 'normal',
+          checkIn: '',
+          metadata: '{}',
+        },
+        httpResponse: makeActionResponse(),
+      });
+
+      expect(lastHttpBody(httpRequest).payload).toEqual({
+        formName: 'Income Disclosure',
+        formId: 'form-123',
+        formApiKey: 'chefs-secret', // pragma: allowlist secret
+        submissionId: 'submission-456',
+        formPreFillData: { firstName: 'Alice' },
+      });
+    });
+
+    it('keeps waitonevent payload as parsed JSON', async () => {
+      const { httpRequest } = await executeWith({
+        resource: 'action',
+        operation: 'create',
+        params: {
+          actorId: 'user-1',
+          actorType: 'user',
+          actionType: 'waitonevent',
+          callbackUrl: 'https://example.com/cb',
+          callbackMethod: 'POST',
+          payload: '{"eventName":"clicked"}',
+          callbackPayloadSpec: '{}',
+          dueDate: '',
+          priority: 'normal',
+          checkIn: '',
+          metadata: '{}',
+        },
+        httpResponse: makeActionResponse(),
+      });
+
+      expect(lastHttpBody(httpRequest).payload).toEqual({ eventName: 'clicked' });
+    });
+
+    it('marks showform structured fields required in the n8n property config', () => {
+      const requiredFieldNames = actionCreateProperties
+        .filter((property) => property.displayOptions?.show?.actionType?.includes('showform') && property.required)
+        .map((property) => property.name);
+
+      expect(requiredFieldNames).toEqual(expect.arrayContaining(['formName', 'formId', 'formApiKey']));
+    });
+
+    it('marks approval options required in the n8n property config', () => {
+      const approvalHtml = actionCreateProperties.find((property) => property.name === 'approvalHtml');
+      const approvalOptions = actionCreateProperties.find((property) => property.name === 'approvalOptions');
+      const optionLabel = approvalOptions?.options?.[0]?.values?.find((property) => property.name === 'label');
+
+      expect(approvalHtml?.required).toBe(true);
+      expect(approvalOptions?.required).toBe(true);
+      expect(optionLabel?.required).toBe(true);
     });
   });
 

@@ -112,6 +112,7 @@ describe('mapActionToUiResponse', () => {
 
     expect(result.id).toBe(action.id);
     expect(result.actionType).toBe(action.actionType);
+    expect(result.actionTitle).toBe(action.actionTitle);
     expect(result.actorId).toBe(action.actorId);
     expect(result.actorType).toBe(action.actorType);
     expect(result.status).toBe(action.status);
@@ -119,6 +120,13 @@ describe('mapActionToUiResponse', () => {
     expect(result.dueDate).toBe(action.dueDate);
     expect(result.createdAt).toBe(action.createdAt);
     expect(result.updatedAt).toBe(action.updatedAt);
+  });
+
+  it('preserves actionTitle when present', () => {
+    const action = makeActionRequest({ actionTitle: 'Ask actor for approval' });
+    const result = mapActionToUiResponse(action);
+
+    expect(result.actionTitle).toBe('Ask actor for approval');
   });
 
   it('preserves payload fields for non-showform actions', () => {

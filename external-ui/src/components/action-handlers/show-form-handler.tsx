@@ -36,7 +36,7 @@ async function initializeForm(params: {
     formId: tokenResponse.formId,
     baseUrl: tokenResponse.baseUrl,
     submissionId,
-    prefillData: { ...formPreFillData, ...buildUserProfile(params.claims) },
+    prefillData: submissionId ? undefined : { ...formPreFillData, ...buildUserProfile(params.claims) },
     token: buildTokenObject(params.claims),
     user: buildUserObject(params.claims, { roles: params.tenantRoles, groups: params.tenantGroups }),
     headers: userToken ? { Authorization: `Bearer ${userToken}` } : {},
