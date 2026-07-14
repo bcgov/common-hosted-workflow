@@ -1,0 +1,20 @@
+{{- if and .Values.seaweedfs.enabled .Values.seaweedfs.admin.enabled .Values.seaweedfs.admin.ingress.host }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .Release.Name }}-seaweedfs-admin
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: admin
+spec:
+  host: {{ .Values.seaweedfs.admin.ingress.host }}
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: {{ .Release.Name }}-seaweedfs-admin
+{{- end }}

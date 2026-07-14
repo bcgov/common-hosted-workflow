@@ -20,5 +20,8 @@ dependencies:
 - name: backup-storage
   repository: https://bcgov.github.io/helm-charts
   version: 0.1.18
-digest: sha256:96b458ca576e06097a0fc2eb5a0988ede4c3c694b95bfd1f0eaab69387228918
-generated: "2026-07-02T23:16:42.798580386Z"
+- name: seaweedfs
+  repository: https://seaweedfs.github.io/seaweedfs/helm
+  version: 4.39.0
+digest: sha256:10110b80a90ed6531548b493ec74cb1bc872a6c6a503690568ef1c00db9ce4cd
+generated: "2026-07-13T16:30:46.0474488-07:00"

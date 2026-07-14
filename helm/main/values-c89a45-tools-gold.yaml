@@ -1,0 +1,22 @@
+global:
+  seaweedfs:
+    createClusterRole: false
+
+n8n:
+  enabled: false
+
+redis:
+  enabled: false
+
+pgo:
+  enabled: false
+
+seaweedfs:
+  enabled: true
+  admin:
+    secret:
+      existingSecret: chwf-seaweedfs-admin-credentials # pragma: allowlist secret
+      userKey: username
+      pwKey: password # pragma: allowlist secret
+    ingress:
+      host: tools-seaweedfs.apps.gold.devops.gov.bc.ca
