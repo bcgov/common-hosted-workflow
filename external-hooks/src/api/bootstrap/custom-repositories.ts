@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { ActionRequestRepository } from '../../db/repository/custom/action-request';
 import { AccessRequestRepository } from '../../db/repository/custom/access-request';
+import { ChefsSubmissionWebhookRepository } from '../../db/repository/custom/chefs-submission-webhook';
 import { CredentialEntityRepository } from '../../db/repository/custom/credential-entity';
 import { MessageRepository } from '../../db/repository/custom/message';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
@@ -15,6 +16,7 @@ export type CustomRepositories = {
   readonly workflowTrigger: WorkflowTriggerRepository;
   readonly credentialEntity: CredentialEntityRepository;
   readonly triggerCredentialRelation: TriggerCredentialRelationRepository;
+  readonly chefsSubmissionWebhook: ChefsSubmissionWebhookRepository;
 };
 
 export function buildCustomRepositories(databaseUrl: string): CustomRepositories {
@@ -28,5 +30,6 @@ export function buildCustomRepositories(databaseUrl: string): CustomRepositories
     workflowTrigger: new WorkflowTriggerRepository(db),
     credentialEntity: new CredentialEntityRepository(db),
     triggerCredentialRelation: new TriggerCredentialRelationRepository(db),
+    chefsSubmissionWebhook: new ChefsSubmissionWebhookRepository(db),
   };
 }

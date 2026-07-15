@@ -50,6 +50,13 @@
       "when": 1783500000000,
       "tag": "0006_action_claim_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784152667912,
+      "tag": "0007_chefs_submission_webhook",
+      "breakpoints": true
     }
   ]
 }
