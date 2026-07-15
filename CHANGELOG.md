@@ -1,4 +1,20 @@
-## 0.0.1 (2026-07-08)
+## [0.1.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.0.1...v0.1.0) (2026-07-15)
+
+### Features
+
+* **CCP-4880:** add claim logic for actions if actor type is group or role ([#340](https://github.com/bcgov/common-hosted-workflow/issues/340)) ([7ae0d6e](https://github.com/bcgov/common-hosted-workflow/commit/7ae0d6ec62d439a5688d162685bbb924d001b1d1))
+* **CCP-4880:** include tenantGroups in session and CHEFS requests ([#346](https://github.com/bcgov/common-hosted-workflow/issues/346)) ([36319dd](https://github.com/bcgov/common-hosted-workflow/commit/36319ddeee23223e2c409a1685fbf3f7e7f44d5c))
+* **CCP-5044:** add action title to action node and use input fields … ([#356](https://github.com/bcgov/common-hosted-workflow/issues/356)) ([f45041f](https://github.com/bcgov/common-hosted-workflow/commit/f45041f55d366323dd1e2c5e7745604431271993))
+* **CCP-5052:** add Docusaurus doc site with GitHub Pages deployment ([#350](https://github.com/bcgov/common-hosted-workflow/issues/350)) ([631f154](https://github.com/bcgov/common-hosted-workflow/commit/631f154474f3f96048783e084647f5d1d58c0fc6))
+* **CCP-5052:** add Mermaid diagram support to doc site ([#351](https://github.com/bcgov/common-hosted-workflow/issues/351)) ([a923ff6](https://github.com/bcgov/common-hosted-workflow/commit/a923ff61fe58de62b1654ed9cdd71264af3d977d))
+* **CCP-5187:** add OIDC token community node ([b80360f](https://github.com/bcgov/common-hosted-workflow/commit/b80360f720b55e77303f35204f3961eac0e9b39e))
+
+### Documentation
+
+* **CCP-5009:** add internal service agreement for hosted workflow platform ([9d21fd5](https://github.com/bcgov/common-hosted-workflow/commit/9d21fd551b0d1382ac180ed30aca06054da9a6fb))
+* **CCP-5053:** add observability research document ([#342](https://github.com/bcgov/common-hosted-workflow/issues/342)) ([e043b39](https://github.com/bcgov/common-hosted-workflow/commit/e043b391d218b2f22a6a8967258d07e8f00baf33))
+
+## [0.0.1](https://github.com/bcgov/common-hosted-workflow/compare/44e67d263ee0c1e13bd0c5d2e93424aa601e48e1...v0.0.1) (2026-07-08)
 
 ### Features
 
