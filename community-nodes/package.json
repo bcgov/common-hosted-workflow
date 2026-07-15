@@ -34,6 +34,7 @@
     ],
     "nodes": [
       "dist/nodes/CHEFS/CHEFS.node.js",
+      "dist/nodes/CHEFSResubmit/CHEFSResubmit.node.js",
       "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
       "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.js",
       "dist/nodes/OidcToken/OidcToken.node.js",
@@ -44,21 +45,23 @@
     "@eslint/js": "^10.0.1",
     "@n8n/eslint-plugin-community-nodes": "^0.15.0",
     "@n8n/node-cli": "^0.30.1",
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.9.5",
     "@types/sanitize-html": "^2.16.1",
     "eslint": "10.3.0",
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import-x": "^4.16.2",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-n8n-nodes-base": "1.16.6",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.59.2",
-    "vitest": "^4.1.5"
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "n8n-workflow": "^2.16.0"
   },
   "dependencies": {
-    "sanitize-html": "^2.17.3",
+    "n8n-core": "^2.16.1",
+    "n8n-nodes-base": "^2.15.1",
+    "sanitize-html": "^2.17.6",
     "zod": "^4.4.3"
   },
   "pnpm": {

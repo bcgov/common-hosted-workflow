@@ -1,6 +1,13 @@
 # pnpm-workspace.yaml
 allowBuilds:
+  '@sentry/node-cpu-profiler': false
+  '@sentry/node-native-stacktrace': false
+  cpu-features: false
   eslint-plugin-n8n-nodes-base: false
   isolated-vm: false
+  oracledb: false
+  protobufjs: false
+  ssh2: false
   unrs-resolver: false
 confirmModulesPurge: false
+blockExoticSubdeps: false
