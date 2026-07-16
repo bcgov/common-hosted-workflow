@@ -151,20 +151,7 @@ alloy:
   enabled: true
   alloy:
     configMap:
-      content: |
-        loki.source.api "n8n_push" {
-          http {
-            listen_address = "0.0.0.0"
-            listen_port    = 3500
-          }
-          forward_to = [loki.write.default.receiver]
-        }
-
-        loki.write "default" {
-          endpoint {
-            url = "http://chwf-loki:3100/loki/api/v1/push"
-          }
-        }
+      content: ""
     resources:
       requests:
         cpu: 5m
