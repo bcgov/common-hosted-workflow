@@ -1,0 +1,104 @@
+nameOverride: chwf
+fullnameOverride: chwf
+
+# See https://github.com/seaweedfs/seaweedfs/tree/master/k8s/charts/seaweedfs
+seaweedfs:
+  enabled: false
+
+  # Allow ingress to SeaweedFS S3 (port 8333) from other namespaces (e.g. dev/test/prod observability stack)
+  s3CrossNamespaceAccess:
+    enabled: false
+    namespaces: []
+
+  global:
+    enableReplication: false
+    replicationPlacement: '000'
+
+  master:
+    replicas: 1
+    data:
+      type: persistentVolumeClaim
+      size: 512Mi
+      storageClass: netapp-block-standard
+    logs:
+      type: emptyDir
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+    containerSecurityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ['ALL']
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+  volume:
+    replicas: 1
+    dataDirs:
+      - name: data1
+        type: persistentVolumeClaim
+        size: 1Gi
+        storageClass: netapp-block-standard
+    logs:
+      type: emptyDir
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+    containerSecurityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ['ALL']
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+  filer:
+    replicas: 1
+    data:
+      type: persistentVolumeClaim
+      size: 512Mi
+      storageClass: netapp-block-standard
+    logs:
+      type: emptyDir
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+    containerSecurityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ['ALL']
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+  s3:
+    enabled: true
+    replicas: 1
+    port: 8333
+    enableAuth: true
+    ingress:
+      enabled: false
+    logs:
+      type: emptyDir
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+    containerSecurityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ['ALL']
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+  admin:
+    enabled: true
+    port: 23646
+    ingress:
+      enabled: false
+      host:

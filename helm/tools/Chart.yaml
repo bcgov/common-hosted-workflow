@@ -1,0 +1,11 @@
+apiVersion: v2
+name: tools
+description: A Helm chart for the tools namespace
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+dependencies:
+  - name: seaweedfs
+    version: '4.39.0'
+    repository: 'https://seaweedfs.github.io/seaweedfs/helm'
+    condition: seaweedfs.enabled

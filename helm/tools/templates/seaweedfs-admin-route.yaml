@@ -1,0 +1,18 @@
+{{- if and .Values.seaweedfs.enabled .Values.seaweedfs.admin.enabled .Values.seaweedfs.admin.ingress.host }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "_.fullname" . }}-seaweedfs-admin
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+spec:
+  host: {{ .Values.seaweedfs.admin.ingress.host }}
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: {{ include "_.fullname" . }}-seaweedfs-admin
+{{- end }}
