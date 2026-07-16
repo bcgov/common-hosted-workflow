@@ -16,29 +16,59 @@ export class ChefsSubmissionWebhookRepository {
         and(
           eq(chefsSubmissionWebhook.formId, params.formId),
           eq(chefsSubmissionWebhook.submissionId, params.submissionId),
-          eq(chefsSubmissionWebhook.status, 'pending'),
         ),
       )
       .limit(1);
     return row ?? null;
   }
 
-  /** Marks the pending row for a form/submission pair as completed. Returns the updated row or null. */
-  async markCompleted(params: {
+  /** Deletes the row for a form/submission pair once resolved. Returns the deleted row or null. */
+  async deleteRow(params: {
     formId: string;
     submissionId: string;
   }): Promise<typeof chefsSubmissionWebhook.$inferSelect | null> {
     const [row] = await this.db
-      .update(chefsSubmissionWebhook)
-      .set({ status: 'completed', updatedAt: new Date() })
+      .delete(chefsSubmissionWebhook)
       .where(
         and(
           eq(chefsSubmissionWebhook.formId, params.formId),
           eq(chefsSubmissionWebhook.submissionId, params.submissionId),
-          eq(chefsSubmissionWebhook.status, 'pending'),
         ),
       )
       .returning();
     return row ?? null;
+  }
+
+  /**
+   * Inserts a new pending row, or — on conflict of the (form_id, submission_id) key —
+   * refreshes execution_id and webhook_url so the latest Wait caller wins.
+   */
+  async upsertPending(params: {
+    executionId: string;
+    formId: string;
+    submissionId: string;
+    webhookUrl: string;
+  }): Promise<typeof chefsSubmissionWebhook.$inferSelect> {
+    const now = new Date();
+    const [row] = await this.db
+      .insert(chefsSubmissionWebhook)
+      .values({
+        executionId: params.executionId,
+        formId: params.formId,
+        submissionId: params.submissionId,
+        webhookUrl: params.webhookUrl,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [chefsSubmissionWebhook.formId, chefsSubmissionWebhook.submissionId],
+        set: {
+          executionId: params.executionId,
+          webhookUrl: params.webhookUrl,
+          updatedAt: now,
+        },
+      })
+      .returning();
+    return row;
   }
 }

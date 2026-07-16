@@ -4,7 +4,7 @@
  * Strategy: build the router with a mocked chefsSubmissionWebhook repository,
  * mock global fetch for the upstream webhook call, and verify each
  * behavioral path (db-row lookup, header fallback, query param forwarding,
- * status update on 2xx, no update on non-2xx).
+ * row deletion on 2xx, no deletion on non-2xx).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +31,6 @@ function makePendingRow(overrides: Record<string, unknown> = {}) {
     webhookUrl: DB_WEBHOOK_URL,
     formId: FORM_ID,
     submissionId: SUBMISSION_ID,
-    status: 'pending',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -41,7 +40,7 @@ function makePendingRow(overrides: Record<string, unknown> = {}) {
 function createTestRouter(repoOverrides: Record<string, any> = {}) {
   const chefsSubmissionWebhook = {
     getPendingByFormAndSubmission: vi.fn().mockResolvedValue(null),
-    markCompleted: vi.fn().mockResolvedValue(null),
+    deleteRow: vi.fn().mockResolvedValue(null),
     ...repoOverrides,
   };
 
@@ -59,7 +58,7 @@ afterEach(() => {
 });
 
 describe('POST /chefs/submissions/callback', () => {
-  it('uses the db webhook url and marks completed on 2xx', async () => {
+  it('uses the db webhook url and deletes the row on 2xx', async () => {
     const { router, chefsSubmissionWebhook } = createTestRouter({
       getPendingByFormAndSubmission: vi.fn().mockResolvedValue(makePendingRow()),
     });
@@ -86,7 +85,7 @@ describe('POST /chefs/submissions/callback', () => {
         body: JSON.stringify({ formId: FORM_ID, submissionId: SUBMISSION_ID, extra: 'data' }),
       }),
     );
-    expect(chefsSubmissionWebhook.markCompleted).toHaveBeenCalledWith({
+    expect(chefsSubmissionWebhook.deleteRow).toHaveBeenCalledWith({
       formId: FORM_ID,
       submissionId: SUBMISSION_ID,
     });
@@ -109,7 +108,7 @@ describe('POST /chefs/submissions/callback', () => {
 
     expect(error).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(HEADER_WEBHOOK_URL, expect.objectContaining({ method: 'POST' }));
-    expect(chefsSubmissionWebhook.markCompleted).not.toHaveBeenCalled();
+    expect(chefsSubmissionWebhook.deleteRow).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -136,7 +135,7 @@ describe('POST /chefs/submissions/callback', () => {
     expect(calledUrl.startsWith(DB_WEBHOOK_URL)).toBe(true);
   });
 
-  it('does not mark completed when upstream returns non-2xx', async () => {
+  it('does not delete the row when upstream returns non-2xx', async () => {
     const { router, chefsSubmissionWebhook } = createTestRouter({
       getPendingByFormAndSubmission: vi.fn().mockResolvedValue(makePendingRow()),
     });
@@ -154,7 +153,7 @@ describe('POST /chefs/submissions/callback', () => {
     const error = await runHandlerChain(handlers, req, res);
 
     expect(error).toBeNull();
-    expect(chefsSubmissionWebhook.markCompleted).not.toHaveBeenCalled();
+    expect(chefsSubmissionWebhook.deleteRow).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(503);
     expect(res.json).toHaveBeenCalledWith({ error: { message: 'Service Unavailable' } });
   });
@@ -187,6 +186,6 @@ describe('POST /chefs/submissions/callback', () => {
 
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).statusCode).toBe(504);
-    expect(chefsSubmissionWebhook.markCompleted).not.toHaveBeenCalled();
+    expect(chefsSubmissionWebhook.deleteRow).not.toHaveBeenCalled();
   });
 });

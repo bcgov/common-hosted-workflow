@@ -43,7 +43,7 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
    *
    * - Resolves formId/submissionId from the request body.
    * - Looks up a pending `chefs_submission_webhook` row by formId + submissionId.
-   * - If found, forwards to the stored webhook_url and marks the row completed on 2xx.
+   * - If found, forwards to the stored webhook_url and deletes the row on 2xx.
    * - If not found, falls back to the `x-n8n-webhook-path` request header, resolving it
    *   against the configured `N8N_BASE_URL` to produce the full outbound webhook URL.
    * - The incoming request body and query params are forwarded as-is.
@@ -96,7 +96,7 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
       }
 
       if (usedDbRow) {
-        await customRepositories.chefsSubmissionWebhook.markCompleted({ formId, submissionId });
+        await customRepositories.chefsSubmissionWebhook.deleteRow({ formId, submissionId });
       }
 
       OkResponse(res, { success: true, message: 'CHEFS submission callback forwarded' });
