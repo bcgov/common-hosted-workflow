@@ -8,6 +8,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@config', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../src/config')>();
+  return { ...original, N8N_BASE_URL: 'https://n8n.test' };
+});
+
 import { buildChefsSubmissionRouter } from '../../../src/api/routes/chefs-submission';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 import { getRouteHandlers, runHandlerChain } from '../../helpers/test-utils';
@@ -16,7 +21,9 @@ import { AppError } from '../../../src/api/utils/errors';
 const FORM_ID = 'form-1';
 const SUBMISSION_ID = 'sub-1';
 const DB_WEBHOOK_URL = 'https://n8n.test/db-hook';
-const HEADER_WEBHOOK_URL = 'https://n8n.test/header-hook';
+const N8N_BASE_URL = 'https://n8n.test';
+const HEADER_WEBHOOK_PATH = '/webhook/header-hook';
+const HEADER_WEBHOOK_URL = `${N8N_BASE_URL}/webhook/header-hook`;
 
 function makePendingRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -86,7 +93,7 @@ describe('POST /chefs/submissions/callback', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('falls back to x-n8n-webhook-url header when no pending db row', async () => {
+  it('falls back to x-n8n-webhook-path header when no pending db row', async () => {
     const { router, chefsSubmissionWebhook } = createTestRouter();
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal('fetch', mockFetch);
@@ -94,7 +101,7 @@ describe('POST /chefs/submissions/callback', () => {
     const handlers = getRouteHandlers(router, 'post', '/submissions/callback')!;
     const req = createMockRequest({
       body: { formId: FORM_ID, submissionId: SUBMISSION_ID },
-      headers: { 'x-n8n-webhook-url': HEADER_WEBHOOK_URL },
+      headers: { 'x-n8n-webhook-path': HEADER_WEBHOOK_PATH },
     });
     const res = createMockResponse();
 
@@ -152,7 +159,7 @@ describe('POST /chefs/submissions/callback', () => {
     expect(res.json).toHaveBeenCalledWith({ error: { message: 'Service Unavailable' } });
   });
 
-  it('throws AppError 400 when no db row and no header webhook url', async () => {
+  it('throws AppError 400 when no db row and no header webhook path', async () => {
     const { router } = createTestRouter();
     const handlers = getRouteHandlers(router, 'post', '/submissions/callback')!;
     const req = createMockRequest({ body: { formId: FORM_ID, submissionId: SUBMISSION_ID } });
