@@ -412,3 +412,281 @@ sdg-mock-app:
       cpu: 250m
       memory: 512Mi
       ephemeral-storage: 256Mi
+
+# See https://github.com/grafana/alloy/tree/main/operations/helm/charts/alloy
+alloy:
+  enabled: false
+  rbac:
+    create: false  # Managed by main chart alloy-rbac.yaml with minimal permissions
+  controller:
+    type: deployment
+    replicas: 1
+  alloy:
+    configMap:
+      create: true
+
+# See https://github.com/grafana/loki/tree/main/production/helm/loki
+loki:
+  enabled: false
+  rbac:
+    namespaced: true
+  deploymentMode: SingleBinary
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    podSecurityContext: null  # OpenShift assigns UID from namespace range; chart default (10001) is outside allowed range
+    containerSecurityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    storage:
+      type: s3
+      s3:
+        region: us-east-1
+        accessKeyId: ${AWS_ACCESS_KEY_ID}
+        secretAccessKey: ${AWS_SECRET_ACCESS_KEY} # pragma: allowlist secret
+        s3ForcePathStyle: true
+        insecure: true
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: false
+    extraVolumes:
+      - name: loki-wal
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: loki-wal
+        mountPath: /var/loki
+    extraEnv:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: chwf-observability-s3 # pragma: allowlist secret
+            key: access-key-id
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: chwf-observability-s3 # pragma: allowlist secret
+            key: secret-access-key
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  backend:
+    replicas: 0
+  gateway:
+    enabled: false
+  lokiCanary:
+    enabled: false
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+  monitoring:
+    selfMonitoring:
+      enabled: false
+      grafanaAgent:
+        installOperator: false
+    lokiCanary:
+      enabled: false
+  test:
+    enabled: false
+
+# See https://github.com/grafana-community/helm-charts/tree/main/charts/tempo
+tempo:
+  enabled: false
+  securityContext: null  # OpenShift assigns UID from namespace range; chart default (10001) is outside allowed range
+  extraVolumes:
+    - name: tempo-wal
+      emptyDir: {}
+  persistence:
+    enabled: false
+  tempo:
+    extraVolumeMounts:
+      - name: tempo-wal
+        mountPath: /var/tempo
+    storage:
+      trace:
+        backend: s3
+        s3:
+          insecure: true
+          forcepathstyle: true
+    extraEnv:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: chwf-observability-s3 # pragma: allowlist secret
+            key: access-key-id
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: chwf-observability-s3 # pragma: allowlist secret
+            key: secret-access-key
+
+x-mimir-s3-env: &mimirEnv
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: chwf-observability-s3 # pragma: allowlist secret
+        key: access-key-id
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: chwf-observability-s3 # pragma: allowlist secret
+        key: secret-access-key
+
+# Mimir monolithic — single-binary, S3 storage, no PVC
+mimir:
+  enabled: false
+  image:
+    repository: grafana/mimir
+    tag: '2.14.0'
+    pullPolicy: IfNotPresent
+  securityContext: null  # OpenShift assigns UID from namespace range
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  storage:
+    s3:
+      insecure: true
+      endpoint: ''
+      blocksBucket: ''
+      alertmanagerBucket: ''
+      rulerBucket: ''
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: chwf-observability-s3 # pragma: allowlist secret
+          key: access-key-id
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: chwf-observability-s3 # pragma: allowlist secret
+          key: secret-access-key
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# See https://github.com/grafana/mimir/tree/main/operations/helm/charts/mimir-distributed
+mimir-distributed:
+  enabled: false
+  kafka:
+    enabled: false
+  minio:
+    enabled: false
+  mimir:
+    structuredConfig:
+      ingest_storage:
+        enabled: false
+      common:
+        storage:
+          backend: s3
+          s3:
+            region: us-east-1
+            access_key_id: ${AWS_ACCESS_KEY_ID}
+            secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+            insecure: true
+  distributor:
+    replicas: 1
+    extraEnv: *mimirEnv
+  ingester:
+    replicas: 1
+    extraEnv: *mimirEnv
+    zoneAwareReplication:
+      enabled: false
+  querier:
+    replicas: 1
+    extraEnv: *mimirEnv
+  query_frontend:
+    replicas: 1
+    extraEnv: *mimirEnv
+  query_scheduler:
+    replicas: 1
+    extraEnv: *mimirEnv
+  store_gateway:
+    replicas: 1
+    extraEnv: *mimirEnv
+    zoneAwareReplication:
+      enabled: false
+  compactor:
+    replicas: 1
+    extraEnv: *mimirEnv
+  ruler:
+    enabled: true
+    extraEnv: *mimirEnv
+  alertmanager:
+    enabled: true
+    extraEnv: *mimirEnv
+  rollout_operator:
+    enabled: false
+
+# See https://github.com/grafana-community/helm-charts/tree/main/charts/grafana
+grafana:
+  enabled: false
+  chwfRouteHost: ""
+  persistence:
+    enabled: false
+  rbac:
+    namespaced: true
+  securityContext: null  # OpenShift assigns UID from namespace range; chart default (472) is outside [1003930000, 1003939999]
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile: null  # Container-level seccompProfile triggers alpha annotation rejected by OpenShift SCC
+  extraEnv:
+    - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+      valueFrom:
+        secretKeyRef:
+          name: chwf # pragma: allowlist secret
+          key: OIDC_CLIENT_ID
+    - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: chwf # pragma: allowlist secret
+          key: OIDC_CLIENT_SECRET
+  grafana.ini:
+    auth:
+      disable_login_form: true
+    auth.generic_oauth:
+      enabled: true
+      name: BCGov SSO
+      allow_sign_up: true
+      scopes: openid profile email
+      role_attribute_path: "contains(client_roles[*], 'global:admin') && 'Admin' || contains(client_roles[*], 'global:member') && 'Editor' || 'Viewer'"
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Loki
+          type: loki
+          url: http://chwf-loki:3100
+          isDefault: false
+        - name: Tempo
+          type: tempo
+          url: http://chwf-tempo:3200
+          isDefault: false
+        - name: Mimir
+          type: prometheus
+          url: http://chwf-mimir:8080/prometheus
+          isDefault: true

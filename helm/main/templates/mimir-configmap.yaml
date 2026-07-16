@@ -1,0 +1,58 @@
+{{- if .Values.mimir.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-mimir-config
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    target: all
+    multitenancy_enabled: false
+
+    common:
+      storage:
+        backend: s3
+        s3:
+          endpoint: {{ .Values.mimir.storage.s3.endpoint }}
+          access_key_id: ${AWS_ACCESS_KEY_ID}
+          secret_access_key: ${AWS_SECRET_ACCESS_KEY}  # pragma: allowlist secret
+          insecure: {{ .Values.mimir.storage.s3.insecure }}
+
+    blocks_storage:
+      s3:
+        bucket_name: {{ .Values.mimir.storage.s3.blocksBucket }}
+      tsdb:
+        dir: /data/tsdb
+      bucket_store:
+        sync_dir: /data/tsdb-sync
+
+    alertmanager_storage:
+      s3:
+        bucket_name: {{ .Values.mimir.storage.s3.alertmanagerBucket }}
+
+    ruler_storage:
+      s3:
+        bucket_name: {{ .Values.mimir.storage.s3.rulerBucket }}
+
+    ingester:
+      ring:
+        replication_factor: 1
+
+    store_gateway:
+      sharding_ring:
+        replication_factor: 1
+
+    compactor:
+      data_dir: /data/compactor
+      sharding_ring:
+        wait_stability_min_duration: 0
+
+    ruler:
+      rule_path: /data/ruler
+
+    server:
+      http_listen_port: 8080
+      grpc_listen_port: 9095
+      log_level: warn
+{{- end }}

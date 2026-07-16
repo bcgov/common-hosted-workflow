@@ -1,0 +1,23 @@
+{{- if .Values.mimir.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "_.fullname" . }}-mimir
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mimir
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    {{- include "_.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mimir
+{{- end }}
