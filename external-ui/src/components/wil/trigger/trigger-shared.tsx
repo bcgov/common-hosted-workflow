@@ -5,6 +5,7 @@ import { IconDeviceFloppy, IconInfoCircle, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ComboboxInput } from '@/components/ui/combobox-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { TriggerActorType, TriggerMethod } from '../../../services/backend/trigger-types';
@@ -90,6 +91,7 @@ export function AllowedActorsField({
   placeholder = '*',
   required = false,
   disabled = false,
+  suggestions = [],
 }: Readonly<{
   id: string;
   value: string;
@@ -97,15 +99,17 @@ export function AllowedActorsField({
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  suggestions?: string[];
 }>) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>Allowed Actors {required && <span className="text-red-500">*</span>}</Label>
-      <Input
+      <ComboboxInput
         id={id}
-        placeholder={placeholder}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
+        options={suggestions}
+        placeholder={placeholder}
         disabled={disabled}
       />
     </div>

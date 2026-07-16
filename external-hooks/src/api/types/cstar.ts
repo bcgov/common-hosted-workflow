@@ -71,6 +71,30 @@ export type CstarUserSharedServiceRolesResponse = {
   };
 };
 
+// --- Tenant groups (all groups within a tenant) ---
+
+export type CstarTenantGroup = {
+  id: string;
+  name: string;
+  description: string;
+  createdDateTime: string;
+  updatedDateTime: string;
+};
+
+export type CstarTenantGroupsResponse = {
+  data: {
+    groups: CstarTenantGroup[];
+  };
+};
+
+// --- Tenant users (all users within a tenant) ---
+
+export type CstarTenantUsersResponse = {
+  data: {
+    users: CstarTenantUser[];
+  };
+};
+
 // --- Groups with shared service roles (per user per tenant) ---
 
 export type CstarGroupSharedServiceRole = {

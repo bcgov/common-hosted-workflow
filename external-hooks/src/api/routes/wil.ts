@@ -11,6 +11,7 @@ import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { getBearerToken } from '../helpers/ui-oidc-session';
 import { buildTriggerRouter } from './triggers';
+import { buildCstarRouter } from './cstar-suggestions';
 import { callWebhook } from './helpers/webhook-fire';
 import { CALLBACK_TIMEOUT_MS } from './constants/constants';
 import { isSharedActorType } from '../services/action-state-machine';
@@ -293,6 +294,7 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
   });
 
   router.use(buildTriggerRouter(routeContext));
+  router.use('/cstar', buildCstarRouter(routeContext));
 
   return router;
 }

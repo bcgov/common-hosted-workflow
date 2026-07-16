@@ -62,6 +62,7 @@ export const UI_OIDC_REDIRECT_URI = `${UI_API_BASE_URL}/auth/callback`;
 // CSTAR – Tenant & user management
 export const CSTAR_BASE_URL = process.env.CSTAR_BASE_URL || '';
 export const CSTAR_API_BASE_URL = CSTAR_BASE_URL ? `${CSTAR_BASE_URL}/api/v1` : '';
+export const CSTAR_WORKFLOW_SERVICE_ROLES_RAW = process.env.CSTAR_WORKFLOW_SERVICE_ROLES ?? '';
 
 // CHEFS – Common Hosted Form Service
 export const CHEFS_BASE_URL = process.env.CHEFS_BASE_URL || '';

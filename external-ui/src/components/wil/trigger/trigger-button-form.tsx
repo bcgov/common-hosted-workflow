@@ -10,6 +10,7 @@ import {
   TriggerMethodField,
   TriggerUrlField,
 } from './trigger-shared';
+import { useActorSuggestions } from './use-actor-suggestions';
 
 export const DEFAULT_BUTTON: ButtonTriggerPayload = {
   type: 'button',
@@ -30,6 +31,8 @@ interface ButtonTriggerFieldsProps {
   isSaving: boolean;
   /** When true, Allowed Actors Type and Allowed Actors fields are read-only (personal project). */
   actorsLocked?: boolean;
+  /** Tenant ID for fetching CSTAR actor suggestions. */
+  tenantId?: string;
 }
 
 export function ButtonTriggerFields({
@@ -39,7 +42,9 @@ export function ButtonTriggerFields({
   onCancel,
   isSaving,
   actorsLocked = false,
+  tenantId = '',
 }: Readonly<ButtonTriggerFieldsProps>) {
+  const suggestions = useActorSuggestions(value.allowedActorsType, tenantId);
   function set<K extends keyof ButtonTriggerPayload>(key: K, val: ButtonTriggerPayload[K]) {
     onChange({ ...value, [key]: val });
   }
@@ -102,6 +107,7 @@ export function ButtonTriggerFields({
           onChange={(v) => set('allowedActors', v)}
           placeholder="e.g. * or specific role/user"
           disabled={actorsLocked || value.allowedActorsType === 'all'}
+          suggestions={suggestions}
         />
       </div>
       <ActorIdBanner method={value.triggerMethod} />

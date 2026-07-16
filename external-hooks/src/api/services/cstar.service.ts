@@ -9,6 +9,10 @@ import type {
   CstarUserSharedServiceRolesResponse,
   CstarUserGroup,
   CstarUserGroupsResponse,
+  CstarTenantGroup,
+  CstarTenantGroupsResponse,
+  CstarTenantUser,
+  CstarTenantUsersResponse,
 } from '../types/cstar';
 
 const log = createLogger('CstarService');
@@ -28,6 +32,11 @@ export type GetUserSharedServiceRolesParams = {
 export type GetUserGroupsWithRolesParams = {
   tenantId: string;
   ssoUserId: string;
+  accessToken: string;
+};
+
+export type GetTenantGroupsParams = {
+  tenantId: string;
   accessToken: string;
 };
 
@@ -97,6 +106,36 @@ export class CstarService {
       'getUserGroupsWithRoles',
     );
     return body?.data?.groups ?? [];
+  }
+
+  /**
+   * Fetches all groups for a tenant (not user-scoped).
+   * GET /tenants/{tenantId}/groups
+   */
+  async getTenantGroups(params: GetTenantGroupsParams): Promise<CstarTenantGroup[]> {
+    const { tenantId, accessToken } = params;
+
+    const body = await this.fetchJson<CstarTenantGroupsResponse>(
+      buildPath('tenants', tenantId, 'groups'),
+      accessToken,
+      'getTenantGroups',
+    );
+    return body?.data?.groups ?? [];
+  }
+
+  /**
+   * Fetches all users for a tenant.
+   * GET /tenants/{tenantId}/users
+   */
+  async getTenantUsers(params: GetTenantGroupsParams): Promise<CstarTenantUser[]> {
+    const { tenantId, accessToken } = params;
+
+    const body = await this.fetchJson<CstarTenantUsersResponse>(
+      buildPath('tenants', tenantId, 'users'),
+      accessToken,
+      'getTenantUsers',
+    );
+    return body?.data?.users ?? [];
   }
 
   /**

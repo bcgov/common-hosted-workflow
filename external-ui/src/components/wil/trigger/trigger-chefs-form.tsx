@@ -13,6 +13,7 @@ import {
   TriggerMethodField,
   TriggerUrlField,
 } from './trigger-shared';
+import { useActorSuggestions } from './use-actor-suggestions';
 
 export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   type: 'chefs-form',
@@ -35,6 +36,8 @@ interface ChefsFormFieldsProps {
   isSaving: boolean;
   /** When true, Allowed Actors Type and Allowed Actors fields are read-only (personal project). */
   actorsLocked?: boolean;
+  /** Tenant ID for fetching CSTAR actor suggestions. */
+  tenantId?: string;
 }
 
 export function ChefsFormFields({
@@ -44,8 +47,10 @@ export function ChefsFormFields({
   onCancel,
   isSaving,
   actorsLocked = false,
+  tenantId = '',
 }: Readonly<ChefsFormFieldsProps>) {
   const [showApiKey, setShowApiKey] = useState(false);
+  const suggestions = useActorSuggestions(value.allowedActorsType, tenantId);
 
   function set<K extends keyof ChefsFormTriggerPayload>(key: K, val: ChefsFormTriggerPayload[K]) {
     onChange({ ...value, [key]: val });
@@ -138,6 +143,7 @@ export function ChefsFormFields({
           onChange={(v) => set('allowedActors', v)}
           required
           disabled={actorsLocked || value.allowedActorsType === 'all'}
+          suggestions={suggestions}
         />
       </div>
       <TriggerUrlField

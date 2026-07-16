@@ -97,6 +97,7 @@ export function TriggerFormPane({
           onCancel={onCancel}
           isSaving={isSaving}
           actorsLocked={actorsLocked}
+          tenantId={tenantId}
         />
       )}
       {triggerType === TRIGGER_TYPES.BUTTON && (
@@ -107,6 +108,7 @@ export function TriggerFormPane({
           onCancel={onCancel}
           isSaving={isSaving}
           actorsLocked={actorsLocked}
+          tenantId={tenantId}
         />
       )}
       {!triggerType && (
