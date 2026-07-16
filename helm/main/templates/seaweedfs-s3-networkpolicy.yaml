@@ -2,11 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ .Release.Name }}-seaweedfs-s3-cross-namespace
+  name: {{ include "_.fullname" . }}-seaweedfs-s3-cross-namespace
   labels:
-    app.kubernetes.io/name: seaweedfs
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: s3
+    {{- include "_.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
