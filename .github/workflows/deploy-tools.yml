@@ -42,6 +42,6 @@ jobs:
       env:
         NAMESPACE: c89a45-tools
         IMAGE_TAG: ${{ github.sha }}
-        CLUSTER: ${{ contains(secrets.OPENSHIFT_SERVER, 'golddr') && 'golddr' || 'gold' }}
+        CLUSTER: gold
       run: make upgrade
       working-directory: ./helm/main
