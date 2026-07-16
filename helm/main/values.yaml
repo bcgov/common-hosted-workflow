@@ -417,7 +417,7 @@ sdg-mock-app:
 alloy:
   enabled: false
   rbac:
-    create: false  # Managed by main chart alloy-rbac.yaml with minimal permissions
+    create: false
   controller:
     type: deployment
     replicas: 1

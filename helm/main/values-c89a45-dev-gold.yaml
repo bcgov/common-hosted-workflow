@@ -149,26 +149,14 @@ grafana:
 
 alloy:
   enabled: true
-  rbac:
-    namespaces:
-      - c89a45-dev
   alloy:
     configMap:
       content: |
-        // Collect logs from n8n pods
-        discovery.kubernetes "n8n_pods" {
-          role = "pod"
-          namespaces {
-            names = ["c89a45-dev"]
+        loki.source.api "n8n_push" {
+          http {
+            listen_address = "0.0.0.0"
+            listen_port    = 3500
           }
-          selectors {
-            role  = "pod"
-            label = "app.kubernetes.io/name=n8n"
-          }
-        }
-
-        loki.source.kubernetes "n8n_logs" {
-          targets    = discovery.kubernetes.n8n_pods.targets
           forward_to = [loki.write.default.receiver]
         }
 
