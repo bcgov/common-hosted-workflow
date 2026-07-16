@@ -680,13 +680,13 @@ grafana:
       datasources:
         - name: Loki
           type: loki
-          url: http://chwf-loki:3100
+          url: http://chwf-loki:3100 # NOSONAR - internal cluster service URL
           isDefault: false
         - name: Tempo
           type: tempo
-          url: http://chwf-tempo:3200
+          url: http://chwf-tempo:3200 # NOSONAR - internal cluster service URL
           isDefault: false
         - name: Mimir
           type: prometheus
-          url: http://chwf-mimir:8080/prometheus
+          url: http://chwf-mimir:8080/prometheus # NOSONAR - internal cluster service URL
           isDefault: true
