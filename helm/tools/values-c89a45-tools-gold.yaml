@@ -2,15 +2,6 @@ global:
   seaweedfs:
     createClusterRole: false
 
-n8n:
-  enabled: false
-
-redis:
-  enabled: false
-
-pgo:
-  enabled: false
-
 seaweedfs:
   enabled: true
   s3CrossNamespaceAccess:

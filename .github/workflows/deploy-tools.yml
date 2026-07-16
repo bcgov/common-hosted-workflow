@@ -44,4 +44,4 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
         CLUSTER: gold
       run: make upgrade
-      working-directory: ./helm/main
+      working-directory: ./helm/tools
