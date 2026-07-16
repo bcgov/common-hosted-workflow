@@ -1,4 +1,8 @@
-import { createAuthMiddleware, createWorkflowInteractionTenantMiddleware } from '../middlewares';
+import {
+  createAuthMiddleware,
+  createInternalBearerMiddleware,
+  createWorkflowInteractionTenantMiddleware,
+} from '../middlewares';
 import type { N8nRepositories } from './n8n-repositories';
 import type { CustomRepositories } from './custom-repositories';
 import type { ApiRouteContext } from '../types/routes';
@@ -35,9 +39,12 @@ export function buildRouteContext({
     },
   });
 
+  const internalBearerMiddleware = createInternalBearerMiddleware();
+
   return {
     apiKeyAuthMiddleware,
     adminAuthMiddleware,
+    internalBearerMiddleware,
     workflowInteractionTenantMiddleware,
     n8nRepositories,
     customRepositories,

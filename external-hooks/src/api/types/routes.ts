@@ -6,6 +6,7 @@ import type { ApiServices } from './services';
 export type ApiRouteContext = {
   apiKeyAuthMiddleware: RequestHandler;
   adminAuthMiddleware: RequestHandler;
+  internalBearerMiddleware: RequestHandler;
   workflowInteractionTenantMiddleware: RequestHandler;
   n8nRepositories: N8nRepositories;
   customRepositories: CustomRepositories;

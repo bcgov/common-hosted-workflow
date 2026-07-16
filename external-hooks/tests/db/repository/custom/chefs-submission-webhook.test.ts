@@ -8,10 +8,9 @@ describe('ChefsSubmissionWebhookRepository', () => {
   beforeEach(() => {
     db = {
       select: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      set: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       returning: vi.fn().mockResolvedValue([]),
     };
@@ -25,7 +24,6 @@ describe('ChefsSubmissionWebhookRepository', () => {
         webhookUrl: 'https://n8n.test/hook',
         formId: 'form-1',
         submissionId: 'sub-1',
-        status: 'pending',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -49,32 +47,30 @@ describe('ChefsSubmissionWebhookRepository', () => {
     });
   });
 
-  describe('markCompleted', () => {
-    it('updates the pending row to completed and returns it', async () => {
-      const updated = {
+  describe('deleteRow', () => {
+    it('deletes the row and returns it', async () => {
+      const deleted = {
         executionId: 'exec-1',
         webhookUrl: 'https://n8n.test/hook',
         formId: 'form-1',
         submissionId: 'sub-1',
-        status: 'completed',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      db.returning.mockResolvedValue([updated]);
+      db.returning.mockResolvedValue([deleted]);
 
-      const result = await repo.markCompleted({ formId: 'form-1', submissionId: 'sub-1' });
+      const result = await repo.deleteRow({ formId: 'form-1', submissionId: 'sub-1' });
 
-      expect(db.update).toHaveBeenCalled();
-      expect(db.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+      expect(db.delete).toHaveBeenCalled();
       expect(db.where).toHaveBeenCalled();
       expect(db.returning).toHaveBeenCalled();
-      expect(result).toEqual(updated);
+      expect(result).toEqual(deleted);
     });
 
-    it('returns null when no pending row matches', async () => {
+    it('returns null when no matching row exists', async () => {
       db.returning.mockResolvedValue([]);
 
-      const result = await repo.markCompleted({ formId: 'form-1', submissionId: 'sub-1' });
+      const result = await repo.deleteRow({ formId: 'form-1', submissionId: 'sub-1' });
 
       expect(result).toBeNull();
     });

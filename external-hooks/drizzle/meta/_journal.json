@@ -57,6 +57,13 @@
       "when": 1784152667912,
       "tag": "0007_chefs_submission_webhook",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784241748913,
+      "tag": "0008_chefs_submission_webhook_remove_status",
+      "breakpoints": true
     }
   ]
 }
