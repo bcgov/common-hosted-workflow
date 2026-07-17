@@ -34,7 +34,7 @@
     ],
     "nodes": [
       "dist/nodes/CHEFS/CHEFS.node.js",
-      "dist/nodes/CHEFSResubmit/CHEFSResubmit.node.js",
+      "dist/nodes/CHEFSResubmitWait/CHEFSResubmitWait.node.js",
       "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
       "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.js",
       "dist/nodes/OidcToken/OidcToken.node.js",

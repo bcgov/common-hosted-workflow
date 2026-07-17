@@ -105,7 +105,7 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
 
   /**
    * POST /chefs/submissions/register
-   * Internal-only endpoint called by the CHEFS Resubmit custom node before an
+   * Internal-only endpoint called by the CHEFS Resubmit Wait custom node before an
    * execution is put to wait.
    *
    * - Secured by internalBearerMiddleware (Authorization: Bearer <INTERNAL_AUTH_TOKEN>).

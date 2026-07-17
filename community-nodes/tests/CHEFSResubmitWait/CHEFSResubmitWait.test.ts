@@ -1,10 +1,10 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { NodeOperationError } from 'n8n-workflow';
 import { Wait } from 'n8n-nodes-base/dist/nodes/Wait/Wait.node';
-import { CHEFSResubmit } from '../../nodes/CHEFSResubmit/CHEFSResubmit.node';
+import { CHEFSResubmitWait } from '../../nodes/CHEFSResubmitWait/CHEFSResubmitWait.node';
 
 // Reuse a single instance; description is constructed once at instantiation.
-const node = new CHEFSResubmit();
+const node = new CHEFSResubmitWait();
 const desc = node.description;
 const propNames = desc.properties.map((p) => p.name);
 
@@ -14,7 +14,7 @@ function findProp(name: string) {
   return p;
 }
 
-describe('CHEFSResubmit node description', () => {
+describe('CHEFSResubmitWait node description', () => {
   describe('CHEFS fields', () => {
     it('exposes required Form ID and Submission ID at the top', () => {
       expect(propNames[0]).toBe('formId');
@@ -59,7 +59,7 @@ describe('CHEFSResubmit node description', () => {
   });
 });
 
-describe('CHEFSResubmit.execute pre-wait hook', () => {
+describe('CHEFSResubmitWait.execute pre-wait hook', () => {
   const SENTINEL = [['PRE_WAIT_SENTINEL']];
 
   function makeExecuteContext(overrides: Record<string, unknown> = {}) {
@@ -74,7 +74,7 @@ describe('CHEFSResubmit.execute pre-wait hook', () => {
       evaluateExpression: vi.fn(() => 'https://resume.example/webhook'),
       getExecutionId: vi.fn(() => 'exec-100'),
       getCredentials: vi.fn(async () => ({ baseUrl: 'https://n8n.example' })),
-      getNode: vi.fn(() => ({ name: 'CHEFS Resubmit' })),
+      getNode: vi.fn(() => ({ name: 'CHEFS Resubmit Wait' })),
       setMetadata: vi.fn(),
       helpers: {
         httpRequest: vi.fn(async () => ({ success: true })),
@@ -167,7 +167,7 @@ describe('CHEFSResubmit.execute pre-wait hook', () => {
   });
 });
 
-describe('CHEFSResubmit.webhook post-resume hook', () => {
+describe('CHEFSResubmitWait.webhook post-resume hook', () => {
   function makeWebhookContext(
     over: {
       body?: unknown;
@@ -181,7 +181,7 @@ describe('CHEFSResubmit.webhook post-resume hook', () => {
       getQueryData: vi.fn(() => over.query ?? {}),
       getParamsData: vi.fn(() => over.params ?? {}),
       getHeaderData: vi.fn(() => over.headers ?? {}),
-      getNode: vi.fn(() => ({ name: 'CHEFS Resubmit' })),
+      getNode: vi.fn(() => ({ name: 'CHEFS Resubmit Wait' })),
       getNodeParameter: vi.fn(() => 'webhook'),
     };
   }
@@ -191,7 +191,7 @@ describe('CHEFSResubmit.webhook post-resume hook', () => {
     const parentSpy = vi.spyOn(Wait.prototype, 'webhook');
 
     await expect(node.webhook.call(node, ctx as never)).rejects.toThrow(
-      /CHEFS Resubmit webhook received no request data/,
+      /CHEFS Resubmit Wait webhook received no request data/,
     );
     expect(parentSpy).not.toHaveBeenCalled();
   });
