@@ -88,7 +88,7 @@ async function registerChefsSubmissionWebhook(
   if (!internalToken) {
     throw new NodeOperationError(context.getNode() as never, 'INTERNAL_AUTH_TOKEN is not configured', {
       description:
-        'The n8n runtime must expose INTERNAL_AUTH_TOKEN so the CHEFS Resubmit node can authenticate to the external-hooks register route.',
+        'The n8n runtime must expose INTERNAL_AUTH_TOKEN so the CHEFS Resubmit Wait node can authenticate to the external-hooks register route.',
     });
   }
 
@@ -118,7 +118,7 @@ async function registerChefsSubmissionWebhook(
 }
 
 /**
- * CHEFS Resubmit
+ * CHEFS Resubmit Wait
  *
  * Extends the native Wait node, inheriting its full UI properties array and
  * execution/webhook behavior. Overrides:
@@ -133,7 +133,7 @@ async function registerChefsSubmissionWebhook(
  * treats them as distinct. The `as unknown as` cast below bridges that boundary
  * at the type level only; at runtime a single object is reused and spread.
  */
-export class CHEFSResubmit extends Wait {
+export class CHEFSResubmitWait extends Wait {
   constructor() {
     super();
 
@@ -147,8 +147,8 @@ export class CHEFSResubmit extends Wait {
 
     this.description = {
       ...this.description,
-      displayName: 'CHEFS Resubmit',
-      name: 'chefsResubmit',
+      displayName: 'CHEFS Resubmit Wait',
+      name: 'chefsResubmitWait',
       description: 'Wait for a CHEFS resubmit webhook before continuing execution',
       subtitle: '=Resubmit CHEFS submission',
       usableAsTool: true,
@@ -160,7 +160,7 @@ export class CHEFSResubmit extends Wait {
       ],
       defaults: {
         ...this.description.defaults,
-        name: 'CHEFS Resubmit',
+        name: 'CHEFS Resubmit Wait',
       },
       properties,
     } as unknown as typeof this.description;
@@ -206,19 +206,16 @@ export class CHEFSResubmit extends Wait {
     const body = context.getBodyData();
     const query = context.getQueryData();
     const params = context.getParamsData();
-    const headers = context.getHeaderData();
+    // const headers = context.getHeaderData();
 
     const isEmpty = (v: unknown): boolean =>
       v == null || typeof v !== 'object' || Object.keys(v as object).length === 0;
 
     if (isEmpty(body) && isEmpty(query) && isEmpty(params)) {
-      throw new NodeOperationError(context.getNode() as never, 'CHEFS Resubmit webhook received no request data', {
+      throw new NodeOperationError(context.getNode() as never, 'CHEFS Resubmit Wait webhook received no request data', {
         description: 'The resume webhook call must include body, query, or params data.',
       });
     }
-
-    // TODO: implement CHEFS post-resume logic using body, query, params, headers.
-    void headers;
 
     return await super.webhook(context as never);
   }
