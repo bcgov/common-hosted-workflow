@@ -1,5 +1,5 @@
 /**
- * Unit tests for POST /chefs/submissions/callback route handler.
+ * Unit tests for POST /chefs/submissions/callback and /submissions/register route handlers.
  *
  * Strategy: build the router with a mocked chefsSubmissionWebhook repository,
  * mock global fetch for the upstream webhook call, and verify each
@@ -10,9 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@config', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../src/config')>();
-  return { ...original, N8N_BASE_URL: 'https://n8n.test' };
+  // Expose INTERNAL_AUTH_TOKEN as a mutable field so the internal-bearer
+  // middleware (which reads it at request time) can be tested for both
+  // the auth-pass and auth-fail paths without touching process.env.
+  return { ...original, N8N_BASE_URL: 'https://n8n.test', INTERNAL_AUTH_TOKEN: '' };
 });
 
+import * as config from '@config';
+import { createInternalBearerMiddleware } from '../../../src/api/middlewares/internal-bearer';
 import { buildChefsSubmissionRouter } from '../../../src/api/routes/chefs-submission';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 import { getRouteHandlers, runHandlerChain } from '../../helpers/test-utils';
@@ -41,11 +46,14 @@ function createTestRouter(repoOverrides: Record<string, any> = {}) {
   const chefsSubmissionWebhook = {
     getPendingByFormAndSubmission: vi.fn().mockResolvedValue(null),
     deleteRow: vi.fn().mockResolvedValue(null),
+    upsertPending: vi.fn().mockResolvedValue(null),
     ...repoOverrides,
   };
 
   const routeContext = {
     customRepositories: { chefsSubmissionWebhook },
+    // Callback route tests don't exercise auth; stub a passthrough.
+    internalBearerMiddleware: (_req: any, _res: any, next: any) => next(),
   } as any;
 
   const router = buildChefsSubmissionRouter(routeContext);
@@ -55,6 +63,7 @@ function createTestRouter(repoOverrides: Record<string, any> = {}) {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.mocked(config).INTERNAL_AUTH_TOKEN = '';
 });
 
 describe('POST /chefs/submissions/callback', () => {
@@ -187,5 +196,100 @@ describe('POST /chefs/submissions/callback', () => {
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).statusCode).toBe(504);
     expect(chefsSubmissionWebhook.deleteRow).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /chefs/submissions/register', () => {
+  const EXECUTION_ID = 'exec-1';
+  const RESUME_URL = 'https://n8n.test/webhook/resume';
+
+  function createRegisterRouterWithRealAuth(internalToken: string) {
+    const chefsSubmissionWebhook = {
+      getPendingByFormAndSubmission: vi.fn().mockResolvedValue(null),
+      deleteRow: vi.fn().mockResolvedValue(null),
+      upsertPending: vi.fn().mockResolvedValue(null),
+    };
+    vi.mocked(config).INTERNAL_AUTH_TOKEN = internalToken;
+    const internalBearerMiddleware = createInternalBearerMiddleware();
+
+    const routeContext = {
+      customRepositories: { chefsSubmissionWebhook },
+      internalBearerMiddleware,
+    } as any;
+    const router = buildChefsSubmissionRouter(routeContext);
+    return { router, chefsSubmissionWebhook };
+  }
+
+  it('upserts a pending row when the body is valid and auth passes', async () => {
+    const { router, chefsSubmissionWebhook } = createRegisterRouterWithRealAuth('secret-token');
+    vi.stubGlobal('fetch', vi.fn());
+
+    const handlers = getRouteHandlers(router, 'post', '/submissions/register')!;
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer secret-token' },
+      body: {
+        executionId: EXECUTION_ID,
+        formId: FORM_ID,
+        submissionId: SUBMISSION_ID,
+        resumeUrl: RESUME_URL,
+      },
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers, req, res);
+
+    expect(error).toBeNull();
+    expect(chefsSubmissionWebhook.upsertPending).toHaveBeenCalledWith({
+      executionId: EXECUTION_ID,
+      formId: FORM_ID,
+      submissionId: SUBMISSION_ID,
+      webhookUrl: RESUME_URL,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('rejects with 401 when the internal bearer token is missing', async () => {
+    const { router, chefsSubmissionWebhook } = createRegisterRouterWithRealAuth('secret-token');
+    vi.stubGlobal('fetch', vi.fn());
+
+    const handlers = getRouteHandlers(router, 'post', '/submissions/register')!;
+    const req = createMockRequest({
+      headers: {},
+      body: {
+        executionId: EXECUTION_ID,
+        formId: FORM_ID,
+        submissionId: SUBMISSION_ID,
+        resumeUrl: RESUME_URL,
+      },
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers, req, res);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).statusCode).toBe(401);
+    expect(chefsSubmissionWebhook.upsertPending).not.toHaveBeenCalled();
+  });
+
+  it('rejects with 400 when resumeUrl is not a valid URL', async () => {
+    const { router } = createRegisterRouterWithRealAuth('secret-token');
+    vi.stubGlobal('fetch', vi.fn());
+
+    const handlers = getRouteHandlers(router, 'post', '/submissions/register')!;
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer secret-token' },
+      body: {
+        executionId: EXECUTION_ID,
+        formId: FORM_ID,
+        submissionId: SUBMISSION_ID,
+        resumeUrl: 'not-a-url',
+      },
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers, req, res);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).statusCode).toBe(400);
   });
 });
