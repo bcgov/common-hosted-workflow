@@ -14,6 +14,11 @@ function findProp(name: string) {
   return p;
 }
 
+function withEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 describe('CHEFSResubmitWait node description', () => {
   describe('CHEFS fields', () => {
     it('exposes required Form ID and Submission ID at the top', () => {
@@ -57,6 +62,10 @@ describe('CHEFSResubmitWait node description', () => {
       expect(propNames).toContain('unit');
     });
   });
+
+  it('does not require workflow interaction layer credentials', () => {
+    expect((desc.credentials ?? []).map((credential) => credential.name)).not.toContain('workflowInteractionLayerApi');
+  });
 });
 
 describe('CHEFSResubmitWait.execute pre-wait hook', () => {
@@ -73,7 +82,6 @@ describe('CHEFSResubmitWait.execute pre-wait hook', () => {
       }),
       evaluateExpression: vi.fn(() => 'https://resume.example/webhook'),
       getExecutionId: vi.fn(() => 'exec-100'),
-      getCredentials: vi.fn(async () => ({ baseUrl: 'https://n8n.example' })),
       getNode: vi.fn(() => ({ name: 'CHEFS Resubmit Wait' })),
       setMetadata: vi.fn(),
       helpers: {
@@ -84,13 +92,16 @@ describe('CHEFSResubmitWait.execute pre-wait hook', () => {
   }
 
   let prevToken: string | undefined;
+  let prevBaseUrl: string | undefined;
   beforeEach(() => {
     prevToken = process.env.INTERNAL_AUTH_TOKEN;
-    process.env.INTERNAL_AUTH_TOKEN = 'test-internal-token';
+    prevBaseUrl = process.env.N8N_BASE_URL;
+    withEnv('INTERNAL_AUTH_TOKEN', 'test-internal-token');
+    withEnv('N8N_BASE_URL', 'https://n8n.example');
   });
   afterEach(() => {
-    if (prevToken === undefined) delete process.env.INTERNAL_AUTH_TOKEN;
-    else process.env.INTERNAL_AUTH_TOKEN = prevToken;
+    withEnv('INTERNAL_AUTH_TOKEN', prevToken);
+    withEnv('N8N_BASE_URL', prevBaseUrl);
     vi.restoreAllMocks();
   });
 
@@ -128,15 +139,12 @@ describe('CHEFSResubmitWait.execute pre-wait hook', () => {
     expect(result).toBe(SENTINEL);
   });
 
-  it('throws NodeOperationError when base URL is missing on the credential', async () => {
-    const ctx = makeExecuteContext({
-      getCredentials: vi.fn(async () => ({ baseUrl: '' })),
-    });
+  it('throws NodeOperationError when N8N_BASE_URL is not set', async () => {
+    delete process.env.N8N_BASE_URL;
+    const ctx = makeExecuteContext();
     const parentSpy = vi.spyOn(Wait.prototype, 'execute').mockResolvedValue(SENTINEL as never);
 
-    await expect(node.execute.call(node, ctx as never)).rejects.toThrow(
-      /Missing Workflow Interaction Layer API base URL/,
-    );
+    await expect(node.execute.call(node, ctx as never)).rejects.toThrow(/N8N_BASE_URL is not configured/);
     expect(ctx.helpers.httpRequest).not.toHaveBeenCalled();
     expect(parentSpy).not.toHaveBeenCalled();
   });
