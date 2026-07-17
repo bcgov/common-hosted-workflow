@@ -640,9 +640,12 @@ mimir-distributed:
     enabled: false
 
 # See https://github.com/grafana-community/helm-charts/tree/main/charts/grafana
+grafanaRoute:
+  enabled: false
+  host:
+
 grafana:
   enabled: false
-  chwfRouteHost: ""
   persistence:
     enabled: false
   rbac:

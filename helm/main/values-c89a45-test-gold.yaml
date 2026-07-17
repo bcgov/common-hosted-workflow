@@ -109,6 +109,10 @@ mimir:
 mimir-distributed:
   enabled: false
 
+grafanaRoute:
+  enabled: true
+  host: test-grafana.apps.gold.devops.gov.bc.ca
+
 grafana:
   enabled: false
   grafana.ini:
@@ -118,7 +122,6 @@ grafana:
       auth_url: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/auth
       token_url: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
       api_url: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/userinfo
-  chwfRouteHost: test-grafana.apps.gold.devops.gov.bc.ca
   resources:
     requests:
       cpu: 10m

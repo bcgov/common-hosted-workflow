@@ -1,8 +1,8 @@
-{{- if .Values.mimir.enabled }}
+{{- if .Values.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "_.fullname" . }}-mimir-config
+  name: {{ include "_.fullname" . }}-config
   labels:
     {{- include "_.labels" . | nindent 4 }}
 data:
@@ -14,14 +14,14 @@ data:
       storage:
         backend: s3
         s3:
-          endpoint: {{ .Values.mimir.storage.s3.endpoint }}
+          endpoint: {{ .Values.storage.s3.endpoint }}
           access_key_id: ${AWS_ACCESS_KEY_ID}
           secret_access_key: ${AWS_SECRET_ACCESS_KEY}  # pragma: allowlist secret
-          insecure: {{ .Values.mimir.storage.s3.insecure }}
+          insecure: {{ .Values.storage.s3.insecure }}
 
     blocks_storage:
       s3:
-        bucket_name: {{ .Values.mimir.storage.s3.blocksBucket }}
+        bucket_name: {{ .Values.storage.s3.blocksBucket }}
       tsdb:
         dir: /data/tsdb
       bucket_store:
@@ -29,11 +29,11 @@ data:
 
     alertmanager_storage:
       s3:
-        bucket_name: {{ .Values.mimir.storage.s3.alertmanagerBucket }}
+        bucket_name: {{ .Values.storage.s3.alertmanagerBucket }}
 
     ruler_storage:
       s3:
-        bucket_name: {{ .Values.mimir.storage.s3.rulerBucket }}
+        bucket_name: {{ .Values.storage.s3.rulerBucket }}
 
     ingester:
       ring:

@@ -129,6 +129,10 @@ mimir:
 mimir-distributed:
   enabled: false  # Too resource-intensive (11 components)
 
+grafanaRoute:
+  enabled: true
+  host: dev-grafana.apps.gold.devops.gov.bc.ca
+
 grafana:
   enabled: true
   grafana.ini:
@@ -138,7 +142,6 @@ grafana:
       auth_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/auth
       token_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
       api_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/userinfo
-  chwfRouteHost: dev-grafana.apps.gold.devops.gov.bc.ca
   resources:
     requests:
       cpu: 10m

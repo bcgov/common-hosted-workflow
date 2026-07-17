@@ -1,0 +1,32 @@
+enabled: false
+
+image:
+  repository: grafana/mimir
+  tag: '2.14.0'
+  pullPolicy: IfNotPresent
+
+securityContext: null  # OpenShift assigns UID from namespace range
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+storage:
+  s3:
+    insecure: true
+    endpoint: ''
+    blocksBucket: ''
+    alertmanagerBucket: ''
+    rulerBucket: ''
+
+extraEnv: []
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
