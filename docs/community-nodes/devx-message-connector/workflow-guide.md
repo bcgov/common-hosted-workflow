@@ -1,4 +1,4 @@
-# DevX Teams Message
+# Workflow Guide — DevX Teams Message
 
 Use `Webhook` together with `DevX Message Connector` to receive an incoming payload in n8n and send a Microsoft Teams message through the DevX Connector API.
 

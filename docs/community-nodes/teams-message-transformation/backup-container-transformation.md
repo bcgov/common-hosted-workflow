@@ -1,4 +1,4 @@
-## Microsoft Teams Transformation: Backup Container
+# Microsoft Teams Transformation: Backup Container
 
 This transformation logic maps incoming logs from the **Backup Container** script to **Microsoft Teams** compatible HTML payloads. It is specifically designed to handle lifecycle events (INFO), non-critical alerts (WARN), and job failures (ERROR) with distinct visual cues.
 
