@@ -22,7 +22,7 @@ function buildWebhookUrlFromPath(path: string): string {
   }
   const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
   const base = N8N_BASE_URL.endsWith('/') ? N8N_BASE_URL : `${N8N_BASE_URL}/`;
-  return new URL(normalizedPath, base).toString();
+  return new URL(`webhook/${normalizedPath}`, base).toString();
 }
 
 /** Constructs the outbound URL by appending the incoming request's query params to the base webhook URL. */
@@ -72,7 +72,9 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
       const requestUrl = buildOutboundUrl(outboundUrl, req);
       const payload = JSON.stringify(req.body ?? {});
 
-      log.debug('Forwarding CHEFS submission callback', {
+      log.info('Forwarding CHEFS submission callback', {
+        requestUrl,
+        payload,
         formId,
         submissionId,
         source: usedDbRow ? 'db' : 'header',
