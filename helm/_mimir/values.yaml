@@ -17,6 +17,7 @@ podLabels: {}
 podSecurityContext: null  # OpenShift assigns UID from namespace range
 
 securityContext:
+  runAsNonRoot: true
   allowPrivilegeEscalation: false
   capabilities:
     drop:
