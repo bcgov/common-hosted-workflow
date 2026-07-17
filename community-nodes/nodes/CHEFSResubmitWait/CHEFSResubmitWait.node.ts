@@ -206,7 +206,7 @@ export class CHEFSResubmitWait extends Wait {
     const body = context.getBodyData();
     const query = context.getQueryData();
     const params = context.getParamsData();
-    const headers = context.getHeaderData();
+    // const headers = context.getHeaderData();
 
     const isEmpty = (v: unknown): boolean =>
       v == null || typeof v !== 'object' || Object.keys(v as object).length === 0;
@@ -216,9 +216,6 @@ export class CHEFSResubmitWait extends Wait {
         description: 'The resume webhook call must include body, query, or params data.',
       });
     }
-
-    // TODO: implement CHEFS post-resume logic using body, query, params, headers.
-    void headers;
 
     return await super.webhook(context as never);
   }
