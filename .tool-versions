@@ -3,5 +3,5 @@ python 3.14.6
 pnpm 11.9.0
 oc 4.22.3
 kubectl 1.36.2
-helm 4.2.2
+helm 4.2.3
 terraform 1.15.7
