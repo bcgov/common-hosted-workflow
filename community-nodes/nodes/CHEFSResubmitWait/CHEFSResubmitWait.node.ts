@@ -43,11 +43,6 @@ type ExecuteReturnInner = Awaited<ReturnType<Wait['execute']>>;
 type WebhookContext = Parameters<Wait['webhook']>[0];
 type WebhookReturnInner = Awaited<ReturnType<Wait['webhook']>>;
 
-/** Shape of the `workflowInteractionLayerApi` credential this node relies on for the base URL. */
-interface WilApiCredentials {
-  baseUrl: string;
-}
-
 /** Path of the external-hooks route that registers a pending CHEFS submission webhook. */
 const REGISTER_PATH = '/rest/custom/v1/chefs/submissions/register';
 
@@ -55,9 +50,8 @@ const REGISTER_PATH = '/rest/custom/v1/chefs/submissions/register';
  * Registers a `chefs_submission_webhook` row with the external-hooks service so
  * that a later CHEFS callback can resume this execution.
  *
- * Uses the `workflowInteractionLayerApi` credential's `baseUrl` to locate the
- * n8n instance, and authenticates with the shared `INTERNAL_AUTH_TOKEN` env
- * var (mirroring the WIL node's internal-call convention). Throws a
+ * Uses the runtime `N8N_BASE_URL` env var to locate the n8n instance, and
+ * authenticates with the shared `INTERNAL_AUTH_TOKEN` env var. Throws a
  * NodeOperationError on any failure so the workflow fails fast before waiting.
  */
 async function registerChefsSubmissionWebhook(
@@ -66,18 +60,11 @@ async function registerChefsSubmissionWebhook(
 ): Promise<void> {
   const { executionId, formId, submissionId, resumeUrl } = params;
 
-  let baseUrl: unknown;
-  try {
-    const credentials = (await context.getCredentials('workflowInteractionLayerApi')) as WilApiCredentials;
-    baseUrl = credentials?.baseUrl;
-  } catch {
-    // Fall back below; the baseUrl may be missing but the user will get a clear error message.
-  }
-
-  if (typeof baseUrl !== 'string' || baseUrl.trim() === '') {
-    throw new NodeOperationError(context.getNode() as never, 'Missing Workflow Interaction Layer API base URL', {
+  const baseUrl = process.env.N8N_BASE_URL?.trim();
+  if (!baseUrl) {
+    throw new NodeOperationError(context.getNode() as never, 'N8N_BASE_URL is not configured', {
       description:
-        'Configure the "Workflow Interaction Layer API" credential with the n8n instance base URL (e.g. http://localhost:5678) and attach it to this node.',
+        'Set N8N_BASE_URL in the n8n runtime so the CHEFS Resubmit Wait node can reach the external-hooks register route.',
     });
   }
 
@@ -152,12 +139,6 @@ export class CHEFSResubmitWait extends Wait {
       description: 'Wait for a CHEFS resubmit webhook before continuing execution',
       subtitle: '=Resubmit CHEFS submission',
       usableAsTool: true,
-      credentials: [
-        {
-          name: 'workflowInteractionLayerApi',
-          required: true,
-        },
-      ],
       defaults: {
         ...this.description.defaults,
         name: 'CHEFS Resubmit Wait',
