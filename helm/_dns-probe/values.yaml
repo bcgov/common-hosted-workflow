@@ -18,9 +18,7 @@ podLabels: {}
 podSecurityContext:
   runAsNonRoot: true
 
-securityContext:
-  runAsNonRoot: true
-  allowPrivilegeEscalation: false
+securityContext: {}
 
 nodeSelector: {}
 
