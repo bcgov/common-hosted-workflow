@@ -43,6 +43,80 @@ type ExecuteReturnInner = Awaited<ReturnType<Wait['execute']>>;
 type WebhookContext = Parameters<Wait['webhook']>[0];
 type WebhookReturnInner = Awaited<ReturnType<Wait['webhook']>>;
 
+/** Shape of the `workflowInteractionLayerApi` credential this node relies on for the base URL. */
+interface WilApiCredentials {
+  baseUrl: string;
+}
+
+/** Path of the external-hooks route that registers a pending CHEFS submission webhook. */
+const REGISTER_PATH = '/rest/custom/v1/chefs/submissions/register';
+
+/**
+ * Registers a `chefs_submission_webhook` row with the external-hooks service so
+ * that a later CHEFS callback can resume this execution.
+ *
+ * Uses the `workflowInteractionLayerApi` credential's `baseUrl` to locate the
+ * n8n instance, and authenticates with the shared `INTERNAL_AUTH_TOKEN` env
+ * var (mirroring the WIL node's internal-call convention). Throws a
+ * NodeOperationError on any failure so the workflow fails fast before waiting.
+ */
+async function registerChefsSubmissionWebhook(
+  context: ExecuteContext,
+  params: { executionId: string; formId: string; submissionId: string; resumeUrl: string },
+): Promise<void> {
+  const { executionId, formId, submissionId, resumeUrl } = params;
+
+  let baseUrl: unknown;
+  try {
+    const credentials = (await context.getCredentials('workflowInteractionLayerApi')) as WilApiCredentials;
+    baseUrl = credentials?.baseUrl;
+  } catch {
+    // Fall back below; the baseUrl may be missing but the user will get a clear error message.
+  }
+
+  if (typeof baseUrl !== 'string' || baseUrl.trim() === '') {
+    throw new NodeOperationError(context.getNode() as never, 'Missing Workflow Interaction Layer API base URL', {
+      description:
+        'Configure the "Workflow Interaction Layer API" credential with the n8n instance base URL (e.g. http://localhost:5678) and attach it to this node.',
+    });
+  }
+
+  const normalizedBase = baseUrl.replace(/\/$/, '');
+  const url = `${normalizedBase}${REGISTER_PATH}`;
+  const internalToken = process.env.INTERNAL_AUTH_TOKEN;
+
+  if (!internalToken) {
+    throw new NodeOperationError(context.getNode() as never, 'INTERNAL_AUTH_TOKEN is not configured', {
+      description:
+        'The n8n runtime must expose INTERNAL_AUTH_TOKEN so the CHEFS Resubmit node can authenticate to the external-hooks register route.',
+    });
+  }
+
+  try {
+    await context.helpers.httpRequest({
+      method: 'POST',
+      url,
+      headers: {
+        Authorization: `Bearer ${internalToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: {
+        executionId,
+        formId,
+        submissionId,
+        resumeUrl,
+      },
+      json: true,
+    });
+  } catch (error) {
+    const detail = (error as Error)?.message ?? 'unknown error';
+    throw new NodeOperationError(context.getNode() as never, `Failed to register CHEFS submission webhook: ${detail}`, {
+      description: `POST ${url} failed. Ensure the external-hooks service is reachable and INTERNAL_AUTH_TOKEN matches.`,
+    });
+  }
+}
+
 /**
  * CHEFS Resubmit
  *
@@ -78,6 +152,12 @@ export class CHEFSResubmit extends Wait {
       description: 'Wait for a CHEFS resubmit webhook before continuing execution',
       subtitle: '=Resubmit CHEFS submission',
       usableAsTool: true,
+      credentials: [
+        {
+          name: 'workflowInteractionLayerApi',
+          required: true,
+        },
+      ],
       defaults: {
         ...this.description.defaults,
         name: 'CHEFS Resubmit',
@@ -90,7 +170,9 @@ export class CHEFSResubmit extends Wait {
    * Pre-wait hook.
    *
    * Runs before the execution is put to wait. Has access to previous-node output
-   * items and to the generated resume URL. Delegates to the native Wait execute
+   * items and to the generated resume URL. Registers a pending CHEFS submission
+   * webhook row with the external-hooks service so that a later CHEFS callback can
+   * locate and resume this execution. Delegates to the native Wait execute
    * afterwards so all resume/limit behavior stays intact.
    */
   async execute(context: ExecuteContext): Promise<ExecuteReturnInner> {
@@ -98,9 +180,17 @@ export class CHEFSResubmit extends Wait {
     const formId = context.getNodeParameter('formId', 0) as string;
     const submissionId = context.getNodeParameter('submissionId', 0) as string;
     const resumeUrl = context.evaluateExpression('{{ $execution.resumeUrl }}', 0) as string;
+    const executionId = context.getExecutionId();
 
-    // TODO: implement CHEFS pre-wait logic using inputItems, formId, submissionId, resumeUrl.
-    void [inputItems, formId, submissionId, resumeUrl];
+    // Keep the lint happy; inputItems are available for downstream CHEFS logic.
+    void inputItems;
+
+    await registerChefsSubmissionWebhook(context, {
+      executionId,
+      formId,
+      submissionId,
+      resumeUrl,
+    });
 
     return await super.execute(context as never);
   }

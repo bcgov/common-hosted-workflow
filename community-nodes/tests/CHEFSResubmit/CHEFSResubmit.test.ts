@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { NodeOperationError } from 'n8n-workflow';
 import { Wait } from 'n8n-nodes-base/dist/nodes/Wait/Wait.node';
 import { CHEFSResubmit } from '../../nodes/CHEFSResubmit/CHEFSResubmit.node';
@@ -62,7 +62,7 @@ describe('CHEFSResubmit node description', () => {
 describe('CHEFSResubmit.execute pre-wait hook', () => {
   const SENTINEL = [['PRE_WAIT_SENTINEL']];
 
-  function makeExecuteContext() {
+  function makeExecuteContext(overrides: Record<string, unknown> = {}) {
     return {
       getInputData: vi.fn(() => [{ json: { hello: 'world' } }]),
       getNodeParameter: vi.fn((name: string) => {
@@ -72,28 +72,98 @@ describe('CHEFSResubmit.execute pre-wait hook', () => {
         return undefined;
       }),
       evaluateExpression: vi.fn(() => 'https://resume.example/webhook'),
+      getExecutionId: vi.fn(() => 'exec-100'),
+      getCredentials: vi.fn(async () => ({ baseUrl: 'https://n8n.example' })),
       getNode: vi.fn(() => ({ name: 'CHEFS Resubmit' })),
       setMetadata: vi.fn(),
+      helpers: {
+        httpRequest: vi.fn(async () => ({ success: true })),
+      },
+      ...overrides,
     };
   }
 
-  it('reads previous-node output, formId, submissionId and resumeUrl, then delegates to parent Wait.execute', async () => {
+  let prevToken: string | undefined;
+  beforeEach(() => {
+    prevToken = process.env.INTERNAL_AUTH_TOKEN;
+    process.env.INTERNAL_AUTH_TOKEN = 'test-internal-token';
+  });
+  afterEach(() => {
+    if (prevToken === undefined) delete process.env.INTERNAL_AUTH_TOKEN;
+    else process.env.INTERNAL_AUTH_TOKEN = prevToken;
+    vi.restoreAllMocks();
+  });
+
+  it('registers the submission webhook and delegates to parent Wait.execute', async () => {
     const ctx = makeExecuteContext();
     const parentSpy = vi.spyOn(Wait.prototype, 'execute').mockResolvedValue(SENTINEL as never);
 
     const result = await node.execute.call(node, ctx as never);
 
-    // Pre-hook inspected previous-node output.
-    expect(ctx.getInputData).toHaveBeenCalled();
-    // Pre-hook read CHEFS identifiers.
+    // Pre-hook read CHEFS identifiers and the resume URL.
     expect(ctx.getNodeParameter).toHaveBeenCalledWith('formId', 0);
     expect(ctx.getNodeParameter).toHaveBeenCalledWith('submissionId', 0);
-    // Pre-hook computed the resume URL.
     expect(ctx.evaluateExpression).toHaveBeenCalledWith('{{ $execution.resumeUrl }}', 0);
+    expect(ctx.getExecutionId).toHaveBeenCalled();
+    // Register call was made to the external-hooks service.
+    expect(ctx.helpers.httpRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: 'https://n8n.example/rest/custom/v1/chefs/submissions/register',
+        headers: {
+          Authorization: 'Bearer test-internal-token',
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: {
+          executionId: 'exec-100',
+          formId: 'form-xyz',
+          submissionId: 'sub-42',
+          resumeUrl: 'https://resume.example/webhook',
+        },
+      }),
+    );
     // Parent Wait.execute was delegated to.
     expect(parentSpy).toHaveBeenCalledTimes(1);
-    // The placeholder returns the parent's result verbatim.
     expect(result).toBe(SENTINEL);
+  });
+
+  it('throws NodeOperationError when base URL is missing on the credential', async () => {
+    const ctx = makeExecuteContext({
+      getCredentials: vi.fn(async () => ({ baseUrl: '' })),
+    });
+    const parentSpy = vi.spyOn(Wait.prototype, 'execute').mockResolvedValue(SENTINEL as never);
+
+    await expect(node.execute.call(node, ctx as never)).rejects.toThrow(
+      /Missing Workflow Interaction Layer API base URL/,
+    );
+    expect(ctx.helpers.httpRequest).not.toHaveBeenCalled();
+    expect(parentSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws NodeOperationError when INTERNAL_AUTH_TOKEN is not set', async () => {
+    delete process.env.INTERNAL_AUTH_TOKEN;
+    const ctx = makeExecuteContext();
+    const parentSpy = vi.spyOn(Wait.prototype, 'execute').mockResolvedValue(SENTINEL as never);
+
+    await expect(node.execute.call(node, ctx as never)).rejects.toThrow(/INTERNAL_AUTH_TOKEN is not configured/);
+    expect(ctx.helpers.httpRequest).not.toHaveBeenCalled();
+    expect(parentSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws NodeOperationError when the register HTTP call fails', async () => {
+    const ctx = makeExecuteContext({
+      helpers: {
+        httpRequest: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+      },
+    });
+    const parentSpy = vi.spyOn(Wait.prototype, 'execute').mockResolvedValue(SENTINEL as never);
+
+    await expect(node.execute.call(node, ctx as never)).rejects.toBeInstanceOf(NodeOperationError);
+    expect(ctx.helpers.httpRequest).toHaveBeenCalled();
+    expect(parentSpy).not.toHaveBeenCalled();
   });
 });
 

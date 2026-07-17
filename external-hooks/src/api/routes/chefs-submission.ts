@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { ApiRouteContext } from '../types/routes';
 import type { UiApiTypedRequest } from '../types/ui-api';
 import { createRequestParser } from '../utils/validation';
-import { chefsSubmissionCallbackSchema } from '../schemas/chefs-submission';
+import { chefsSubmissionCallbackSchema, chefsSubmissionRegisterSchema } from '../schemas/chefs-submission';
 import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { callWebhook } from './helpers/webhook-fire';
@@ -34,7 +34,7 @@ function buildOutboundUrl(baseUrl: string, req: Request): string {
 }
 
 export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
-  const { customRepositories } = routeContext;
+  const { customRepositories, internalBearerMiddleware } = routeContext;
   const router = Router();
 
   /**
@@ -100,6 +100,36 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
       }
 
       OkResponse(res, { success: true, message: 'CHEFS submission callback forwarded' });
+    },
+  );
+
+  /**
+   * POST /chefs/submissions/register
+   * Internal-only endpoint called by the CHEFS Resubmit custom node before an
+   * execution is put to wait.
+   *
+   * - Secured by internalBearerMiddleware (Authorization: Bearer <INTERNAL_AUTH_TOKEN>).
+   * - Upserts a `chefs_submission_webhook` row keyed by (formId, submissionId),
+   *   storing executionId and resumeUrl so the later CHEFS callback route knows
+   *   which n8n execution to resume.
+   */
+  router.post(
+    '/submissions/register',
+    internalBearerMiddleware,
+    createRequestParser(chefsSubmissionRegisterSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof chefsSubmissionRegisterSchema>>, res: Response) => {
+      const { executionId, formId, submissionId, resumeUrl } = req.parsed.body;
+
+      log.debug('Registering CHEFS submission webhook', { formId, submissionId, executionId });
+
+      await customRepositories.chefsSubmissionWebhook.upsertPending({
+        executionId,
+        formId,
+        submissionId,
+        webhookUrl: resumeUrl,
+      });
+
+      OkResponse(res, { success: true, message: 'CHEFS submission webhook registered' });
     },
   );
 
