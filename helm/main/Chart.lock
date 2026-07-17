@@ -20,5 +20,20 @@ dependencies:
 - name: backup-storage
   repository: https://bcgov.github.io/helm-charts
   version: 0.1.18
-digest: sha256:96b458ca576e06097a0fc2eb5a0988ede4c3c694b95bfd1f0eaab69387228918
-generated: "2026-07-02T23:16:42.798580386Z"
+- name: alloy
+  repository: https://grafana.github.io/helm-charts
+  version: 1.10.1
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 7.0.0
+- name: tempo
+  repository: https://grafana.github.io/helm-charts
+  version: 1.24.4
+- name: mimir
+  repository: file://../_mimir
+  version: 0.1.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 10.5.15
+digest: sha256:372e56a18de87ccc9ea38ee2c88a4483408b9fe1ee0e2cc03de360342e83a859
+generated: "2026-07-17T15:11:54.8471136-07:00"

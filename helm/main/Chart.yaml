@@ -33,3 +33,23 @@ dependencies:
     version: '0.1.18'
     repository: 'https://bcgov.github.io/helm-charts'
     condition: backup-storage.enabled
+  - name: alloy
+    version: '1.10.1'
+    repository: 'https://grafana.github.io/helm-charts'
+    condition: alloy.enabled
+  - name: loki
+    version: '7.0.0'
+    repository: 'https://grafana.github.io/helm-charts'
+    condition: loki.enabled
+  - name: tempo
+    version: '1.24.4'
+    repository: 'https://grafana.github.io/helm-charts'
+    condition: tempo.enabled
+  - name: mimir
+    version: '0.1.0'
+    repository: 'file://../_mimir'
+    condition: mimir.enabled
+  - name: grafana
+    version: '10.5.15'
+    repository: 'https://grafana.github.io/helm-charts'
+    condition: grafana.enabled

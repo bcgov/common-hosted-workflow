@@ -71,3 +71,90 @@ sdg-mock-app:
       cpu: 250m
       memory: 512Mi
       ephemeral-storage: 256Mi
+
+loki:
+  enabled: true
+  loki:
+    storage:
+      bucketNames:
+        chunks: dev-loki
+        ruler: dev-loki-ruler
+      s3:
+        endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+  singleBinary:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+
+tempo:
+  enabled: true
+  tempo:
+    storage:
+      trace:
+        s3:
+          bucket: dev-tempo
+          endpoint: chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+mimir:
+  enabled: true
+  storage:
+    s3:
+      endpoint: chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+      blocksBucket: dev-mimir-blocks
+      alertmanagerBucket: dev-mimir-alertmanager
+      rulerBucket: dev-mimir-ruler
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+grafana:
+  chwfRoute:
+    enabled: true
+    host: dev-grafana-workflow.apps.gold.devops.gov.bc.ca
+  enabled: true
+  grafana.ini:
+    server:
+      root_url: https://dev-grafana-workflow.apps.gold.devops.gov.bc.ca
+    auth.generic_oauth:
+      auth_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/auth
+      token_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
+      api_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/userinfo
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+alloy:
+  enabled: true
+  alloy:
+    configMap:
+      content: ""
+    resources:
+      requests:
+        cpu: 5m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi

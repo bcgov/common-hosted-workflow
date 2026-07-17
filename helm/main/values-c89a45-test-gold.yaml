@@ -51,3 +51,90 @@ pgo:
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+
+loki:
+  enabled: false
+  loki:
+    storage:
+      bucketNames:
+        chunks: test-loki
+        ruler: test-loki-ruler
+      s3:
+        endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+  singleBinary:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+
+tempo:
+  enabled: false
+  tempo:
+    storage:
+      trace:
+        s3:
+          bucket: test-tempo
+          endpoint: chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+mimir:
+  enabled: false
+  storage:
+    s3:
+      endpoint: chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+      blocksBucket: test-mimir-blocks
+      alertmanagerBucket: test-mimir-alertmanager
+      rulerBucket: test-mimir-ruler
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+grafana:
+  chwfRoute:
+    enabled: true
+    host: test-grafana-workflow.apps.gold.devops.gov.bc.ca
+  enabled: false
+  grafana.ini:
+    server:
+      root_url: https://test-grafana-workflow.apps.gold.devops.gov.bc.ca
+    auth.generic_oauth:
+      auth_url: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/auth
+      token_url: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
+      api_url: https://test.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/userinfo
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+alloy:
+  enabled: false
+  alloy:
+    configMap:
+      content: ""
+    resources:
+      requests:
+        cpu: 5m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
