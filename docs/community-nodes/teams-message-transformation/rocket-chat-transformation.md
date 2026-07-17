@@ -1,4 +1,4 @@
-## Microsoft Teams Transformation: Rocket.Chat
+# Microsoft Teams Transformation: Rocket.Chat
 
 This transformation logic maps incoming **Rocket.Chat** message structures to **Microsoft Teams** compatible HTML payloads. It replicates the classic "attachment" aesthetic (colored sidebar, structured fields, and linked titles) within the Teams chat interface.
 
