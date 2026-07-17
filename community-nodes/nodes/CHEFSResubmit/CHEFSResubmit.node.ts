@@ -176,14 +176,11 @@ export class CHEFSResubmit extends Wait {
    * afterwards so all resume/limit behavior stays intact.
    */
   async execute(context: ExecuteContext): Promise<ExecuteReturnInner> {
-    const inputItems = context.getInputData();
+    // const inputItems = context.getInputData();
     const formId = context.getNodeParameter('formId', 0) as string;
     const submissionId = context.getNodeParameter('submissionId', 0) as string;
     const resumeUrl = context.evaluateExpression('{{ $execution.resumeUrl }}', 0) as string;
     const executionId = context.getExecutionId();
-
-    // Keep the lint happy; inputItems are available for downstream CHEFS logic.
-    void inputItems;
 
     await registerChefsSubmissionWebhook(context, {
       executionId,
