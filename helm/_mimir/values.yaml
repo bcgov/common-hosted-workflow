@@ -1,11 +1,18 @@
-replicaCount: 1
-
 image:
   repository: grafana/mimir
   tag: '2.14.0'
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
+
+nameOverride: mimir
+
+serviceAccountName: ""
+
+replicaCount: 1
+
+podAnnotations: {}
+podLabels: {}
 
 podSecurityContext: null  # OpenShift assigns UID from namespace range
 
@@ -15,6 +22,18 @@ securityContext:
     drop:
       - ALL
 
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+deploymentStrategy:
+  type: Recreate
+
+service:
+  type: ClusterIP
+
 storage:
   s3:
     insecure: true
@@ -22,6 +41,10 @@ storage:
     blocksBucket: ''
     alertmanagerBucket: ''
     rulerBucket: ''
+
+envSecretName: ""
+
+env: {}
 
 extraEnv: []
 
@@ -45,6 +68,8 @@ resources:
   requests:
     cpu: 10m
     memory: 128Mi
+    ephemeral-storage: 64Mi
   limits:
     cpu: 500m
     memory: 512Mi
+    ephemeral-storage: 256Mi

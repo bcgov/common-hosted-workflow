@@ -111,11 +111,10 @@ mimir:
       cpu: 500m
       memory: 512Mi
 
-grafanaRoute:
-  enabled: true
-  host: grafana-workflow.apps.gold.devops.gov.bc.ca
-
 grafana:
+  chwfRoute:
+    enabled: true
+    host: grafana-workflow.apps.gold.devops.gov.bc.ca
   enabled: false
   grafana.ini:
     server:

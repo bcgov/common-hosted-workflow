@@ -469,17 +469,9 @@ loki:
     extraVolumeMounts:
       - name: loki-wal
         mountPath: /var/loki
-    extraEnv:
-      - name: AWS_ACCESS_KEY_ID
-        valueFrom:
-          secretKeyRef:
-            name: chwf-observability-s3 # pragma: allowlist secret
-            key: access-key-id
-      - name: AWS_SECRET_ACCESS_KEY
-        valueFrom:
-          secretKeyRef:
-            name: chwf-observability-s3 # pragma: allowlist secret
-            key: secret-access-key
+    extraEnvFrom:
+      - secretRef:
+          name: chwf-observability-s3 # pragma: allowlist secret
   read:
     replicas: 0
   write:
@@ -523,29 +515,9 @@ tempo:
         s3:
           insecure: true
           forcepathstyle: true
-    extraEnv:
-      - name: AWS_ACCESS_KEY_ID
-        valueFrom:
-          secretKeyRef:
-            name: chwf-observability-s3 # pragma: allowlist secret
-            key: access-key-id
-      - name: AWS_SECRET_ACCESS_KEY
-        valueFrom:
-          secretKeyRef:
-            name: chwf-observability-s3 # pragma: allowlist secret
-            key: secret-access-key
-
-x-mimir-s3-env: &mimirEnv
-  - name: AWS_ACCESS_KEY_ID
-    valueFrom:
-      secretKeyRef:
-        name: chwf-observability-s3 # pragma: allowlist secret
-        key: access-key-id
-  - name: AWS_SECRET_ACCESS_KEY
-    valueFrom:
-      secretKeyRef:
-        name: chwf-observability-s3 # pragma: allowlist secret
-        key: secret-access-key
+    extraEnvFrom:
+      - secretRef:
+          name: chwf-observability-s3 # pragma: allowlist secret
 
 # Mimir monolithic — single-binary, S3 storage, no PVC
 mimir:
@@ -555,11 +527,7 @@ mimir:
     tag: '2.14.0'
     pullPolicy: IfNotPresent
   podSecurityContext: null  # OpenShift assigns UID from namespace range
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
+  envSecretName: chwf-observability-s3 # pragma: allowlist secret
   storage:
     s3:
       insecure: true
@@ -567,84 +535,12 @@ mimir:
       blocksBucket: ''
       alertmanagerBucket: ''
       rulerBucket: ''
-  extraEnv:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: chwf-observability-s3 # pragma: allowlist secret
-          key: access-key-id
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: chwf-observability-s3 # pragma: allowlist secret
-          key: secret-access-key
-  resources:
-    requests:
-      cpu: 10m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-# See https://github.com/grafana/mimir/tree/main/operations/helm/charts/mimir-distributed
-mimir-distributed:
-  enabled: false
-  kafka:
-    enabled: false
-  minio:
-    enabled: false
-  mimir:
-    structuredConfig:
-      ingest_storage:
-        enabled: false
-      common:
-        storage:
-          backend: s3
-          s3:
-            region: us-east-1
-            access_key_id: ${AWS_ACCESS_KEY_ID}
-            secret_access_key: ${AWS_SECRET_ACCESS_KEY}
-            insecure: true
-  distributor:
-    replicas: 1
-    extraEnv: *mimirEnv
-  ingester:
-    replicas: 1
-    extraEnv: *mimirEnv
-    zoneAwareReplication:
-      enabled: false
-  querier:
-    replicas: 1
-    extraEnv: *mimirEnv
-  query_frontend:
-    replicas: 1
-    extraEnv: *mimirEnv
-  query_scheduler:
-    replicas: 1
-    extraEnv: *mimirEnv
-  store_gateway:
-    replicas: 1
-    extraEnv: *mimirEnv
-    zoneAwareReplication:
-      enabled: false
-  compactor:
-    replicas: 1
-    extraEnv: *mimirEnv
-  ruler:
-    enabled: true
-    extraEnv: *mimirEnv
-  alertmanager:
-    enabled: true
-    extraEnv: *mimirEnv
-  rollout_operator:
-    enabled: false
 
 # See https://github.com/grafana-community/helm-charts/tree/main/charts/grafana
-grafanaRoute:
-  enabled: false
-  host:
-
 grafana:
+  chwfRoute:
+    enabled: false
+    host:
   enabled: false
   persistence:
     enabled: false

@@ -1,4 +1,4 @@
-{{- if and .Values.grafana.enabled .Values.grafanaRoute.enabled .Values.grafanaRoute.host }}
+{{- if and .Values.grafana.enabled .Values.grafana.chwfRoute.enabled .Values.grafana.chwfRoute.host }}
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -9,7 +9,7 @@ metadata:
     haproxy.router.openshift.io/balance: roundrobin
     haproxy.router.openshift.io/timeout: 600s
 spec:
-  host: {{ .Values.grafanaRoute.host }}
+  host: {{ .Values.grafana.chwfRoute.host }}
   port:
     targetPort: service
   tls:
