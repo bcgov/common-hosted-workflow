@@ -1,13 +1,15 @@
-enabled: false
+replicaCount: 1
 
 image:
   repository: grafana/mimir
   tag: '2.14.0'
   pullPolicy: IfNotPresent
 
-securityContext: null  # OpenShift assigns UID from namespace range
+imagePullSecrets: []
 
-containerSecurityContext:
+podSecurityContext: null  # OpenShift assigns UID from namespace range
+
+securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
@@ -22,6 +24,22 @@ storage:
     rulerBucket: ''
 
 extraEnv: []
+
+livenessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
 
 resources:
   requests:

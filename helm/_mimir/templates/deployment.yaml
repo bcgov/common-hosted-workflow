@@ -1,4 +1,3 @@
-{{- if .Values.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,7 +5,7 @@ metadata:
   labels:
     {{- include "_.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "_.selectorLabels" . | nindent 6 }}
@@ -15,7 +14,12 @@ spec:
       labels:
         {{- include "_.labels" . | nindent 8 }}
     spec:
-      {{- with .Values.securityContext }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -36,7 +40,7 @@ spec:
               protocol: TCP
           env:
             {{- toYaml .Values.extraEnv | nindent 12 }}
-          {{- with .Values.containerSecurityContext }}
+          {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -45,19 +49,21 @@ spec:
               mountPath: /etc/mimir
             - name: data
               mountPath: /data
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
           readinessProbe:
-            httpGet:
-              path: /ready
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 5
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "_.fullname" . }}-config
         - name: data
           emptyDir: {}
-{{- end }}

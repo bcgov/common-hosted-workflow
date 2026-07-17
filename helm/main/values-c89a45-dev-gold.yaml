@@ -126,18 +126,15 @@ mimir:
       cpu: 500m
       memory: 512Mi
 
-mimir-distributed:
-  enabled: false  # Too resource-intensive (11 components)
-
 grafanaRoute:
   enabled: true
-  host: dev-grafana.apps.gold.devops.gov.bc.ca
+  host: dev-grafana-workflow.apps.gold.devops.gov.bc.ca
 
 grafana:
   enabled: true
   grafana.ini:
     server:
-      root_url: https://dev-grafana.apps.gold.devops.gov.bc.ca
+      root_url: https://dev-grafana-workflow.apps.gold.devops.gov.bc.ca
     auth.generic_oauth:
       auth_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/auth
       token_url: https://dev.loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token

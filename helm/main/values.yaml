@@ -554,8 +554,8 @@ mimir:
     repository: grafana/mimir
     tag: '2.14.0'
     pullPolicy: IfNotPresent
-  securityContext: null  # OpenShift assigns UID from namespace range
-  containerSecurityContext:
+  podSecurityContext: null  # OpenShift assigns UID from namespace range
+  securityContext:
     allowPrivilegeEscalation: false
     capabilities:
       drop:
