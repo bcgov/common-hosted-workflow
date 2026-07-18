@@ -1,6 +1,6 @@
 {
-  "id": "5af19b33-6334-4be8-baf9-1301f4b12b8b",
-  "prevId": "0e09c47c-40fc-4dd4-b6d2-8c0e8a493b93",
+  "id": "0e09c47c-40fc-4dd4-b6d2-8c0e8a493b93",
+  "prevId": "93956b47-0ffe-4412-9464-eaccc18ccb8c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1406,102 +1406,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.chefs_submission_webhook": {
-      "name": "chefs_submission_webhook",
-      "schema": "",
-      "columns": {
-        "execution_id": {
-          "name": "execution_id",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "webhook_url": {
-          "name": "webhook_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "form_id": {
-          "name": "form_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "submission_id": {
-          "name": "submission_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_chefs_submission_webhook_pending": {
-          "name": "idx_chefs_submission_webhook_pending",
-          "columns": [
-            {
-              "expression": "form_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "submission_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "pk_chefs_submission_webhook": {
-          "name": "pk_chefs_submission_webhook",
-          "columns": ["form_id", "submission_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "chk_chefs_submission_webhook_status": {
-          "name": "chk_chefs_submission_webhook_status",
-          "value": "\"chefs_submission_webhook\".\"status\" IN ('pending', 'completed')"
-        }
-      },
       "isRLSEnabled": false
     }
   },
