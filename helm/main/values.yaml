@@ -524,7 +524,7 @@ mimir:
   enabled: false
   image:
     repository: grafana/mimir
-    tag: '2.14.0'
+    tag: '2.17.11'
     pullPolicy: IfNotPresent
   podSecurityContext: null  # OpenShift assigns UID from namespace range
   envSecretName: chwf-observability-s3 # pragma: allowlist secret
