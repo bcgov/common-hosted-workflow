@@ -15,6 +15,7 @@ n8n:
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
+    AUTHZ_ENVIRONMENT: dev
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"
