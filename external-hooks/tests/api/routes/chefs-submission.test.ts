@@ -27,7 +27,7 @@ const FORM_ID = 'form-1';
 const SUBMISSION_ID = 'sub-1';
 const DB_WEBHOOK_URL = 'https://n8n.test/db-hook';
 const N8N_BASE_URL = 'https://n8n.test';
-const HEADER_WEBHOOK_PATH = '/webhook/header-hook';
+const HEADER_WEBHOOK_PATH = '/header-hook';
 const HEADER_WEBHOOK_URL = `${N8N_BASE_URL}/webhook/header-hook`;
 
 function makePendingRow(overrides: Record<string, unknown> = {}) {
