@@ -50,6 +50,7 @@ function createTestRouter() {
       projectTenant: {} as any,
       claim: {} as any,
       trigger: {} as any,
+      multiWebhookWait: {} as any,
     },
   });
 

@@ -8,6 +8,7 @@ import type { ChefsService } from '../services/chefs.service';
 import type { CstarService } from '../services/cstar.service';
 import type { FeatureFlagService } from '../services/feature-flag.service';
 import type { MessageService } from '../services/message.service';
+import type { MultiWebhookWaitService } from '../services/multi-webhook-wait.service';
 import type { ProjectTenantService } from '../services/project-tenant.service';
 import type { TenantService } from '../services/tenant.service';
 import type { ClaimService } from '../services/claim.service';
@@ -50,4 +51,5 @@ export type ApiServices = {
   tenant: TenantService;
   tenantProjectSync: TenantProjectSyncService;
   projectTenant: ProjectTenantService;
+  multiWebhookWait: MultiWebhookWaitService;
 };
