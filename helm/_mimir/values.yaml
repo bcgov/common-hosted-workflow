@@ -1,6 +1,6 @@
 image:
   repository: grafana/mimir
-  tag: '2.14.0'
+  tag: '2.17.11'
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
