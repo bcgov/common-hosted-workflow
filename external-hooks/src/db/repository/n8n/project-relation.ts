@@ -16,7 +16,22 @@ export class ProjectRelationRepository {
   }
 
   async findProjectRole(args: { userId: string; projectId: string }) {
-    return await this.projectRelationRepository.findProjectRole(args);
+    // Use find with role relation loaded, since findOneBy doesn't load ManyToOne relations.
+    // Cast required because our adapter type doesn't expose `find`, but at runtime this is
+    // a full TypeORM Repository with `find` available.
+    const repo = this.projectRelationRepository as unknown as {
+      find: (options: {
+        where: { userId: string; projectId: string };
+        relations: { role: boolean };
+        take: number;
+      }) => Promise<Array<{ role?: unknown }>>;
+    };
+    const results = await repo.find({
+      where: { userId: args.userId, projectId: args.projectId },
+      relations: { role: true },
+      take: 1,
+    });
+    return results.length > 0 ? (results[0].role ?? null) : null;
   }
 
   async save(relation: { projectId: string; userId: string; role: { slug: string } }): Promise<unknown> {
