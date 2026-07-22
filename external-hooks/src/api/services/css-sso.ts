@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { createLogger } from '../utils/logger';
 import { buildPath } from '../utils/url';
+import { logger } from 'handlebars';
 
 const log = createLogger('CssSsoService');
 
@@ -124,7 +125,9 @@ export class CssSsoService {
       return response.data;
     } catch (err) {
       const detail =
-        axios.isAxiosError(err) && err.response ? `(${err.response.status}): ${err.response.data}` : String(err);
+        axios.isAxiosError(err) && err.response
+          ? `(${err.response.status}): ${JSON.stringify(err.response.data)}`
+          : String(err);
       throw new Error(`CSS SSO GET ${path} failed ${detail}`, { cause: err });
     }
   }
