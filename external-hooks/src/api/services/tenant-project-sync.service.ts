@@ -14,6 +14,38 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('TenantProjectSyncService');
 
+/**
+ * Extracts the role slug from whatever shape n8n's findProjectRole returns.
+ * n8n's findProjectRole uses findOneBy (no relation loading), so the `role` column
+ * value is returned directly as a string (the slug), not a Role entity.
+ */
+function extractRoleSlug(role: unknown): string | null {
+  // Direct string — the raw column value (most common case)
+  if (typeof role === 'string') {
+    return role;
+  }
+  if (!role || typeof role !== 'object') {
+    return null;
+  }
+  const record = role as Record<string, unknown>;
+  // Object with slug property (Role entity if relation was loaded)
+  if (typeof record.slug === 'string') {
+    return record.slug;
+  }
+  // Nested role.slug (defensive)
+  if (record.role && typeof record.role === 'object') {
+    const nested = record.role as Record<string, unknown>;
+    if (typeof nested.slug === 'string') {
+      return nested.slug;
+    }
+  }
+  // role field is itself a string (e.g. from raw relation column)
+  if (typeof record.role === 'string') {
+    return record.role;
+  }
+  return null;
+}
+
 export type SyncTenantsForUserParams = {
   ssoUserId: string;
   n8nUserId: string;
@@ -61,33 +93,36 @@ export class TenantProjectSyncService {
     log.debug('Starting tenant project sync', { ssoUserId, n8nUserId });
 
     const tenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken });
-    if (tenants.length === 0) {
-      log.debug('No CSTAR tenants for user, skipping sync', { ssoUserId });
-      return;
-    }
 
-    log.debug('Found CSTAR tenants for user', {
-      ssoUserId,
-      tenantCount: tenants.length,
-      tenantNames: tenants.map((t) => t.name),
-    });
-
-    // Process tenants concurrently — each is independent
-    const results = await Promise.allSettled(
-      tenants.map((tenant) =>
-        this.syncTenantForUser(tenant.id, tenant.name, n8nUserId, ssoUserId, accessToken, ownerUserId),
-      ),
-    );
-
-    const failures = results.filter((r) => r.status === 'rejected');
-    if (failures.length > 0) {
-      log.warn('Some tenant syncs failed', {
+    if (tenants.length > 0) {
+      log.debug('Found CSTAR tenants for user', {
         ssoUserId,
-        n8nUserId,
-        failedCount: failures.length,
-        totalCount: tenants.length,
+        tenantCount: tenants.length,
+        tenantNames: tenants.map((t) => t.name),
       });
+
+      // Process tenants concurrently — each is independent
+      const results = await Promise.allSettled(
+        tenants.map((tenant) =>
+          this.syncTenantForUser(tenant.id, tenant.name, n8nUserId, ssoUserId, accessToken, ownerUserId),
+        ),
+      );
+
+      const failures = results.filter((r) => r.status === 'rejected');
+      if (failures.length > 0) {
+        log.warn('Some tenant syncs failed', {
+          ssoUserId,
+          n8nUserId,
+          failedCount: failures.length,
+          totalCount: tenants.length,
+        });
+      }
     }
+
+    // Reconcile: remove relations for tenant projects that are no longer in CSTAR
+    // When tenants is empty, this removes ALL managed team project relations
+    const activeTenantIds = new Set(tenants.map((t) => t.id));
+    await this.removeStaleTenantProjectRelations(n8nUserId, activeTenantIds, ownerUserId);
 
     log.debug('Tenant project sync completed', { ssoUserId, n8nUserId });
   }
@@ -219,6 +254,52 @@ export class TenantProjectSyncService {
   }
 
   /**
+   * Removes managed project relations for tenants that are no longer in the user's CSTAR list.
+   * Called after syncing active tenants — handles the case where a user was removed
+   * from specific tenants but still has others.
+   * When activeTenantIds is empty, removes the user from ALL tenant projects.
+   */
+  private async removeStaleTenantProjectRelations(
+    n8nUserId: string,
+    activeTenantIds: Set<string>,
+    ownerUserId: string,
+  ): Promise<void> {
+    const personalProject = await this.n8nRepositories.project.getPersonalProjectForUser(n8nUserId);
+    const personalProjectId = personalProject?.id ?? null;
+
+    const relations = await this.n8nRepositories.projectRelation.findAllByUser(n8nUserId);
+
+    for (const relation of relations) {
+      // Skip the personal project
+      if (relation.projectId === personalProjectId) continue;
+
+      // Check if this project is a tenant project
+      const tenantId = await this.customRepositories.tenantProjectRelation.getTenantIdByProjectId(relation.projectId);
+      if (!tenantId) continue;
+
+      // Skip if tenant is still in the active CSTAR list (already synced above)
+      if (activeTenantIds.has(tenantId)) continue;
+
+      // Extract role slug from the relation (findAllByUser eagerly loads the role)
+      const roleSlug = extractRoleSlug(relation);
+
+      // Skip global owner's admin relation
+      if (roleSlug === PROJECT_ROLE_ADMIN && n8nUserId === ownerUserId) continue;
+
+      // Only remove managed roles
+      if (roleSlug && isManagedProjectRole(roleSlug)) {
+        await this.n8nRepositories.projectRelation.delete({ projectId: relation.projectId, userId: n8nUserId });
+        log.info('Removed user from stale tenant project', {
+          n8nUserId,
+          projectId: relation.projectId,
+          previousRole: roleSlug,
+          tenantId,
+        });
+      }
+    }
+  }
+
+  /**
    * Syncs a user's relation to a tenant project.
    * - Adds or updates the relation if the user has an allowed role
    * - Removes the relation if the user no longer has an allowed role
@@ -230,12 +311,12 @@ export class TenantProjectSyncService {
     tenantId: string,
     ownerUserId: string,
   ): Promise<void> {
-    const existingRelation = (await this.n8nRepositories.projectRelation.findProjectRole({
+    const existingRelation = await this.n8nRepositories.projectRelation.findProjectRole({
       userId: n8nUserId,
       projectId,
-    })) as { role?: { slug?: string } } | null;
+    });
 
-    const currentRoleSlug = existingRelation?.role?.slug ?? null;
+    const currentRoleSlug = extractRoleSlug(existingRelation);
     log.debug('Current user project relation', { n8nUserId, projectId, currentRoleSlug, resolvedRole, tenantId });
 
     // Skip if this user is the global owner (project:admin) — don't modify their relation

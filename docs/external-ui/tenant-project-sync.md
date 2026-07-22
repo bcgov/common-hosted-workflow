@@ -55,6 +55,8 @@ Returns all tenants the user belongs to. Each tenant has an `id` and `name`.
 
 All tenants are processed in parallel via `Promise.allSettled()`. Each tenant sync is independent — one failure does not block others.
 
+> **Note:** If CSTAR returns zero tenants, this step is skipped entirely and the flow proceeds directly to Step 4 (reconciliation).
+
 #### 3a. Fetch Shared Service Roles
 
 Calls CSTAR API: `GET /api/v1/tenants/{tenantId}/ssousers/{ssoUserId}/shared-service-roles`
@@ -107,6 +109,30 @@ Determines what action to take based on the user's current relation vs. resolved
 
 The service only manages roles it owns (`project:editor`, `project:viewer`). If a user was manually assigned a different role (e.g., `project:admin`), the sync will not modify it.
 
+### Step 4: Reconcile Stale Tenant Project Relations
+
+After processing active tenants (or immediately if CSTAR returned zero tenants), a reconciliation pass runs to remove the user from any tenant projects they no longer belong to.
+
+The `removeStaleTenantProjectRelations` method:
+
+1. Fetches all the user's project relations from n8n (with role eagerly loaded)
+2. Skips the user's personal project
+3. For each remaining project, checks if it has a `tenant_project_relation` mapping
+4. If the mapped tenant is **not** in the active CSTAR tenant list → removes the user's relation (if it's a managed role)
+
+This handles two scenarios:
+
+- **User removed from all tenants** — active set is empty, so all managed team project relations are removed
+- **User removed from specific tenants** — only relations for missing tenants are removed; active tenants are preserved
+
+| Condition                                         | Result                                        |
+| ------------------------------------------------- | --------------------------------------------- |
+| Tenant still in CSTAR list                        | Relation preserved (already synced in Step 3) |
+| Tenant no longer in CSTAR list + managed role     | **Relation removed**                          |
+| Tenant no longer in CSTAR list + non-managed role | Relation preserved                            |
+| Personal project                                  | Always preserved                              |
+| Global owner `project:admin`                      | Always preserved                              |
+
 ## Configuration
 
 | Environment Variable                               | Default | Description                                      |
@@ -145,6 +171,7 @@ Maps CSTAR tenants to n8n team projects.
 5. **Race condition handling** — concurrent logins use `INSERT ... ON CONFLICT DO NOTHING` for the tenant mapping to prevent duplicate constraint violations.
 6. **Empty owner guard** — if no global owner user exists at startup, sync is skipped entirely with a warning (prevents corrupt data).
 7. **Graceful CSTAR failures** — if CSTAR API is unreachable or returns errors, individual tenant syncs fail independently without affecting other tenants.
+8. **Stale relation reconciliation** — after every sync, stale project relations (for tenants no longer in CSTAR) are removed. Only managed roles are affected; personal projects and non-managed roles are always preserved.
 
 ## Service Dependencies
 
@@ -186,7 +213,7 @@ User Login ─────────▶ OIDC Callback
                ┌── getUserTenants() ──▶ CSTAR API
                │
                ▼
-         For each tenant (parallel):
+         If tenants > 0, for each tenant (parallel):
                │
                ├── getUserSharedServiceRoles() ──▶ CSTAR API
                │
@@ -203,6 +230,19 @@ User Login ─────────▶ OIDC Callback
                │                                  syncUserProjectRelation()
                │
                └── Done (logged, errors caught per-tenant)
+                           │
+                           ▼
+         removeStaleTenantProjectRelations()
+               │
+               ├── findAllByUser() (with role loaded)
+               │
+               ├── For each non-personal, tenant-mapped project:
+               │        │
+               │        ├─ Tenant in active list? ──▶ Skip
+               │        │
+               │        └─ Tenant NOT in list + managed role? ──▶ Delete relation
+               │
+               └── Done
 ```
 
 ## Local Development

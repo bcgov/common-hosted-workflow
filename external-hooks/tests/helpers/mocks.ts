@@ -287,12 +287,19 @@ export function createMockN8nRepositories() {
       getPersonalProjectForUser: vi.fn().mockResolvedValue(defaultProject),
       getPersonalProjectForUserOrFail: vi.fn().mockResolvedValue(defaultProject),
     },
-    projectRelation: {
-      findProjectRole: vi.fn().mockResolvedValue(null),
-      findAllByUser: vi.fn().mockResolvedValue([{ projectId: VALID_PROJECT_ID }]),
-      metadata: metadata.ProjectRelation,
-      manager: makeManager(),
-    },
+    projectRelation: (() => {
+      const findProjectRoleMock = vi.fn().mockResolvedValue(null);
+      return {
+        findProjectRole: findProjectRoleMock,
+        find: vi.fn().mockImplementation(async () => {
+          const role = await findProjectRoleMock();
+          return role ? [{ role }] : [];
+        }),
+        findAllByUser: vi.fn().mockResolvedValue([{ projectId: VALID_PROJECT_ID }]),
+        metadata: metadata.ProjectRelation,
+        manager: makeManager(),
+      };
+    })(),
     workflow: { findOneBy: vi.fn(), metadata: metadata.Workflow },
     credential: { findOneBy: vi.fn() },
     sharedWorkflow: {
