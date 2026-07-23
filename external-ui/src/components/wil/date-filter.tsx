@@ -1,4 +1,5 @@
-import { IconFilter } from '@tabler/icons-react';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 
 export type DateFilterOption = {
   label: string;
@@ -34,20 +35,15 @@ interface DateFilterProps {
 
 export function DateFilter({ selected, onChange }: Readonly<DateFilterProps>) {
   return (
-    <div className="flex items-center gap-2">
-      <IconFilter size={16} className="text-[var(--bc-muted)]" aria-hidden="true" />
-      <select
-        aria-label="Date filter"
-        value={selected ?? ''}
-        onChange={(e) => onChange(e.target.value || undefined)}
-        className="h-9 rounded-md border border-[var(--bc-border)] bg-white px-3 text-sm text-[var(--bc-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bc-blue)]"
-      >
+    <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+      <Label htmlFor="date-filter">Time</Label>
+      <Select id="date-filter" value={selected ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
         {DATE_FILTER_OPTIONS.map((opt) => (
           <option key={opt.label} value={opt.value ?? ''}>
             {opt.label}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }
