@@ -1,5 +1,5 @@
 FROM node:24-alpine AS base
-RUN npm install -g pnpm@11.0.8
+RUN npm install -g pnpm@11.17.0
 
 FROM base AS deps
 RUN apk add --no-cache g++ libc6-compat make python3
