@@ -14,7 +14,7 @@ dependencies:
     repository: 'file://../_pgo'
     condition: pgo.enabled
   - name: postgresql
-    version: 18.7.8
+    version: 18.8.0
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
   - name: redis
@@ -38,7 +38,7 @@ dependencies:
     repository: 'https://grafana.github.io/helm-charts'
     condition: alloy.enabled
   - name: loki
-    version: '7.0.0'
+    version: '7.1.0'
     repository: 'https://grafana.github.io/helm-charts'
     condition: loki.enabled
   - name: tempo
