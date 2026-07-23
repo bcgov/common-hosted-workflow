@@ -2,7 +2,7 @@ FROM node:24.18.0-alpine3.23 AS build-nodes
 
 RUN apk add --no-cache libc6-compat
 
-RUN npm install -g pnpm@11.0.8
+RUN npm install -g pnpm@11.17.0
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ FROM node:24.18.0-alpine3.23 AS build-hooks
 
 RUN apk add --no-cache libc6-compat
 
-RUN npm install -g pnpm@11.0.8
+RUN npm install -g pnpm@11.17.0
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ FROM node:24.18.0-alpine3.23 AS build-ui
 
 RUN apk add --no-cache libc6-compat
 
-RUN npm install -g pnpm@11.0.8
+RUN npm install -g pnpm@11.17.0
 
 WORKDIR /app
 
@@ -53,6 +53,8 @@ COPY --from=build-hooks /app/dist /external-hooks
 COPY --from=build-hooks /app/src/api/assets /external-hooks/api/assets
 COPY --from=build-ui /app/dist /external-ui/dist
 COPY external-hooks/drizzle /external-hooks/drizzle
+
+RUN cd /community-nodes && npm install --omit=dev
 
 # Keep Swagger UI disabled by default. Enable per environment.
 ENV N8N_PORT=5678 \
