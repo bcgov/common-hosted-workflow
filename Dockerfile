@@ -52,6 +52,9 @@ COPY --from=build-nodes /app/package.json /community-nodes/package.json
 COPY --from=build-nodes /app/pnpm-lock.yaml /community-nodes/pnpm-lock.yaml
 COPY --from=build-nodes /app/pnpm-workspace.yaml /community-nodes/pnpm-workspace.yaml
 COPY --from=build-hooks /app/dist /external-hooks
+COPY --from=build-hooks /app/package.json /external-hooks/package.json
+COPY --from=build-hooks /app/pnpm-lock.yaml /external-hooks/pnpm-lock.yaml
+COPY --from=build-hooks /app/pnpm-workspace.yaml /external-hooks/pnpm-workspace.yaml
 COPY --from=build-hooks /app/src/api/assets /external-hooks/api/assets
 COPY --from=build-ui /app/dist /external-ui/dist
 COPY external-hooks/drizzle /external-hooks/drizzle
@@ -59,6 +62,7 @@ COPY external-hooks/drizzle /external-hooks/drizzle
 USER root
 RUN npm install -g pnpm@11.17.0
 RUN cd /community-nodes && pnpm install --frozen-lockfile --prod
+RUN cd /external-hooks && pnpm install --frozen-lockfile --prod
 USER node
 
 # Keep Swagger UI disabled by default. Enable per environment.

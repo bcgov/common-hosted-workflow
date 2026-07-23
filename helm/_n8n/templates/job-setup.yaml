@@ -76,6 +76,8 @@ spec:
 
             mkdir -p "$N8N_CUSTOM_EXTENSIONS"
             cd "$N8N_CUSTOM_EXTENSIONS"
+            rm -rf "$N8N_CUSTOM_EXTENSIONS/node_modules/community-nodes"
+            rm -f "$N8N_CUSTOM_EXTENSIONS/package-lock.json"
             npm install /community-nodes
 
             cd /external-hooks

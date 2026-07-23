@@ -199,6 +199,8 @@ services:
 
           echo 'Installing community nodes';
           mkdir -p /home/node/.n8n/nodes;
+          rm -rf /home/node/.n8n/nodes/node_modules/community-nodes;
+          rm -f /home/node/.n8n/nodes/package-lock.json;
           cd /home/node/.n8n/nodes && npm install /community-nodes;
 
           echo 'Installing external hooks';
