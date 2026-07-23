@@ -56,7 +56,10 @@ COPY --from=build-hooks /app/src/api/assets /external-hooks/api/assets
 COPY --from=build-ui /app/dist /external-ui/dist
 COPY external-hooks/drizzle /external-hooks/drizzle
 
-RUN npm install -g pnpm@11.17.0 && cd /community-nodes && pnpm install --frozen-lockfile --prod
+USER root
+RUN npm install -g pnpm@11.17.0
+USER node
+RUN cd /community-nodes && pnpm install --frozen-lockfile --prod
 
 # Keep Swagger UI disabled by default. Enable per environment.
 ENV N8N_PORT=5678 \
