@@ -72,7 +72,11 @@ n8n:
     N8N_TEMPLATES_ENABLED: "false"
     N8N_PERSONALIZATION_ENABLED: "false"
     N8N_DIAGNOSTICS_ENABLED: "false"
+    N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
     N8N_HIRING_BANNER_ENABLED: "false"
+    N8N_PUBLIC_API_SWAGGERUI_DISABLED: "true"
+    # See https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/scheduler#enable-vars
+    N8N_SCHEDULER_ENABLED: "true"
     # Extra
     N8N_WORKER_SERVER_ADDRESS: "0.0.0.0"
     N8N_BLOCK_FS_WRITE_ACCESS: "true"
@@ -191,6 +195,7 @@ n8n:
 
   # Nodes disabled in all environments.
   baseExcludedNodes:
+    - "n8n-nodes-base.executeCommand" # Execute Command — no shell access in containers
     - "n8n-nodes-base.readWriteFile" # Read/Write Files from Disk — no persistent local filesystem in containers
 
   # Additional nodes to exclude on top of baseExcludedNodes.
