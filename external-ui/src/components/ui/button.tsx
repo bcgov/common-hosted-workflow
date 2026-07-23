@@ -5,22 +5,23 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bc-blue)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-control border border-transparent text-[0.8125rem] font-bold leading-none transition-[background-color,border-color,color,box-shadow] duration-150 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-[var(--bc-blue)] text-white shadow-sm hover:bg-[var(--bc-blue-dark)]',
-        secondary: 'bg-white text-[var(--bc-blue-dark)] shadow-sm hover:bg-white/90',
-        outline: 'border border-[var(--bc-border)] bg-white text-[var(--bc-text)] hover:bg-[var(--bc-surface)]',
-        ghost: 'text-[var(--bc-text)] hover:bg-[var(--bc-surface)] hover:text-[var(--bc-text)]',
-        link: 'text-[var(--bc-link)] underline-offset-4 hover:underline',
-        destructive: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
+        default: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover active:bg-primary-active',
+        secondary:
+          'border-primary bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary-hover active:bg-surface-muted',
+        outline: 'border-border-strong bg-surface text-foreground hover:bg-surface-subtle active:bg-surface-muted',
+        ghost: 'bg-transparent text-foreground hover:bg-surface-subtle active:bg-surface-muted',
+        link: 'h-auto border-0 bg-transparent px-0 py-0 text-link underline-offset-4 shadow-none hover:text-link-hover hover:underline',
+        destructive: 'bg-danger text-white shadow-sm hover:bg-danger-hover active:bg-danger-hover',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 rounded-md px-3 text-xs',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'h-10 w-10',
+        default: 'min-h-10 px-4 py-2.5',
+        sm: 'min-h-9 px-3 py-2 text-xs',
+        lg: 'min-h-11 px-6 py-3 text-sm',
+        icon: 'size-10 p-0',
       },
     },
     defaultVariants: {
