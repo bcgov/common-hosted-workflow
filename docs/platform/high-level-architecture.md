@@ -1,3 +1,9 @@
+---
+title: High-Level Architecture
+sidebar_label: Architecture
+sidebar_position: 1
+---
+
 # High-Level Architecture
 
 ```mermaid
