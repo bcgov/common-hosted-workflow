@@ -1,0 +1,118 @@
+volumes:
+  mimir_data:
+  seaweedfs_data:
+  grafana_data:
+
+# Run alongside the main stack:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+# Run standalone (no SSO — Grafana defaults to admin/admin):
+#   docker compose -f docker-compose.observability.yml up -d
+
+networks:
+  chwf:
+    driver: bridge
+
+# REUSABLE ANCHORS
+x-common-props: &common-props
+  # platform: linux/amd64
+  restart: unless-stopped
+  networks: [chwf]
+
+services:
+  seaweedfs:
+    <<: *common-props
+    container_name: seaweedfs
+    image: chrislusf/seaweedfs:3.84  # pin version — do not use latest
+    command: server -dir=/data -filer -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports:
+    - 8333:8333
+    volumes:
+    - seaweedfs_data:/data
+    - ../observability/seaweedfs/s3.json:/etc/seaweedfs/s3.json
+    healthcheck:
+      test: [CMD-SHELL, "wget -qO /dev/null http://$(hostname -i | awk '{print $1}'):9333/"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+
+  seaweedfs-provision:
+    <<: *common-props
+    container_name: seaweedfs-provision
+    restart: no   # Should only run once
+    image: minio/mc:RELEASE.2025-04-08T15-39-49Z  # pin version — do not use latest
+    entrypoint: /bin/sh
+    command: >
+      -c "until mc alias set local http://seaweedfs:8333 localuser localdevkey --api S3v4; do echo 'S3 not ready, retrying...'; sleep 2; done &&
+          mc mb --ignore-existing local/local-mimir-blocks &&
+          mc mb --ignore-existing local/local-mimir-alertmanager &&
+          mc mb --ignore-existing local/local-mimir-ruler"
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+
+  mimir:
+    <<: *common-props
+    container_name: mimir
+    image: grafana/mimir:2.17.11
+    command:
+    - -config.file=/etc/mimir/config.yaml
+    - -target=all
+    ports:
+    - 9009:9009
+    volumes:
+    - mimir_data:/data
+    - ../observability/mimir/config.yaml:/etc/mimir/config.yaml
+    depends_on:
+      seaweedfs-provision:
+        condition: service_completed_successfully
+
+  grafana:
+    <<: *common-props
+    container_name: grafana
+    image: grafana/grafana:12.3.1
+    environment:
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin # pragma: allowlist secret
+      # Login form kept enabled so grafana is accessible without SSO when running standalone
+      GF_AUTH_DISABLE_LOGIN_FORM: 'false'
+      GF_AUTH_GENERIC_OAUTH_ENABLED: 'true'
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${OIDC_CLIENT_ID}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${OIDC_AUTHORIZATION_ENDPOINT}
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${OIDC_TOKEN_ENDPOINT}
+      GF_AUTH_GENERIC_OAUTH_API_URL: ${OIDC_USERINFO_ENDPOINT}
+      # Reuse the n8n roles already provisioned by keycloak-provision
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: contains(client_roles[*], 'global:admin') && 'Admin' || contains(client_roles[*], 'global:member') && 'Editor' || 'Viewer'
+    ports:
+    - 3000:3000
+    volumes:
+    - grafana_data:/var/lib/grafana
+    - ../observability/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    - ../helm/main/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      mimir:
+        condition: service_started
+
+  alloy:
+    <<: *common-props
+    container_name: alloy
+    image: grafana/alloy:v1.17.1
+    command:
+    - run
+    - /etc/alloy/config.alloy
+    - --storage.path=/tmp/alloy
+    - --server.http.listen-addr=0.0.0.0:12345
+    ports:
+    - 12345:12345
+    environment:
+      ALLOY_N8N_ADDRESS: n8n:5678
+      ALLOY_MIMIR_URL: http://mimir:9009/api/v1/push
+    volumes:
+    - ../helm/main/alloy/config.alloy:/etc/alloy/config.alloy
+    depends_on:
+      mimir:
+        condition: service_started
