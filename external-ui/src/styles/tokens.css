@@ -1,0 +1,124 @@
+@theme inline {
+  --font-sans: 'BC Sans', Arial, sans-serif;
+
+  --color-background: var(--ds-color-background);
+  --color-foreground: var(--ds-color-foreground);
+  --color-surface: var(--ds-color-surface);
+  --color-surface-subtle: var(--ds-color-surface-subtle);
+  --color-surface-muted: var(--ds-color-surface-muted);
+  --color-border: var(--ds-color-border);
+  --color-border-strong: var(--ds-color-border-strong);
+  --color-muted-foreground: var(--ds-color-muted-foreground);
+
+  --color-primary: var(--ds-color-primary);
+  --color-primary-hover: var(--ds-color-primary-hover);
+  --color-primary-active: var(--ds-color-primary-active);
+  --color-primary-foreground: var(--ds-color-primary-foreground);
+  --color-secondary: var(--ds-color-secondary);
+  --color-secondary-hover: var(--ds-color-secondary-hover);
+  --color-secondary-foreground: var(--ds-color-secondary-foreground);
+  --color-accent: var(--ds-color-accent);
+  --color-link: var(--ds-color-link);
+  --color-link-hover: var(--ds-color-link-hover);
+  --color-focus: var(--ds-color-focus);
+
+  --color-danger: var(--ds-color-danger);
+  --color-danger-hover: var(--ds-color-danger-hover);
+  --color-danger-surface: var(--ds-color-danger-surface);
+  --color-danger-foreground: var(--ds-color-danger-foreground);
+  --color-success: var(--ds-color-success);
+  --color-success-surface: var(--ds-color-success-surface);
+  --color-success-foreground: var(--ds-color-success-foreground);
+  --color-warning: var(--ds-color-warning);
+  --color-warning-surface: var(--ds-color-warning-surface);
+  --color-warning-foreground: var(--ds-color-warning-foreground);
+  --color-information: var(--ds-color-information);
+  --color-information-surface: var(--ds-color-information-surface);
+  --color-information-foreground: var(--ds-color-information-foreground);
+
+  --radius-control: 0.25rem;
+  --radius-card: 0.5rem;
+  --radius-dialog: 0.5rem;
+
+  --shadow-card: 0 1px 2px rgb(37 36 35 / 8%);
+  --shadow-card-hover: 0 4px 12px rgb(37 36 35 / 14%);
+  --shadow-dialog: 0 16px 40px rgb(37 36 35 / 24%);
+
+  --container-content: 75rem;
+}
+
+:root {
+  color-scheme: light;
+
+  --bcgov-blue-950: #01264c;
+  --bcgov-blue-900: #013366;
+  --bcgov-blue-700: #1e5189;
+  --bcgov-blue-600: #255a90;
+  --bcgov-gold-500: #fcba19;
+  --bcgov-red-600: #ce3e39;
+  --bcgov-green-600: #42814a;
+  --bcgov-yellow-500: #f8bb47;
+  --bcgov-gray-950: #252423;
+  --bcgov-gray-700: #606060;
+  --bcgov-gray-500: #898785;
+  --bcgov-gray-300: #d8d8d8;
+  --bcgov-gray-200: #e8e8e8;
+  --bcgov-gray-100: #f2f2f2;
+  --bcgov-gray-50: #faf9f8;
+  --bcgov-white: #ffffff;
+
+  --ds-color-background: var(--bcgov-white);
+  --ds-color-foreground: var(--bcgov-gray-950);
+  --ds-color-surface: var(--bcgov-white);
+  --ds-color-surface-subtle: var(--bcgov-gray-50);
+  --ds-color-surface-muted: var(--bcgov-gray-100);
+  --ds-color-border: var(--bcgov-gray-300);
+  --ds-color-border-strong: var(--bcgov-gray-500);
+  --ds-color-muted-foreground: var(--bcgov-gray-700);
+
+  --ds-color-primary: var(--bcgov-blue-900);
+  --ds-color-primary-hover: var(--bcgov-blue-950);
+  --ds-color-primary-active: #001b35;
+  --ds-color-primary-foreground: var(--bcgov-white);
+  --ds-color-secondary: var(--bcgov-white);
+  --ds-color-secondary-hover: var(--bcgov-gray-100);
+  --ds-color-secondary-foreground: var(--bcgov-blue-900);
+  --ds-color-accent: var(--bcgov-gold-500);
+  --ds-color-link: var(--bcgov-blue-600);
+  --ds-color-link-hover: var(--bcgov-blue-950);
+  --ds-color-focus: var(--bcgov-blue-700);
+
+  --ds-color-danger: var(--bcgov-red-600);
+  --ds-color-danger-hover: #a72f2b;
+  --ds-color-danger-surface: #fcebea;
+  --ds-color-danger-foreground: #711e1a;
+  --ds-color-success: var(--bcgov-green-600);
+  --ds-color-success-surface: #eaf4eb;
+  --ds-color-success-foreground: #234c28;
+  --ds-color-warning: var(--bcgov-yellow-500);
+  --ds-color-warning-surface: #fff4d6;
+  --ds-color-warning-foreground: #5f4300;
+  --ds-color-information: var(--bcgov-blue-700);
+  --ds-color-information-surface: #e9f1f8;
+  --ds-color-information-foreground: var(--bcgov-blue-950);
+
+  --ds-header-height: 4rem;
+  --ds-footer-height: 4rem;
+  --ds-page-gutter: clamp(1rem, 4vw, 2rem);
+  --ds-section-gap: clamp(1.5rem, 3vw, 2rem);
+  --ds-focus-width: 0.1875rem;
+  --ds-focus-offset: 0.125rem;
+  --ds-transition-fast: 150ms;
+  --ds-transition-standard: 200ms;
+
+  /* Temporary compatibility aliases for components not yet migrated. */
+  --bc-blue: var(--ds-color-primary);
+  --bc-blue-dark: var(--ds-color-primary-hover);
+  --bc-gold: var(--ds-color-accent);
+  --bc-surface: var(--ds-color-surface-subtle);
+  --bc-card: var(--ds-color-surface);
+  --bc-border: var(--ds-color-border);
+  --bc-text: var(--ds-color-foreground);
+  --bc-muted: var(--ds-color-muted-foreground);
+  --bc-link: var(--ds-color-link);
+}
