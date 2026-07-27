@@ -601,7 +601,7 @@ grafana:
       provider:
         foldersFromFilesStructure: true
   # Helm/OpenShift datasource provisioning.
-  # Docker-compose equivalent: observability/grafana/datasources.yaml
+  # Docker-compose equivalents: docker-compose/observability/grafana/datasources.yaml and dashboards.yaml
   # Keep in sync when adding or changing datasources.
   # Port note: Mimir is on 8080 here (Helm subchart default). Docker-compose uses 9009
   # (upstream Mimir default). The uid must stay "prometheus" in both — dashboards

@@ -29,7 +29,7 @@ repos:
       (?x)^(
           docker-compose/n8n/demo-data/ |
           docker-compose/sdg-mock-app/src/app/api/v1/mock-data\.json$ |
-          observability/seaweedfs/s3\.json$ |
+          docker-compose/observability/seaweedfs/s3\.json$ |
           pnpm-lock\.yaml$ |
           .*/pnpm-lock\.yaml$
       )

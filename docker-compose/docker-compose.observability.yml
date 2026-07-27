@@ -28,7 +28,7 @@ services:
     - 8333:8333
     volumes:
     - seaweedfs_data:/data
-    - ../observability/seaweedfs/s3.json:/etc/seaweedfs/s3.json
+    - ./observability/seaweedfs/s3.json:/etc/seaweedfs/s3.json
     healthcheck:
       test: [CMD-SHELL, "wget -qO /dev/null http://$(hostname -i | awk '{print $1}'):9333/"]
       interval: 5s
@@ -62,7 +62,7 @@ services:
     - 9009:9009
     volumes:
     - mimir_data:/data
-    - ../observability/mimir/config.yaml:/etc/mimir/config.yaml
+    - ./observability/mimir/config.yaml:/etc/mimir/config.yaml
     depends_on:
       seaweedfs-provision:
         condition: service_completed_successfully
@@ -91,8 +91,9 @@ services:
     - 3000:3000
     volumes:
     - grafana_data:/var/lib/grafana
-    - ../observability/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
-    - ../helm/main/dashboards:/etc/grafana/provisioning/dashboards
+    - ./observability/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    - ./observability/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+    - ../helm/main/dashboards/n8n:/etc/grafana/provisioning/dashboards/n8n
     depends_on:
       mimir:
         condition: service_started
