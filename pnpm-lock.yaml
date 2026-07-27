@@ -21,8 +21,8 @@ importers:
         specifier: ^7.0.6
         version: 7.0.6(release-it@20.2.1(@types/node@25.9.0))
       '@repo-toolkit/changelog':
-        specifier: ^0.2.0
-        version: 0.2.0(conventional-commits-filter@5.0.0)
+        specifier: ^0.7.0
+        version: 0.7.2(conventional-commits-filter@5.0.0)
       '@types/node':
         specifier: ^25.6.2
         version: 25.9.0
@@ -363,8 +363,13 @@ packages:
     peerDependencies:
       release-it: ^18.0.0 || ^19.0.0 || ^20.0.0
 
-  '@repo-toolkit/changelog@0.2.0':
-    resolution: {integrity: sha512-KwYAPb5wfL4y3jlAUPoNVx/y9A8ZyxE2EYsNRRrrLCWJD44MumoJPCbAEUaWcCottVIMGLq4S6Eju9W53wBFRQ==}
+  '@repo-toolkit/changelog@0.7.2':
+    resolution: {integrity: sha512-u91IxH5NQd5avn470shFY6d40oDA4DmKirTFpOQ8VanWzvAmUM4/bsPVrU5hkvoMpD4eVaDnRpvJbfQfJPdXHg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  '@repo-toolkit/publish-package@0.7.2':
+    resolution: {integrity: sha512-8CtEX6mZQK/wMUMRIER7S3m6CQ6dNwX55zcway/ZHoZzBOb7c7bgG7BIQVD67rj2bsJKT79xxei/b7aGHxOv6w==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -1824,12 +1829,15 @@ snapshots:
       release-it: 20.2.1(@types/node@25.9.0)
       semver: 7.8.5
 
-  '@repo-toolkit/changelog@0.2.0(conventional-commits-filter@5.0.0)':
+  '@repo-toolkit/changelog@0.7.2(conventional-commits-filter@5.0.0)':
     dependencies:
+      '@repo-toolkit/publish-package': 0.7.2
       conventional-changelog: 7.2.1(conventional-commits-filter@5.0.0)
       conventional-changelog-conventionalcommits: 9.3.1
     transitivePeerDependencies:
       - conventional-commits-filter
+
+  '@repo-toolkit/publish-package@0.7.2': {}
 
   '@simple-libs/child-process-utils@1.0.2':
     dependencies:

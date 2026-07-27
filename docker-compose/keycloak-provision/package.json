@@ -9,7 +9,7 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "@egose/keycloak-fluent": "^0.6.4",
+    "@egose/keycloak-fluent": "^0.10.0",
     "wait-on": "^9.0.6"
   },
   "devDependencies": {
