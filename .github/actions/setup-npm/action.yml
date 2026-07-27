@@ -14,6 +14,7 @@ runs:
         external-ui
         external-hooks
         docker-compose/sdg-mock-app
+        doc-site
 
   - name: Set executable permissions for local format scripts
     run: |

@@ -25,17 +25,17 @@ jobs:
     timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       with:
-        node-version: 20
-        cache: npm
-        cache-dependency-path: doc-site/package-lock.json
+        fetch-depth: 0
 
-    - run: |
-        npm ci
-        npm run build
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Setup NPM Packages
+      uses: ./.github/actions/setup-npm
+
+    - run: pnpm build
       working-directory: doc-site
       env:
         DOCS_URL: https://bcgov.github.io
