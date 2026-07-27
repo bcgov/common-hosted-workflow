@@ -1,4 +1,10 @@
-# Internal Service Agreement (ISA) — Common Hosted Workflow Platform
+---
+title: Internal Service Agreement
+sidebar_label: Service Agreement
+sidebar_position: 2
+---
+
+# Internal Service Agreement
 
 > **Document classification:** Internal — Restricted
 > **Hosting tier:** BC Gov Private Cloud — **Gold** (Kamloops) + **Gold DR** (Calgary)
