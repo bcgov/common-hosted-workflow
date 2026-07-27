@@ -1,0 +1,26 @@
+// Scrape n8n /metrics endpoint (requires N8N_METRICS=true)
+// Addresses are injected via environment variables so this file works in both
+// docker-compose (ALLOY_N8N_ADDRESS=n8n:5678) and Helm/OpenShift (chwf-n8n-main:5678).
+prometheus.scrape "n8n" {
+  targets = [{
+    "__address__"      = env("ALLOY_N8N_ADDRESS"),
+    "__metrics_path__" = "/metrics",
+    "job"              = "n8n",
+    "app"              = "n8n",
+  }]
+  scrape_interval = "30s"
+  scrape_timeout  = "20s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = env("ALLOY_MIMIR_URL")
+
+    queue_config {
+      capacity    = 10000
+      min_backoff = "1s"
+      max_backoff = "5m"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: warn
+
+common:
+  storage:
+    backend: s3
+    s3:
+      endpoint: seaweedfs:8333
+      access_key_id: localuser
+      secret_access_key: localdevkey # pragma: allowlist secret
+      insecure: true
+      bucket_lookup_type: path
+
+blocks_storage:
+  backend: s3
+  s3:
+    bucket_name: local-mimir-blocks
+  tsdb:
+    dir: /data/tsdb
+
+alertmanager_storage:
+  backend: s3
+  s3:
+    bucket_name: local-mimir-alertmanager
+
+ruler_storage:
+  backend: s3
+  s3:
+    bucket_name: local-mimir-ruler
+
+compactor:
+  data_dir: /data/compactor
+
+ingester:
+  ring:
+    replication_factor: 1
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1

@@ -82,7 +82,17 @@ x-n8n-env: &n8n-env
   WIL_ENCRYPTION_KEY: ${WIL_ENCRYPTION_KEY}
   WIL_ENCRYPTION_KEY_ACTIVE: ${WIL_ENCRYPTION_KEY_ACTIVE:-1}
   CHEFS_API_KEY_PLACEHOLDER: ${CHEFS_API_KEY_PLACEHOLDER}
-
+  # Prometheus metrics — exposed at :5678/metrics, scraped by Alloy when observability stack is running
+  N8N_METRICS: 'true'
+  # Executions dashboard — labels on execution_duration_seconds needed for workflow name join
+  N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL: 'true'
+  N8N_METRICS_INCLUDE_WORKFLOW_NAME_LABEL: 'true'
+  # Executions dashboard — enables n8n_workflow_started_total (join target for workflow name)
+  N8N_METRICS_INCLUDE_MESSAGE_EVENT_BUS_METRICS: 'true'
+  N8N_METRICS_INCLUDE_QUEUE_METRICS: 'true'
+  # Health dashboard — instance stats and cache performance
+  N8N_METRICS_INCLUDE_WORKFLOW_STATISTICS: 'true'
+  N8N_METRICS_INCLUDE_CACHE_METRICS: 'true'
 services:
   sdg-mock-app:
     <<: *common-props

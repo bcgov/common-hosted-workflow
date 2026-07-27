@@ -1,0 +1,15 @@
+# Docker-compose datasource provisioning.
+# Helm/OpenShift equivalent: helm/main/values.yaml → grafana.datasources
+# Keep in sync when adding or changing datasources.
+#
+# Port note: Mimir listens on 9009 here because the docker-compose observability
+# stack uses the default Mimir HTTP port. The Helm subchart exposes 8080.
+# The uid must stay "prometheus" in both environments — dashboards reference
+# the datasource by uid, so a mismatch silently breaks all panel queries.
+apiVersion: 1
+datasources:
+- name: Mimir
+  type: prometheus
+  uid: prometheus
+  url: http://mimir:9009/prometheus
+  isDefault: true

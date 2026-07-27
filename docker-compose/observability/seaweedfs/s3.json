@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "mimir",
+      "credentials": [
+        {
+          "accessKey": "localuser",
+          "secretKey": "localdevkey"
+        }
+      ],
+      "actions": ["Read", "Write", "List", "Tagging", "Admin"]
+    }
+  ]
+}
