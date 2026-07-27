@@ -1,0 +1,103 @@
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-italic.woff') format('woff');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BC Sans';
+  src: url('/fonts/bcsans-bold-italic.woff') format('woff');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+html {
+  min-width: 20rem;
+  min-height: 100%;
+  background: var(--ds-color-background);
+  color: var(--ds-color-foreground);
+  font-family: 'BC Sans', Arial, sans-serif;
+  font-size: 100%;
+  line-height: 1.5;
+  text-size-adjust: 100%;
+}
+
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ds-color-background);
+  color: var(--ds-color-foreground);
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+a {
+  color: var(--ds-color-link);
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  color: var(--ds-color-link-hover);
+}
+
+:focus-visible {
+  outline: var(--ds-focus-width) solid var(--ds-color-focus);
+  outline-offset: var(--ds-focus-offset);
+}
+
+::selection {
+  background: var(--ds-color-information-surface);
+  color: var(--ds-color-information-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
