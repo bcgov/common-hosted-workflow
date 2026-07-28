@@ -58,10 +58,12 @@ function createHookConfig() {
           mountOidc({
             app,
             n8nRepositories: n8nRuntime.n8nRepositories,
+            customRepositories,
             authService: n8nServices.authService,
             jwtService: n8nServices.jwtService,
             userService: n8nServices.userService,
             tenantProjectSyncService: services.tenantProjectSync,
+            cstarService: services.cstar,
           });
           mountAssets(app);
 
