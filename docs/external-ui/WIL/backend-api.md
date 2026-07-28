@@ -22,7 +22,7 @@ Returns available tenants for the logged-in user.
 }
 ```
 
-**Notes:** Currently resolves tenants from the `tenant_project_relation` table. TODO: Replace with CSTAR API integration for real tenant names and user-specific access.
+**Notes:** Tenant sourcing and current limitations are documented in [`../wil-tenant-source-and-limitations.md`](../wil-tenant-source-and-limitations.md). In short, `GET /ui-api/wil/tenants` now uses `TenantService.listTenantsForUser()`, while route-level tenant scoping still relies on `tenant_project_relation` plus a TODO for stronger CSTAR verification.
 
 ---
 

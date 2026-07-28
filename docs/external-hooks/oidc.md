@@ -96,7 +96,7 @@ When `OIDC_ISSUER` is not set, all of the following must be provided:
   When `OIDC_ISSUER` is not set, this provides the IDP logout URL for upstream single-logout. If not set, logout redirects directly without IDP involvement.
 
 - `SSO_RESTRICT_NO_ROLE`
-  When `true`, users without a mapped OIDC role cannot be newly provisioned, and existing users are synced to an empty role when the token carries no valid role.
+  When `true`, users without a mapped OIDC role are checked for CSTAR managed project roles during sign-in. If they have one, they receive `global:member`. If they do not, new users are not provisioned and existing users are synced to an empty role. If CSTAR verification fails, sign-in fails.
 
 ---
 
@@ -125,8 +125,9 @@ The callback uses email as the primary identity key.
 Default role assignment during creation:
 
 - First user in the system: `global:owner`
-- Later users: `global:member`
+- Later users: the resolved next role from OIDC or fallback logic
 - If a valid OIDC role exists, it overrides the default above.
+- If no valid OIDC role exists, later users may still receive `global:member` from the CSTAR managed project-role fallback or, when `SSO_RESTRICT_NO_ROLE=false`, from the unrestricted default.
 
 ---
 
@@ -148,16 +149,17 @@ Examples:
 Role sync behavior:
 
 - If `SSO_RESTRICT_NO_ROLE=false`, the next role becomes the mapped OIDC role, or `global:member` when the token has no valid role.
-- If `SSO_RESTRICT_NO_ROLE=true`, the next role becomes the mapped OIDC role, or an empty string when the token has no valid role.
+- If `SSO_RESTRICT_NO_ROLE=true`, the next role becomes the mapped OIDC role, or `global:member` when CSTAR shows a managed project role in any tenant, or an empty string when neither condition is true.
 - A role change is applied only when the current and next roles differ.
 
 ### `SSO_RESTRICT_NO_ROLE` behavior
 
 When `SSO_RESTRICT_NO_ROLE=true`:
 
-- New users are not created if no valid OIDC role is present.
+- New users are not created if neither a valid OIDC role nor a qualifying CSTAR managed project role is present.
 - Existing users are still allowed to authenticate.
-- Existing users are synced to an empty role if the token has no valid role.
+- Existing users are synced to an empty role if neither a valid OIDC role nor a qualifying CSTAR managed project role is present.
+- If CSTAR verification fails during the fallback check, sign-in fails instead of silently treating the user as role-less.
 
 ---
 
