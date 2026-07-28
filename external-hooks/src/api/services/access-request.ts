@@ -11,6 +11,7 @@ import { renderEmail } from './email-templates';
 import { accessRequest, type AccessRequest } from '../../db/schema/access-request';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
+import { ensurePersonalProjectTenantMapping } from './personal-project-tenant';
 
 const log = createLogger('AccessRequestService');
 
@@ -182,40 +183,11 @@ export class AccessRequestService {
       }
     }
 
-    // Add Unique Generated Tenant Id to Personal Project
-    await this.assignTenantToPersonalProject(targetUser.id, project);
-  }
-
-  /**
-   * Assigns a unique generated tenant ID to the user's personal project.
-   * Skips assignment if the project already has a tenant mapping (idempotent).
-   * Uses insertIgnoreConflict to handle concurrent race conditions gracefully.
-   */
-  private async assignTenantToPersonalProject(userId: string, projectRepo: N8nRepositories['project']): Promise<void> {
-    const personalProject = await projectRepo.getPersonalProjectForUser(userId);
-    if (!personalProject) {
-      log.warn('No personal project found for user after approval, skipping tenant assignment', { userId });
-      return;
-    }
-
-    const existingTenantId = await this.customRepositories.tenantProjectRelation.getTenantIdByProjectId(
-      personalProject.id,
-    );
-    if (existingTenantId) {
-      log.info('Personal project already has a tenant mapping, skipping', { userId, tenantId: existingTenantId });
-      return;
-    }
-
-    const tenantId = crypto.randomUUID();
-    await this.customRepositories.tenantProjectRelation.insertIgnoreConflict({
-      tenantId,
-      projectId: personalProject.id,
-    });
-
-    log.info('Assigned tenant to personal project after access request approval', {
-      userId,
-      projectId: personalProject.id,
-      tenantId,
+    await ensurePersonalProjectTenantMapping({
+      userId: targetUser.id,
+      projectRepo: project,
+      tenantProjectRelationRepository: this.customRepositories.tenantProjectRelation,
+      reason: 'access-request-approval',
     });
   }
 

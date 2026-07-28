@@ -36,17 +36,20 @@ import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
 import type { N8nUser } from '../types/user';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { AuthService } from '../services/auth';
 import type { CstarService } from '../services/cstar.service';
 import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
+import { ensurePersonalProjectTenantMapping } from '../services/personal-project-tenant';
 
 const log = createLogger('OIDCHook');
 const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
 
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
+  customRepositories: CustomRepositories;
   authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
@@ -95,6 +98,7 @@ async function redirectToAccessRequest(
 
 export function buildOidcRouter({
   n8nRepositories,
+  customRepositories,
   authService,
   jwtService,
   userService,
@@ -227,6 +231,13 @@ export function buildOidcRouter({
         user.disabled = false;
         log.info('User re-enabled after receiving a valid OIDC role', { email: identity.email });
       }
+
+      await ensurePersonalProjectTenantMapping({
+        userId: user.id,
+        projectRepo: n8nRepositories.project,
+        tenantProjectRelationRepository: customRepositories.tenantProjectRelation,
+        reason: 'oidc-login',
+      });
 
       // Sync tenant projects (non-blocking — errors are logged but don't fail login)
       if (completion.tokens.access_token) {

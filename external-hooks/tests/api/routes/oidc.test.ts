@@ -40,6 +40,12 @@ function createMockParams(): BuildOidcRouterParams {
       withTransaction: {} as any,
       raw: {} as any,
     },
+    customRepositories: {
+      tenantProjectRelation: {
+        getTenantIdByProjectId: async () => null,
+        insertIgnoreConflict: async () => undefined,
+      },
+    } as any,
     authService: {
       invalidateToken: async () => undefined,
       clearCookie: () => undefined,
