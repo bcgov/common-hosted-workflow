@@ -2,6 +2,7 @@ import { type Express } from 'express';
 import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from '../helpers/n8n-oidc';
 import { buildOidcRouter } from '../routes/oidc';
 import type { AuthService } from '../services/auth';
+import type { CstarService } from '../services/cstar.service';
 import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
@@ -17,6 +18,7 @@ type MountOidcParams = {
   jwtService: JwtService;
   userService: UserService;
   tenantProjectSyncService: TenantProjectSyncService;
+  cstarService: CstarService;
 };
 
 export function mountOidc({
@@ -26,6 +28,7 @@ export function mountOidc({
   jwtService,
   userService,
   tenantProjectSyncService,
+  cstarService,
 }: MountOidcParams) {
   const config = getN8nOidcConfigFromEnv();
   const missing = validateN8nOidcConfig(config);
@@ -43,6 +46,7 @@ export function mountOidc({
       jwtService,
       userService,
       tenantProjectSyncService,
+      cstarService,
       config,
     }),
   );
