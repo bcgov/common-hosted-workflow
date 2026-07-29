@@ -9,6 +9,9 @@ on:
     - docs/**
     - .github/workflows/docs-to-confluence.yml
 
+permissions:
+  contents: read
+
 jobs:
   docs-as-code:
     runs-on: ubuntu-latest
