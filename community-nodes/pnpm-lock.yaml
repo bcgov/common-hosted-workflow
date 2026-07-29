@@ -19,8 +19,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.7.0(supports-color@8.1.1))
       '@n8n/eslint-plugin-community-nodes':
-        specifier: ^0.25.0
-        version: 0.25.0(eslint@10.7.0(supports-color@8.1.1))(n8n-workflow@2.16.0)(supports-color@8.1.1)(typescript@6.0.3)
+        specifier: ^0.26.0
+        version: 0.26.0(eslint@10.7.0(supports-color@8.1.1))(n8n-workflow@2.16.0)(supports-color@8.1.1)(typescript@6.0.3)
       '@n8n/node-cli':
         specifier: ^0.40.0
         version: 0.40.3(a2bfcaa7e2756ee718a0cc77789ce2a3)
@@ -1087,6 +1087,12 @@ packages:
 
   '@n8n/eslint-plugin-community-nodes@0.25.0':
     resolution: {integrity: sha512-qSOrldDCeZmV1eOds/SWqbS/YMyjZrnRRJI1/VDxBU7aa+Jk2jO4DkKp7R5hvhjRH3CosQ0+hW/4WP1xxxuWPw==}
+    peerDependencies:
+      eslint: 9.29.0
+      n8n-workflow: '>=2'
+
+  '@n8n/eslint-plugin-community-nodes@0.26.0':
+    resolution: {integrity: sha512-UuynO/NvcbfNIWuHUjd/4hRYfmEzjRJsE4KjKh6z6eGQsuTVYO7QeVPM+4SJLrx8oxzwfSo7IqYc8G0jyb0VOA==}
     peerDependencies:
       eslint: 9.29.0
       n8n-workflow: '>=2'
@@ -7193,6 +7199,17 @@ snapshots:
       - supports-color
       - typescript
 
+  '@n8n/eslint-plugin-community-nodes@0.26.0(eslint@10.7.0(supports-color@8.1.1))(n8n-workflow@2.16.0)(supports-color@8.1.1)(typescript@6.0.3)':
+    dependencies:
+      '@typescript-eslint/typescript-estree': 8.65.0(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.65.0(eslint@10.7.0(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      eslint: 10.7.0(supports-color@8.1.1)
+      fastest-levenshtein: 1.0.16
+      n8n-workflow: 2.16.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@n8n/expression-runtime@0.22.1':
     dependencies:
       '@n8n/errors': 0.12.0
@@ -8190,8 +8207,8 @@ snapshots:
 
   '@typescript-eslint/project-service@8.64.0(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.64.0(typescript@6.0.3)
-      '@typescript-eslint/types': 8.64.0
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/types': 8.65.0
       debug: 4.4.3(supports-color@8.1.1)
       typescript: 6.0.3
     transitivePeerDependencies:
