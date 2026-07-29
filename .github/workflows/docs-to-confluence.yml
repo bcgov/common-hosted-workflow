@@ -14,6 +14,7 @@ on:
 jobs:
   docs-as-code:
     runs-on: ubuntu-latest
+    environment: confluence
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
