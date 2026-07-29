@@ -1,4 +1,4 @@
-name: gh-pages
+name: Publish Documentation
 
 on:
   workflow_dispatch:

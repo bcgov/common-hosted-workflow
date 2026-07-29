@@ -1,0 +1,29 @@
+name: Sync Docs to Confluence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+    - main
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'docs/**'
+
+jobs:
+  docs-as-code:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Sync Markdown to Confluence
+      uses: Bhacaz/docs-as-code-confluence@v3.2.2
+      with:
+        folder: docs
+        username: ${{ secrets.CONFLUENCE_USERNAME }}
+        password: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        confluence-base-url: ${{ vars.CONFLUENCE_BASE_URL }}
+        space-key: ${{ vars.CONFLUENCE_SPACE_KEY }}
+        parent-page-id: ${{ vars.CONFLUENCE_PARENT_PAGE_ID }}
