@@ -260,8 +260,65 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+      const logoutButton = screen.getByRole('button', { name: 'Log out' });
+      expect(logoutButton).toHaveTextContent('Log out');
+      expect(logoutButton.querySelector('svg')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    });
+
+    it('marks the current page and exposes its active visual treatment', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      const homeLink = screen.getByRole('link', { name: 'Home' });
+      expect(homeLink).toHaveAttribute('aria-current', 'page');
+      expect(homeLink).toHaveClass('bg-white/15', 'font-bold', 'after:left-0', 'after:right-0');
+      expect(homeLink).not.toHaveClass('hover:underline');
+    });
+
+    it('left-aligns a single desktop item', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('xl:ml-20', 'xl:justify-start');
+    });
+
+    it('adds the hover underline treatment only to inactive links', () => {
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: false,
+          role: null,
+        },
+        permissions: {
+          isAdmin: false,
+          canRequestAccess: true,
+          canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
+        },
+      };
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('link', { name: 'Access Request' })).toHaveClass(
+        'hover:underline',
+        'hover:decoration-2',
+        'hover:decoration-white/70',
+      );
     });
 
     it('opens and closes the responsive main menu', async () => {
