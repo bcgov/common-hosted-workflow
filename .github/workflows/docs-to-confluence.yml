@@ -2,14 +2,12 @@ name: Sync Docs to Confluence
 
 on:
   workflow_dispatch:
-  pull_request:
+  push:
     branches:
     - main
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - 'docs/**'
+    paths:
+    - docs/**
+    - .github/workflows/docs-to-confluence.yml
 
 jobs:
   docs-as-code:
@@ -17,10 +15,10 @@ jobs:
     environment: confluence
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
     - name: Sync Markdown to Confluence
-      uses: Bhacaz/docs-as-code-confluence@v3.2.2
+      uses: Bhacaz/docs-as-code-confluence@a869d3d27b293b12cc3bf86c95b6e72a29030bea
       with:
         folder: docs
         username: ${{ secrets.CONFLUENCE_USERNAME }}
