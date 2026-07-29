@@ -64,24 +64,24 @@ export function StatusFilter({ selected, onChange, counts }: Readonly<StatusFilt
   }
 
   return (
-    <fieldset className="flex flex-wrap gap-1.5 border-0 p-0 m-0">
+    <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0">
       <legend className="sr-only">Status filter</legend>
 
       {/* All button */}
       <button
         type="button"
         onClick={selectAll}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+        className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
           isAll
-            ? 'bg-[var(--bc-blue)] text-white border-[var(--bc-blue)]'
-            : 'bg-white text-[var(--bc-muted)] border-[var(--bc-border)] hover:border-[var(--bc-blue)]'
+            ? 'border-primary bg-primary text-primary-foreground'
+            : 'border-border-strong bg-surface text-muted-foreground hover:border-primary hover:text-foreground'
         }`}
         aria-pressed={isAll}
       >
         <IconList size={12} aria-hidden="true" />
         All
         {totalCount !== undefined && totalCount > 0 && (
-          <span className={`ml-0.5 text-[10px] font-semibold ${isAll ? 'text-white/80' : 'text-[var(--bc-text)]'}`}>
+          <span className={`ml-0.5 text-[10px] font-bold ${isAll ? 'text-white/80' : 'text-foreground'}`}>
             ({totalCount})
           </span>
         )}
@@ -97,19 +97,17 @@ export function StatusFilter({ selected, onChange, counts }: Readonly<StatusFilt
             key={status}
             type="button"
             onClick={() => toggleStatus(status)}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+            className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
               isActive
-                ? 'bg-[var(--bc-blue)] text-white border-[var(--bc-blue)]'
-                : 'bg-white text-[var(--bc-muted)] border-[var(--bc-border)] hover:border-[var(--bc-blue)]'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border-strong bg-surface text-muted-foreground hover:border-primary hover:text-foreground'
             }`}
             aria-pressed={isActive}
           >
             {Icon && <Icon size={12} aria-hidden="true" />}
             {formatStatusLabel(status)}
             {statusCount !== undefined && statusCount > 0 && (
-              <span
-                className={`ml-0.5 text-[10px] font-semibold ${isActive ? 'text-white/80' : 'text-[var(--bc-text)]'}`}
-              >
+              <span className={`ml-0.5 text-[10px] font-bold ${isActive ? 'text-white/80' : 'text-foreground'}`}>
                 ({statusCount})
               </span>
             )}
