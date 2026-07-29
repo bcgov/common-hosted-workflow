@@ -13,3 +13,14 @@ datasources:
   uid: prometheus
   url: http://mimir:9009/prometheus
   isDefault: true
+- name: Tempo
+  type: tempo
+  uid: tempo
+  url: http://tempo:3200
+  jsonData:
+    nodeGraph:
+      enabled: true
+    traceQuery:
+      timeShiftEnabled: true
+      spanStartTimeShift: -15m
+      spanEndTimeShift: 15m

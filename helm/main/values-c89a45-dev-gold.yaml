@@ -17,6 +17,7 @@ n8n:
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
     AUTHZ_ENVIRONMENT: dev
+    N8N_OTEL_TRACES_PRODUCTION_ONLY: "false"  # trace all executions in dev, not just production triggers
 
 
   route:
@@ -100,6 +101,7 @@ loki:
 tempo:
   enabled: true
   tempo:
+    retention: 720h  # 30 days
     storage:
       trace:
         s3:

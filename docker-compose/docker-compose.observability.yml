@@ -2,6 +2,7 @@ volumes:
   mimir_data:
   seaweedfs_data:
   grafana_data:
+  tempo_data:
 
 # Run alongside the main stack:
 #   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
@@ -46,7 +47,8 @@ services:
       -c "until mc alias set local http://seaweedfs:8333 localuser localdevkey --api S3v4; do echo 'S3 not ready, retrying...'; sleep 2; done &&
           mc mb --ignore-existing local/local-mimir-blocks &&
           mc mb --ignore-existing local/local-mimir-alertmanager &&
-          mc mb --ignore-existing local/local-mimir-ruler"
+          mc mb --ignore-existing local/local-mimir-ruler &&
+          mc mb --ignore-existing local/local-tempo-traces"
     depends_on:
       seaweedfs:
         condition: service_healthy
@@ -63,6 +65,20 @@ services:
     volumes:
     - mimir_data:/data
     - ./observability/mimir/config.yaml:/etc/mimir/config.yaml
+    depends_on:
+      seaweedfs-provision:
+        condition: service_completed_successfully
+
+  tempo:
+    <<: *common-props
+    container_name: tempo
+    image: grafana/tempo:2.9.0
+    command: [-config.file=/etc/tempo/config.yaml]
+    volumes:
+    - tempo_data:/var/tempo
+    - ./observability/tempo/config.yaml:/etc/tempo/config.yaml
+    ports:
+    - 3200:3200
     depends_on:
       seaweedfs-provision:
         condition: service_completed_successfully
@@ -109,11 +125,15 @@ services:
     - --server.http.listen-addr=0.0.0.0:12345
     ports:
     - 12345:12345
+    - 4318:4318
     environment:
       ALLOY_N8N_ADDRESS: n8n:5678
       ALLOY_MIMIR_URL: http://mimir:9009/api/v1/push
+      ALLOY_TEMPO_URL: tempo:4317
     volumes:
     - ../helm/main/alloy/config.alloy:/etc/alloy/config.alloy
     depends_on:
       mimir:
+        condition: service_started
+      tempo:
         condition: service_started
