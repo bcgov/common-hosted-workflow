@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">OIDC external hook | Common Hosted Workflow</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="OIDC external hook | Common Hosted Workflow"><meta data-rh="true" name="description" content="Custom OIDC authentication for n8n is implemented in external-hooks/src/api/hooks.ts and related helpers/routes."><meta data-rh="true" property="og:description" content="Custom OIDC authentication for n8n is implemented in external-hooks/src/api/hooks.ts and related helpers/routes."><link data-rh="true" rel="icon" href="/common-hosted-workflow/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc" hreflang="en"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"OIDC external hook","item":"https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"}]}</script><link rel="stylesheet" href="/common-hosted-workflow/assets/css/styles.bc4b6adf.css">
-<script src="/common-hosted-workflow/assets/js/runtime~main.4e4fd108.js" defer="defer"></script>
-<script src="/common-hosted-workflow/assets/js/main.c9e4a04a.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/runtime~main.d31a47ce.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/main.76f5a2d4.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -96,7 +96,7 @@ When <code>OIDC_ISSUER</code> is not set, this provides the IDP logout URL for u
 </li>
 <li class="">
 <p><code>SSO_RESTRICT_NO_ROLE</code>
-When <code>true</code>, users without a mapped OIDC role cannot be newly provisioned, and existing users are synced to an empty role when the token carries no valid role.</p>
+When <code>true</code>, users without a mapped OIDC role are checked for CSTAR managed project roles during sign-in. If they have one, they receive <code>global:member</code>. If they do not, new users are not provisioned and existing users are synced to an empty role. If CSTAR verification fails, sign-in fails.</p>
 </li>
 </ul>
 <hr>
@@ -123,8 +123,9 @@ When <code>true</code>, users without a mapped OIDC role cannot be newly provisi
 <p>Default role assignment during creation:</p>
 <ul>
 <li class="">First user in the system: <code>global:owner</code></li>
-<li class="">Later users: <code>global:member</code></li>
+<li class="">Later users: the resolved next role from OIDC or fallback logic</li>
 <li class="">If a valid OIDC role exists, it overrides the default above.</li>
+<li class="">If no valid OIDC role exists, later users may still receive <code>global:member</code> from the CSTAR managed project-role fallback or, when <code>SSO_RESTRICT_NO_ROLE=false</code>, from the unrestricted default.</li>
 </ul>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_R21m" id="role-mapping-and-sync">Role mapping and sync<a href="#role-mapping-and-sync" class="hash-link" aria-label="Direct link to Role mapping and sync" title="Direct link to Role mapping and sync" translate="no">​</a></h2>
@@ -144,15 +145,16 @@ When <code>true</code>, users without a mapped OIDC role cannot be newly provisi
 <p>Role sync behavior:</p>
 <ul>
 <li class="">If <code>SSO_RESTRICT_NO_ROLE=false</code>, the next role becomes the mapped OIDC role, or <code>global:member</code> when the token has no valid role.</li>
-<li class="">If <code>SSO_RESTRICT_NO_ROLE=true</code>, the next role becomes the mapped OIDC role, or an empty string when the token has no valid role.</li>
+<li class="">If <code>SSO_RESTRICT_NO_ROLE=true</code>, the next role becomes the mapped OIDC role, or <code>global:member</code> when CSTAR shows a managed project role in any tenant, or an empty string when neither condition is true.</li>
 <li class="">A role change is applied only when the current and next roles differ.</li>
 </ul>
 <h3 class="anchor anchorTargetStickyNavbar_R21m" id="sso_restrict_no_role-behavior"><code>SSO_RESTRICT_NO_ROLE</code> behavior<a href="#sso_restrict_no_role-behavior" class="hash-link" aria-label="Direct link to sso_restrict_no_role-behavior" title="Direct link to sso_restrict_no_role-behavior" translate="no">​</a></h3>
 <p>When <code>SSO_RESTRICT_NO_ROLE=true</code>:</p>
 <ul>
-<li class="">New users are not created if no valid OIDC role is present.</li>
+<li class="">New users are not created if neither a valid OIDC role nor a qualifying CSTAR managed project role is present.</li>
 <li class="">Existing users are still allowed to authenticate.</li>
-<li class="">Existing users are synced to an empty role if the token has no valid role.</li>
+<li class="">Existing users are synced to an empty role if neither a valid OIDC role nor a qualifying CSTAR managed project role is present.</li>
+<li class="">If CSTAR verification fails during the fallback check, sign-in fails instead of silently treating the user as role-less.</li>
 </ul>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_R21m" id="last-owner-protection">Last owner protection<a href="#last-owner-protection" class="hash-link" aria-label="Direct link to Last owner protection" title="Direct link to Last owner protection" translate="no">​</a></h2>
