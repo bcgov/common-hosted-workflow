@@ -1,0 +1,881 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "uid": "n8n-executions",
+  "title": "n8n Executions",
+  "tags": ["n8n"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 32,
+  "refresh": "30s",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "mode",
+        "label": "Execution Type",
+        "type": "custom",
+        "query": "All : .*,Webhook : webhook,Scheduled : trigger,Manual : manual",
+        "definition": "All : .*,Webhook : webhook,Scheduled : trigger,Manual : manual",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": ".*"
+          },
+          {
+            "selected": false,
+            "text": "Webhook",
+            "value": "webhook"
+          },
+          {
+            "selected": false,
+            "text": "Scheduled",
+            "value": "trigger"
+          },
+          {
+            "selected": false,
+            "text": "Manual",
+            "value": "manual"
+          }
+        ],
+        "includeAll": false,
+        "allValue": null,
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "workflow_name",
+        "label": "Workflow",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(n8n_workflow_started_total, workflow_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Executions",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range])))",
+          "legendFormat": "Total"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Successful",
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\", status=\"success\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range])))",
+          "legendFormat": "Success"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\", status=\"failed\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range])))",
+          "legendFormat": "Failed"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Success Rate",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.9
+              },
+              {
+                "color": "green",
+                "value": 0.99
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\", status=\"success\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))) / clamp_min(sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))), 1)",
+          "legendFormat": "Rate"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Executions / min",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))) * 60",
+          "legendFormat": "exec/min"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Avg Processing Time",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_sum{mode=~\"$mode\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))) / clamp_min(sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))), 0.0001)",
+          "legendFormat": "avg"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Executions Over Time",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 14,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "spanNulls": false,
+            "showPoints": "auto",
+            "drawStyle": "line"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "success"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by(status)(rate(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__rate_interval]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))) * 60",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "Executions by Status",
+      "gridPos": {
+        "x": 14,
+        "y": 4,
+        "w": 10,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Success"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\", status=\"success\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range])))",
+          "legendFormat": "Success"
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\", status=\"failed\"}[$__range]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range])))",
+          "legendFormat": "Failed"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Execution Stats — Breakdown by Type & Status",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "workflow_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Workflow"
+              },
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mode"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Execution Type"
+              },
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "success": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "failed": {
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Count"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Count",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by(workflow_id, workflow_name, mode, status)(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__range]) * on(workflow_id) group_left(workflow_name) (max by(workflow_id, workflow_name)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range])) * 0 + 1))",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["workflow_name", "mode", "status", "Value"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Execution Duration — p50 / p90 / p99",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 16,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "spanNulls": false,
+            "showPoints": "auto",
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum by(le)(rate(n8n_workflow_execution_duration_seconds_bucket{mode=~\"$mode\"}[$__rate_interval]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "instant": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.90, sum by(le)(rate(n8n_workflow_execution_duration_seconds_bucket{mode=~\"$mode\"}[$__rate_interval]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))))",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "C",
+          "instant": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by(le)(rate(n8n_workflow_execution_duration_seconds_bucket{mode=~\"$mode\"}[$__rate_interval]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Average Execution Duration Over Time",
+      "gridPos": {
+        "x": 16,
+        "y": 22,
+        "w": 8,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "showPoints": "auto",
+            "drawStyle": "line"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(n8n_workflow_execution_duration_seconds_sum{mode=~\"$mode\"}[$__rate_interval]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))) / clamp_min(sum(rate(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\"}[$__rate_interval]) and on(workflow_id) max by(workflow_id)(last_over_time(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}[$__range]))), 0.0001)",
+          "legendFormat": "avg duration"
+        }
+      ]
+    }
+  ]
+}

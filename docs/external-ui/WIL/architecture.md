@@ -144,7 +144,7 @@ Express app (n8n)
 
 2. **requireUiRequestContext** middleware validates the Bearer JWT, attaches session.
 
-3. **resolveWilTenantProjectIds** extracts and validates `X-TENANT-ID`, queries `tenant_project_relation` table for project IDs.
+3. **resolveWilTenantProjectIds** extracts and validates `X-TENANT-ID`, queries `tenant_project_relation` table for project IDs. For current tenant-source limits and the distinction between tenant listing and route-level scoping, see [`../wil-tenant-source-and-limitations.md`](../wil-tenant-source-and-limitations.md).
 
 4. **resolveActorMatchers** builds the actor filter from the OIDC session and the validated `tenantId`:
    - `userId` — user's email

@@ -152,8 +152,6 @@ grafana:
 alloy:
   enabled: true
   alloy:
-    configMap:
-      content: ""
     resources:
       requests:
         cpu: 5m

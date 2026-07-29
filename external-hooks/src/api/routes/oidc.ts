@@ -31,24 +31,30 @@ import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
 import { getOidcConfigFromEnv } from '../helpers/ui-oidc';
 import { appendSessionToReturnTo, buildUiAppUrl } from '../helpers/url';
+import { isManagedProjectRole } from '../constants/project-roles';
 import { createLogger, logError } from '../utils/logger';
 import { InternalServerErrorResponse } from './responses';
 import type { N8nUser } from '../types/user';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
+import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { AuthService } from '../services/auth';
+import type { CstarService } from '../services/cstar.service';
 import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { UserService } from '../services/user';
+import { ensurePersonalProjectTenantMapping } from '../services/personal-project-tenant';
 
 const log = createLogger('OIDCHook');
 const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
 
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
+  customRepositories: CustomRepositories;
   authService: AuthService;
   jwtService: JwtService;
   userService: UserService;
   tenantProjectSyncService: TenantProjectSyncService;
+  cstarService: CstarService;
   config: N8nOidcConfig;
 };
 
@@ -92,10 +98,12 @@ async function redirectToAccessRequest(
 
 export function buildOidcRouter({
   n8nRepositories,
+  customRepositories,
   authService,
   jwtService,
   userService,
   tenantProjectSyncService,
+  cstarService,
   config,
 }: BuildOidcRouterParams) {
   const { user: userRepository } = n8nRepositories;
@@ -176,7 +184,14 @@ export function buildOidcRouter({
       await persistOidcTokens(identity.email, completion.tokens, accessTokenExpiresAt);
 
       const jwtRole = parseN8nOidcRole(identity.claims[config.rolesClaim]);
-      const nextRole = config.restrictNoRole ? (jwtRole ?? '') : jwtRole || 'global:member';
+      const cstarSsoUserId = resolveCstarSsoUserId(identity.claims, identity.subject, identity.email);
+      const nextRole = await resolveNextRole({
+        jwtRole,
+        restrictNoRole: config.restrictNoRole,
+        cstarService,
+        ssoUserId: cstarSsoUserId,
+        accessToken: completion.tokens.access_token,
+      });
 
       let user = await userRepository.findByEmail(identity.email, ['role']);
 
@@ -217,10 +232,15 @@ export function buildOidcRouter({
         log.info('User re-enabled after receiving a valid OIDC role', { email: identity.email });
       }
 
+      await ensurePersonalProjectTenantMapping({
+        userId: user.id,
+        projectRepo: n8nRepositories.project,
+        tenantProjectRelationRepository: customRepositories.tenantProjectRelation,
+        reason: 'oidc-login',
+      });
+
       // Sync tenant projects (non-blocking — errors are logged but don't fail login)
       if (completion.tokens.access_token) {
-        const cstarSsoUserId = resolveCstarSsoUserId(identity.claims, identity.subject, identity.email);
-
         tenantProjectSyncService
           .syncTenantsForUser({
             ssoUserId: cstarSsoUserId,
@@ -298,6 +318,84 @@ export function buildOidcRouter({
   });
 
   return router;
+}
+
+type ResolveNextRoleParams = {
+  jwtRole: string | null;
+  restrictNoRole: boolean;
+  cstarService: CstarService;
+  ssoUserId: string;
+  accessToken?: string;
+};
+
+export async function resolveNextRole(params: ResolveNextRoleParams): Promise<string> {
+  const { jwtRole, restrictNoRole, cstarService, ssoUserId, accessToken } = params;
+
+  if (!restrictNoRole) {
+    return jwtRole || 'global:member';
+  }
+
+  if (jwtRole) {
+    return jwtRole;
+  }
+
+  if (!accessToken || !cstarService.isConfigured()) {
+    return '';
+  }
+
+  const hasManagedProjectRole = await hasCstarManagedProjectRoleInAnyTenant({ cstarService, ssoUserId, accessToken });
+  if (hasManagedProjectRole) {
+    log.info('Granting global:member based on CSTAR managed tenant project role', { ssoUserId });
+    return 'global:member';
+  }
+
+  return '';
+}
+
+type HasCstarProjectRoleInAnyTenantParams = {
+  cstarService: CstarService;
+  ssoUserId: string;
+  accessToken: string;
+};
+
+async function hasCstarManagedProjectRoleInAnyTenant(params: HasCstarProjectRoleInAnyTenantParams): Promise<boolean> {
+  const { cstarService, ssoUserId, accessToken } = params;
+  let tenants;
+
+  try {
+    tenants = await cstarService.getUserTenantsStrict({ ssoUserId, accessToken });
+  } catch (error) {
+    log.error('Failed to verify CSTAR tenant memberships during OIDC login', {
+      ssoUserId,
+      error: String(error),
+    });
+    throw new Error('Unable to verify CSTAR tenant roles during sign-in', { cause: error });
+  }
+
+  for (const tenant of tenants) {
+    let roles;
+
+    try {
+      roles = await cstarService.getUserSharedServiceRolesStrict({
+        tenantId: tenant.id,
+        ssoUserId,
+        accessToken,
+      });
+    } catch (error) {
+      log.error('Failed to verify CSTAR tenant shared-service roles during OIDC login', {
+        ssoUserId,
+        tenantId: tenant.id,
+        error: String(error),
+      });
+      throw new Error('Unable to verify CSTAR tenant roles during sign-in', { cause: error });
+    }
+
+    if (roles.some((role) => isManagedProjectRole(role.name))) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // --- Extracted helpers to reduce callback cognitive complexity ---

@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         fetch-depth: 0
 
@@ -28,7 +28,7 @@ jobs:
       run: npx commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
     - name: Run pre-commit
-      uses: egose/actions/precommit@25fa7e841dfc761ef55e85b9312299939c700ac9
+      uses: egose/actions/precommit@799b388fb3497236093c6eb7e3eac0b4c8f956ce
       with:
         config: .pre-commit-config.yaml
         commit-on-push: false

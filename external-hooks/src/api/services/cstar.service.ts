@@ -69,6 +69,19 @@ export class CstarService {
     return body?.data?.tenants ?? [];
   }
 
+  async getUserTenantsStrict(params: GetUserTenantsParams): Promise<CstarTenant[]> {
+    const { ssoUserId, accessToken, expand } = params;
+    const queryParams = expand ? { expand } : undefined;
+
+    const body = await this.fetchJsonStrict<CstarUserTenantsResponse>(
+      buildPath('users', ssoUserId, 'tenants'),
+      accessToken,
+      'getUserTenants',
+      queryParams,
+    );
+    return body?.data?.tenants ?? [];
+  }
+
   /**
    * Fetches shared service roles assigned to a user within a specific tenant.
    * GET /tenants/{tenantId}/ssousers/{ssoUserId}/shared-service-roles
@@ -77,6 +90,17 @@ export class CstarService {
     const { tenantId, ssoUserId, accessToken } = params;
 
     const body = await this.fetchJson<CstarUserSharedServiceRolesResponse>(
+      buildPath('tenants', tenantId, 'ssousers', ssoUserId, 'shared-service-roles'),
+      accessToken,
+      'getUserSharedServiceRoles',
+    );
+    return body?.data?.sharedServiceRoles ?? [];
+  }
+
+  async getUserSharedServiceRolesStrict(params: GetUserSharedServiceRolesParams): Promise<CstarSharedServiceRole[]> {
+    const { tenantId, ssoUserId, accessToken } = params;
+
+    const body = await this.fetchJsonStrict<CstarUserSharedServiceRolesResponse>(
       buildPath('tenants', tenantId, 'ssousers', ssoUserId, 'shared-service-roles'),
       accessToken,
       'getUserSharedServiceRoles',
@@ -134,6 +158,28 @@ export class CstarService {
         log.error(`CSTAR ${operation} network error`, { error: String(err) });
       }
       return null;
+    }
+  }
+
+  private async fetchJsonStrict<T>(
+    path: string,
+    accessToken: string,
+    operation: string,
+    queryParams?: Record<string, string>,
+  ): Promise<T> {
+    if (!this.client) {
+      throw new Error(`CSTAR not configured for ${operation}`);
+    }
+
+    try {
+      const response = await this.client.get<T>(path, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        params: queryParams,
+      });
+      return response.data;
+    } catch (err) {
+      const detail = axios.isAxiosError(err) && err.response ? `status ${err.response.status}` : `error ${String(err)}`;
+      throw new Error(`CSTAR ${operation} failed (${detail})`, { cause: err });
     }
   }
 }
