@@ -59,3 +59,8 @@ flowchart TB
 | **Redis Server**    | Caching and transient workflow state                                |
 | **BC Notify**       | Common service used by workflow nodes for Email and SMS             |
 | **API Gateway**     | Gateway fronting approved/published API services on Openshift       |
+
+## Related docs
+
+- [Authentication And Authorization](./authentication-and-authorization.md)
+- [Tenant Isolation Model](./tenant-isolation-model.md)

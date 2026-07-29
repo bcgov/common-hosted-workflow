@@ -1,0 +1,31 @@
+name: Sync Docs to Confluence
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    paths:
+    - docs/**
+    - .github/workflows/docs-to-confluence.yml
+
+permissions:
+  contents: read
+
+jobs:
+  docs-as-code:
+    runs-on: ubuntu-latest
+    environment: confluence
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+    - name: Sync Markdown to Confluence
+      uses: Bhacaz/docs-as-code-confluence@a869d3d27b293b12cc3bf86c95b6e72a29030bea
+      with:
+        folder: docs
+        username: ${{ secrets.CONFLUENCE_USERNAME }}
+        password: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        confluence-base-url: ${{ vars.CONFLUENCE_BASE_URL }}
+        space-key: ${{ vars.CONFLUENCE_SPACE_KEY }}
+        parent-page-id: ${{ vars.CONFLUENCE_PARENT_PAGE_ID }}
