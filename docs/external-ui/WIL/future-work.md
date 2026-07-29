@@ -202,7 +202,7 @@ Allow actions to reference an existing submission that the actor should update (
 
 ### Current State
 
-Tenant access is resolved via the `tenant_project_relation` table with a placeholder access check (always returns true). Tenant names come from the same table.
+See [`../wil-tenant-source-and-limitations.md`](../wil-tenant-source-and-limitations.md) for the current implementation details and limits. In short, the tenant list endpoint now uses `TenantService.listTenantsForUser()`, while `resolveWilTenantProjectIds()` still relies on `tenant_project_relation` and does not directly verify CSTAR membership.
 
 ### Planned Enhancement
 
@@ -220,7 +220,7 @@ Integrate with the CSTAR (Common Services Tenant Administration Registry) API to
 // TODO: Integrate CSTAR API for tenant access verification
 
 // In GET /tenants (currently reads all from DB):
-// TODO: Replace with CSTAR API integration to resolve tenants per user
+// TODO: keep route behavior aligned with the current tenant-source model
 ```
 
 ---
