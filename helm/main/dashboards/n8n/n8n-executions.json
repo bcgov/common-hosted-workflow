@@ -6,7 +6,7 @@
   "tags": ["n8n"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 32,
+  "version": 35,
   "refresh": "30s",
   "time": {
     "from": "now-7d",
@@ -624,6 +624,13 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "workflow_id"
+            },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "workflow_name"
             },
             "properties": [
@@ -634,6 +641,16 @@
               {
                 "id": "custom.width",
                 "value": 220
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View traces",
+                    "url": "/d/n8n-traces/n8n-traces?from=${__from}&to=${__to}&var-workflow_id=${__data.fields.workflow_id}",
+                    "targetBlank": true
+                  }
+                ]
               }
             ]
           },
@@ -747,7 +764,7 @@
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": ["workflow_name", "mode", "status", "Value"]
+              "names": ["workflow_id", "workflow_name", "mode", "status", "Value"]
             }
           }
         }

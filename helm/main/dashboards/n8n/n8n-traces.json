@@ -1,0 +1,191 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "uid": "n8n-traces",
+  "title": "n8n Traces",
+  "tags": ["n8n", "tracing"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 22,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "links": [
+    {
+      "title": "Open in Grafana Explore",
+      "type": "link",
+      "url": "/explore?orgId=1&left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bspan.n8n.workflow.name%20!%3D%20%5C%22%5C%22%7D%22%2C%22tableType%22%3A%22traces%22%2C%22limit%22%3A20%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${__from}%22%2C%22to%22%3A%22${__to}%22%7D%7D",
+      "tooltip": "Open Grafana Explore to search traces and view span waterfalls",
+      "icon": "external link",
+      "targetBlank": true,
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "workflow_id",
+        "label": "Workflow",
+        "type": "textbox",
+        "current": { "selected": false, "text": ".*", "value": ".*" },
+        "options": [{ "selected": true, "text": ".*", "value": ".*" }],
+        "query": ".*",
+        "hide": 0
+      },
+      {
+        "name": "status",
+        "label": "Status",
+        "type": "custom",
+        "query": "All : status = ok || status = error || status = unset,Success : status = ok,Failed : status = error",
+        "definition": "All : status = ok || status = error || status = unset,Success : status = ok,Failed : status = error",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "status = ok || status = error || status = unset"
+        },
+        "options": [
+          { "selected": true, "text": "All", "value": "status = ok || status = error || status = unset" },
+          { "selected": false, "text": "Success", "value": "status = ok" },
+          { "selected": false, "text": "Failed", "value": "status = error" }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Workflow Executions",
+      "description": "One row per workflow execution. Filter by Workflow ID and Status above. Click a Trace ID to open the span waterfall in Explore.",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 18 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{span.n8n.workflow.id =~ \"${workflow_id}\" && (${status})} | select(span.n8n.workflow.name, span.n8n.execution.id, span.n8n.execution.mode, span.n8n.execution.status, span.n8n.execution.is_retry, span.n8n.execution.error_type)",
+          "limit": 50,
+          "tableType": "spans"
+        }
+      ],
+      "options": {
+        "sortBy": [{ "displayName": "Started", "desc": true }],
+        "footer": { "show": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "traceIdHidden" },
+            "properties": [
+              { "id": "displayName", "value": "Trace ID" },
+              { "id": "custom.width", "value": 310 },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View span waterfall in Explore",
+                    "url": "/explore?orgId=1&left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bspan.n8n.execution.id%20%3D%20%5C%22${__data.fields[\"n8n.execution.id\"]}%5C%22%7D%22%2C%22tableType%22%3A%22traces%22%2C%22limit%22%3A5%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${__from}%22%2C%22to%22%3A%22${__to}%22%7D%7D",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "traceService" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "traceName" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "spanID" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "name" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.workflow.name" },
+            "properties": [{ "id": "displayName", "value": "Workflow" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.execution.id" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.execution.mode" },
+            "properties": [
+              { "id": "displayName", "value": "Mode" },
+              { "id": "custom.width", "value": 100 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.execution.status" },
+            "properties": [
+              { "id": "displayName", "value": "n8n Status" },
+              { "id": "custom.width", "value": 110 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.execution.is_retry" },
+            "properties": [
+              { "id": "displayName", "value": "Retry" },
+              { "id": "custom.width", "value": 70 },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "true": { "text": "Yes", "color": "orange", "index": 0 } } },
+                  { "type": "special", "options": { "match": "null", "result": { "text": "—", "index": 1 } } }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.execution.error_type" },
+            "properties": [
+              { "id": "displayName", "value": "Error Type" },
+              { "id": "custom.width", "value": 160 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "startTime" },
+            "properties": [
+              { "id": "displayName", "value": "Started" },
+              { "id": "custom.width", "value": 200 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "duration" },
+            "properties": [
+              { "id": "displayName", "value": "Duration" },
+              { "id": "unit", "value": "ns" },
+              { "id": "custom.width", "value": 130 },
+              { "id": "custom.align", "value": "right" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

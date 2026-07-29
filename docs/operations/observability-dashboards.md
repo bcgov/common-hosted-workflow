@@ -6,6 +6,7 @@ Grafana provides two dashboards for monitoring n8n in Common Hosted Workflow. Th
 | ------------------ | ---------------------------- | -------------------------------------- |
 | **n8n Executions** | Workflow authors, team leads | Are my workflows running and how fast? |
 | **n8n Health**     | Platform / ops team          | Is the n8n process itself healthy?     |
+| **n8n Traces**     | Workflow authors, platform   | What happened inside a single run?     |
 
 ---
 
@@ -118,10 +119,64 @@ n8n caches workflow definitions and credentials in memory to avoid repeated data
 
 ---
 
-## How metrics reach Grafana
+---
+
+## n8n Traces
+
+Shows individual workflow executions as distributed traces. Use it to inspect the internal span waterfall for a single run — which nodes executed, in what order, and how long each took.
+
+Linked from the **Executions** dashboard: clicking a workflow name in the "Execution Stats — Breakdown by Type & Status" table opens the Traces dashboard pre-filtered to that workflow's ID.
+
+### Filters
+
+**Workflow** — workflow ID filter (default `.*` = all workflows). Populated automatically when navigating from the Executions dashboard. Can be manually replaced with a specific workflow ID to narrow results.
+
+**Status** — All, Success, or Failed. Maps to the OpenTelemetry span status: `ok` for successful executions, `error` for failed ones.
+
+### Panel
+
+| Panel                   | What it shows                                                                                                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Workflow Executions** | One row per workflow execution span. Columns: Trace ID, Start time, Retry, Mode, n8n Status, n8n workflow id, Workflow, Duration. Click the **Trace ID** to open the full span waterfall in Explore. |
+
+### Trace structure
+
+Span names are enriched by Alloy before storage — the workflow or node name is appended to make the waterfall readable:
+
+| Span name (stored in Tempo)         | Description                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `workflow.execute: <workflow name>` | Root span for the entire execution. Status is `ok` or `error` based on outcome. |
+| `node.execute: <node name>`         | Child span for each node that ran.                                              |
+
+> **Note:** Because span names are enriched, exact-match TraceQL queries like `{name = "workflow.execute"}` return zero results. Use a prefix regex instead: `{name =~ "workflow.execute.*"}`.
+
+**Sub-workflows** run inside the same trace as the parent — they do not create a separate trace. A sub-workflow's `workflow.execute` span is a child of the Execute Workflow node span in the parent, so both rows in the table will share the same Trace ID.
+
+**Wait nodes** cause a different behaviour: n8n creates two separate traces linked via a SpanLink — one for the execution up to the Wait, one for the resume after the wait completes. Both are visible in the trace list as distinct rows.
+
+### Key span attributes
+
+| Attribute                  | Value                                                               |
+| -------------------------- | ------------------------------------------------------------------- |
+| `n8n.workflow.name`        | Workflow name                                                       |
+| `n8n.workflow.id`          | n8n internal workflow ID                                            |
+| `n8n.execution.id`         | Execution ID (matches n8n UI and logs)                              |
+| `n8n.execution.mode`       | Trigger type: `manual`, `webhook`, `trigger`, `retry`               |
+| `n8n.execution.status`     | `success`, `error`, or `waiting`                                    |
+| `n8n.execution.error_type` | Error class name when status is `error` (e.g. `NodeOperationError`) |
+| `n8n.execution.is_retry`   | `true` when the execution is a manual retry of a previous failure   |
+| `n8n.execution.retry_of`   | Execution ID of the original failed run, when `is_retry` is `true`  |
+| `n8n.project.id`           | n8n project ID (for multi-tenant filtering)                         |
+| `n8n.node.name`            | Display name of the node (node spans only)                          |
+| `n8n.node.type`            | Node type identifier, e.g. `n8n-nodes-base.httpRequest`             |
+
+---
+
+## How metrics and traces reach Grafana
 
 ```
 n8n /metrics  →  Alloy (scrapes every 30 s)  →  Mimir  →  Grafana
+n8n OTLP      →  Alloy (OTLP receiver :4318)  →  Tempo  →  Grafana
 ```
 
 ---

@@ -98,6 +98,10 @@ n8n:
     # Health dashboard — instance stats and cache performance
     N8N_METRICS_INCLUDE_WORKFLOW_STATISTICS: "true"
     N8N_METRICS_INCLUDE_CACHE_METRICS: "true"
+    # OpenTelemetry tracing — exports spans to Alloy → Tempo
+    N8N_OTEL_ENABLED: "true"
+    N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://chwf-alloy:4318  # NOSONAR - internal cluster service URL
+    N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
@@ -530,12 +534,16 @@ tempo:
     extraVolumeMounts:
       - name: tempo-wal
         mountPath: /var/tempo
+    ingester:
+      max_block_duration: 5m
     storage:
       trace:
         backend: s3
         s3:
           insecure: true
           forcepathstyle: true
+        wal:
+          path: /var/tempo/wal
     extraEnvFrom:
       - secretRef:
           name: chwf-observability-s3 # pragma: allowlist secret
@@ -616,8 +624,16 @@ grafana:
           isDefault: false
         - name: Tempo
           type: tempo
+          uid: tempo
           url: http://chwf-tempo:3200 # NOSONAR - internal cluster service URL
           isDefault: false
+          jsonData:
+            nodeGraph:
+              enabled: true
+            traceQuery:
+              timeShiftEnabled: true
+              spanStartTimeShift: -15m
+              spanEndTimeShift: 15m
         - name: Mimir
           type: prometheus
           uid: prometheus  # Grafana 12.x bundled apps (metricsdrilldown, exploretraces) expect a

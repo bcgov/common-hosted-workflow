@@ -13,6 +13,48 @@ prometheus.scrape "n8n" {
   forward_to      = [prometheus.remote_write.mimir.receiver]
 }
 
+// Receive OTLP traces from n8n (N8N_OTEL_ENABLED=true) and forward to Tempo
+otelcol.receiver.otlp "n8n" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces = [otelcol.processor.transform.rename_spans.input]
+  }
+}
+
+// Enrich span names with workflow/node names so the Grafana node graph shows
+// meaningful labels instead of the generic "workflow.execute" / "node.execute".
+// NOTE: after this transform, exact-match TraceQL queries like {name = "workflow.execute"}
+// return zero results — use prefix matches instead: {name =~ "workflow.execute.*"}.
+otelcol.processor.transform "rename_spans" {
+  trace_statements {
+    context = "span"
+    statements = [
+      `set(span.name, Concat([span.name, ": ", span.attributes["n8n.workflow.name"]], "")) where span.name == "workflow.execute" and span.attributes["n8n.workflow.name"] != nil and span.attributes["n8n.workflow.name"] != ""`,
+      `set(span.name, Concat([span.name, ": ", span.attributes["n8n.node.name"]], "")) where span.name == "node.execute" and span.attributes["n8n.node.name"] != nil and span.attributes["n8n.node.name"] != ""`,
+    ]
+  }
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = env("ALLOY_TEMPO_URL")
+    tls {
+      insecure = true
+    }
+  }
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}
+
 prometheus.remote_write "mimir" {
   endpoint {
     url = env("ALLOY_MIMIR_URL")
