@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from '../src/app';
@@ -221,17 +222,20 @@ describe('Session-driven navigation/gating', () => {
       expect(screen.queryByText('Review Requests')).not.toBeInTheDocument();
     });
 
-    it('shows login button when not authenticated', () => {
+    it('shows sign in button and accessible shell when not authenticated', () => {
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      expect(screen.getByText('Login')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main-content');
+      expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+      expect(screen.getByRole('navigation', { name: 'Legal' })).toBeInTheDocument();
     });
 
-    it('shows logout button when authenticated', () => {
+    it('shows log out button when authenticated', () => {
       sessionState.session = {
         user: { subject: 'sub-1', email: 'user@example.com' },
         oidc: null,
@@ -256,8 +260,26 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByText('Logout')).toBeInTheDocument();
-      expect(screen.queryByText('Login')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    });
+
+    it('opens and closes the responsive main menu', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      const menuButton = screen.getByRole('button', { name: 'Open main menu' });
+      expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(menuButton);
+      expect(screen.getByRole('button', { name: 'Close main menu' })).toHaveAttribute('aria-expanded', 'true');
+
+      await user.keyboard('{Escape}');
+      expect(screen.getByRole('button', { name: 'Open main menu' })).toHaveAttribute('aria-expanded', 'false');
     });
   });
 });
