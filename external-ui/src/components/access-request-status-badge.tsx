@@ -10,14 +10,14 @@ export function AccessRequestStatusBadge({ status }: AccessRequestStatusBadgePro
   switch (status) {
     case 'pending':
       return (
-        <Badge variant="secondary" className="gap-1">
+        <Badge variant="warning" className="gap-1">
           <IconClock size={14} aria-hidden="true" />
           Pending
         </Badge>
       );
     case 'approved':
       return (
-        <Badge className="gap-1 bg-green-600 text-white">
+        <Badge variant="success" className="gap-1">
           <IconCheck size={14} aria-hidden="true" />
           Approved
         </Badge>
