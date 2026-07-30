@@ -6,7 +6,7 @@
   "tags": ["n8n", "tracing"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 22,
+  "version": 27,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
@@ -70,7 +70,7 @@
           "refId": "A",
           "datasource": { "type": "tempo", "uid": "tempo" },
           "queryType": "traceql",
-          "query": "{span.n8n.workflow.id =~ \"${workflow_id}\" && (${status})} | select(span.n8n.workflow.name, span.n8n.execution.id, span.n8n.execution.mode, span.n8n.execution.status, span.n8n.execution.is_retry, span.n8n.execution.error_type)",
+          "query": "{span.n8n.workflow.id =~ \"${workflow_id}\" && (${status})} | select(span.n8n.workflow.name, span.n8n.project.custom.name, span.n8n.execution.id, span.n8n.execution.mode, span.n8n.execution.status, span.n8n.execution.is_retry, span.n8n.execution.error_type)",
           "limit": 50,
           "tableType": "spans"
         }
@@ -122,8 +122,23 @@
             "properties": [{ "id": "custom.hidden", "value": true }]
           },
           {
+            "matcher": { "id": "byName", "options": "n8n.workflow.id" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
             "matcher": { "id": "byName", "options": "n8n.workflow.name" },
             "properties": [{ "id": "displayName", "value": "Workflow" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "n8n.project.custom.name" },
+            "properties": [
+              { "id": "displayName", "value": "Project" },
+              { "id": "custom.width", "value": 140 },
+              {
+                "id": "mappings",
+                "value": [{ "type": "special", "options": { "match": "null", "result": { "text": "—", "index": 0 } } }]
+              }
+            ]
           },
           {
             "matcher": { "id": "byName", "options": "n8n.execution.id" },

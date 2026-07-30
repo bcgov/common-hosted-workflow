@@ -16,6 +16,7 @@ seaweedfs:
 
   master:
     replicas: 1
+    volumeSizeLimitMB: 100
     data:
       type: persistentVolumeClaim
       size: 512Mi
@@ -41,6 +42,7 @@ seaweedfs:
         type: persistentVolumeClaim
         size: 1Gi
         storageClass: netapp-block-standard
+        maxVolumes: 20
     logs:
       type: emptyDir
     podSecurityContext:
