@@ -135,9 +135,9 @@ Linked from the **Executions** dashboard: clicking a workflow name in the "Execu
 
 ### Panel
 
-| Panel                   | What it shows                                                                                                                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Workflow Executions** | One row per workflow execution span. Columns: Trace ID, Start time, Retry, Mode, n8n Status, n8n workflow id, Workflow, Duration. Click the **Trace ID** to open the full span waterfall in Explore. |
+| Panel                   | What it shows                                                                                                                                                                                |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Workflow Executions** | One row per workflow execution span. Columns: Trace ID, Start time, Retry, Mode, n8n Status, Project, Workflow, Duration. Click the **Trace ID** to open the full span waterfall in Explore. |
 
 ### Trace structure
 
@@ -156,19 +156,36 @@ Span names are enriched by Alloy before storage — the workflow or node name is
 
 ### Key span attributes
 
-| Attribute                  | Value                                                               |
-| -------------------------- | ------------------------------------------------------------------- |
-| `n8n.workflow.name`        | Workflow name                                                       |
-| `n8n.workflow.id`          | n8n internal workflow ID                                            |
-| `n8n.execution.id`         | Execution ID (matches n8n UI and logs)                              |
-| `n8n.execution.mode`       | Trigger type: `manual`, `webhook`, `trigger`, `retry`               |
-| `n8n.execution.status`     | `success`, `error`, or `waiting`                                    |
-| `n8n.execution.error_type` | Error class name when status is `error` (e.g. `NodeOperationError`) |
-| `n8n.execution.is_retry`   | `true` when the execution is a manual retry of a previous failure   |
-| `n8n.execution.retry_of`   | Execution ID of the original failed run, when `is_retry` is `true`  |
-| `n8n.project.id`           | n8n project ID (for multi-tenant filtering)                         |
-| `n8n.node.name`            | Display name of the node (node spans only)                          |
-| `n8n.node.type`            | Node type identifier, e.g. `n8n-nodes-base.httpRequest`             |
+| Attribute                  | Value                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `n8n.workflow.name`        | Workflow name                                                                   |
+| `n8n.workflow.id`          | n8n internal workflow ID                                                        |
+| `n8n.execution.id`         | Execution ID (matches n8n UI and logs)                                          |
+| `n8n.execution.mode`       | Trigger type: `manual`, `webhook`, `trigger`, `retry`                           |
+| `n8n.execution.status`     | `success`, `error`, or `waiting`                                                |
+| `n8n.execution.error_type` | Error class name when status is `error` (e.g. `NodeOperationError`)             |
+| `n8n.execution.is_retry`   | `true` when the execution is a manual retry of a previous failure               |
+| `n8n.execution.retry_of`   | Execution ID of the original failed run, when `is_retry` is `true`              |
+| `n8n.project.id`           | n8n project ID — set automatically when the workflow belongs to a named project |
+| `n8n.node.name`            | Display name of the node (node spans only)                                      |
+| `n8n.node.type`            | Node type identifier, e.g. `n8n-nodes-base.httpRequest`                         |
+
+### Project column
+
+The **Project** column in the Workflow Executions table is populated from a custom span attribute set at the project level in n8n. It shows `—` for workflows that are not in a project or whose project has no custom attributes configured.
+
+To populate the Project column:
+
+1. In n8n, open the project the workflow belongs to.
+2. Go to **Project settings → Custom Span Attributes**.
+3. Add an attribute with key `name` and the project's display name as the value (e.g. `Analytics`).
+4. Save.
+
+All subsequent executions of workflows in that project will include `n8n.project.custom.name` in their traces.
+
+> **Convention:** n8n prefixes project custom attributes with `n8n.project.custom.` — a key of `name` becomes the span attribute `n8n.project.custom.name`. Use `name` (not `project.name` or `n8n.project.name`) to match what the dashboard queries.
+
+Executions that ran before the attribute was configured will continue to show `—`.
 
 ---
 

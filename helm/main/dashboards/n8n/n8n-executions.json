@@ -6,7 +6,7 @@
   "tags": ["n8n"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 35,
+  "version": 36,
   "refresh": "30s",
   "time": {
     "from": "now-7d",
@@ -573,7 +573,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -585,7 +584,6 @@
           "refId": "B",
           "instant": true,
           "range": false,
-          "format": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -594,12 +592,7 @@
           "legendFormat": "Failed"
         }
       ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        }
-      ]
+      "transformations": []
     },
     {
       "id": 9,
