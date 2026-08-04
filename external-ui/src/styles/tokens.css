@@ -44,7 +44,7 @@
   --shadow-card-hover: 0 4px 12px rgb(37 36 35 / 14%);
   --shadow-dialog: 0 16px 40px rgb(37 36 35 / 24%);
 
-  --container-content: 75rem;
+  --container-content: var(--ds-content-max);
 }
 
 :root {
@@ -104,6 +104,7 @@
 
   --ds-header-height: 4rem;
   --ds-footer-height: 4rem;
+  --ds-content-max: 75rem;
   --ds-page-gutter: clamp(1rem, 4vw, 2rem);
   --ds-section-gap: clamp(1.5rem, 3vw, 2rem);
   --ds-focus-width: 0.1875rem;
