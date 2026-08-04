@@ -66,13 +66,15 @@ svg {
   max-width: 100%;
 }
 
-a {
-  color: var(--ds-color-link);
-  text-underline-offset: 0.15em;
-}
+@layer base {
+  a {
+    color: var(--ds-color-link);
+    text-underline-offset: 0.15em;
+  }
 
-a:hover {
-  color: var(--ds-color-link-hover);
+  a:hover {
+    color: var(--ds-color-link-hover);
+  }
 }
 
 :focus-visible {
