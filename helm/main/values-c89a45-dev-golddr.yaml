@@ -17,6 +17,7 @@ n8n:
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
     AUTHZ_ENVIRONMENT: dev
+    N8N_LICENSE_AUTO_RENEW_ENABLED: "true"
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"
