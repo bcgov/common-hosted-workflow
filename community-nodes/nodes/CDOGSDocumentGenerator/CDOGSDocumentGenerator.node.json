@@ -1,0 +1,18 @@
+{
+  "node": "community-nodes.cdogs",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Utility"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/cdogs-document-generator/credentials.md"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-service-showcase/services/cdogs.html"
+      }
+    ]
+  }
+}

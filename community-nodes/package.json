@@ -33,6 +33,7 @@
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],
     "nodes": [
+      "dist/nodes/CDOGSDocumentGenerator/CDOGSDocumentGenerator.node.js",
       "dist/nodes/CHEFS/CHEFS.node.js",
       "dist/nodes/CHEFSResubmitWait/CHEFSResubmitWait.node.js",
       "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
