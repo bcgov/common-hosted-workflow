@@ -364,7 +364,7 @@ async function executeUploadTemplate(this: IExecuteFunctions, itemIndex: number)
 
   const hash = (response.headers?.['x-template-hash'] as string) ?? '';
 
-  return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray({ hash, ...(response.body ?? {}) }), {
+  return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray({ hash, ...response.body }), {
     itemData: { item: itemIndex },
   });
 }

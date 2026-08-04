@@ -19,7 +19,7 @@ export async function cdogsApiRequest(
     url,
     headers: {
       Accept: 'application/json',
-      ...(headers ?? {}),
+      ...headers,
     },
     json: true,
   };
@@ -53,7 +53,7 @@ export async function cdogsApiBinaryResponse(
     method,
     url,
     headers: {
-      ...(headers ?? {}),
+      ...headers,
     },
     encoding: 'arraybuffer',
     returnFullResponse: true,
