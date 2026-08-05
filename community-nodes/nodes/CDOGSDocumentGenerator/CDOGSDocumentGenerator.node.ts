@@ -374,20 +374,8 @@ async function executeUploadTemplate(this: IExecuteFunctions, itemIndex: number)
  */
 async function executeGenerateFromExisting(this: IExecuteFunctions, itemIndex: number): Promise<INodeExecutionData[]> {
   const templateHash = this.getNodeParameter('templateHash', itemIndex) as string;
-  const dataStr = this.getNodeParameter('data', itemIndex) as string;
-  const convertTo = this.getNodeParameter('convertTo', itemIndex) as string;
-  const reportName = this.getNodeParameter('reportName', itemIndex) as string;
   const overwrite = this.getNodeParameter('overwrite', itemIndex) as boolean;
-  const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
-
-  let parsedData: IDataObject;
-  try {
-    parsedData = JSON.parse(dataStr) as IDataObject;
-  } catch {
-    throw new NodeOperationError(this.getNode(), 'The "Template Data (JSON)" field contains invalid JSON', {
-      itemIndex,
-    });
-  }
+  const { parsedData, convertTo, reportName, outputField } = parseRenderParams.call(this, itemIndex);
 
   const requestBody: IDataObject = { data: parsedData };
   if (convertTo) {
@@ -404,13 +392,7 @@ async function executeGenerateFromExisting(this: IExecuteFunctions, itemIndex: n
     requestBody,
   );
 
-  const fileName = buildFileName(reportName, convertTo, response.headers);
-  const binary = await this.helpers.prepareBinaryData(response.body, fileName);
-
-  const executionData = this.helpers.constructExecutionMetaData([{ json: {}, binary: { [outputField]: binary } }], {
-    itemData: { item: itemIndex },
-  });
-  return executionData;
+  return buildBinaryOutput.call(this, response, reportName, convertTo, outputField, itemIndex);
 }
 
 /**
@@ -418,19 +400,7 @@ async function executeGenerateFromExisting(this: IExecuteFunctions, itemIndex: n
  */
 async function executeGenerateFromInline(this: IExecuteFunctions, itemIndex: number): Promise<INodeExecutionData[]> {
   const templateSource = this.getNodeParameter('templateSource', itemIndex) as string;
-  const dataStr = this.getNodeParameter('data', itemIndex) as string;
-  const convertTo = this.getNodeParameter('convertTo', itemIndex) as string;
-  const reportName = this.getNodeParameter('reportName', itemIndex) as string;
-  const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
-
-  let parsedData: IDataObject;
-  try {
-    parsedData = JSON.parse(dataStr) as IDataObject;
-  } catch {
-    throw new NodeOperationError(this.getNode(), 'The "Template Data (JSON)" field contains invalid JSON', {
-      itemIndex,
-    });
-  }
+  const { parsedData, convertTo, reportName, outputField } = parseRenderParams.call(this, itemIndex);
 
   const template = await buildInlineTemplate.call(this, itemIndex, templateSource);
 
@@ -448,13 +418,46 @@ async function executeGenerateFromInline(this: IExecuteFunctions, itemIndex: num
 
   const response = await cdogsApiBinaryResponse.call(this, 'POST', '/template/render', requestBody);
 
+  return buildBinaryOutput.call(this, response, reportName, convertTo, outputField, itemIndex);
+}
+
+/**
+ * Parse common render parameters shared by both generate operations.
+ */
+function parseRenderParams(this: IExecuteFunctions, itemIndex: number) {
+  const dataStr = this.getNodeParameter('data', itemIndex) as string;
+  const convertTo = this.getNodeParameter('convertTo', itemIndex) as string;
+  const reportName = this.getNodeParameter('reportName', itemIndex) as string;
+  const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
+
+  let parsedData: IDataObject;
+  try {
+    parsedData = JSON.parse(dataStr) as IDataObject;
+  } catch {
+    throw new NodeOperationError(this.getNode(), 'The "Template Data (JSON)" field contains invalid JSON', {
+      itemIndex,
+    });
+  }
+
+  return { parsedData, convertTo, reportName, outputField };
+}
+
+/**
+ * Build binary output from a CDOGS response buffer.
+ */
+async function buildBinaryOutput(
+  this: IExecuteFunctions,
+  response: { body: Buffer; headers: IDataObject },
+  reportName: string,
+  convertTo: string,
+  outputField: string,
+  itemIndex: number,
+): Promise<INodeExecutionData[]> {
   const fileName = buildFileName(reportName, convertTo, response.headers);
   const binary = await this.helpers.prepareBinaryData(response.body, fileName);
-
-  const executionData = this.helpers.constructExecutionMetaData([{ json: {}, binary: { [outputField]: binary } }], {
+  return this.helpers.constructExecutionMetaData([{ json: {}, binary: { [outputField]: binary } }], {
     itemData: { item: itemIndex },
   });
-  return executionData;
 }
 
 /**
