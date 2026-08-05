@@ -1,23 +1,30 @@
 # Credentials
 
-The CDOGS Document Generator node uses the built-in **OAuth2 API** credential type (`oAuth2Api`) with a **Client Credentials** grant. This avoids the need for a custom credential — you configure it directly in n8n's standard OAuth2 credential form.
+The CDOGS Document Generator node uses the dedicated **CDOGS OAuth2 API** credential type (`cdogsOAuth2Api`). It extends n8n's standard OAuth2 credential and fixes the grant type to **Client Credentials** so n8n signs every CDOGS request and refreshes tokens automatically.
 
 ## Setting Up the Credential
 
 1. In n8n, go to **Settings → Credentials → Add Credential**
-2. Search for **"OAuth2 API"** and select it
+2. Search for **"CDOGS OAuth2 API"** and select it
 3. Fill in the fields as described below
+
+### Migrating an Existing Workflow
+
+Workflows created before the dedicated credential was introduced reference the generic `oAuth2Api` credential and cannot migrate that encrypted credential automatically. After updating the community-node package:
+
+1. Create a **CDOGS OAuth2 API** credential with the same token URL, client ID, client secret, scope, and authentication setting
+2. Open each CDOGS node and select the new credential
+3. Confirm the node's Base URL matches the credential environment (Dev, Test, or Prod)
 
 ## Credential Fields
 
-| Field            | Value                                                   |
-| ---------------- | ------------------------------------------------------- |
-| Grant Type       | `Client Credentials`                                    |
-| Access Token URL | Your Keycloak/SSO token endpoint (see below)            |
-| Client ID        | The client ID provisioned for your CDOGS integration    |
-| Client Secret    | The client secret for the above client                  |
-| Scope            | `openid` (or as required by your integration)           |
-| Authentication   | `Body` (sends client_id/client_secret in the POST body) |
+| Field            | Value                                                |
+| ---------------- | ---------------------------------------------------- |
+| Access Token URL | Your Keycloak/SSO token endpoint (see below)         |
+| Client ID        | The client ID provisioned for your CDOGS integration |
+| Client Secret    | The client secret for the above client               |
+| Scope            | `openid` (fixed and hidden by the CDOGS credential)  |
+| Authentication   | `Header` (fixed and hidden by the CDOGS credential)  |
 
 ### Access Token URL
 
@@ -35,12 +42,11 @@ The token endpoint depends on your environment:
 
 | Field            | Example Value                                                                           |
 | ---------------- | --------------------------------------------------------------------------------------- |
-| Grant Type       | Client Credentials                                                                      |
 | Access Token URL | `https://dev.loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token` |
 | Client ID        | `906B4222-742E0CC43BC`                                                                  |
 | Client Secret    | `••••••••••••`                                                                          |
-| Scope            | `openid`                                                                                |
-| Authentication   | Body                                                                                    |
+| Scope            | `openid` (automatically applied)                                                        |
+| Authentication   | Header (automatically applied)                                                          |
 
 ## How Authentication Works
 
@@ -71,7 +77,7 @@ This typically means the token's `iss` claim doesn't match what CDOGS expects. C
 ### "Unauthorized" (401)
 
 - Verify the Client ID and Client Secret are correct
-- Ensure the credential's Grant Type is set to "Client Credentials"
+- Ensure the node uses a **CDOGS OAuth2 API** credential rather than the generic **OAuth2 API** credential
 - Check that the service account has been provisioned for CDOGS access in the CSS app
 - Try clicking "Connect" on the credential to force a fresh token exchange
 

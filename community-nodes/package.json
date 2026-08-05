@@ -28,6 +28,7 @@
     "credentials": [
       "dist/credentials/ChefsApi.credentials.js",
       "dist/credentials/ChefsFormAuth.credentials.js",
+      "dist/credentials/CDOGSOAuth2Api.credentials.js",
       "dist/credentials/DevXConnector.credentials.js",
       "dist/credentials/OidcToken.credentials.js",
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"

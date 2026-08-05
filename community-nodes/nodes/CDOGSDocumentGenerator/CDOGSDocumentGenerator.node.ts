@@ -1,31 +1,23 @@
-/* eslint-disable @n8n/community-nodes/no-credential-reuse, @n8n/community-nodes/valid-credential-references */
 import {
   NodeConnectionTypes,
   NodeApiError,
   NodeOperationError,
   type IExecuteFunctions,
+  type IBinaryData,
+  type ILoadOptionsFunctions,
   type INodeExecutionData,
   type IDataObject,
-  type IHttpRequestOptions,
+  type INodePropertyOptions,
   type JsonObject,
   type INodeType,
   type INodeTypeDescription,
 } from 'n8n-workflow';
-import { cdogsApiRequest, cdogsApiBinaryResponse } from './shared/GenericFunctions';
+import { cdogsApiRequest, cdogsApiBinaryResponse, cdogsApiUploadTemplate } from './shared/GenericFunctions';
+import { CDOGS_OAUTH2_CREDENTIAL } from './shared/constants';
 
-const DOCUMENT_FORMAT_OPTIONS = [
-  { name: 'DOCX', value: 'docx' },
+const TEXT_TEMPLATE_FORMAT_OPTIONS = [
   { name: 'HTML', value: 'html' },
-  { name: 'PPTX', value: 'pptx' },
   { name: 'TXT', value: 'txt' },
-  { name: 'XLSX', value: 'xlsx' },
-] as const;
-
-const CONVERT_TO_OPTIONS = [
-  ...DOCUMENT_FORMAT_OPTIONS.slice(0, 2),
-  { name: 'None (Same Format)', value: '' },
-  { name: 'PDF', value: 'pdf' },
-  ...DOCUMENT_FORMAT_OPTIONS.slice(2),
 ] as const;
 
 export class CDOGSDocumentGenerator implements INodeType {
@@ -44,7 +36,7 @@ export class CDOGSDocumentGenerator implements INodeType {
     outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
-        name: 'oAuth2Api',
+        name: CDOGS_OAUTH2_CREDENTIAL,
         required: true,
       },
     ],
@@ -53,9 +45,9 @@ export class CDOGSDocumentGenerator implements INodeType {
         displayName: 'Base URL',
         name: 'baseUrl',
         type: 'string',
-        default: 'https://cdogs.api.gov.bc.ca/api/v2',
+        default: 'https://cdogs-dev.api.gov.bc.ca/api/v2',
         required: true,
-        description: 'The base URL of the CDOGS API (v2 endpoint)',
+        description: 'The CDOGS API v2 URL; its environment must match the OAuth2 credential token endpoint',
       },
       {
         displayName: 'Operation',
@@ -115,7 +107,8 @@ export class CDOGSDocumentGenerator implements INodeType {
             operation: ['uploadTemplate'],
           },
         },
-        description: 'The name of the input binary field containing the template file',
+        description:
+          "Specify the property name of the binary data in the input item or use an expression to access the binary data in previous nodes, e.g. {{ $('Target Node').item.binary.data }}",
       },
       // --- Check Template / Remove Template fields ---
       {
@@ -146,10 +139,43 @@ export class CDOGSDocumentGenerator implements INodeType {
         description: 'JSON object containing the template variable data for rendering',
       },
       {
+        displayName: 'Enable Custom Formatters',
+        name: 'enableFormatters',
+        type: 'boolean',
+        default: false,
+        displayOptions: {
+          show: {
+            operation: ['generateFromExisting', 'generateFromInline'],
+          },
+        },
+        description: 'Whether to send a TeleJSON custom formatter map to CDOGS',
+      },
+      {
+        displayName: 'Custom Formatters (JSON)',
+        name: 'formatters',
+        type: 'json',
+        typeOptions: {
+          rows: 6,
+        },
+        default: '{}',
+        required: true,
+        displayOptions: {
+          show: {
+            operation: ['generateFromExisting', 'generateFromInline'],
+            enableFormatters: [true],
+          },
+        },
+        description:
+          'TeleJSON formatter map sent as the CDOGS formatters string; functions are passed to CDOGS and are not executed by n8n',
+      },
+      {
         displayName: 'Convert To',
         name: 'convertTo',
         type: 'options',
-        options: [...CONVERT_TO_OPTIONS],
+        typeOptions: {
+          loadOptionsMethod: 'getConvertToOptions',
+          loadOptionsDependsOn: ['baseUrl', 'templateSource', 'contentFileType'],
+        },
         default: 'pdf',
         displayOptions: {
           show: {
@@ -174,13 +200,13 @@ export class CDOGSDocumentGenerator implements INodeType {
         displayName: 'Overwrite Cached Template',
         name: 'overwrite',
         type: 'boolean',
-        default: false,
+        default: true,
         displayOptions: {
           show: {
-            operation: ['generateFromExisting'],
+            operation: ['generateFromInline'],
           },
         },
-        description: 'Whether to overwrite the cached template on the server',
+        description: 'Whether CDOGS may replace an identical template already stored in its cache',
       },
       // --- Generate from Inline Template fields ---
       {
@@ -220,7 +246,8 @@ export class CDOGSDocumentGenerator implements INodeType {
             templateSource: ['binary'],
           },
         },
-        description: 'The name of the input binary field containing the template file',
+        description:
+          "Specify the property name of the binary data in the input item or use an expression to access the binary data in previous nodes, e.g. {{ $('Target Node').item.binary.data }}",
       },
       {
         displayName: 'Template Content',
@@ -243,7 +270,7 @@ export class CDOGSDocumentGenerator implements INodeType {
         displayName: 'Content File Type',
         name: 'contentFileType',
         type: 'options',
-        options: [...DOCUMENT_FORMAT_OPTIONS],
+        options: [...TEXT_TEMPLATE_FORMAT_OPTIONS],
         default: 'html',
         displayOptions: {
           show: {
@@ -267,6 +294,12 @@ export class CDOGSDocumentGenerator implements INodeType {
         description: 'The name of the output binary field to store the generated document',
       },
     ],
+  };
+
+  methods = {
+    loadOptions: {
+      getConvertToOptions,
+    },
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -334,32 +367,20 @@ async function executeOperation(
  * Upload a template binary to CDOGS and return the template hash.
  */
 async function executeUploadTemplate(this: IExecuteFunctions, itemIndex: number): Promise<INodeExecutionData[]> {
-  const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
-  const binaryData = this.helpers.assertBinaryData(itemIndex, binaryPropertyName);
-  const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
+  const binaryInput = this.getNodeParameter('binaryPropertyName', itemIndex) as string | IBinaryData;
+  const binaryData = this.helpers.assertBinaryData(itemIndex, binaryInput);
+  const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryInput);
+  const result = await cdogsApiUploadTemplate.call(
+    this,
+    buffer,
+    binaryData.fileName || 'template',
+    binaryData.mimeType || 'application/octet-stream',
+  );
+  if (!result.hash) {
+    throw new NodeOperationError(this.getNode(), 'CDOGS did not return a template hash', { itemIndex });
+  }
 
-  const baseUrl = this.getNodeParameter('baseUrl', 0) as string;
-  const url = `${baseUrl.replace(/\/$/, '')}/template`;
-
-  const options: IHttpRequestOptions = {
-    method: 'POST',
-    url,
-    body: buffer,
-    headers: {
-      'Content-Type': binaryData.mimeType || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${binaryData.fileName || 'template'}"`,
-    },
-    returnFullResponse: true,
-  };
-
-  const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'oAuth2Api', options)) as {
-    headers: IDataObject;
-    body: IDataObject;
-  };
-
-  const hash = (response.headers?.['x-template-hash'] as string) ?? '';
-
-  return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray({ hash, ...response.body }), {
+  return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
     itemData: { item: itemIndex },
   });
 }
@@ -369,15 +390,21 @@ async function executeUploadTemplate(this: IExecuteFunctions, itemIndex: number)
  */
 async function executeGenerateFromExisting(this: IExecuteFunctions, itemIndex: number): Promise<INodeExecutionData[]> {
   const templateHash = this.getNodeParameter('templateHash', itemIndex) as string;
-  const overwrite = this.getNodeParameter('overwrite', itemIndex) as boolean;
-  const { parsedData, convertTo, reportName, outputField } = parseRenderParams.call(this, itemIndex);
+  const { parsedData, formatters, convertTo, reportName, outputField } = parseRenderParams.call(this, itemIndex);
 
   const requestBody: IDataObject = { data: parsedData };
+  if (formatters) {
+    requestBody.formatters = formatters;
+  }
+  const options: IDataObject = {};
   if (convertTo) {
-    requestBody.options = { convertTo, overwrite };
-    if (reportName) {
-      (requestBody.options as IDataObject).reportName = reportName;
-    }
+    options.convertTo = convertTo;
+  }
+  if (reportName) {
+    options.reportName = reportName;
+  }
+  if (Object.keys(options).length) {
+    requestBody.options = options;
   }
 
   const response = await cdogsApiBinaryResponse.call(
@@ -395,7 +422,8 @@ async function executeGenerateFromExisting(this: IExecuteFunctions, itemIndex: n
  */
 async function executeGenerateFromInline(this: IExecuteFunctions, itemIndex: number): Promise<INodeExecutionData[]> {
   const templateSource = this.getNodeParameter('templateSource', itemIndex) as string;
-  const { parsedData, convertTo, reportName, outputField } = parseRenderParams.call(this, itemIndex);
+  const overwrite = this.getNodeParameter('overwrite', itemIndex) as boolean;
+  const { parsedData, formatters, convertTo, reportName, outputField } = parseRenderParams.call(this, itemIndex);
 
   const template = await buildInlineTemplate.call(this, itemIndex, templateSource);
 
@@ -403,17 +431,29 @@ async function executeGenerateFromInline(this: IExecuteFunctions, itemIndex: num
     data: parsedData,
     template,
   };
-  if (convertTo) {
-    const options: IDataObject = { convertTo };
-    if (reportName) {
-      options.reportName = reportName;
-    }
-    requestBody.options = options;
+  if (formatters) {
+    requestBody.formatters = formatters;
   }
+  const options: IDataObject = { overwrite };
+  if (convertTo) {
+    options.convertTo = convertTo;
+  }
+  if (reportName) {
+    options.reportName = reportName;
+  }
+  requestBody.options = options;
 
   const response = await cdogsApiBinaryResponse.call(this, 'POST', '/template/render', requestBody);
 
-  return buildBinaryOutput.call(this, response, reportName, convertTo, outputField, itemIndex);
+  return buildBinaryOutput.call(
+    this,
+    response,
+    reportName,
+    convertTo,
+    outputField,
+    itemIndex,
+    String(template.fileType ?? ''),
+  );
 }
 
 /**
@@ -421,6 +461,7 @@ async function executeGenerateFromInline(this: IExecuteFunctions, itemIndex: num
  */
 function parseRenderParams(this: IExecuteFunctions, itemIndex: number) {
   const dataStr = this.getNodeParameter('data', itemIndex) as string;
+  const enableFormatters = this.getNodeParameter('enableFormatters', itemIndex) as boolean;
   const convertTo = this.getNodeParameter('convertTo', itemIndex) as string;
   const reportName = this.getNodeParameter('reportName', itemIndex) as string;
   const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
@@ -434,7 +475,80 @@ function parseRenderParams(this: IExecuteFunctions, itemIndex: number) {
     });
   }
 
-  return { parsedData, convertTo, reportName, outputField };
+  let formatters: string | undefined;
+  if (enableFormatters) {
+    const formatterValue = this.getNodeParameter('formatters', itemIndex);
+    formatters = typeof formatterValue === 'string' ? formatterValue : JSON.stringify(formatterValue);
+    try {
+      const parsedFormatters = JSON.parse(formatters) as unknown;
+      if (!parsedFormatters || typeof parsedFormatters !== 'object' || Array.isArray(parsedFormatters)) {
+        throw new Error('Expected an object');
+      }
+    } catch {
+      throw new NodeOperationError(this.getNode(), 'The "Custom Formatters (JSON)" field must be a JSON object', {
+        itemIndex,
+      });
+    }
+  }
+
+  return { parsedData, formatters, convertTo, reportName, outputField };
+}
+
+/**
+ * Load output file types from the authenticated CDOGS /fileTypes endpoint.
+ */
+async function getConvertToOptions(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+  const baseUrl = this.getNodeParameter('baseUrl') as string;
+  const url = `${baseUrl.replace(/\/$/, '')}/fileTypes`;
+
+  let response: IDataObject;
+  try {
+    response = (await this.helpers.httpRequestWithAuthentication.call(this, CDOGS_OAUTH2_CREDENTIAL, {
+      method: 'GET',
+      url,
+      headers: { Accept: 'application/json' },
+      json: true,
+    })) as IDataObject;
+  } catch (error) {
+    throw new NodeApiError(this.getNode(), error as JsonObject);
+  }
+
+  const dictionary = response.dictionary;
+  if (!dictionary || typeof dictionary !== 'object' || Array.isArray(dictionary)) {
+    throw new NodeOperationError(this.getNode(), 'CDOGS /fileTypes returned an invalid file type dictionary');
+  }
+
+  const currentParameters = this.getCurrentNodeParameters() ?? {};
+  const inputFileType =
+    currentParameters.operation === 'generateFromInline' && currentParameters.templateSource === 'text'
+      ? String(currentParameters.contentFileType ?? '').toLowerCase()
+      : '';
+  const outputTypes = getSupportedOutputTypes(dictionary as IDataObject, inputFileType);
+
+  return [
+    { name: 'None (Same Format)', value: '' },
+    ...outputTypes.map((fileType) => ({ name: fileType.toUpperCase(), value: fileType })),
+  ];
+}
+
+function getSupportedOutputTypes(dictionary: IDataObject, inputFileType: string): string[] {
+  const selectedEntry = inputFileType ? dictionary[inputFileType] : undefined;
+  const entries = selectedEntry === undefined ? Object.values(dictionary) : [selectedEntry];
+  const outputTypes = new Set<string>();
+
+  for (const entry of entries) {
+    const values = Array.isArray(entry)
+      ? entry
+      : entry && typeof entry === 'object' && !Array.isArray(entry)
+        ? (entry as IDataObject).outputFileTypes
+        : undefined;
+    if (!Array.isArray(values)) continue;
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) outputTypes.add(value.toLowerCase());
+    }
+  }
+
+  return [...outputTypes].sort((left, right) => left.localeCompare(right));
 }
 
 /**
@@ -447,8 +561,9 @@ async function buildBinaryOutput(
   convertTo: string,
   outputField: string,
   itemIndex: number,
+  sourceFileType = '',
 ): Promise<INodeExecutionData[]> {
-  const fileName = buildFileName(reportName, convertTo, response.headers);
+  const fileName = buildFileName(reportName, convertTo, response.headers, sourceFileType);
   const binary = await this.helpers.prepareBinaryData(response.body, fileName);
   return this.helpers.constructExecutionMetaData([{ json: {}, binary: { [outputField]: binary } }], {
     itemData: { item: itemIndex },
@@ -464,9 +579,9 @@ async function buildInlineTemplate(
   templateSource: string,
 ): Promise<IDataObject> {
   if (templateSource === 'binary') {
-    const binaryField = this.getNodeParameter('templateBinaryPropertyName', itemIndex) as string;
-    const binaryData = this.helpers.assertBinaryData(itemIndex, binaryField);
-    const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryField);
+    const binaryInput = this.getNodeParameter('templateBinaryPropertyName', itemIndex) as string | IBinaryData;
+    const binaryData = this.helpers.assertBinaryData(itemIndex, binaryInput);
+    const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryInput);
     const content = buffer.toString('base64');
     const fileType = (binaryData.fileExtension || binaryData.fileName?.split('.').pop() || 'docx').toLowerCase();
     return {
@@ -490,15 +605,38 @@ async function buildInlineTemplate(
 /**
  * Determine output filename from reportName, convertTo, or response headers.
  */
-function buildFileName(reportName: string, convertTo: string, headers: IDataObject): string {
+function buildFileName(reportName: string, convertTo: string, headers: IDataObject, sourceFileType = ''): string {
+  const responseFileName = getResponseFileName(headers);
+  const extension = convertTo || sourceFileType || getFileExtension(responseFileName) || 'bin';
+
   if (reportName) {
-    const ext = convertTo || 'bin';
-    return `${reportName}.${ext}`;
+    return reportName.toLowerCase().endsWith(`.${extension.toLowerCase()}`) ? reportName : `${reportName}.${extension}`;
   }
-  const disposition = (headers?.['content-disposition'] as string) ?? '';
+
+  if (responseFileName) {
+    return responseFileName;
+  }
+
+  return `document.${extension}`;
+}
+
+function getResponseFileName(headers: IDataObject): string {
+  const disposition = getHeaderValue(headers, 'content-disposition');
   const match = /filename="?([^";\n]+)"?/i.exec(disposition);
   if (match?.[1]) {
     return match[1];
   }
-  return `document.${convertTo || 'bin'}`;
+
+  return getHeaderValue(headers, 'x-report-name');
+}
+
+function getHeaderValue(headers: IDataObject, headerName: string): string {
+  const entry = Object.entries(headers).find(([name]) => name.toLowerCase() === headerName);
+  const value = entry?.[1];
+  return typeof value === 'string' ? value : '';
+}
+
+function getFileExtension(fileName: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(fileName);
+  return match?.[1]?.toLowerCase() ?? '';
 }
