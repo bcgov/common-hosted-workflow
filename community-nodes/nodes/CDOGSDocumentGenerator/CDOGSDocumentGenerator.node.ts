@@ -13,20 +13,33 @@ import {
 } from 'n8n-workflow';
 import { cdogsApiRequest, cdogsApiBinaryResponse } from './shared/GenericFunctions';
 
+const DOCUMENT_FORMAT_OPTIONS = [
+  { name: 'DOCX', value: 'docx' },
+  { name: 'HTML', value: 'html' },
+  { name: 'PPTX', value: 'pptx' },
+  { name: 'TXT', value: 'txt' },
+  { name: 'XLSX', value: 'xlsx' },
+] as const;
+
+const CONVERT_TO_OPTIONS = [
+  ...DOCUMENT_FORMAT_OPTIONS.slice(0, 2),
+  { name: 'None (Same Format)', value: '' },
+  { name: 'PDF', value: 'pdf' },
+  ...DOCUMENT_FORMAT_OPTIONS.slice(2),
+] as const;
+
 export class CDOGSDocumentGenerator implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'CDOGS',
     name: 'cdogs',
-    description:
-      'Interact with the Common Document Generation Service (CDOGS) API to generate documents from templates',
     icon: { light: 'file:../../icons/document-generate.svg', dark: 'file:../../icons/document-generate.dark.svg' },
     group: ['transform'],
     version: 1,
+    description:
+      'Interact with the Common Document Generation Service (CDOGS) API to generate documents from templates',
     subtitle: '={{$parameter["operation"]}}',
-    defaults: {
-      name: 'CDOGS',
-    },
     usableAsTool: true,
+    defaults: { name: 'CDOGS' },
     inputs: [NodeConnectionTypes.Main],
     outputs: [NodeConnectionTypes.Main],
     credentials: [
@@ -136,15 +149,7 @@ export class CDOGSDocumentGenerator implements INodeType {
         displayName: 'Convert To',
         name: 'convertTo',
         type: 'options',
-        options: [
-          { name: 'DOCX', value: 'docx' },
-          { name: 'HTML', value: 'html' },
-          { name: 'None (Same Format)', value: '' },
-          { name: 'PDF', value: 'pdf' },
-          { name: 'PPTX', value: 'pptx' },
-          { name: 'TXT', value: 'txt' },
-          { name: 'XLSX', value: 'xlsx' },
-        ],
+        options: [...CONVERT_TO_OPTIONS],
         default: 'pdf',
         displayOptions: {
           show: {
@@ -238,13 +243,7 @@ export class CDOGSDocumentGenerator implements INodeType {
         displayName: 'Content File Type',
         name: 'contentFileType',
         type: 'options',
-        options: [
-          { name: 'DOCX', value: 'docx' },
-          { name: 'HTML', value: 'html' },
-          { name: 'PPTX', value: 'pptx' },
-          { name: 'TXT', value: 'txt' },
-          { name: 'XLSX', value: 'xlsx' },
-        ],
+        options: [...DOCUMENT_FORMAT_OPTIONS],
         default: 'html',
         displayOptions: {
           show: {
@@ -272,25 +271,21 @@ export class CDOGSDocumentGenerator implements INodeType {
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const items = this.getInputData();
-    const returnData: INodeExecutionData[] = [];
     const operation = this.getNodeParameter('operation', 0) as string;
+    const returnData: INodeExecutionData[] = [];
 
-    for (const [i] of items.entries()) {
+    for (const [itemIndex] of items.entries()) {
       try {
-        const result = await executeOperation.call(this, operation, i);
+        const result = await executeOperation.call(this, operation, itemIndex);
         returnData.push(...result);
       } catch (error) {
-        if (this.continueOnFail()) {
-          returnData.push({
-            json: { error: (error as Error).message } as IDataObject,
-            pairedItem: { item: i },
-          });
-          continue;
+        if (!this.continueOnFail()) {
+          if ((error as Error & { response?: unknown }).response) {
+            throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
+          }
+          throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
         }
-        if ((error as Error & { response?: unknown }).response) {
-          throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
-        }
-        throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+        returnData.push({ json: { error: (error as Error).message }, pairedItem: { item: itemIndex } });
       }
     }
 
