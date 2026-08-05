@@ -1,6 +1,6 @@
 # CDOGS Document Generator — Custom n8n Node
 
-The CDOGS Document Generator node interacts with the [Common Document Generation Service (CDOGS)](https://bcgov.github.io/common-service-showcase/services/cdogs.html) API to generate documents from templates. It supports uploading templates, managing cached templates, and rendering documents to various output formats (PDF, DOCX, HTML, etc.).
+The CDOGS Document Generator node interacts with the [Common Document Generation Service (CDOGS)](https://bcgov.github.io/common-service-showcase/services/cdogs.html) API to generate documents from templates. It supports uploading templates, managing cached templates, loading supported conversions from CDOGS, custom TeleJSON formatters, and rendering binary documents.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The CDOGS Document Generator node interacts with the [Common Document Generation
 | Display name    | CDOGS                                           |
 | Style           | Programmatic (`execute()` method)               |
 | Version         | 1                                               |
-| Credential      | `oAuth2Api` (built-in n8n OAuth2 API)           |
+| Credential      | `cdogsOAuth2Api` (extends n8n OAuth2 API)       |
 | Category        | Utility                                         |
 | AI-tool capable | Yes (`usableAsTool: true`)                      |
 | Operations      | 6 (see [Node Operations](./node-operations.md)) |
@@ -26,7 +26,9 @@ The CDOGS Document Generator node interacts with the [Common Document Generation
 
 ```
 community-nodes/
-├── nodes/
+├── credentials/
+│   └── CDOGSOAuth2Api.credentials.ts      # Dedicated OAuth2 credential
+└── nodes/
 │   └── CDOGSDocumentGenerator/
 │       ├── CDOGSDocumentGenerator.node.ts   # Main node logic
 │       ├── CDOGSDocumentGenerator.node.json # Codex metadata
@@ -36,11 +38,13 @@ community-nodes/
 
 ## Quick Start
 
-1. Configure an OAuth2 API credential for CDOGS (see [Credentials](./credentials.md))
+1. Configure a CDOGS OAuth2 API credential (see [Credentials](./credentials.md))
 2. Drag the "CDOGS" node into your workflow
-3. Set the **Base URL** (defaults to `https://cdogs.api.gov.bc.ca/api/v2`)
+3. Set the **Base URL** (defaults to `https://cdogs-dev.api.gov.bc.ca/api/v2`)
 4. Choose an **Operation** (e.g., "Generate from Inline Template")
 5. Provide template data and options as required by the operation
+
+The **Convert To** choices are loaded from the authenticated `GET /fileTypes` endpoint for the selected Base URL. Changing environments or the text template file type refreshes the available choices.
 
 ## Common Workflow Patterns
 

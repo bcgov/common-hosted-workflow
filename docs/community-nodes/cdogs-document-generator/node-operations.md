@@ -6,10 +6,10 @@ This document describes every operation and parameter available in the CDOGS Doc
 
 These parameters are always visible regardless of the selected operation:
 
-| Parameter | Type   | Required | Default                              | Description                            |
-| --------- | ------ | -------- | ------------------------------------ | -------------------------------------- |
-| Base URL  | string | Yes      | `https://cdogs.api.gov.bc.ca/api/v2` | The base URL of the CDOGS API endpoint |
-| Operation | select | Yes      | `Health Check`                       | The operation to perform               |
+| Parameter | Type   | Required | Default                                  | Description                            |
+| --------- | ------ | -------- | ---------------------------------------- | -------------------------------------- |
+| Base URL  | string | Yes      | `https://cdogs-dev.api.gov.bc.ca/api/v2` | The base URL of the CDOGS API endpoint |
+| Operation | select | Yes      | `Health Check`                           | The operation to perform               |
 
 ---
 
@@ -42,21 +42,22 @@ Upload a template file to CDOGS and receive a reusable template hash.
 
 **Parameters:**
 
-| Parameter             | Type   | Required | Default | Description                                         |
-| --------------------- | ------ | -------- | ------- | --------------------------------------------------- |
-| Input Data Field Name | string | Yes      | `data`  | The binary input field containing the template file |
+| Parameter             | Type              | Required | Default | Description                                                 |
+| --------------------- | ----------------- | -------- | ------- | ----------------------------------------------------------- |
+| Input Data Field Name | string/expression | Yes      | `data`  | Binary property name or expression resolving to binary data |
 
-**Input:** A binary item containing the template file (e.g., `.docx`, `.xlsx`, `.pptx`, `.html`).
+**Input:** A binary item containing the template file (e.g., `.docx`, `.xlsx`, `.pptx`, `.html`). The node sends it as the required multipart field named `template`.
 
 **Output:** JSON object containing the template hash.
 
 ```json
 {
-  "hash": "abc123def456..."
+  "hash": "abc123def456...",
+  "cached": false
 }
 ```
 
-The hash is extracted from the `x-template-hash` response header. Use this hash in subsequent "Generate from Existing Template" or "Check Template Exists" operations.
+The hash is extracted from the `x-template-hash` response header. If the identical file is already cached, the node returns its hash with `"cached": true` instead of failing on CDOGS's HTTP 405 response. Use the hash in subsequent "Generate from Existing Template" or "Check Template Exists" operations.
 
 ---
 
@@ -106,14 +107,17 @@ Render a document using a previously uploaded template hash and a JSON data payl
 
 **Parameters:**
 
-| Parameter                 | Type    | Required | Default | Description                                               |
-| ------------------------- | ------- | -------- | ------- | --------------------------------------------------------- |
-| Template Hash             | string  | Yes      | —       | The hash of the cached template                           |
-| Template Data (JSON)      | json    | Yes      | `{}`    | JSON object with template variable data                   |
-| Convert To                | select  | Yes      | `PDF`   | Output format (PDF, DOCX, HTML, PPTX, TXT, XLSX, or None) |
-| Report Name               | string  | No       | —       | Output filename (without extension)                       |
-| Overwrite Cached Template | boolean | No       | `false` | Whether to overwrite the cached template on the server    |
-| Output Data Field Name    | string  | No       | `data`  | Binary output field name for the generated document       |
+| Parameter                | Type    | Required | Default | Description                                           |
+| ------------------------ | ------- | -------- | ------- | ----------------------------------------------------- |
+| Template Hash            | string  | Yes      | —       | The hash of the cached template                       |
+| Template Data (JSON)     | json    | Yes      | `{}`    | JSON object with template variable data               |
+| Enable Custom Formatters | boolean | No       | `false` | Send custom TeleJSON formatters to CDOGS              |
+| Custom Formatters (JSON) | json    | Yes\*    | `{}`    | Formatter map used when custom formatters are enabled |
+| Convert To               | select  | Yes      | `PDF`   | Output formats loaded from the CDOGS `/fileTypes` API |
+| Report Name              | string  | No       | —       | Output filename (without extension)                   |
+| Output Data Field Name   | string  | No       | `data`  | Binary output field name for the generated document   |
+
+> \* Required when **Enable Custom Formatters** is selected.
 
 **Output:** Binary item containing the rendered document in the specified format.
 
@@ -141,18 +145,25 @@ Render a document by supplying the template content directly (no pre-upload requ
 
 **Parameters:**
 
-| Parameter                      | Type   | Required | Default        | Description                                             |
-| ------------------------------ | ------ | -------- | -------------- | ------------------------------------------------------- |
-| Template Source                | select | Yes      | `Binary Input` | Where to get the template: Binary Input or Text Content |
-| Template Input Data Field Name | string | Yes\*    | `template`     | Binary field containing the template (Binary mode only) |
-| Template Content               | string | Yes\*    | —              | Text content of the template (Text mode only)           |
-| Content File Type              | select | Yes\*    | `HTML`         | File type of the text content (Text mode only)          |
-| Template Data (JSON)           | json   | Yes      | `{}`           | JSON object with template variable data                 |
-| Convert To                     | select | Yes      | `PDF`          | Output format                                           |
-| Report Name                    | string | No       | —              | Output filename (without extension)                     |
-| Output Data Field Name         | string | No       | `data`         | Binary output field name for the generated document     |
+| Parameter                      | Type              | Required | Default        | Description                                                 |
+| ------------------------------ | ----------------- | -------- | -------------- | ----------------------------------------------------------- |
+| Template Source                | select            | Yes      | `Binary Input` | Where to get the template: Binary Input or Text Content     |
+| Template Input Data Field Name | string/expression | Yes\*    | `template`     | Binary property name or expression resolving to binary data |
+| Template Content               | string            | Yes\*    | —              | Text content of the template (Text mode only)               |
+| Content File Type              | select            | Yes\*    | `HTML`         | File type of the text content (Text mode only)              |
+| Template Data (JSON)           | json              | Yes      | `{}`           | JSON object with template variable data                     |
+| Enable Custom Formatters       | boolean           | No       | `false`        | Send custom TeleJSON formatters to CDOGS                    |
+| Custom Formatters (JSON)       | json              | Yes\*    | `{}`           | Formatter map used when custom formatters are enabled       |
+| Convert To                     | select            | Yes      | `PDF`          | Output formats loaded from the CDOGS `/fileTypes` API       |
+| Report Name                    | string            | No       | —              | Output filename (without extension)                         |
+| Overwrite Cached Template      | boolean           | No       | `true`         | Allow an identical inline template to replace cached data   |
+| Output Data Field Name         | string            | No       | `data`         | Binary output field name for the generated document         |
 
-> \* Conditional — required based on the selected Template Source.
+> \* Conditional — required when its related source or enable option is selected.
+
+The **Convert To** dropdown calls the authenticated `GET /fileTypes` endpoint. For Text Content it filters conversions using **Content File Type**. For Binary Input and cached templates, n8n cannot inspect the source extension while loading editor options, so the dropdown shows the unique output formats returned by CDOGS. The API still validates the actual input/output combination when the node executes.
+
+Selecting **None (Same Format)** preserves the detected inline template extension. For example, a DOCX Binary Input produces a `.docx` binary output rather than a generic `.bin` file.
 
 **Output:** Binary item containing the rendered document.
 
@@ -160,9 +171,11 @@ Render a document by supplying the template content directly (no pre-upload requ
 
 Read the template from a binary input field. The file type is auto-detected from the file extension. Supports `.docx`, `.xlsx`, `.pptx`, `.html`, `.txt`, and other formats supported by CDOGS.
 
+You can enter the current item's binary property name, such as `template_file`, or use an expression that resolves to binary data from another node, such as `{{ $('Target Node').item.binary.data }}`.
+
 #### Template Source: Text Content
 
-Provide the template as inline text (e.g., an HTML string with template variables). The content is base64-encoded before sending to the API. Choose the matching Content File Type (HTML, TXT, DOCX, XLSX, PPTX).
+Provide the template as inline text (HTML or TXT with template variables). The content is base64-encoded before sending to the API. Use Binary Input for structured formats such as DOCX, XLSX, and PPTX.
 
 **Example — HTML template with Carbone.js syntax:**
 
@@ -190,6 +203,17 @@ Provide the template as inline text (e.g., an HTML string with template variable
 ```
 
 > **Note:** CDOGS uses [Carbone.js](https://carbone.io/) for template rendering. Template syntax follows Carbone conventions — use `{d.fieldName}` for variable substitution and `{#d.array}...{/d.array}` for loops.
+
+### Custom Formatters (Both Generate Operations)
+
+Enable **Custom Formatters**, then enter a TeleJSON formatter map. The node validates that the value is a JSON object and sends it as the `formatters` string expected by CDOGS. Formatter functions run in CDOGS, not in n8n; only use trusted formatter code.
+
+```json
+{
+  "myFormatter": "_function_myFormatter|function(data) { return data.slice(1); }",
+  "myOtherFormatter": "_function_myOtherFormatter|function(data) { return data.slice(2); }"
+}
+```
 
 ---
 
