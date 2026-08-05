@@ -43,7 +43,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY external-ui .
 RUN pnpm build
 
-FROM n8nio/n8n:2.31.4
+FROM n8nio/n8n:2.33.1
 
 WORKDIR /home/node
 
