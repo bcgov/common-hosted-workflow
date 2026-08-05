@@ -23,7 +23,7 @@ services:
   seaweedfs:
     <<: *common-props
     container_name: seaweedfs
-    image: chrislusf/seaweedfs:3.84  # pin version — do not use latest
+    image: chrislusf/seaweedfs:3.99  # pin version — do not use latest
     command: server -dir=/data -filer -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
     ports:
     - 8333:8333
@@ -72,7 +72,7 @@ services:
   tempo:
     <<: *common-props
     container_name: tempo
-    image: grafana/tempo:2.9.0
+    image: grafana/tempo:2.10.7
     command: [-config.file=/etc/tempo/config.yaml]
     volumes:
     - tempo_data:/var/tempo
@@ -86,7 +86,7 @@ services:
   grafana:
     <<: *common-props
     container_name: grafana
-    image: grafana/grafana:12.3.1
+    image: grafana/grafana:12.4.5
     environment:
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_SECURITY_ADMIN_USER: admin
@@ -117,7 +117,7 @@ services:
   alloy:
     <<: *common-props
     container_name: alloy
-    image: grafana/alloy:v1.17.1
+    image: grafana/alloy:v1.18.0
     command:
     - run
     - /etc/alloy/config.alloy
