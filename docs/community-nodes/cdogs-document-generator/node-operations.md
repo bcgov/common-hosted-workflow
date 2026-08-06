@@ -107,15 +107,15 @@ Render a document using a previously uploaded template hash and a JSON data payl
 
 **Parameters:**
 
-| Parameter                | Type    | Required | Default | Description                                           |
-| ------------------------ | ------- | -------- | ------- | ----------------------------------------------------- |
-| Template Hash            | string  | Yes      | —       | The hash of the cached template                       |
-| Template Data (JSON)     | json    | Yes      | `{}`    | JSON object with template variable data               |
-| Enable Custom Formatters | boolean | No       | `false` | Send custom TeleJSON formatters to CDOGS              |
-| Custom Formatters (JSON) | json    | Yes\*    | `{}`    | Formatter map used when custom formatters are enabled |
-| Convert To               | select  | Yes      | `PDF`   | Output formats loaded from the CDOGS `/fileTypes` API |
-| Report Name              | string  | No       | —       | Output filename (without extension)                   |
-| Output Data Field Name   | string  | No       | `data`  | Binary output field name for the generated document   |
+| Parameter                | Type            | Required | Default | Description                                           |
+| ------------------------ | --------------- | -------- | ------- | ----------------------------------------------------- |
+| Template Hash            | string          | Yes      | —       | The hash of the cached template                       |
+| Template Data (JSON)     | json/expression | Yes      | `{}`    | JSON text or expression returning an object/array     |
+| Enable Custom Formatters | boolean         | No       | `false` | Send custom TeleJSON formatters to CDOGS              |
+| Custom Formatters (JSON) | json            | Yes\*    | `{}`    | Formatter map used when custom formatters are enabled |
+| Convert To               | select          | Yes      | `PDF`   | Output formats loaded from the CDOGS `/fileTypes` API |
+| Report Name              | string          | No       | —       | Output filename (without extension)                   |
+| Output Data Field Name   | string          | No       | `data`  | Binary output field name for the generated document   |
 
 > \* Required when **Enable Custom Formatters** is selected.
 
@@ -135,6 +135,8 @@ Render a document using a previously uploaded template hash and a JSON data payl
 }
 ```
 
+The field also accepts an expression that returns an object directly, for example `{{ $json.templateData }}`. You do not need to call `JSON.stringify()`.
+
 ---
 
 ### Generate from Inline Template
@@ -151,7 +153,7 @@ Render a document by supplying the template content directly (no pre-upload requ
 | Template Input Data Field Name | string/expression | Yes\*    | `template`     | Binary property name or expression resolving to binary data |
 | Template Content               | string            | Yes\*    | —              | Text content of the template (Text mode only)               |
 | Content File Type              | select            | Yes\*    | `HTML`         | File type of the text content (Text mode only)              |
-| Template Data (JSON)           | json              | Yes      | `{}`           | JSON object with template variable data                     |
+| Template Data (JSON)           | json/expression   | Yes      | `{}`           | JSON text or expression returning an object/array           |
 | Enable Custom Formatters       | boolean           | No       | `false`        | Send custom TeleJSON formatters to CDOGS                    |
 | Custom Formatters (JSON)       | json              | Yes\*    | `{}`           | Formatter map used when custom formatters are enabled       |
 | Convert To                     | select            | Yes      | `PDF`          | Output formats loaded from the CDOGS `/fileTypes` API       |
