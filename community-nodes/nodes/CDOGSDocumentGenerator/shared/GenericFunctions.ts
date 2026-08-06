@@ -43,6 +43,16 @@ export async function cdogsApiRequest(
 /**
  * Make a request to CDOGS that returns binary content (e.g. generated documents).
  * Returns the full response including headers and body as Buffer.
+ *
+ * --- DEPRECATION NOTE / TECH DEBT ---
+ * This function uses `requestOAuth2()` with the deprecated `IRequestOptions` interface.
+ * This is intentional: as of n8n 2.x, `httpRequestWithAuthentication()` does not reliably
+ * handle binary POST responses with `returnFullResponse` semantics that CDOGS requires.
+ * The workaround is isolated here to limit blast radius when the modern helper gains support.
+ *
+ * TODO: Re-evaluate once n8n exposes a stable binary-response + full-headers path in
+ * `httpRequestWithAuthentication` / `IHttpRequestOptions`. Track removal as tech debt.
+ * ---
  */
 export async function cdogsApiBinaryResponse(
   this: IExecuteFunctions,
@@ -92,6 +102,14 @@ export async function cdogsApiBinaryResponse(
  * Upload a template as the multipart field expected by POST /template.
  * CDOGS reports an existing cached template as HTTP 405; when that response
  * includes its hash, the upload objective has still been satisfied.
+ *
+ * --- DEPRECATION NOTE / TECH DEBT ---
+ * Uses `requestOAuth2()` with `IRequestOptions` because `httpRequestWithAuthentication()`
+ * does not support multipart `formData` with raw Buffers as of n8n 2.x. The workaround is
+ * intentionally isolated to this single function.
+ *
+ * TODO: Re-evaluate once n8n's modern helper supports multipart form uploads.
+ * ---
  */
 export async function cdogsApiUploadTemplate(
   this: IExecuteFunctions,
