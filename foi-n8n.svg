@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1696" height="844" viewBox="-24 -64 2600 1294">
+  <defs>
+    <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#dedee2"/></pattern>
+    <marker id="arrow" viewBox="-10 -10 20 20" refX="0" refY="0" markerWidth="12.5" markerHeight="12.5" markerUnits="strokeWidth" orient="auto-start-reverse"><polyline points="-5,-4 0,0 -5,4 -5,-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" stroke="#a9a9af" fill="#a9a9af"/></marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#222" flood-opacity=".12"/></filter>
+  </defs>
+  <style>
+    text{font-family:Inter,Arial,sans-serif}.edge path,.arrow-top{fill:none;stroke:#a9a9af;stroke-width:2;marker-end:url(#arrow)}.node>rect{fill:#fff;stroke:#bdbdc3;stroke-width:1.5;filter:url(#shadow)}.node-icon{fill:none}.node-label{font-size:12px;font-weight:550;text-anchor:middle;fill:#202024}.subtitle{font-size:9px;text-anchor:middle;fill:#96969d}.port{fill:#fff;stroke:#94949a;stroke-width:1.5}.port-label{font-size:9px;text-anchor:start;fill:#6e6e75}
+  </style>
+  <rect x="-24" y="-64" width="2600" height="1294" fill="#fbfbfc"/><rect x="-24" y="-64" width="2600" height="1294" fill="url(#grid)"/>
+  <g class="edge"><path d="M1360,376 C1376,376 1376,376 1392,376"/><title>Set Ministries → Call API Manager (Archived)</title></g>
+<g class="edge"><path d="M1160,96 C1176,96 1176,96 1192,96"/><title>Parse Intake Claim Payload → Intake Assignment:  API Update</title></g>
+<g class="edge"><path d="M360,376 C376,376 376,376 392,376"/><title>Set Execution Variables → Send PID</title></g>
+<g class="edge"><path d="M960,328 C976,328 976,96 992,96"/><title>Intake Event Router → Parse Intake Claim Payload</title></g>
+<g class="edge"><path d="M960,368 C976,368 976,376 992,376"/><title>Intake Event Router → Parse Intake Complete Payload</title></g>
+<g class="edge"><path d="M960,408 H994 V1040 H558 V376 H592"/><title>Intake Event Router → Wait For Intake</title></g>
+<g class="edge"><path d="M1360,96 H1394 V190 H558 V376 H592"/><title>Intake Assignment:  API Update → Wait For Intake</title></g>
+<g class="edge"><path d="M760,376 C776,376 776,368 792,368"/><title>Wait For Intake → Intake Event Router</title></g>
+<g class="edge"><path d="M560,376 C576,376 576,376 592,376"/><title>Send PID → Wait For Intake</title></g>
+<g class="edge"><path d="M1960,608 H1990 V800 H1562 V656 H1592"/><title>SLA Exceeded (&gt;5)? → End (Closed at Intake)</title></g>
+<g class="edge"><path d="M1960,648 H1994 V820 H1958 V376 H1992"/><title>SLA Exceeded (&gt;5)? → Compute Next 22:00</title></g>
+<g class="edge"><path d="M2160,656 H2190 V800 H1762 V648 H1792"/><title>Increment SLA Days → SLA Exceeded (&gt;5)?</title></g>
+<g class="edge"><path d="M2560,656 H2594 V1120 H558 V376 H592"/><title>Prep Reopen → Wait For Intake</title></g>
+<g class="edge"><path d="M2360,640 C2376,640 2376,656 2392,656"/><title>Was Reopened? → Prep Reopen</title></g>
+<g class="edge"><path d="M2360,680 H2390 V832 H1962 V656 H1992"/><title>Was Reopened? → Increment SLA Days</title></g>
+<g class="edge"><path d="M2360,376 H2390 V832 H2162 V680 H2192"/><title>Await Reopen Or Daily SLA → Was Reopened?</title></g>
+<g class="edge"><path d="M2160,376 C2176,376 2176,376 2192,376"/><title>Compute Next 22:00 → Await Reopen Or Daily SLA</title></g>
+<g class="edge"><path d="M1960,376 C1976,376 1976,376 1992,376"/><title>Init SLA Counter → Compute Next 22:00</title></g>
+<g class="edge"><path d="M1960,96 C1976,96 1976,96 1992,96"/><title>Parse foiRequestMetaData → Start FOI Request Processing (MIN)</title></g>
+<g class="edge"><path d="M2160,96 C2176,96 2176,96 2192,96"/><title>Start FOI Request Processing (MIN) → End (Opened)</title></g>
+<g class="edge"><path d="M1560,376 C1576,376 1576,384 1592,384"/><title>Call API Manager (Archived) → Route On Status</title></g>
+<g class="edge"><path d="M1760,309.333408 C1776,309.333408 1776,96 1792,96"/><title>Route On Status → Parse foiRequestMetaData</title></g>
+<g class="edge"><path d="M1760,346.666592 C1776,346.666592 1776,376 1792,376"/><title>Route On Status → Init SLA Counter</title></g>
+<g class="edge"><path d="M1760,384 C1776,384 1776,936 1792,936"/><title>Route On Status → End (Closed at Intake)1</title></g>
+<g class="edge"><path d="M1760,421.333408 H1794 V1200 H558 V376 H592"/><title>Route On Status → Wait For Intake</title></g>
+<g class="edge"><path d="M1160,376 C1176,376 1176,376 1192,376"/><title>Parse Intake Complete Payload → Set Ministries</title></g>
+<g class="edge"><path d="M160,376 C176,376 176,376 192,376"/><title>Start Raw Request → Set Execution Variables</title></g>
+  <g class="node"><rect x="1200" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="1192" cy="376" r="6"/><circle class="port output" cx="1360" cy="376" r="6"/><svg x="1252" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#3f8ed0">
+                          <path
+                            fill="currentColor"
+                            d="M12.268 4.343 11.11 5.5H5.75a.75.75 0 0 0-.75.75v12c0 .414.336.75.75.75h12a.75.75 0 0 0 .75-.75v-5.361l1.156-1.157H20v6.518a2.25 2.25 0 0 1-2.25 2.25h-12a2.25 2.25 0 0 1-2.25-2.25v-12A2.25 2.25 0 0 1 5.75 4h6.518z"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M17.19 3.31a1.5 1.5 0 0 1 2.12 0l1.38 1.38a1.5 1.5 0 0 1 0 2.12l-8 8a1.5 1.5 0 0 1-1.061.44H8.75v-2.879c0-.398.158-.779.44-1.06zM15.75 4.75l3.5 3.5"
+                          ></path></svg><text class="node-label" x="1276" y="398"><tspan x="1276" dy="0">Set Ministries</tspan></text><text class="subtitle" x="1276" y="427"><tspan x="1276" dy="0">manual</tspan></text><title>n8n-nodes-base.set</title></g>
+<g class="node"><rect x="1800" y="40" width="152" height="112" rx="7"/><circle class="port input" cx="1792" cy="96" r="6"/><circle class="port output" cx="1960" cy="96" r="6"/><svg x="1852" y="52" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="1876" y="118"><tspan x="1876" dy="0">Parse</tspan><tspan x="1876" dy="14">foiRequestMetaData</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="1800" y="880" width="152" height="112" rx="7"/><circle class="port input" cx="1792" cy="936" r="6"/><circle class="port output" cx="1960" cy="936" r="6"/><svg x="1852" y="892" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#8a9299">
+                          <path stroke="currentColor" stroke-width="1.5" d="M2.5 12h13M14 19.5l7.5-7.5L14 4.5"></path>
+                          <path stroke="currentColor" stroke-width="1.5" d="m8 19.5 7.5-7.5L8 4.5"></path></svg><text class="node-label" x="1876" y="958"><tspan x="1876" dy="0">End (Closed at</tspan><tspan x="1876" dy="14">Intake)1</tspan></text><title>n8n-nodes-base.noOp</title></g>
+<g class="node"><rect x="1000" y="40" width="152" height="112" rx="7"/><circle class="port input" cx="992" cy="96" r="6"/><circle class="port output" cx="1160" cy="96" r="6"/><svg x="1052" y="52" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="1076" y="118"><tspan x="1076" dy="0">Parse Intake Claim</tspan><tspan x="1076" dy="14">Payload</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="200" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="192" cy="376" r="6"/><circle class="port output" cx="360" cy="376" r="6"/><svg x="252" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="276" y="398"><tspan x="276" dy="0">Set Execution</tspan><tspan x="276" dy="14">Variables</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="800" y="288" width="152" height="160" rx="7"/><circle class="port input" cx="792" cy="368" r="6"/><text class="port-label" x="966" y="321">claim</text><circle class="port output" cx="960" cy="328" r="6"/><text class="port-label" x="966" y="361">complete</text><circle class="port output" cx="960" cy="368" r="6"/><text class="port-label" x="966" y="401">Unrecognized Event</text><circle class="port output" cx="960" cy="408" r="6"/><svg x="852" y="300" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#4aa8d8">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M21.5 5.25H2M21.5 18.75h-7.01a3 3 0 0 1-2.876-2.148L8.886 7.398A3 3 0 0 0 6.01 5.25H2"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M21.5 12h-9.01a3 3 0 0 1-2.876-2.148l-.728-2.454A3 3 0 0 0 6.01 5.25H2"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="m19 9.5 2.5 2.5-2.5 2.5M19 2.75l2.5 2.5-2.5 2.5M19 16.25l2.5 2.5-2.5 2.5"
+                          ></path></svg><text class="node-label" x="876" y="366"><tspan x="876" dy="0">Intake Event Router</tspan></text><text class="subtitle" x="876" y="395"><tspan x="876" dy="0">mode: Rules</tspan></text><title>n8n-nodes-base.switch</title></g>
+<g class="node"><rect x="1200" y="40" width="152" height="112" rx="7"/><circle class="port input" cx="1192" cy="96" r="6"/><circle class="port output" cx="1360" cy="96" r="6"/><svg x="1252" y="52" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#ff6d5a">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M8 20.25H5.25a1.5 1.5 0 0 1-1.5-1.5V5.25a1.5 1.5 0 0 1 1.5-1.5H8M15 17.5l5.5-5.5L15 6.5M20.5 12H7"
+                          ></path></svg><text class="node-label" x="1276" y="118"><tspan x="1276" dy="0">Intake Assignment: API</tspan><tspan x="1276" dy="14">Update</tspan></text><text class="subtitle" x="1276" y="147"><tspan x="1276" dy="0">Workflow: 4lbA7rMVV6rrIE7m</tspan></text><title>n8n-nodes-base.executeWorkflow</title></g>
+<g class="node"><rect x="600" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="592" cy="376" r="6"/><circle class="port output" cx="760" cy="376" r="6"/><svg x="652" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#ff9f43">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M18.25 20.25H5.75v-2.629c0-.397.158-.779.44-1.06l3.706-3.707a1.207 1.207 0 0 0 0-1.708L6.19 7.44a1.5 1.5 0 0 1-.439-1.06V3.75h12.5v2.629a1.5 1.5 0 0 1-.44 1.06l-3.706 3.707a1.207 1.207 0 0 0 0 1.708l3.707 3.707a1.5 1.5 0 0 1 .439 1.06z"
+                          ></path></svg><text class="node-label" x="676" y="398"><tspan x="676" dy="0">Wait For Intake</tspan></text><title>n8n-nodes-base.wait</title></g>
+<g class="node"><rect x="400" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="392" cy="376" r="6"/><circle class="port output" cx="560" cy="376" r="6"/><svg x="452" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#ff6d5a">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M8 20.25H5.25a1.5 1.5 0 0 1-1.5-1.5V5.25a1.5 1.5 0 0 1 1.5-1.5H8M15 17.5l5.5-5.5L15 6.5M20.5 12H7"
+                          ></path></svg><text class="node-label" x="476" y="398"><tspan x="476" dy="0">Send PID</tspan></text><text class="subtitle" x="476" y="427"><tspan x="476" dy="0">Workflow: pWTH0plYI47nLOpq</tspan></text><title>n8n-nodes-base.executeWorkflow</title></g>
+<g class="node"><rect x="1600" y="600" width="152" height="112" rx="7"/><circle class="port input" cx="1592" cy="656" r="6"/><circle class="port output" cx="1760" cy="656" r="6"/><svg x="1652" y="612" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#8a9299">
+                          <path stroke="currentColor" stroke-width="1.5" d="M2.5 12h13M14 19.5l7.5-7.5L14 4.5"></path>
+                          <path stroke="currentColor" stroke-width="1.5" d="m8 19.5 7.5-7.5L8 4.5"></path></svg><text class="node-label" x="1676" y="678"><tspan x="1676" dy="0">End (Closed at Intake)</tspan></text><title>n8n-nodes-base.noOp</title></g>
+<g class="node"><rect x="1800" y="568" width="152" height="160" rx="7"/><circle class="port input" cx="1792" cy="648" r="6"/><text class="port-label" x="1966" y="601">true</text><circle class="port output" cx="1960" cy="608" r="6"/><text class="port-label" x="1966" y="641">false</text><circle class="port output" cx="1960" cy="648" r="6"/><text class="port-label" x="1966" y="681">Error</text><circle class="port output" cx="1960" cy="688" r="6"/><svg x="1852" y="580" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#4aa8d8">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M21.5 5.75H2M21.5 18.25h-7.06a3 3 0 0 1-2.857-2.086L8.917 7.836A3 3 0 0 0 6.06 5.75H2M18.5 2.75l3 3-3 3"
+                          ></path>
+                          <path stroke="currentColor" stroke-width="1.5" d="m18.5 15.25 3 3-3 3"></path></svg><text class="node-label" x="1876" y="646"><tspan x="1876" dy="0">SLA Exceeded (&gt;5)?</tspan></text><title>n8n-nodes-base.if</title></g>
+<g class="node"><rect x="2000" y="600" width="152" height="112" rx="7"/><circle class="port input" cx="1992" cy="656" r="6"/><circle class="port output" cx="2160" cy="656" r="6"/><svg x="2052" y="612" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="2076" y="678"><tspan x="2076" dy="0">Increment SLA Days</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="2400" y="600" width="152" height="112" rx="7"/><circle class="port input" cx="2392" cy="656" r="6"/><circle class="port output" cx="2560" cy="656" r="6"/><svg x="2452" y="612" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#3f8ed0">
+                          <path
+                            fill="currentColor"
+                            d="M12.268 4.343 11.11 5.5H5.75a.75.75 0 0 0-.75.75v12c0 .414.336.75.75.75h12a.75.75 0 0 0 .75-.75v-5.361l1.156-1.157H20v6.518a2.25 2.25 0 0 1-2.25 2.25h-12a2.25 2.25 0 0 1-2.25-2.25v-12A2.25 2.25 0 0 1 5.75 4h6.518z"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M17.19 3.31a1.5 1.5 0 0 1 2.12 0l1.38 1.38a1.5 1.5 0 0 1 0 2.12l-8 8a1.5 1.5 0 0 1-1.061.44H8.75v-2.879c0-.398.158-.779.44-1.06zM15.75 4.75l3.5 3.5"
+                          ></path></svg><text class="node-label" x="2476" y="678"><tspan x="2476" dy="0">Prep Reopen</tspan></text><text class="subtitle" x="2476" y="707"><tspan x="2476" dy="0">manual</tspan></text><title>n8n-nodes-base.set</title></g>
+<g class="node"><rect x="2200" y="600" width="152" height="160" rx="7"/><circle class="port input" cx="2192" cy="680" r="6"/><text class="port-label" x="2366" y="633">true</text><circle class="port output" cx="2360" cy="640" r="6"/><text class="port-label" x="2366" y="673">false</text><circle class="port output" cx="2360" cy="680" r="6"/><text class="port-label" x="2366" y="713">Error</text><circle class="port output" cx="2360" cy="720" r="6"/><svg x="2252" y="612" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#4aa8d8">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M21.5 5.75H2M21.5 18.25h-7.06a3 3 0 0 1-2.857-2.086L8.917 7.836A3 3 0 0 0 6.06 5.75H2M18.5 2.75l3 3-3 3"
+                          ></path>
+                          <path stroke="currentColor" stroke-width="1.5" d="m18.5 15.25 3 3-3 3"></path></svg><text class="node-label" x="2276" y="678"><tspan x="2276" dy="0">Was Reopened?</tspan></text><title>n8n-nodes-base.if</title></g>
+<g class="node"><rect x="2200" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="2192" cy="376" r="6"/><circle class="port output" cx="2360" cy="376" r="6"/><svg x="2252" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#ff9f43">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M18.25 20.25H5.75v-2.629c0-.397.158-.779.44-1.06l3.706-3.707a1.207 1.207 0 0 0 0-1.708L6.19 7.44a1.5 1.5 0 0 1-.439-1.06V3.75h12.5v2.629a1.5 1.5 0 0 1-.44 1.06l-3.706 3.707a1.207 1.207 0 0 0 0 1.708l3.707 3.707a1.5 1.5 0 0 1 .439 1.06z"
+                          ></path></svg><text class="node-label" x="2276" y="398"><tspan x="2276" dy="0">Await Reopen Or Daily</tspan><tspan x="2276" dy="14">SLA</tspan></text><title>n8n-nodes-base.wait</title></g>
+<g class="node"><rect x="2000" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="1992" cy="376" r="6"/><circle class="port output" cx="2160" cy="376" r="6"/><svg x="2052" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="2076" y="398"><tspan x="2076" dy="0">Compute Next 22:00</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="1800" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="1792" cy="376" r="6"/><circle class="port output" cx="1960" cy="376" r="6"/><svg x="1852" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="1876" y="398"><tspan x="1876" dy="0">Init SLA Counter</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="2200" y="40" width="152" height="112" rx="7"/><circle class="port input" cx="2192" cy="96" r="6"/><circle class="port output" cx="2360" cy="96" r="6"/><svg x="2252" y="52" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#8a9299">
+                          <path stroke="currentColor" stroke-width="1.5" d="M2.5 12h13M14 19.5l7.5-7.5L14 4.5"></path>
+                          <path stroke="currentColor" stroke-width="1.5" d="m8 19.5 7.5-7.5L8 4.5"></path></svg><text class="node-label" x="2276" y="118"><tspan x="2276" dy="0">End (Opened)</tspan></text><title>n8n-nodes-base.noOp</title></g>
+<g class="node"><rect x="2000" y="40" width="152" height="112" rx="7"/><circle class="port input" cx="1992" cy="96" r="6"/><circle class="port output" cx="2160" cy="96" r="6"/><svg x="2052" y="52" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#4f86c6">
+                          <circle cx="12" cy="12" r="8.75" stroke="currentColor" stroke-width="1.5"></circle>
+                          <ellipse
+                            cx="12"
+                            cy="12"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            rx="3.75"
+                            ry="8.75"
+                          ></ellipse>
+                          <path stroke="currentColor" stroke-width="1.5" d="M3 12h18"></path></svg><text class="node-label" x="2076" y="118"><tspan x="2076" dy="0">Start FOI Request</tspan><tspan x="2076" dy="14">Processing (MIN)</tspan></text><text class="subtitle" x="2076" y="147"><tspan x="2076" dy="0">POST:</tspan><tspan x="2076" dy="14">https://dev-workflow.apps.gold…</tspan></text><title>n8n-nodes-base.httpRequest</title></g>
+<g class="node"><rect x="1400" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="1392" cy="376" r="6"/><circle class="port output" cx="1560" cy="376" r="6"/><svg x="1452" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#ff6d5a">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M8 20.25H5.25a1.5 1.5 0 0 1-1.5-1.5V5.25a1.5 1.5 0 0 1 1.5-1.5H8M15 17.5l5.5-5.5L15 6.5M20.5 12H7"
+                          ></path></svg><text class="node-label" x="1476" y="398"><tspan x="1476" dy="0">Call API Manager</tspan><tspan x="1476" dy="14">(Archived)</tspan></text><text class="subtitle" x="1476" y="427"><tspan x="1476" dy="0">Workflow: pWTH0plYI47nLOpq</tspan></text><title>n8n-nodes-base.executeWorkflow</title></g>
+<g class="node"><rect x="1600" y="272" width="152" height="224" rx="7"/><circle class="port input" cx="1592" cy="384" r="6"/><text class="port-label" x="1766" y="302.333408">Open</text><circle class="port output" cx="1760" cy="309.333408" r="6"/><text class="port-label" x="1766" y="339.666592">Closed</text><circle class="port output" cx="1760" cy="346.666592" r="6"/><text class="port-label" x="1766" y="377">Redirect</text><circle class="port output" cx="1760" cy="384" r="6"/><text class="port-label" x="1766" y="414.333408">Other Status</text><circle class="port output" cx="1760" cy="421.333408" r="6"/><text class="port-label" x="1766" y="451.666592">Error</text><circle class="port output" cx="1760" cy="458.666592" r="6"/><svg x="1652" y="284" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#4aa8d8">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M21.5 5.25H2M21.5 18.75h-7.01a3 3 0 0 1-2.876-2.148L8.886 7.398A3 3 0 0 0 6.01 5.25H2"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M21.5 12h-9.01a3 3 0 0 1-2.876-2.148l-.728-2.454A3 3 0 0 0 6.01 5.25H2"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="m19 9.5 2.5 2.5-2.5 2.5M19 2.75l2.5 2.5-2.5 2.5M19 16.25l2.5 2.5-2.5 2.5"
+                          ></path></svg><text class="node-label" x="1676" y="350"><tspan x="1676" dy="0">Route On Status</tspan></text><text class="subtitle" x="1676" y="379"><tspan x="1676" dy="0">mode: Rules</tspan></text><title>n8n-nodes-base.switch</title></g>
+<g class="node"><rect x="1000" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="992" cy="376" r="6"/><circle class="port output" cx="1160" cy="376" r="6"/><svg x="1052" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#7256d9">
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M9 3.75H6.25a1.5 1.5 0 0 0-1.5 1.5v4.129a1.5 1.5 0 0 1-.44 1.06L2.75 12l1.56 1.56a1.5 1.5 0 0 1 .44 1.061v4.129a1.5 1.5 0 0 0 1.5 1.5H9M15 3.75h2.75a1.5 1.5 0 0 1 1.5 1.5v4.129c0 .398.158.779.44 1.06L21.25 12l-1.56 1.56a1.5 1.5 0 0 0-.44 1.061v4.129a1.5 1.5 0 0 1-1.5 1.5H15"
+                          ></path></svg><text class="node-label" x="1076" y="398"><tspan x="1076" dy="0">Parse Intake Complete</tspan><tspan x="1076" dy="14">Payload</tspan></text><title>n8n-nodes-base.code</title></g>
+<g class="node"><rect x="0" y="320" width="152" height="112" rx="7"/><circle class="port input" cx="-8" cy="376" r="6"/><svg x="52" y="332" width="48" height="48" viewBox="0 0 24 24" class="node-icon" style="color:#ff6d5a">
+                          <circle cx="12" cy="7" r="1.5" fill="currentColor"></circle>
+                          <circle cx="6.5" cy="16.5" r="1.5" fill="currentColor"></circle>
+                          <circle cx="17.5" cy="16.5" r="1.5" fill="currentColor"></circle>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M15.248 8.875a3.748 3.748 0 0 0-1.373-5.123 3.75 3.75 0 1 0-3.75 6.496L6.5 16.5"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M6.5 12.75a3.75 3.75 0 1 0 3.75 3.75h7.25"
+                          ></path>
+                          <path
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            d="M14.252 18.375a3.75 3.75 0 1 0 1.373-5.123L12 7"
+                          ></path></svg><text class="node-label" x="76" y="398"><tspan x="76" dy="0">Start Raw Request</tspan></text><title>n8n-nodes-base.webhook</title></g>
+  <path class="arrow-top" d="M1378,376 H1392"/>
+<path class="arrow-top" d="M1178,96 H1192"/>
+<path class="arrow-top" d="M378,376 H392"/>
+<path class="arrow-top" d="M978,96 H992"/>
+<path class="arrow-top" d="M978,376 H992"/>
+<path class="arrow-top" d="M578,376 H592"/>
+<path class="arrow-top" d="M578,376 H592"/>
+<path class="arrow-top" d="M778,368 H792"/>
+<path class="arrow-top" d="M578,376 H592"/>
+<path class="arrow-top" d="M1578,656 H1592"/>
+<path class="arrow-top" d="M1978,376 H1992"/>
+<path class="arrow-top" d="M1778,648 H1792"/>
+<path class="arrow-top" d="M578,376 H592"/>
+<path class="arrow-top" d="M2378,656 H2392"/>
+<path class="arrow-top" d="M1978,656 H1992"/>
+<path class="arrow-top" d="M2178,680 H2192"/>
+<path class="arrow-top" d="M2178,376 H2192"/>
+<path class="arrow-top" d="M1978,376 H1992"/>
+<path class="arrow-top" d="M1978,96 H1992"/>
+<path class="arrow-top" d="M2178,96 H2192"/>
+<path class="arrow-top" d="M1578,384 H1592"/>
+<path class="arrow-top" d="M1778,96 H1792"/>
+<path class="arrow-top" d="M1778,376 H1792"/>
+<path class="arrow-top" d="M1778,936 H1792"/>
+<path class="arrow-top" d="M578,376 H592"/>
+<path class="arrow-top" d="M1178,376 H1192"/>
+<path class="arrow-top" d="M178,376 H192"/>
+</svg>

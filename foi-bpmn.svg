@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760">
+    <defs>
+        <style>
+            text { font-family: Arial, Helvetica, sans-serif; fill: #222; }
+            .pool { fill: #ececec; stroke: #2f3136; stroke-width: 2; }
+            .sep { stroke: #2f3136; stroke-width: 1.5; }
+            .flow { fill: none; stroke: #2f3136; stroke-width: 3; stroke-linecap: round;
+            stroke-linejoin: round; }
+            .thin { fill: none; stroke: #2f3136; stroke-width: 1.8; stroke-linecap: round;
+            stroke-linejoin: round; }
+            .task { fill: #f8f8f8; stroke: #2f3136; stroke-width: 3; }
+            .task-heavy { fill: #f8f8f8; stroke: #2f3136; stroke-width: 6; }
+            .event { fill: #f8f8f8; stroke: #2f3136; stroke-width: 2.6; }
+            .event-inner { fill: none; stroke: #2f3136; stroke-width: 1.8; }
+            .end { fill: #f8f8f8; stroke: #2f3136; stroke-width: 5; }
+            .gateway { fill: #f8f8f8; stroke: #2f3136; stroke-width: 3; }
+            .dash { stroke-dasharray: 6 5; }
+            .label { font-size: 14px; }
+            .main { font-size: 15px; }
+        </style>
+
+        <pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r="0.8" fill="#d1d1d1" />
+        </pattern>
+
+        <marker id="arrow" markerWidth="5" markerHeight="5" refX="4.2" refY="2.5" orient="auto"
+            markerUnits="strokeWidth">
+            <path d="M0.6,0.8 L5,2.5 L0.6,4.2 L1.6,2.5 z" fill="#2f3136" />
+        </marker>
+    </defs>
+
+    <rect x="0" y="0" width="1400" height="760" fill="#f6f6f6" />
+    <rect x="0" y="0" width="1400" height="760" fill="url(#dots)" />
+
+    <rect class="pool" x="60" y="82" width="1262" height="600" />
+    <line class="sep" x1="98" y1="82" x2="98" y2="682" />
+
+    <g transform="translate(84,480) rotate(-90)">
+        <text class="main">FOI Raw Request Processing</text>
+    </g>
+    <g transform="translate(124,420) rotate(-90)">
+        <text class="main">Intake Team</text>
+    </g>
+
+    <!-- Start -->
+    <circle class="event" cx="222" cy="407" r="22" />
+
+    <line class="flow" x1="244" y1="407" x2="372" y2="407" marker-end="url(#arrow)" />
+    <text class="label" x="262" y="398">apply Settings</text>
+
+    <!-- Parallel gateway -->
+    <polygon class="gateway" points="410,375 442,407 410,439 378,407" />
+    <line class="flow" x1="410" y1="387" x2="410" y2="427" />
+    <line class="flow" x1="390" y1="407" x2="430" y2="407" />
+
+    <!-- Send PID -->
+    <line class="flow" x1="410" y1="439" x2="410" y2="468" marker-end="url(#arrow)" />
+    <circle class="event" cx="410" cy="492" r="22" />
+    <circle class="event-inner" cx="410" cy="492" r="16" />
+    <rect class="thin" x="399" y="485" width="22" height="14" />
+    <path class="thin" d="M399 485 L410 493 L421 485" />
+    <text class="label" x="379" y="540">Send PID</text>
+
+    <!-- Intake Analyst -->
+    <line class="flow" x1="442" y1="407" x2="510" y2="407" marker-end="url(#arrow)" />
+    <rect class="task" x="510" y="358" rx="14" ry="14" width="128" height="100" />
+    <rect class="thin" x="520" y="362" width="18" height="18" />
+    <circle class="thin" cx="529" cy="367" r="5" />
+    <path class="thin" d="M523 378 Q529 371 535 378" />
+    <text class="main" x="528" y="414">Intake Analyst</text>
+
+    <circle class="thin dash" cx="547" cy="456" r="18" />
+    <circle class="thin dash" cx="599" cy="456" r="18" />
+    <rect class="thin" x="537" y="449" width="20" height="13" />
+    <path class="thin" d="M537 449 L547 457 L557 449" />
+    <rect class="thin" x="589" y="449" width="20" height="13" />
+    <path class="thin" d="M589 449 L599 457 L609 449" />
+    <text class="label" x="532" y="499">claim Complete</text>
+
+    <!-- Reopen: message event to Intake Analyst -->
+    <path class="flow" d="M948 145 H574 Q572 145 572 153 V358" marker-end="url(#arrow)" />
+    <text class="label" x="798" y="135">Reopen</text>
+
+    <!-- Center XOR -->
+    <line class="flow" x1="638" y1="407" x2="720" y2="407" marker-end="url(#arrow)" />
+    <polygon class="gateway" points="748,379 776,407 748,435 720,407" />
+    <line class="flow" x1="736" y1="395" x2="760" y2="419" />
+    <line class="flow" x1="760" y1="395" x2="736" y2="419" />
+
+    <!-- Open -->
+    <line class="flow" x1="776" y1="407" x2="886" y2="407" marker-end="url(#arrow)" />
+    <text class="label" x="796" y="398">Open</text>
+
+    <rect class="task-heavy" x="886" y="356" rx="14" ry="14" width="126" height="102" />
+    <text class="main" x="907" y="403">FOI Request</text>
+    <text class="main" x="912" y="422">Processing</text>
+    <rect x="939" y="431" width="18" height="18" fill="#fff" stroke="#2f3136" stroke-width="2" />
+    <line class="thin" x1="948" y1="435" x2="948" y2="445" />
+    <line class="thin" x1="943" y1="440" x2="953" y2="440" />
+
+    <line class="flow" x1="1012" y1="407" x2="1174" y2="407" marker-end="url(#arrow)" />
+
+    <!-- Redirect -->
+    <path class="flow" d="M748 435 V582 H886" marker-end="url(#arrow)" />
+    <text class="label" x="798" y="572">Redirect</text>
+
+    <rect class="task" x="886" y="532" rx="14" ry="14" width="126" height="100" />
+    <rect class="thin" x="897" y="540" width="20" height="13" />
+    <path class="thin" d="M897 540 L907 548 L917 540" />
+    <text class="main" x="920" y="587">Redirect</text>
+
+    <!-- Closed -->
+    <path class="flow" d="M748 379 V232 H920" marker-end="url(#arrow)" />
+    <text class="label" x="802" y="223">Closed</text>
+
+    <!-- Upper gateway -->
+    <polygon class="gateway" points="948,200 976,228 948,256 920,228" />
+    <circle class="thin" cx="948" cy="228" r="14" />
+    <polygon class="thin" points="948,217 957,223 954,234 942,234 939,223" />
+
+    <!-- Up to message event -->
+    <line class="flow" x1="948" y1="200" x2="948" y2="168" marker-end="url(#arrow)" />
+    <circle class="event" cx="948" cy="145" r="23" />
+    <circle class="event-inner" cx="948" cy="145" r="17" />
+    <rect class="thin" x="937" y="138" width="22" height="14" />
+    <path class="thin" d="M937 138 L948 146 L959 138" />
+
+    <!-- Pre-Closure SLA -->
+    <path class="flow" d="M948 256 V320 H1050" marker-end="url(#arrow)" />
+    <text class="label" x="1018" y="287">Pre-Closure SLA</text>
+
+    <circle class="event" cx="1074" cy="320" r="22" />
+    <circle class="event-inner" cx="1074" cy="320" r="16" />
+    <circle class="thin" cx="1074" cy="320" r="11" />
+    <line class="thin" x1="1074" y1="313" x2="1074" y2="320" />
+    <line class="thin" x1="1074" y1="320" x2="1080" y2="324" />
+    <line class="thin" x1="1074" y1="308" x2="1074" y2="306" />
+    <line class="thin" x1="1074" y1="334" x2="1074" y2="332" />
+    <line class="thin" x1="1062" y1="320" x2="1064" y2="320" />
+    <line class="thin" x1="1084" y1="320" x2="1086" y2="320" />
+    <line class="thin" x1="1067" y1="313" x2="1068" y2="314" />
+    <line class="thin" x1="1080" y1="326" x2="1081" y2="327" />
+    <line class="thin" x1="1067" y1="327" x2="1068" y2="326" />
+    <line class="thin" x1="1080" y1="314" x2="1081" y2="313" />
+
+    <line class="flow" x1="1096" y1="320" x2="1168" y2="320" marker-end="url(#arrow)" />
+
+    <!-- Right-side XOR -->
+    <polygon class="gateway" points="1196,289 1227,320 1196,351 1165,320" />
+    <line class="flow" x1="1185" y1="309" x2="1207" y2="331" />
+    <line class="flow" x1="1207" y1="309" x2="1185" y2="331" />
+
+    <!-- right gateway flows LEFT into upper gateway -->
+    <path class="flow" d="M1196 289 V228 H976" marker-end="url(#arrow)" />
+
+    <!-- down to end -->
+    <line class="flow" x1="1196" y1="351" x2="1196" y2="379" marker-end="url(#arrow)" />
+    <circle class="end" cx="1196" cy="407" r="22" />
+    <text class="main" x="1206" y="365">Pre-Closure SLA</text>
+    <text class="main" x="1206" y="384">Exceeded</text>
+</svg>  
