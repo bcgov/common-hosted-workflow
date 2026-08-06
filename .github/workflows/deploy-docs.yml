@@ -47,3 +47,4 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./doc-site/build
         publish_branch: gh-pages
+        keep_files: true
