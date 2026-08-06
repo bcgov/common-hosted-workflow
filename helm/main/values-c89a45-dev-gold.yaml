@@ -85,6 +85,8 @@ loki:
         ruler: dev-loki-ruler
       s3:
         endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+    limits_config:
+      retention_period: 720h  # 30 days
   singleBinary:
     resources:
       requests:
@@ -110,10 +112,10 @@ tempo:
     resources:
       requests:
         cpu: 10m
-        memory: 64Mi
+        memory: 256Mi
       limits:
         cpu: 250m
-        memory: 256Mi
+        memory: 768Mi
 
 mimir:
   enabled: true

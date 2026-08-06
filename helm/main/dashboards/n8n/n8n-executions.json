@@ -6,7 +6,7 @@
   "tags": ["n8n"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 36,
+  "version": 37,
   "refresh": "30s",
   "time": {
     "from": "now-7d",
@@ -73,9 +73,44 @@
         "hide": 0,
         "skipUrlSync": false,
         "current": {}
+      },
+      {
+        "name": "workflow_id",
+        "label": "Workflow ID",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(n8n_workflow_started_total{workflow_name=~\"$workflow_name\"}, workflow_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "hide": 2,
+        "skipUrlSync": false,
+        "current": {}
       }
     ]
   },
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "n8n Logs",
+      "tooltip": "",
+      "type": "link",
+      "url": "/d/n8n-logs/n8n-logs"
+    }
+  ],
   "panels": [
     {
       "id": 1,
@@ -219,7 +254,14 @@
                 "value": 1
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "View failure logs",
+              "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-event_name=n8n.workflow.failed&var-mode=${mode}&var-workflow_name=${workflow_name}&var-workflow_id=${workflow_id}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -446,7 +488,14 @@
             "spanNulls": false,
             "showPoints": "auto",
             "drawStyle": "line"
-          }
+          },
+          "links": [
+            {
+              "title": "View ${__series.name} logs",
+              "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-event_name=n8n.workflow.${__series.name}&var-mode=${mode}&var-workflow_name=${workflow_name}&var-workflow_id=${workflow_id}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": [
           {
@@ -696,6 +745,16 @@
                         "index": 1
                       }
                     }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View ${__data.fields.status} logs",
+                    "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-event_name=n8n.workflow.${__data.fields.status}&var-mode=${__data.fields.mode}&var-workflow_name=${__data.fields.workflow_name}&var-workflow_id=${__data.fields.workflow_id}",
+                    "targetBlank": false
                   }
                 ]
               }

@@ -55,6 +55,67 @@ otelcol.exporter.otlp "tempo" {
   }
 }
 
+// Receive n8n log streaming events via syslog TCP and forward to Loki.
+// n8n sends one JSON event per syslog message; the MSG body is the full envelope.
+loki.source.syslog "n8n_events" {
+  listener {
+    address  = "0.0.0.0:5514"
+    protocol = "tcp"
+    labels = {
+      job    = "n8n-log-streaming",
+      source = "n8n",
+    }
+  }
+  forward_to = [loki.process.n8n_events.receiver]
+}
+
+loki.process "n8n_events" {
+  stage.json {
+    expressions = {
+      event_name    = "eventName",
+      event_type    = "__type",
+      workflow_id   = "payload.workflowId",
+      execution_id  = "payload.executionId",
+      project_name  = "payload.projectName",
+      workflow_name = "payload.workflowName",
+      mode          = "payload.mode",
+      ts            = "ts",
+    }
+  }
+
+  stage.labels {
+    values = {
+      event_name    = "",
+      event_type    = "",
+      project_name  = "",
+      mode          = "",
+      workflow_name = "",
+      workflow_id   = "",
+    }
+  }
+
+  stage.timestamp {
+    source              = "ts"
+    format              = "RFC3339Nano"
+    fallback_formats    = ["RFC3339"]
+    action_on_failure   = "skip"
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
+loki.write "loki" {
+  endpoint {
+    url = env("ALLOY_LOKI_URL")
+  }
+  // Buffer to disk when Loki is temporarily unavailable; replays on recovery.
+  // max_segment_age caps WAL growth — entries older than 1h are dropped rather than filling disk.
+  wal {
+    enabled         = true
+    max_segment_age = "1h"
+  }
+}
+
 prometheus.remote_write "mimir" {
   endpoint {
     url = env("ALLOY_MIMIR_URL")

@@ -1,0 +1,24 @@
+{{- if .Values.n8n.enabled }}
+{{- with .Values.logStreaming }}
+{{- $dest := dict
+  "type"                 "syslog"
+  "label"                "Alloy"
+  "enabled"              .enabled
+  "subscribedEvents"     .subscribedEvents
+  "anonymizeAuditMessages" .anonymizeAuditMessages
+  "host"                 .syslog.host
+  "port"                 .syslog.port
+  "protocol"             .syslog.protocol
+  "facility"             .syslog.facility
+  "app_name"             .syslog.appName
+}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" $ }}-n8n-log-streaming
+  labels:
+    {{- include "_.labels" $ | nindent 4 }}
+data:
+  destinations: {{ list $dest | toJson | quote }}
+{{- end }}
+{{- end }}

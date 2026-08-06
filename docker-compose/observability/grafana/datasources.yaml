@@ -24,3 +24,8 @@ datasources:
       timeShiftEnabled: true
       spanStartTimeShift: -15m
       spanEndTimeShift: 15m
+- name: Loki
+  type: loki
+  uid: loki
+  url: http://loki:3100
+  isDefault: false
