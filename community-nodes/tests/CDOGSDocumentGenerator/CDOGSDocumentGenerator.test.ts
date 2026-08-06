@@ -261,7 +261,7 @@ describe('CDOGS inline rendering', () => {
       baseUrl: 'https://cdogs-dev.api.gov.bc.ca/api/v2',
       templateSource: 'binary',
       templateBinaryPropertyName: expressionBinaryData,
-      data: '{}',
+      data: { coorsFile: '121', region: 'Region 3' },
       convertTo: '',
       reportName: 'report',
       overwrite: true,
@@ -285,7 +285,9 @@ describe('CDOGS inline rendering', () => {
     await new CDOGSDocumentGenerator().execute.call(context as never);
 
     const serializedBody = requestOAuth2.mock.calls[0]?.[1]?.body as string;
-    expect(JSON.parse(serializedBody).options).toEqual({
+    const requestBody = JSON.parse(serializedBody);
+    expect(requestBody.data).toEqual({ coorsFile: '121', region: 'Region 3' });
+    expect(requestBody.options).toEqual({
       overwrite: true,
       reportName: 'report',
     });

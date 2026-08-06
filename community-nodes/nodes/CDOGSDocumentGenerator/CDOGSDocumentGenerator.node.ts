@@ -15,6 +15,14 @@ import {
 import { cdogsApiRequest, cdogsApiBinaryResponse, cdogsApiUploadTemplate } from './shared/GenericFunctions';
 import { CDOGS_OAUTH2_CREDENTIAL } from './shared/constants';
 
+/**
+ * Type guard: returns true when the error is already a structured n8n error
+ * (NodeApiError or NodeOperationError) and should be rethrown as-is.
+ */
+function isN8nError(error: unknown): error is NodeApiError | NodeOperationError {
+  return error instanceof NodeApiError || error instanceof NodeOperationError;
+}
+
 const TEXT_TEMPLATE_FORMAT_OPTIONS = [
   { name: 'HTML', value: 'html' },
   { name: 'TXT', value: 'txt' },
@@ -136,7 +144,7 @@ export class CDOGSDocumentGenerator implements INodeType {
             operation: ['generateFromExisting', 'generateFromInline'],
           },
         },
-        description: 'JSON object containing the template variable data for rendering',
+        description: 'Template variables as JSON text or an expression resolving to an object or array of objects',
       },
       {
         displayName: 'Enable Custom Formatters',
@@ -313,8 +321,9 @@ export class CDOGSDocumentGenerator implements INodeType {
         returnData.push(...result);
       } catch (error) {
         if (!this.continueOnFail()) {
-          if ((error as Error & { response?: unknown }).response) {
-            throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
+          // Rethrow already-structured n8n errors unchanged to avoid double-wrapping.
+          if (isN8nError(error)) {
+            throw error;
           }
           throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
         }
@@ -345,10 +354,23 @@ async function executeOperation(
   }
   if (operation === 'checkTemplate') {
     const templateHash = this.getNodeParameter('templateHash', itemIndex) as string;
-    const response = await cdogsApiRequest.call(this, 'GET', `/template/${encodeURIComponent(templateHash)}`);
-    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(response), {
-      itemData: { item: itemIndex },
-    });
+    try {
+      const response = await cdogsApiRequest.call(this, 'GET', `/template/${encodeURIComponent(templateHash)}`);
+      return this.helpers.constructExecutionMetaData(
+        this.helpers.returnJsonArray({ exists: true, hash: templateHash, template: response }),
+        { itemData: { item: itemIndex } },
+      );
+    } catch (error) {
+      const statusCode = getCheckTemplateErrorStatus(error);
+      if (statusCode === 404) {
+        return this.helpers.constructExecutionMetaData(
+          this.helpers.returnJsonArray({ exists: false, hash: templateHash }),
+          { itemData: { item: itemIndex } },
+        );
+      }
+      // Unexpected errors (401, 403, 500, network) should still fail the node.
+      throw error;
+    }
   }
   if (operation === 'removeTemplate') {
     const templateHash = this.getNodeParameter('templateHash', itemIndex) as string;
@@ -460,19 +482,26 @@ async function executeGenerateFromInline(this: IExecuteFunctions, itemIndex: num
  * Parse common render parameters shared by both generate operations.
  */
 function parseRenderParams(this: IExecuteFunctions, itemIndex: number) {
-  const dataStr = this.getNodeParameter('data', itemIndex) as string;
+  const dataValue = this.getNodeParameter('data', itemIndex);
   const enableFormatters = this.getNodeParameter('enableFormatters', itemIndex) as boolean;
   const convertTo = this.getNodeParameter('convertTo', itemIndex) as string;
   const reportName = this.getNodeParameter('reportName', itemIndex) as string;
   const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
 
-  let parsedData: IDataObject;
+  let parsedData: IDataObject | IDataObject[];
   try {
-    parsedData = JSON.parse(dataStr) as IDataObject;
+    parsedData = (typeof dataValue === 'string' ? JSON.parse(dataValue) : dataValue) as IDataObject | IDataObject[];
   } catch {
     throw new NodeOperationError(this.getNode(), 'The "Template Data (JSON)" field contains invalid JSON', {
       itemIndex,
     });
+  }
+  if (!isTemplateData(parsedData)) {
+    throw new NodeOperationError(
+      this.getNode(),
+      'The "Template Data (JSON)" field must contain an object or an array of objects',
+      { itemIndex },
+    );
   }
 
   let formatters: string | undefined;
@@ -492,6 +521,28 @@ function parseRenderParams(this: IExecuteFunctions, itemIndex: number) {
   }
 
   return { parsedData, formatters, convertTo, reportName, outputField };
+}
+
+function isTemplateData(value: unknown): value is IDataObject | IDataObject[] {
+  if (Array.isArray(value)) {
+    return value.every((item) => item !== null && typeof item === 'object' && !Array.isArray(item));
+  }
+  return value !== null && typeof value === 'object';
+}
+
+/**
+ * Extract the HTTP status code from a NodeApiError or raw request error.
+ * Used by checkTemplate to distinguish expected 404 from unexpected failures.
+ */
+function getCheckTemplateErrorStatus(error: unknown): number | undefined {
+  // NodeApiError stores the HTTP status in httpCode (string).
+  if (error instanceof NodeApiError) {
+    const code = (error as NodeApiError & { httpCode?: string }).httpCode;
+    if (code) return Number(code);
+  }
+  // Fallback for raw request errors that might not be wrapped yet.
+  const typed = error as { statusCode?: number; response?: { status?: number; statusCode?: number } };
+  return typed.statusCode ?? typed.response?.statusCode ?? typed.response?.status;
 }
 
 /**
@@ -537,11 +588,7 @@ function getSupportedOutputTypes(dictionary: IDataObject, inputFileType: string)
   const outputTypes = new Set<string>();
 
   for (const entry of entries) {
-    const values = Array.isArray(entry)
-      ? entry
-      : entry && typeof entry === 'object' && !Array.isArray(entry)
-        ? (entry as IDataObject).outputFileTypes
-        : undefined;
+    const values = extractOutputFileTypes(entry);
     if (!Array.isArray(values)) continue;
     for (const value of values) {
       if (typeof value === 'string' && value.trim()) outputTypes.add(value.toLowerCase());
@@ -552,7 +599,22 @@ function getSupportedOutputTypes(dictionary: IDataObject, inputFileType: string)
 }
 
 /**
+ * Extract an array of output file types from a dictionary entry.
+ * An entry may be an array directly or an object with an outputFileTypes field.
+ */
+function extractOutputFileTypes(entry: unknown): unknown[] | undefined {
+  if (Array.isArray(entry)) return entry;
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    const candidate = (entry as IDataObject).outputFileTypes;
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
  * Build binary output from a CDOGS response buffer.
+ * Preserves the source item's JSON so downstream nodes can access metadata
+ * without referencing a previous node explicitly.
  */
 async function buildBinaryOutput(
   this: IExecuteFunctions,
@@ -565,7 +627,8 @@ async function buildBinaryOutput(
 ): Promise<INodeExecutionData[]> {
   const fileName = buildFileName(reportName, convertTo, response.headers, sourceFileType);
   const binary = await this.helpers.prepareBinaryData(response.body, fileName);
-  return this.helpers.constructExecutionMetaData([{ json: {}, binary: { [outputField]: binary } }], {
+  const sourceJson = this.getInputData()[itemIndex].json;
+  return this.helpers.constructExecutionMetaData([{ json: { ...sourceJson }, binary: { [outputField]: binary } }], {
     itemData: { item: itemIndex },
   });
 }
@@ -603,11 +666,35 @@ async function buildInlineTemplate(
 }
 
 /**
+ * Common MIME type to file extension mapping for document generation.
+ */
+const MIME_TO_EXTENSION: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.oasis.opendocument.text': 'odt',
+  'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+  'application/vnd.oasis.opendocument.presentation': 'odp',
+  'application/msword': 'doc',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/rtf': 'rtf',
+  'text/html': 'html',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+};
+
+/**
  * Determine output filename from reportName, convertTo, or response headers.
+ * Uses Content-Type as an extension fallback when no filename is available.
  */
 function buildFileName(reportName: string, convertTo: string, headers: IDataObject, sourceFileType = ''): string {
   const responseFileName = getResponseFileName(headers);
-  const extension = convertTo || sourceFileType || getFileExtension(responseFileName) || 'bin';
+  const contentTypeExt = getExtensionFromContentType(headers);
+  const extension = convertTo || sourceFileType || getFileExtension(responseFileName) || contentTypeExt || 'bin';
 
   if (reportName) {
     return reportName.toLowerCase().endsWith(`.${extension.toLowerCase()}`) ? reportName : `${reportName}.${extension}`;
@@ -620,14 +707,77 @@ function buildFileName(reportName: string, convertTo: string, headers: IDataObje
   return `document.${extension}`;
 }
 
+/**
+ * Infer a file extension from the Content-Type response header.
+ */
+function getExtensionFromContentType(headers: IDataObject): string {
+  const contentType = getHeaderValue(headers, 'content-type');
+  if (!contentType) return '';
+  // Strip parameters (e.g. "; charset=utf-8")
+  const mimeType = contentType.split(';')[0].trim().toLowerCase();
+  return MIME_TO_EXTENSION[mimeType] ?? '';
+}
+
+/**
+ * Extract filename from response headers with robust parsing:
+ * - RFC 5987 `filename*=UTF-8''...` (preferred, URL-encoded)
+ * - Standard `filename="..."` or `filename=...`
+ * - Fallback to x-report-name header
+ * - Path traversal sanitization (strips directory components)
+ */
 function getResponseFileName(headers: IDataObject): string {
   const disposition = getHeaderValue(headers, 'content-disposition');
-  const match = /filename="?([^";\n]+)"?/i.exec(disposition);
-  if (match?.[1]) {
-    return match[1];
+
+  if (disposition) {
+    const parsed = parseContentDisposition(disposition);
+    if (parsed) return parsed;
   }
 
-  return getHeaderValue(headers, 'x-report-name');
+  const reportName = getHeaderValue(headers, 'x-report-name');
+  return reportName ? sanitizeFileName(reportName) : '';
+}
+
+/**
+ * Parse a Content-Disposition header value to extract the filename.
+ * Returns the sanitized filename or empty string if none found.
+ */
+function parseContentDisposition(disposition: string): string {
+  // Prefer RFC 5987 filename* (handles UTF-8 encoded filenames)
+  const rfc5987Name = parseRfc5987Filename(disposition);
+  if (rfc5987Name) return rfc5987Name;
+
+  // Standard filename with quotes: filename="name.ext"
+  const quotedMatch = /filename\s*=\s*"([^"]+)"/i.exec(disposition);
+  if (quotedMatch?.[1]) return sanitizeFileName(quotedMatch[1]);
+
+  // Unquoted filename: filename=name.ext
+  const unquotedMatch = /filename\s*=\s*([^\s;]+)/i.exec(disposition);
+  if (unquotedMatch?.[1]) return sanitizeFileName(unquotedMatch[1]);
+
+  return '';
+}
+
+/**
+ * Attempt to parse an RFC 5987 filename* value from a Content-Disposition header.
+ */
+function parseRfc5987Filename(disposition: string): string {
+  const match = /filename\*\s*=\s*(?:UTF-8|utf-8)''(.+?)(?:;|$)/i.exec(disposition);
+  if (!match?.[1]) return '';
+  try {
+    return sanitizeFileName(decodeURIComponent(match[1].trim()));
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Strip path traversal and directory components, returning only the basename.
+ */
+function sanitizeFileName(name: string): string {
+  // Remove any path separators — keep only the final segment
+  const basename = name.replace(/^.*[/\\]/, '');
+  // Remove null bytes and other control characters
+  return basename.replace(/[\x00-\x1f]/g, '').trim();
 }
 
 function getHeaderValue(headers: IDataObject, headerName: string): string {
