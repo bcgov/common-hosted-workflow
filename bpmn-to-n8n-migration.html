@@ -22,7 +22,7 @@
   #stage{position:fixed; inset:0; display:flex; align-items:center; justify-content:center}
   .slide{
     position:absolute; inset:0; display:flex; flex-direction:column;
-     padding:44px 64px 68px; opacity:0; transform:translateX(40px);
+     padding:44px 64px 88px; opacity:0; transform:translateX(40px); overflow-y:auto;
     transition:opacity .5s ease, transform .5s ease; pointer-events:none;
   }
   .slide.active{opacity:1; transform:none; pointer-events:auto}
@@ -60,7 +60,7 @@
   .n-gateway{background:var(--accent);color:#fff;border-radius:3px}
   .n-n8n{background:#ea6a47;color:#fff;border-radius:4px}
   .arrow{color:var(--muted);font-size:22px;position:relative}
-  .diagram>.arrow{animation:flow-arrow 1.8s ease-in-out infinite}
+  .slide.active .diagram>.arrow{animation:flow-arrow 1.8s ease-in-out 2}
   .col{display:flex;flex-direction:column;gap:14px;align-items:center}
   .col .label{font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
   .bridge{padding:14px 18px;border-radius:4px;background:#eef4f8;border:1px dashed #8196a5;font-size:13px;text-align:center;max-width:260px}
@@ -84,14 +84,15 @@
   .controls{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:10}
   .btn{background:#fff;border:1px solid #8295a3;color:var(--accent);padding:9px 15px;border-radius:3px;font-size:14px;cursor:pointer;transition:.2s}
   .btn:hover{background:#eef4f8}
+  .btn:disabled{opacity:.45;cursor:not-allowed;background:#fff}
   .counter{font-size:13px;color:var(--muted);min-width:60px;text-align:center}
   .kbd{font-size:11px;color:var(--muted)}
 
   /* Flow animation */
   @keyframes dash{to{stroke-dashoffset:-20}}
-  .flow-line{stroke-dasharray:6 4;animation:dash 1s linear infinite}
+  .slide.active .flow-line{stroke-dasharray:6 4;animation:dash 1s linear 2}
   @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:.85}}
-  .pulse{animation:pulse 2s ease-in-out infinite}
+  .slide.active .pulse{animation:pulse 2s ease-in-out 2}
   @keyframes flow-arrow{0%,100%{transform:translateX(0);opacity:.45}50%{transform:translateX(6px);opacity:1}}
   @keyframes rise-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
   @keyframes travel{from{left:-12px}to{left:calc(100% + 4px)}}
@@ -106,11 +107,12 @@
   .flow-step b{display:block;color:var(--accent);margin-bottom:5px}
   .flow-step span{font-size:12px;color:var(--muted)}
   .flow-connector{position:relative;width:72px;height:2px;background:#a8b8c3;overflow:visible}
-  .flow-connector::after{content:"";position:absolute;top:-4px;left:-12px;width:10px;height:10px;border-radius:50%;background:var(--gold);animation:travel 1.8s linear infinite}
+  .flow-connector::after{content:"";position:absolute;top:-4px;left:-12px;width:10px;height:10px;border-radius:50%;background:var(--gold)}
+  .slide.active .flow-connector::after{animation:travel 1.8s linear 2}
   .flow-connector::before{content:"";position:absolute;right:-1px;top:-4px;border-left:8px solid #7b8f9d;border-top:5px solid transparent;border-bottom:5px solid transparent}
-  .orbit{position:relative;width:250px;height:250px;margin:auto;border:1px dashed #9db0bd;border-radius:50%;animation:spin 24s linear infinite}
+  .orbit{position:relative;width:250px;height:250px;margin:auto;border:1px dashed #9db0bd;border-radius:50%}
   .orbit-core{position:absolute;inset:68px;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:#fff;font-size:20px;font-weight:700;box-shadow:0 8px 24px rgba(0,51,102,.2)}
-  .orbit-item{position:absolute;width:88px;padding:9px 5px;background:#fff;border:1px solid var(--line);border-radius:4px;text-align:center;font-size:12px;font-weight:700;color:var(--accent);box-shadow:0 3px 9px rgba(23,43,58,.1);animation:counter-spin 24s linear infinite}
+  .orbit-item{position:absolute;width:88px;padding:9px 5px;background:#fff;border:1px solid var(--line);border-radius:4px;text-align:center;font-size:12px;font-weight:700;color:var(--accent);box-shadow:0 3px 9px rgba(23,43,58,.1)}
   .orbit-item:nth-child(2){top:-17px;left:81px}.orbit-item:nth-child(3){right:-37px;top:99px}.orbit-item:nth-child(4){bottom:-17px;left:81px}.orbit-item:nth-child(5){left:-37px;top:99px}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes counter-spin{to{transform:rotate(-360deg)}}
@@ -121,14 +123,21 @@
   .example-panel h3{font-size:17px;color:var(--accent);margin-bottom:5px}
   .example-panel p{font-size:13px;line-height:1.4;color:var(--muted)}
   .svg-open{width:100%;height:100%;min-height:0;padding:0;border:1px solid #e2e7eb;background:#fff;cursor:zoom-in;overflow:hidden}
-  .svg-open:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .svg-open:focus-visible,.btn:focus-visible,.dialog-close:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   .svg-open img{display:block;width:100%;height:100%;min-height:0;object-fit:contain}
   .svg-dialog{width:100vw;height:100vh;max-width:none;max-height:none;border:0;padding:0;background:#f4f6f8}
   .svg-dialog::backdrop{background:rgba(23,43,58,.72)}
   .svg-dialog img{display:block;width:100%;height:100%;object-fit:contain;padding:56px 24px 24px}
   .dialog-close{position:fixed;top:16px;right:20px;z-index:1;background:#fff;border:1px solid #8295a3;color:var(--accent);padding:9px 15px;border-radius:3px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(23,43,58,.16)}
   .dialog-close:hover{background:#eef4f8}
-  @media(max-width:900px){.slide{padding:28px 32px 70px}.grid{gap:10px}.card{padding:12px}.diagram{gap:12px}h1{font-size:38px}.mapping-table{font-size:13px}.mapping-table th{font-size:12px}.flow-step{min-width:120px;padding:12px}.flow-connector{width:40px}}
+  @media(max-width:900px), (max-height:700px){
+    body{overflow:auto}.slide{padding:24px 28px 88px;overflow-y:auto}.topbar{margin-bottom:14px}
+    .grid{grid-template-columns:1fr!important;gap:10px}.card{padding:12px}.diagram{gap:12px;flex-wrap:wrap;flex:none}
+    h1{font-size:36px}h2{font-size:26px}.mapping-table{font-size:13px}.mapping-table th{font-size:12px}
+    .flow-strip{flex-wrap:wrap;gap:8px}.flow-step{min-width:120px;padding:12px}.flow-connector{width:28px}
+    .example-comparison{display:block}.example-panel{grid-template-columns:1fr;margin-bottom:12px}.svg-open{min-height:220px}
+    .controls{bottom:12px;background:#fff;padding:6px;border:1px solid var(--line);border-radius:4px}.kbd{display:none}.btn{min-height:44px}
+  }
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -144,8 +153,8 @@
     </div>
     <div style="margin:auto">
        <div class="eyebrow">Common Hosted Workflow</div>
-       <h1>From <span class="grad">BPMN processes</span><br>to an extensible <span class="grad">n8n platform</span></h1>
-       <p class="lead">A practical migration path that preserves orchestration and human interaction, while adding integration breadth, tenant automation, reusable government forms, and AI-ready workflows.</p>
+       <h1>From <span class="grad">BPMN processes</span><br>to a shared <span class="grad">n8n platform</span></h1>
+       <p class="lead">Which processes can move to n8n, which should stay on BPMN, and how to migrate with controlled risk.</p>
     </div>
   </section>
 
@@ -156,8 +165,8 @@
       <div class="progress"><span></span></div>
       <div class="pill">01 / Context</div>
     </div>
-    <h2>What is a BPMN workflow engine?</h2>
-    <p class="lead">A BPMN engine (e.g. Camunda, Flowable, Bonita) executes <b>stateful, long-running processes</b> defined by BPMN 2.0 XML — with explicit gateways, events, and persisted process state.</p>
+    <h2>What does a BPMN engine do?</h2>
+    <p class="lead">A BPMN engine runs formal business processes. It tracks each case, routes work and can wait days or months for people, events or deadlines.</p>
     <div class="flow-strip">
       <div class="flow-step"><b>Event</b><span>Starts or resumes work</span></div><div class="flow-connector"></div>
       <div class="flow-step"><b>Activity</b><span>Human or system task</span></div><div class="flow-connector"></div>
@@ -165,10 +174,10 @@
       <div class="flow-step"><b>End</b><span>Records an outcome</span></div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="card"><div class="icon ic-accent">B</div><h3>Stateful</h3><p>Process context persisted to DB; survives restarts and waits days for a task or timer.</p></div>
-      <div class="card"><div class="icon ic-accent">G</div><h3>Gateways</h3><p>Exclusive, parallel, inclusive gateways drive branching & merge logic declaratively.</p></div>
-      <div class="card"><div class="icon ic-accent">U</div><h3>User Tasks</h3><p>Human tasks with forms, assignments, claim/complete lifecycle & task lists.</p></div>
-      <div class="card"><div class="icon ic-accent">H</div><h3>BPMN History</h3><p>Audit trail of every activity, variable change, and execution path.</p></div>
+      <div class="card"><div class="icon ic-accent">B</div><h3>Remembers each case</h3><p>Process data survives restarts and long waits.</p></div>
+      <div class="card"><div class="icon ic-accent">G</div><h3>Controls routing</h3><p>Formal rules split and join different paths through a process.</p></div>
+      <div class="card"><div class="icon ic-accent">U</div><h3>Manages human work</h3><p>Task lists, assignments, forms and completion are built into many BPMN engines.</p></div>
+      <div class="card"><div class="icon ic-accent">H</div><h3>Keeps history</h3><p>Activity and process history can be retained for operations and audit.</p></div>
     </div>
   </section>
 
@@ -180,7 +189,7 @@
       <div class="pill">02 / Context</div>
     </div>
     <h2>What is n8n?</h2>
-    <p class="lead">A low-code <b>workflow automation platform</b>: triggers, processing, integrations and custom nodes in one visual graph. Self-hosting and an open extension model make it suitable for a controlled government platform.</p>
+    <p class="lead">n8n is a visual automation platform. It connects systems, applies business logic and moves data between services. It can be self-hosted and extended for government use.</p>
     <div class="flow-strip">
       <div class="flow-step"><b>Trigger</b><span>Webhook · schedule · queue</span></div><div class="flow-connector"></div>
       <div class="flow-step"><b>Transform</b><span>Validate · enrich · branch</span></div><div class="flow-connector"></div>
@@ -188,10 +197,10 @@
       <div class="flow-step"><b>Respond</b><span>Callback · event · result</span></div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-       <div class="card"><div class="icon ic-ok">T</div><h3>Triggers & waits</h3><p>Webhook, schedule, polling, queues and durable callback-based waits.</p></div>
-      <div class="card"><div class="icon ic-ok">N</div><h3>400+ Nodes</h3><p>Pre-built integrations for SaaS, DBs, IMAP, HTTP, etc.</p></div>
-       <div class="card"><div class="icon ic-ok">C</div><h3>Extensible</h3><p>Code, custom nodes and platform APIs adapt n8n to government services.</p></div>
-      <div class="card"><div class="icon ic-ok">S</div><h3>Scalable</h3><p>Queue mode + workers for horizontal throughput.</p></div>
+       <div class="card"><div class="icon ic-ok">T</div><h3>Starts and pauses work</h3><p>Work can start from events or schedules and pause while waiting for a response.</p></div>
+      <div class="card"><div class="icon ic-ok">N</div><h3>Connects many systems</h3><p>Built-in connectors, APIs, databases and approved custom integrations.</p></div>
+       <div class="card"><div class="icon ic-ok">C</div><h3>Can be extended</h3><p>Custom components connect n8n to government services.</p></div>
+      <div class="card"><div class="icon ic-ok">S</div><h3>Can scale</h3><p>Additional workers can handle higher transaction volumes.</p></div>
     </div>
   </section>
 
@@ -202,26 +211,25 @@
       <div class="progress"><span></span></div>
       <div class="pill">03 / Mapping</div>
     </div>
-    <h2>Concept mapping <span class="grad">BPMN → n8n</span></h2>
+    <h2>How BPMN concepts <span class="grad">map to n8n</span></h2>
     <table class="mapping-table">
-      <thead><tr><th>BPMN concept</th><th>n8n equivalent</th><th>Notes</th></tr></thead>
+      <caption class="sr-only">BPMN concepts, possible n8n approaches and important limits</caption>
+      <thead><tr><th scope="col">BPMN concept</th><th scope="col">n8n approach</th><th scope="col">What to know</th></tr></thead>
       <tbody>
-        <tr><td>None / Message Start</td><td>Manual / Webhook / app trigger</td><td>Start from API, event or another workflow</td></tr>
-        <tr><td>Timer / Conditional / Signal Start</td><td>Schedule / polling / webhook trigger</td><td>Condition evaluation can precede the main flow</td></tr>
-        <tr><td>Service / Script / Business Rule Task</td><td>Integration / HTTP / Code / rules API</td><td>Use a native node first; code or service when specialized</td></tr>
-        <tr><td>Send / Receive Task</td><td>HTTP, queue or email / Wait for webhook</td><td>Correlation data travels with the execution</td></tr>
-        <tr><td>User Task</td><td>WIL action + Wait callback</td><td>Approvals, acknowledgements and CHEFS forms</td></tr>
-        <tr><td>Manual Task</td><td>WIL action or external operational step</td><td>Callback records completion before continuation</td></tr>
-        <tr><td>Call Activity / Sub-process</td><td>Execute Sub-workflow</td><td>Reusable, versioned workflow composition</td></tr>
-        <tr><td>Exclusive / Complex Gateway</td><td>IF / Switch / Code</td><td>Expressions provide explicit routing rules</td></tr>
-        <tr><td>Parallel / Inclusive Gateway</td><td>Branches + Merge</td><td>Fan-out/fan-in; conditional branches for OR behavior</td></tr>
-        <tr><td>Event-based Gateway</td><td>Webhook entry points + correlation</td><td>Route the first relevant external event</td></tr>
-        <tr><td>Timer Intermediate Event</td><td>Wait until / Wait interval</td><td>Persisted execution resumes at the due time</td></tr>
-        <tr><td>Message / Signal / Link Event</td><td>Wait webhook / Webhook / sub-workflow</td><td>Use explicit callback URLs and correlation IDs</td></tr>
-        <tr><td>Error / Escalation Boundary Event</td><td>Error workflow + branch / notification</td><td>Central handling plus local outcome routing</td></tr>
-        <tr><td>Compensation / Cancel / Terminate</td><td>Compensation branch / Stop and Error</td><td>Model business rollback explicitly</td></tr>
-        <tr><td>Data Object / Process Variables</td><td>Execution JSON + databases/services</td><td>Data remains inspectable at every node</td></tr>
-        <tr><td>End Event</td><td>Final node / Respond to Webhook</td><td>Return a result, emit an event or end silently</td></tr>
+        <tr><td>Start event</td><td>Manual, webhook, schedule or app trigger</td><td>Starts work from a person, system or time</td></tr>
+        <tr><td>Automated task</td><td>Integration, HTTP, Code or rules service</td><td>Use a built-in connector where possible</td></tr>
+        <tr><td>Send or receive task</td><td>API, queue, email or Wait node</td><td>Keep a business ID to match every response</td></tr>
+        <tr><td>User or manual task</td><td>WIL action + Wait node</td><td>Supports current WIL interaction types</td></tr>
+        <tr><td>Sub-process</td><td>Sub-workflow</td><td>Reusable, but releases must be managed</td></tr>
+        <tr><td>Decision gateway</td><td>IF, Switch or Code</td><td>Routes work using clear conditions</td></tr>
+        <tr><td>Parallel or inclusive gateway</td><td>Branches + Merge pattern</td><td>Looks similar, but may not run at the same time</td></tr>
+        <tr><td>First event wins</td><td>Callbacks + stored race status</td><td>Needs extra controls for duplicate or late events</td></tr>
+        <tr><td>Timer event</td><td>Wait until or Wait interval</td><td>Resumes the saved workflow when due</td></tr>
+        <tr><td>Message or signal event</td><td>Webhook, Wait node or sub-workflow</td><td>Needs a business ID to match the right case</td></tr>
+        <tr><td>Error attached to a task</td><td>Error output or explicit branch</td><td>Not the same as a separate n8n error workflow</td></tr>
+        <tr><td>Undo, cancel or stop</td><td>Purpose-built recovery logic</td><td>No direct match; prove the behavior before moving</td></tr>
+        <tr><td>Process data</td><td>Workflow data + business systems</td><td>Keep official records in the right system</td></tr>
+        <tr><td>End event</td><td>Final node or response</td><td>Returns a result, sends an event or ends</td></tr>
       </tbody>
     </table>
   </section>
@@ -233,8 +241,8 @@
       <div class="progress"><span></span></div>
       <div class="pill">04 / Decisions</div>
     </div>
-    <h2>DMN decisions with <span class="grad">n8n Data Tables</span></h2>
-    <p class="lead"><b>Decision Model and Notation (DMN)</b> is the companion standard commonly used with BPMN to separate business rules from process flow. Many decision-table use cases can be implemented in n8n with Data Tables.</p>
+    <h2>Simple business rules with <span class="grad">n8n Data Tables</span></h2>
+    <p class="lead">Many simple DMN decision tables can become lookup tables in n8n. The workflow finds the matching rule and uses its result.</p>
     <div class="diagram" style="margin-top:22px">
       <div class="node n-n8n">Workflow input</div><div class="arrow">→</div>
       <div class="node n-n8n pulse">Query Data Table</div><div class="arrow">→</div>
@@ -242,11 +250,11 @@
       <div class="node n-n8n">Route outcome</div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card"><div class="icon ic-ok">1</div><h3>Store rules as data</h3><p>Model input conditions, priorities and outcomes as rows that authorized maintainers can update independently of the workflow.</p></div>
-      <div class="card"><div class="icon ic-ok">2</div><h3>Evaluate in the workflow</h3><p>Query candidate rows, apply comparisons in IF, Switch or Code nodes, and pass the selected result into the process.</p></div>
-      <div class="card"><div class="icon ic-warn">!</div><h3>Know the boundary</h3><p>Data Tables do not natively execute DMN XML, FEEL, hit policies or decision requirement diagrams. Retain a DMN engine when those standards are required.</p></div>
+      <div class="card"><div class="icon ic-ok">1</div><h3>Keep simple rules in rows</h3><p>Authorized maintainers can update conditions, priorities and results without changing the workflow.</p></div>
+      <div class="card"><div class="icon ic-ok">2</div><h3>Apply rules in the workflow</h3><p>The workflow finds matching rows and uses the selected result.</p></div>
+      <div class="card"><div class="icon ic-warn">!</div><h3>Keep complex DMN where needed</h3><p>Use a DMN engine when formal DMN files, advanced rule logic or strict control over decisions is required.</p></div>
     </div>
-    <div class="callout"><b>Migration pattern:</b> translate straightforward DMN decision tables into versioned Data Table rules and regression-test their outcomes against the source DMN model.</div>
+    <div class="callout"><b>Good fit:</b> small lookup tables owned by one project. Track the rule version, effective date and approval, and test conflicting or missing matches. Data Tables can also save a node's result for later use.</div>
   </section>
 
   <!-- SLIDE 6: Visual flow comparison -->
@@ -256,7 +264,7 @@
       <div class="progress"><span></span></div>
       <div class="pill">05 / Visual</div>
     </div>
-    <h2>The same process — two worlds</h2>
+    <h2>One business outcome — <span class="grad">two implementations</span></h2>
     <div class="diagram">
       <div class="col">
         <div class="label">BPMN</div>
@@ -288,7 +296,7 @@
     </div>
   </section>
 
-  <!-- SLIDE 6: FOI migration example -->
+  <!-- SLIDE 7: FOI migration example -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
@@ -296,16 +304,16 @@
       <div class="pill">06 / Example</div>
     </div>
     <h2>Example: <span class="grad">FOI request processing</span></h2>
-    <p class="lead">The same intake process expressed as a BPMN model and as an executable n8n workflow.</p>
+    <p class="lead">A proposed n8n design for the same service outcome. Testing must confirm tasks, deadlines, retries and failure handling.</p>
     <div class="example-comparison">
       <figure class="example-panel">
-        <figcaption><h3>BPMN source</h3><p>Events, user tasks, gateways and process semantics form the migration baseline.</p></figcaption>
+        <figcaption><h3>BPMN source</h3><p>The current events, user tasks, decisions and outcomes define what the new design must preserve.</p></figcaption>
         <button class="svg-open" type="button" data-svg="foi-bpmn.svg" data-alt="BPMN diagram for FOI raw request processing" aria-label="Open BPMN diagram full screen">
           <img src="foi-bpmn.svg" alt="BPMN diagram for FOI raw request processing">
         </button>
       </figure>
       <figure class="example-panel">
-        <figcaption><h3>n8n target</h3><p>Triggers, waits, routers and integration nodes implement the same operational flow.</p></figcaption>
+        <figcaption><h3>n8n target</h3><p>Triggers, waits, routers and integrations form the candidate operational redesign.</p></figcaption>
         <button class="svg-open" type="button" data-svg="foi-n8n.svg" data-alt="n8n workflow for FOI raw request processing" aria-label="Open n8n diagram full screen">
           <img src="foi-n8n.svg" alt="n8n workflow for FOI raw request processing">
         </button>
@@ -313,31 +321,32 @@
     </div>
   </section>
 
-  <!-- SLIDE 7: Key challenges -->
+  <!-- SLIDE 8: Migration boundaries and patterns -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
-      <div class="pill">07 / Challenges</div>
+      <div class="pill">07 / Fit</div>
     </div>
-    <h2>Migration considerations, with clear patterns</h2>
+    <h2>What can move, and <span class="grad">what needs care?</span></h2>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="icon ic-ok">1</div><h3>Long-running execution</h3><p>Wait nodes persist execution data. Our standard is a webhook callback, so no worker or in-memory process remains occupied while waiting.</p></div>
-      <div class="card"><div class="icon ic-ok">2</div><h3>Human interaction</h3><p>WIL supplies the tenant-scoped inbox and supports approvals, event acknowledgement, messages and embedded CHEFS forms.</p></div>
-      <div class="card"><div class="icon ic-warn">3</div><h3>Compensation</h3><p>Translate BPMN compensation into visible, testable rollback branches and reusable sub-workflows.</p></div>
-      <div class="card"><div class="icon ic-warn">4</div><h3>Standards portability</h3><p>The target is an executable n8n workflow, not BPMN 2.0 XML. Preserve the source model and document traceability where required.</p></div>
+      <div class="card"><div class="icon ic-ok">1</div><h3>Long waits can move</h3><p>n8n saves the workflow while it waits. A worker does not need to stay busy for days or months.</p></div>
+      <div class="card"><div class="icon ic-ok">2</div><h3>Current WIL tasks can move</h3><p>WIL supports assigned approvals, acknowledgements, messages and CHEFS forms. Check any need to claim, reassign or escalate tasks.</p></div>
+      <div class="card"><div class="icon ic-warn">3</div><h3>Complex behavior needs proof</h3><p>If a process must undo completed work or choose the first of several events, build and test that behavior before deciding to move.</p></div>
+      <div class="card"><div class="icon ic-warn">4</div><h3>Some processes should stay</h3><p>Keep BPMN when the organization must exchange BPMN files or run models supplied by another system.</p></div>
     </div>
+    <div class="callout"><b>What we have seen:</b> across our client engagements, we have not yet found a process where items 3 or 4 prevented migration. This gives us confidence in using n8n as the core workflow engine for existing BPMN processes, while still checking each process during migration.</div>
   </section>
 
-  <!-- SLIDE 8: State strategy -->
+  <!-- SLIDE 9: State strategy -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
       <div class="pill">08 / State</div>
     </div>
-    <h2>Long-running processes are a <span class="grad">supported pattern</span></h2>
-    <p class="lead">At each human or external decision point, the workflow creates a WIL action and enters a <b>Wait node configured for webhook callback</b>. n8n persists the execution and provides a unique resume URL.</p>
+    <h2>n8n can <span class="grad">pause and resume</span> long-running work</h2>
+    <p class="lead">When a person or system must respond, the workflow creates a WIL action and pauses. n8n saves the workflow and provides a unique address to resume it.</p>
     <div class="diagram" style="margin-top:22px">
       <div class="node n-n8n">Create WIL action</div><div class="arrow">→</div>
       <div class="node n-n8n pulse">Wait for webhook</div><div class="arrow">··· days ···</div>
@@ -345,22 +354,22 @@
       <div class="node n-n8n">Resume with response</div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card"><h3>Durable</h3><p>Execution context is stored by n8n rather than held in worker memory.</p></div>
-      <div class="card"><h3>Secure callback</h3><p>WIL keeps the resume URL server-side and proxies authorized user responses.</p></div>
-      <div class="card"><h3>Operationally simple</h3><p>No special concern merely because an execution waits for an extended period.</p></div>
+      <div class="card"><h3>Saved while waiting</h3><p>n8n stores the workflow instead of keeping a worker busy.</p></div>
+      <div class="card"><h3>Controlled response</h3><p>WIL checks the user and sends the response without exposing the resume address.</p></div>
+      <div class="card"><h3>Operations still matter</h3><p>Plan storage, expiry, cleanup, backup, upgrades and disaster recovery.</p></div>
     </div>
-    <div class="callout"><b>External business records remain appropriate</b> when reporting, cross-process lookup, retention or domain ownership requires them. They are not required just to keep a Wait node alive.</div>
+    <div class="callout"><b>Keep official business records in the appropriate system</b> when they are needed for reporting, retention or use by other processes. A separate record is not needed only to keep the n8n wait alive.</div>
   </section>
 
-  <!-- SLIDE 9: Human task pattern -->
+  <!-- SLIDE 10: Human task pattern -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
       <div class="pill">09 / User Tasks</div>
     </div>
-    <h2>WIL provides the <span class="grad">User Task</span> experience</h2>
-    <p class="lead">The custom <b>Workflow Interaction Layer (WIL)</b> bridges automated executions and authenticated users. It is tenant-scoped, actor-filtered and proxies callbacks so internal webhook URLs and secrets never reach the browser.</p>
+    <h2>WIL connects workflows <span class="grad">with people</span></h2>
+    <p class="lead">The Workflow Interaction Layer gives signed-in users a secure inbox for workflow actions. It shows only work for the user's organization and role.</p>
     <div class="diagram" style="margin-top:20px">
       <div class="col">
         <div class="node n-n8n">1 · Webhook Trigger → starts flow</div>
@@ -386,64 +395,64 @@
         <div class="node n-n8n">6 · Continue or loop back to Wait</div>
       </div>
     </div>
-    <p class="lead" style="margin-top:14px"><span class="grad">Implemented:</span> user, CSTAR role and group assignment; actions and messages; approvals; event acknowledgement; CHEFS submissions; tenant/project scoping; and server-side callback proxying.</p>
+    <p class="lead" style="margin-top:14px"><span class="grad">Available today:</span> assignment by user, role or group; messages; approvals; acknowledgements; CHEFS forms; organization separation; and secure responses. More advanced BPMN task features may need additional work.</p>
   </section>
 
-  <!-- SLIDE 10: Custom platform integration -->
+  <!-- SLIDE 11: Custom platform integration -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
       <div class="pill">10 / Platform</div>
     </div>
-    <h2>Custom implementation makes n8n <span class="grad">government-ready</span></h2>
-    <p class="lead">n8n remains the flexible orchestration core. CHWF extensions connect identity, tenancy, project access and human services without forcing every workflow to rebuild those concerns.</p>
+    <h2>CHWF adds the <span class="grad">shared government capabilities</span></h2>
+    <p class="lead">n8n runs the automation. CHWF connects identity, organizations, project access and human services so each workflow does not have to build them again.</p>
     <div class="diagram" style="margin-top:22px">
-      <div class="col"><div class="label">Identity & tenancy</div><div class="node n-gateway">CSTAR tenants</div><div class="arrow">↓</div><div class="node n-task">Users · roles · groups</div></div>
+      <div class="col"><div class="label">Identity & organizations</div><div class="node n-gateway">CSTAR organizations</div><div class="arrow">↓</div><div class="node n-task">Users · roles · groups</div></div>
       <div class="arrow">→</div>
       <div class="col"><div class="label">Automation core</div><div class="node n-n8n pulse">CHWF + n8n</div><div class="arrow">↓</div><div class="node n-n8n">Projects · workflows · waits</div></div>
       <div class="arrow">→</div>
       <div class="col"><div class="label">Human services</div><div class="node n-gateway">WIL</div><div class="arrow">↓</div><div class="node n-task">CHEFS forms · callbacks</div></div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card"><h3>Automatic project provisioning</h3><p>On login, CSTAR tenant membership creates or resolves the matching n8n team project and reconciles managed access.</p></div>
-      <div class="card"><h3>Explicit role synchronization</h3><p><code>project:editor</code> and <code>project:viewer</code> map predictably; editor wins. Other CSTAR roles remain available to WIL without accidental project grants.</p></div>
-      <div class="card"><h3>Personal + team workspaces</h3><p>Personal projects receive local pseudo-tenant mappings; CSTAR-backed team projects retain authoritative tenant IDs.</p></div>
-      <div class="card"><h3>Actor-aware work queues</h3><p>WIL targets a specific user, a CSTAR role or a CSTAR group within the selected tenant.</p></div>
-      <div class="card"><h3>Multiple form submissions</h3><p>Each WIL <code>showform</code> interaction can launch an authenticated CHEFS form and return its new submission ID to the waiting workflow.</p></div>
-      <div class="card"><h3>Secure extensibility</h3><p>Long-lived CHEFS keys and callback URLs stay server-side; the browser receives only scoped data and short-lived tokens.</p></div>
+      <div class="card"><h3>Projects created from membership</h3><p>When users sign in, CSTAR membership is matched to the right n8n team project.</p></div>
+      <div class="card"><h3>Clear access levels</h3><p>Editor and viewer access are synchronized without granting project access from unrelated roles.</p></div>
+      <div class="card"><h3>Personal and team spaces</h3><p>Users can work privately or in projects tied to a CSTAR organization.</p></div>
+      <div class="card"><h3>Work sent to the right people</h3><p>WIL can target a user, role or group within an organization.</p></div>
+      <div class="card"><h3>CHEFS forms</h3><p>WIL can open a secure CHEFS form and return the new submission to the waiting workflow.</p></div>
+      <div class="card"><h3>Secrets stay on the server</h3><p>CHEFS keys and workflow resume addresses are not sent to the browser.</p></div>
     </div>
   </section>
 
-  <!-- SLIDE 11: Migration playbook -->
+  <!-- SLIDE 12: Migration playbook -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
       <div class="pill">11 / Playbook</div>
     </div>
-    <h2>Step-by-step migration playbook</h2>
+    <h2>A controlled path <span class="grad">from pilot to migration</span></h2>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="icon ic-ok">1</div><h3>Inventory BPMN models</h3><p>List processes, start events, variables, gateways, timers, user tasks, integrations.</p></div>
-      <div class="card"><div class="icon ic-ok">2</div><h3>Classify migration patterns</h3><p>Identify straight-through automation, callback waits, WIL user tasks, compensation and reusable sub-processes.</p></div>
-      <div class="card"><div class="icon ic-ok">3</div><h3>Convert triggers</h3><p>Map each start event to a Webhook / Cron trigger; emit unique processId per instance.</p></div>
-      <div class="card"><div class="icon ic-ok">4</div><h3>Translate gateways</h3><p>Use IF/Switch for XOR; branching + Merge node for AND; emulate inclusive with multiple IFs.</p></div>
-      <div class="card"><div class="icon ic-ok">5</div><h3>Configure WIL tasks</h3><p>Choose approval, event or CHEFS form; target a user, CSTAR role or group; resume through the callback proxy.</p></div>
-      <div class="card"><div class="icon ic-ok">6</div><h3>Capture audit</h3><p>Log each node transition to audit table; mirror BPMN history needs.</p></div>
-      <div class="card"><div class="icon ic-ok">7</div><h3>Translate waits & events</h3><p>Use Wait for webhook callbacks and timers; preserve correlation and timeout behavior.</p></div>
-      <div class="card"><div class="icon ic-ok">8</div><h3>Test & shadow-run</h3><p>Replay BPMN history against n8n outputs; diff outcomes before cutover.</p></div>
+      <div class="card"><div class="icon ic-ok">1</div><h3>Understand the current process</h3><p>Record decisions, deadlines, errors, retries, human tasks and any special engine behavior.</p></div>
+      <div class="card"><div class="icon ic-ok">2</div><h3>Choose good candidates</h3><p>Start with clear automation, simple decisions, supported WIL tasks and callback-based waits.</p></div>
+      <div class="card"><div class="icon ic-ok">3</div><h3>Prevent duplicate work</h3><p>Give every case and request a stable ID. Decide how retries, duplicate responses and late events are handled.</p></div>
+      <div class="card"><div class="icon ic-ok">4</div><h3>Prove difficult behavior</h3><p>Test work that runs on several paths, competing events, cancellation and undo steps.</p></div>
+      <div class="card"><div class="icon ic-ok">5</div><h3>Set up human actions</h3><p>Choose approvals, acknowledgements or CHEFS forms and send them to the right user, role or group.</p></div>
+      <div class="card"><div class="icon ic-ok">6</div><h3>Protect records and privacy</h3><p>Record key business events, minimize sensitive data and set access and retention rules.</p></div>
+      <div class="card"><div class="icon ic-ok">7</div><h3>Plan the changeover</h3><p>Decide how to promote configurations, roll back and handle cases already running in BPMN.</p></div>
+      <div class="card"><div class="icon ic-ok">8</div><h3>Test service readiness</h3><p>Test volume, failures, recovery, upgrades and backups before moving live services.</p></div>
     </div>
   </section>
 
-  <!-- SLIDE 12: Why n8n can be broader -->
+  <!-- SLIDE 13: Why n8n can be broader -->
   <section class="slide">
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
       <div class="pill">12 / Reach</div>
     </div>
-    <h2>Does n8n cover <span class="grad">broader use cases</span> than BPMN?</h2>
-    <p class="lead">Yes. BPMN is a precise notation for process orchestration. n8n combines orchestration with a general-purpose integration and data automation platform, so the same hosted capability serves more delivery needs.</p>
+    <h2>n8n is broader in some areas, <span class="grad">BPMN is deeper in others</span></h2>
+    <p class="lead">n8n is strong for system integration and data automation. BPMN engines are stronger when formal process standards and advanced process behavior are central requirements.</p>
     <div class="grid" style="grid-template-columns:320px 1fr;align-items:center">
       <div class="orbit">
         <div class="orbit-core">n8n</div>
@@ -451,29 +460,13 @@
         <div class="orbit-item">AI</div><div class="orbit-item">Human tasks</div>
       </div>
       <div class="grid" style="grid-template-columns:repeat(2,1fr);margin-top:0">
-        <div class="card"><div class="icon ic-ok">I</div><h3>Integration automation</h3><p>APIs, databases, SaaS, messaging, files and queues connect through native nodes, HTTP and custom nodes.</p></div>
-        <div class="card"><div class="icon ic-ok">D</div><h3>Data & document pipelines</h3><p>Transform, validate, enrich and route data without requiring every automation to become a formal business process.</p></div>
-        <div class="card"><div class="icon ic-ok">A</div><h3>AI-assisted services</h3><p>Add classification, extraction, summarization, retrieval and guarded agent steps, with human review through WIL.</p></div>
-        <div class="card"><div class="icon ic-ok">H</div><h3>Human + machine workflows</h3><p>CHEFS and WIL combine public-service interactions with automated integration and durable waits.</p></div>
+        <div class="card"><div class="icon ic-ok">I</div><h3>Connect systems</h3><p>Link APIs, databases, business applications, messages, files and queues.</p></div>
+        <div class="card"><div class="icon ic-ok">D</div><h3>Move and improve data</h3><p>Validate, transform, enrich and route data between services.</p></div>
+        <div class="card"><div class="icon ic-ok">A</div><h3>Add assisted AI</h3><p>Use approved AI for classification or summaries, with controls and human review.</p></div>
+        <div class="card"><div class="icon ic-ok">H</div><h3>Combine people and automation</h3><p>CHEFS and WIL connect public-service interactions with automated work.</p></div>
       </div>
     </div>
-    <p class="lead" style="margin-top:18px"><span class="grad">Value beyond migration:</span> the destination is not only a replacement engine; it is a reusable automation platform for process, integration, data, forms and responsible AI use cases.</p>
-  </section>
-
-  <!-- SLIDE 13: Decision boundaries -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">13 / Decision</div>
-    </div>
-    <h2>Use explicit <span class="grad">decision boundaries</span></h2>
-    <div class="grid" style="grid-template-columns:1fr 1fr">
-      <div class="card"><div class="icon ic-ok">✓</div><h3>Human-task processes</h3><p><b>Supported by WIL:</b> inbox, actor targeting, approvals, events, messages, CHEFS forms and secure resume callbacks.</p></div>
-      <div class="card"><div class="icon ic-ok">✓</div><h3>Long-running processes</h3><p><b>Supported by Wait:</b> webhook callbacks preserve execution context without occupying a worker throughout the wait.</p></div>
-      <div class="card"><div class="icon ic-warn">!</div><h3>Strict BPMN interchange</h3><p>Retain a BPMN engine when BPMN 2.0 XML portability or execution of externally supplied models is itself a requirement.</p></div>
-      <div class="card"><div class="icon ic-warn">!</div><h3>Validate exceptional semantics</h3><p>Prototype event races, complex compensation or engine-specific behavior and prove operational controls before cutover.</p></div>
-    </div>
+    <p class="lead" style="margin-top:18px"><span class="grad">Value beyond migration:</span> one shared platform for suitable workflows, integrations, data and forms. AI use still requires approval, privacy review, testing, fallback and human accountability.</p>
   </section>
 
   <!-- SLIDE 14: Summary -->
@@ -481,20 +474,19 @@
     <div class="topbar">
       <div class="brand"><div class="logo"></div>BPMN → n8n</div>
       <div class="progress"><span></span></div>
-      <div class="pill">14 / Recommendation</div>
+      <div class="pill">13 / Recommendation</div>
     </div>
     <div style="margin:auto">
        <div class="eyebrow">Recommendation</div>
-       <h1>Proceed with confidence,<br><span class="grad">migrate with evidence</span></h1>
+       <h1>Start with a controlled pilot,<br><span class="grad">decide with evidence</span></h1>
       <ul style="margin-top:18px;max-width:760px;line-height:2;font-size:18px;color:var(--muted)">
-         <li>Most standard BPMN constructs have direct n8n nodes or established composition patterns.</li>
-         <li>Straightforward DMN decision tables can become maintainable n8n Data Table rules.</li>
-         <li>Webhook-based Wait nodes support durable long-running processes without occupying workers.</li>
-         <li>WIL and CHEFS provide the missing human-task layer as an implemented platform capability.</li>
-         <li>CSTAR automatically aligns tenants, n8n projects and managed user roles.</li>
-         <li>Migration also unlocks integration, data automation and responsible AI-assisted workflows.</li>
+          <li>Start with processes that have clear routing, integrations and simple waits.</li>
+          <li>Keep BPMN where formal standards or advanced process behavior are essential.</li>
+          <li>Use WIL for the human actions it supports today.</li>
+          <li>Before launch, prove duplicate prevention, audit, privacy, recovery and changeover plans.</li>
+          <li>Expand migration only when representative pilots meet agreed success measures.</li>
       </ul>
-       <p class="lead" style="margin-top:24px"><span class="grad">Next step:</span> select representative BPMN processes, build migration exemplars, and shadow-run outcomes before phased cutover.</p>
+       <p class="lead" style="margin-top:24px"><span class="grad">Next step:</span> choose both a simple and a difficult process, agree on success measures, and run them beside the current system before deciding to expand.</p>
     </div>
   </section>
 
@@ -505,30 +497,37 @@
   <img id="dialog-image" alt="">
 </dialog>
 
-<div class="controls">
+<div class="controls" aria-label="Slide navigation">
   <button class="btn" id="prev">← Prev</button>
-  <span class="counter" id="counter">1 / 15</span>
+  <span class="counter" id="counter" role="status" aria-live="polite">1 / 14</span>
   <button class="btn" id="next">Next →</button>
   <span class="kbd">← / → or Space</span>
 </div>
 
 <style>
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   ul{list-style:none}
   ul li::before{content:"◆";color:var(--accent);margin-right:10px}
 </style>
 
 <script>
   const slides=[...document.querySelectorAll('.slide')];
-  let i=0; const bar=document.querySelector('#bar');
+  let i=0;
   function show(n){
-    i=(n+slides.length)%slides.length;
+    i=Math.max(0,Math.min(n,slides.length-1));
     slides.forEach((s,idx)=>{
       s.classList.remove('active','prev');
+      s.inert=true;
+      s.setAttribute('aria-hidden','true');
       if(idx<i) s.classList.add('prev');
     });
     slides[i].classList.add('active');
+    slides[i].inert=false;
+    slides[i].removeAttribute('aria-hidden');
     document.querySelectorAll('.progress span').forEach(b=>b.style.width=((i+1)/slides.length*100)+'%');
     document.getElementById('counter').textContent=(i+1)+' / '+slides.length;
+    document.getElementById('prev').disabled=i===0;
+    document.getElementById('next').disabled=i===slides.length-1;
   }
   document.getElementById('prev').onclick=()=>show(i-1);
   document.getElementById('next').onclick=()=>show(i+1);
@@ -551,8 +550,9 @@
   });
   document.addEventListener('keydown',e=>{
     if(dialog.open) return;
-    if(e.key==='ArrowRight'||e.key===' ') show(i+1);
-    if(e.key==='ArrowLeft') show(i-1);
+    if(e.target.closest('button,a,input,select,textarea,[contenteditable="true"]')) return;
+    if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();show(i+1)}
+    if(e.key==='ArrowLeft'){e.preventDefault();show(i-1)}
   });
   show(0);
 </script>
