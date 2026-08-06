@@ -3,6 +3,7 @@ volumes:
   seaweedfs_data:
   grafana_data:
   tempo_data:
+  loki_data:
 
 # Run alongside the main stack:
 #   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
@@ -48,7 +49,8 @@ services:
           mc mb --ignore-existing local/local-mimir-blocks &&
           mc mb --ignore-existing local/local-mimir-alertmanager &&
           mc mb --ignore-existing local/local-mimir-ruler &&
-          mc mb --ignore-existing local/local-tempo-traces"
+          mc mb --ignore-existing local/local-tempo-traces &&
+          mc mb --ignore-existing local/local-loki-chunks"
     depends_on:
       seaweedfs:
         condition: service_healthy
@@ -114,6 +116,17 @@ services:
       mimir:
         condition: service_started
 
+  loki:
+    <<: *common-props
+    container_name: loki
+    image: grafana/loki:3.5.0
+    command: [-config.file=/etc/loki/config.yaml]
+    ports:
+    - 3100:3100
+    volumes:
+    - loki_data:/loki
+    - ./observability/loki/config.yaml:/etc/loki/config.yaml
+
   alloy:
     <<: *common-props
     container_name: alloy
@@ -126,14 +139,18 @@ services:
     ports:
     - 12345:12345
     - 4318:4318
+    - 5514:5514
     environment:
       ALLOY_N8N_ADDRESS: n8n:5678
       ALLOY_MIMIR_URL: http://mimir:9009/api/v1/push
       ALLOY_TEMPO_URL: tempo:4317
+      ALLOY_LOKI_URL: http://loki:3100/loki/api/v1/push
     volumes:
     - ../helm/main/alloy/config.alloy:/etc/alloy/config.alloy
     depends_on:
       mimir:
         condition: service_started
       tempo:
+        condition: service_started
+      loki:
         condition: service_started

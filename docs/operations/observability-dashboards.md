@@ -2,11 +2,12 @@
 
 Grafana provides two dashboards for monitoring n8n in Common Hosted Workflow. They are provisioned automatically — no manual import is needed.
 
-| Dashboard          | Audience                     | Scope                                  |
-| ------------------ | ---------------------------- | -------------------------------------- |
-| **n8n Executions** | Workflow authors, team leads | Are my workflows running and how fast? |
-| **n8n Health**     | Platform / ops team          | Is the n8n process itself healthy?     |
-| **n8n Traces**     | Workflow authors, platform   | What happened inside a single run?     |
+| Dashboard          | Audience                     | Scope                                       |
+| ------------------ | ---------------------------- | ------------------------------------------- |
+| **n8n Executions** | Workflow authors, team leads | Are my workflows running and how fast?      |
+| **n8n Health**     | Platform / ops team          | Is the n8n process itself healthy?          |
+| **n8n Traces**     | Workflow authors, platform   | What happened inside a single run?          |
+| **n8n Logs**       | Platform / ops team          | What failed, who changed what, audit trail? |
 
 ---
 
@@ -189,11 +190,95 @@ Executions that ran before the attribute was configured will continue to show `�
 
 ---
 
-## How metrics and traces reach Grafana
+## n8n Logs
+
+Provides an audit trail and failure analysis based on n8n log streaming events. Use it to investigate workflow failures, trace configuration changes, monitor user activity, and diagnose queue issues.
+
+Linked from the **Executions** dashboard: clicking a workflow in the failure panels opens the Logs dashboard pre-filtered to that workflow.
+
+Default time range: **last 15 minutes** — widen the time picker for historical investigation.
+
+### Filters
+
+| Filter       | Behaviour                                                                               |
+| ------------ | --------------------------------------------------------------------------------------- |
+| **Workflow** | Scopes all execution and audit panels to a single workflow by name. Defaults to All.    |
+| **Project**  | Multi-select. Scopes execution panels to one or more projects.                          |
+| **Event**    | Multi-select. Filters raw logs to specific event types (e.g. `n8n.workflow.failed`).    |
+| **Mode**     | Multi-select. Filters execution panels by trigger mode: `manual`, `webhook`, `trigger`. |
+
+### Live Health (top row)
+
+| Panel                    | What it shows                                                                                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Failed Executions**    | Count of failed executions in the time range. First thing to check when a user reports a broken workflow.                                                            |
+| **In-Flight Executions** | Executions started minus executions completed. A persistently positive value means workflows started but never finished — check for stuck or very long-running runs. |
+| **Stalled Jobs**         | Queue jobs where the worker became unresponsive mid-execution. Any non-zero value warrants investigation. Queue mode only.                                           |
+
+### Failures
+
+| Panel                                       | What it shows                                                                                                                                                                                                  |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Failed Executions by Project & Workflow** | Table of failure counts grouped by project, workflow, and the last node executed before failure to help identify where workflows commonly fail. Click any row to filter the entire dashboard to that workflow. |
+| **Recent Workflow Failures**                | Raw log lines for each failure — expand a line to see the full error message, execution ID, and node context.                                                                                                  |
+| **Top Error Messages**                      | Most common failure error messages grouped by workflow. The same message appearing across multiple workflows points to a shared dependency (e.g. an external API down) rather than isolated bugs.              |
+
+### Execution Overview
+
+| Panel                         | What it shows                                                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Workflow Events Over Time** | All four lifecycle events (started, success, failed, cancelled) on one chart. Started events exceeding completions indicate stuck executions. |
+
+### Cancellations
+
+| Panel                           | What it shows                                                                                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cancelled Executions**        | Count of manually stopped executions in the time range.                                                                                                                                                 |
+| **Cancellation Rate**           | Cancelled executions as a percentage of all completed executions. Elevated values usually indicate manual cancellation or workflows configured to stop previous executions when a new execution starts. |
+| **Failure Rate**                | Failed executions as a percentage of all completed executions.                                                                                                                                          |
+| **Cancellations Over Time**     | Count of cancellation events over time — spikes often correlate with a specific workflow being triggered repeatedly and stopped manually.                                                               |
+| **Recent Cancelled Executions** | Raw log lines for each cancellation — expand to see which workflow was stopped and the trigger mode.                                                                                                    |
+
+### Audit & Security
+
+| Panel                              | What it shows                                                                                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Audit Events**                   | Count of workflow configuration and user events in the time range. When a workflow is selected, shows only events for that workflow.                                                      |
+| **Failed Login Attempts**          | Count of failed login attempts — repeated failures may indicate a credential attack or a misconfigured SSO client.                                                                        |
+| **Workflow Configuration Changes** | Bar chart of workflow CRUD events over time (created, updated, activated, deactivated, archived, published, unpublished). Use to correlate execution behaviour changes with config edits. |
+| **User Activity**                  | Bar chart of user login success/failure, signup and account deletions events.                                                                                                             |
+| **Audit Log**                      | Raw audit event log lines. Expand each line to see who made the change, which workflow was affected.                                                                                      |
+
+### Performance & Debug
+
+| Panel                 | What it shows                                                                                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Most Active Nodes** | Table of node execution counts by node name, node type, and workflow. High counts on a single node reveal which external services are called most — Helps identify which integrations are used most frequently. |
+| **Raw Logs**          | Full log stream filtered by all active dropdowns. Use this for ad-hoc investigation when the structured panels above don't show enough detail.                                                                  |
+
+### Queue & Worker (queue mode only)
+
+These panels show data only when n8n runs in queue mode. They will show no data in the local sandbox.
+
+| Panel                | What it shows                                                                                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Queue Job Events** | Lifecycle events for each queue job: enqueued, dequeued, completed, failed, stalled. A gap between enqueued and dequeued indicates queue lag — insufficient worker capacity. |
+| **Worker Events**    | Worker process start and stop events. A stopped event not followed by a started event means a worker went down and did not recover.                                          |
+
+### Cross-dashboard navigation
+
+- The **n8n Executions** link in the top-right navigates to the Executions dashboard, carrying the current time range and workflow filter.
+- Clicking a row in **Failed Executions by Project & Workflow** filters the entire Logs dashboard to that workflow.
+- Navigating from the Executions dashboard to Logs (via data links on failure panels) automatically sets the Workflow filter.
+
+---
+
+## How metrics, traces, and logs reach Grafana
 
 ```
-n8n /metrics  →  Alloy (scrapes every 30 s)  →  Mimir  →  Grafana
-n8n OTLP      →  Alloy (OTLP receiver :4318)  →  Tempo  →  Grafana
+n8n /metrics       →  Alloy (scrapes every 30 s)     →  Mimir  →  Grafana
+n8n OTLP           →  Alloy (OTLP receiver :4318)    →  Tempo  →  Grafana
+n8n log streaming  →  Alloy (syslog TCP :5514)       →  Loki   →  Grafana
 ```
 
 ---
@@ -208,3 +293,18 @@ SSO counters are in-memory and reset to zero when n8n restarts. Time-series char
 
 **Metrics scrape interval is 30 seconds**
 Short-lived executions that complete between scrapes contribute to histogram buckets but may not appear as a visible spike in rate-based time series charts over very short time windows.
+
+**Log metric panels lag raw log panels by 10–30 seconds**
+Stat and table panels on the Logs dashboard (Failed Executions count, Top Error Messages, etc.) use aggregated Loki metric queries that go through Loki's result cache. Raw log panels (Recent Failures, Audit Log, Raw Logs) query the store directly and update immediately. The gap closes on the next dashboard refresh cycle.
+
+**New workflows don't appear in the Workflow dropdown immediately**
+The Workflow filter is populated from Loki label values. A newly created workflow only appears in the dropdown after it has generated at least one log streaming event (e.g. a test run). Click the refresh icon next to the dropdown to force a reload.
+
+**User login events are not filterable by workflow**
+`n8n.audit.user.*` events carry no workflow context. They appear only when the Workflow filter is set to All. Filtering to a specific workflow will hide all login and signup events.
+
+**Queue and worker panels show no data in single-process mode**
+The Queue Job Events and Worker Events panels only receive data when n8n runs in queue mode. In the local docker-compose sandbox these panels will always be empty.
+
+**`anonymizeAuditMessages` is disabled**
+Audit log events include full user details to support accountability and investigation. Access to the Logs dashboard should be restricted to authorized platform and ops team members.

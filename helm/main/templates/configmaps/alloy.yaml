@@ -19,4 +19,5 @@ data:
   ALLOY_N8N_ADDRESS: "{{ include "_.fullname" . }}-n8n-main:5678"
   ALLOY_MIMIR_URL: "http://{{ include "_.fullname" . }}-mimir:8080/api/v1/push"
   ALLOY_TEMPO_URL: "{{ include "_.fullname" . }}-tempo:4317"
+  ALLOY_LOKI_URL: "http://{{ include "_.fullname" . }}-loki:3100/loki/api/v1/push"
 {{- end }}
