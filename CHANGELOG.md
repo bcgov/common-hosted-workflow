@@ -1,3 +1,55 @@
+## [0.2.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.1.0...v0.2.0) (2026-08-06)
+
+### Features
+
+* **CCP-4747:** create mutiwebhook wait node ([131c0df](https://github.com/bcgov/common-hosted-workflow/commit/131c0dfcc74570a6f35577180cae7aae93d82178))
+* **CCP-4747:** custom node for n8n multiwebhook wait node ([#377](https://github.com/bcgov/common-hosted-workflow/issues/377)) ([e7cada8](https://github.com/bcgov/common-hosted-workflow/commit/e7cada8b583c55e44cbdb1d918120bedf883e99e))
+* **CCP-4845:** bypass access request when a CSTAR project role exists ([08e8e9b](https://github.com/bcgov/common-hosted-workflow/commit/08e8e9b88512f64ae95dce109d6becf58018c981))
+* **CCP-4845:** enable n8n license auto-renew in dev values ([321142f](https://github.com/bcgov/common-hosted-workflow/commit/321142fbdb4d611af2460a902a778ba302800b3d))
+* **CCP-4845:** ensure personal project tenant mapping when logging in ([362cd87](https://github.com/bcgov/common-hosted-workflow/commit/362cd8757c1a18aaf3bddb6d7b1d968855e0dee0))
+* **CCP-4845:** preserve existing docs files during deployment ([9105d84](https://github.com/bcgov/common-hosted-workflow/commit/9105d842f305df4888d6493e4321e0a1cb4df1e9))
+* **CCP-5054:** add external hooks package installation to runtime images ([2b335a3](https://github.com/bcgov/common-hosted-workflow/commit/2b335a3db6883091b705153aba13d94f4d2db694))
+* **CCP-5054:** enable encryption key rotation and harden n8n defaults ([2e671f2](https://github.com/bcgov/common-hosted-workflow/commit/2e671f26c1225eabe83731f4843c7d2a86a36d9c))
+* **CCP-5054:** enable scheduler by default in main helm values ([e7c4b06](https://github.com/bcgov/common-hosted-workflow/commit/e7c4b067856532a025408c9fbbfca55c5ce2a63d))
+* **CCP-5054:** refresh doc site search dependency and lockfile ([43fef26](https://github.com/bcgov/common-hosted-workflow/commit/43fef266cc08ff2d6b73a84079faad0791dabb7b))
+* **CCP-5054:** use pnpm to install community nodes in the Docker image ([641beec](https://github.com/bcgov/common-hosted-workflow/commit/641beecf25b51b1d8e55dd52e8104dc3d9eb9798))
+* **CCP-5256:** add tools helm chart and deployment workflow ([#363](https://github.com/bcgov/common-hosted-workflow/issues/363)) ([b5d77d7](https://github.com/bcgov/common-hosted-workflow/commit/b5d77d7232e003b925e5ab992e9eaa456668251e))
+* **CCP-5256:** add tools-gold terraform deployer and GitHub environment config ([#364](https://github.com/bcgov/common-hosted-workflow/issues/364)) ([3f63ebe](https://github.com/bcgov/common-hosted-workflow/commit/3f63ebee9a95660cfc168b0012aa484eb13e884c))
+* **CCP-5257:** deploy observability stack ([#366](https://github.com/bcgov/common-hosted-workflow/issues/366)) ([9043aed](https://github.com/bcgov/common-hosted-workflow/commit/9043aed85e8a4e5d47cacfd17c4c215e14f04f99))
+* **CCP-5276:** add CHEFS resubmit node and tests ([d6096a0](https://github.com/bcgov/common-hosted-workflow/commit/d6096a015fe0fbe82a96d73d903f38bb79383df5))
+* **CCP-5276:** add chefs submission webhook route and persistence ([8f34d22](https://github.com/bcgov/common-hosted-workflow/commit/8f34d223d03f7a24dee637130f049369f6cf256d))
+* **CCP-5276:** register CHEFS submissions before waiting ([940559c](https://github.com/bcgov/common-hosted-workflow/commit/940559c41768652ed8f8cdab44b80a3a3930c589))
+* **CCP-5276:** remove chefs submission webhook status and delete resolved rows ([cffad3c](https://github.com/bcgov/common-hosted-workflow/commit/cffad3c508b2f06cabbc4c80a12d575e8e8db740))
+* **CCP-5276:** rename resubmit node to resubmit wait and update its integration points ([42d6d1c](https://github.com/bcgov/common-hosted-workflow/commit/42d6d1cf488b3fc2f48b60a17ff885c6f894e676))
+* **CCP-5276:** route webhook URLs through the webhook path and log forwarded payloads ([2ee40f5](https://github.com/bcgov/common-hosted-workflow/commit/2ee40f51616bae2cfce5d35853e7b6c36b208b16))
+* **CCP-5276:** use N8N_BASE_URL for CHEFS resubmit registration ([206e606](https://github.com/bcgov/common-hosted-workflow/commit/206e60691bdec20875ad1559ecc8b4cf4d53c089))
+* **CCP-5302:** enable n8n metrics and add observability dashboards ([#404](https://github.com/bcgov/common-hosted-workflow/issues/404)) ([d9832ec](https://github.com/bcgov/common-hosted-workflow/commit/d9832ec224b944b9871171760fff795b9f5907e2))
+* **CCP-5305:** enable n8n distributed tracing with Tempo ([#413](https://github.com/bcgov/common-hosted-workflow/issues/413)) ([0c7a1d3](https://github.com/bcgov/common-hosted-workflow/commit/0c7a1d39b2263a36976e7d4428743bdad764624c))
+* **CCP-5355:** develop custom n8n node for CDOGS integration ([#420](https://github.com/bcgov/common-hosted-workflow/issues/420)) ([3f18598](https://github.com/bcgov/common-hosted-workflow/commit/3f18598910f09a8f6ac4eb6c9bf06b4f9ec6bc4c))
+* **CCP-5355:** use a dedicated credential type for CDOGS ([#422](https://github.com/bcgov/common-hosted-workflow/issues/422)) ([79d8377](https://github.com/bcgov/common-hosted-workflow/commit/79d8377ba076b6b6f2b90fea3a2bf0c50cff5011))
+* configure authz environment per deployment ([d4539d6](https://github.com/bcgov/common-hosted-workflow/commit/d4539d68a6d5426a5172d5f96021cd5f0e661192))
+
+### Bug Fixes
+
+* allow pre-commit workflow to update webhook fixtures ([c924aed](https://github.com/bcgov/common-hosted-workflow/commit/c924aedd0ed48bd8dfaa05985b1aeae142e68102))
+* **CCP-5054:** run pnpm install with the node user ([9750653](https://github.com/bcgov/common-hosted-workflow/commit/97506539df0365cea7d554935569fc2b664685f6))
+* **CCP-5054:** run production install before dropping root ([214016e](https://github.com/bcgov/common-hosted-workflow/commit/214016ed735fbf8b6f896bc81d0b32ad89069230))
+* **CCP-5276:** make hook migrations idempotent ([9939779](https://github.com/bcgov/common-hosted-workflow/commit/9939779fa584e47aa1c9c463a0aa6ab2fba090d5))
+* **CCP-5276:** stop reading unused webhook headers ([d555856](https://github.com/bcgov/common-hosted-workflow/commit/d5558568a4046eda9c156238ecab866f7ef937e1))
+* **CCP-5305:** fix SeaweedFS volume exhaustion, add project column to traces, fix chart labels ([#416](https://github.com/bcgov/common-hosted-workflow/issues/416)) ([ef3476f](https://github.com/bcgov/common-hosted-workflow/commit/ef3476f421cd33ed47209925fe46aeb9f72631ff))
+* **CCP-5344:** fix tenant project sync race condition if tenant list is blank from cstar ([#381](https://github.com/bcgov/common-hosted-workflow/issues/381)) ([cdb8127](https://github.com/bcgov/common-hosted-workflow/commit/cdb81271f3fd897714efb6919c993a9c7ff516e1))
+* **CCP-5344:** optimize CDOGS node input values and operations ([#424](https://github.com/bcgov/common-hosted-workflow/issues/424)) ([384816c](https://github.com/bcgov/common-hosted-workflow/commit/384816c8391aa459502af527ffe510ced0c61be4))
+* **external-hooks:** improve css sso error detail formatting ([c401727](https://github.com/bcgov/common-hosted-workflow/commit/c401727bec937a2a263f43077e0971483e35b301))
+
+### Documentation
+
+* **CCP-4845:** add conventions and patterns guide for custom nodes ([cffec4e](https://github.com/bcgov/common-hosted-workflow/commit/cffec4e7d60f46b554e9c5ffa63d6fa17f3875ff))
+* **CCP-4845:** add tenant isolation model and cross-link architecture docs ([1fbc695](https://github.com/bcgov/common-hosted-workflow/commit/1fbc695dcfd6609c74adcfc16aab8b1ce2b79aa2))
+* **CCP-4845:** document authentication, roles, access requests, and tenant limits ([3891b92](https://github.com/bcgov/common-hosted-workflow/commit/3891b92c46a179a2ecb5510b37504ecfa5f68a67))
+* **CCP-5054:** reorganize technology docs around platform stack ([9f8acde](https://github.com/bcgov/common-hosted-workflow/commit/9f8acde6b0fdc613b80f93d4a8a88da6aec470ee))
+* **CCP-5054:** update CI/CD and platform documentation with deployment and failover guidance ([1605f48](https://github.com/bcgov/common-hosted-workflow/commit/1605f480c0374c35ddab2c180c3ccb35c5af9f65))
+* **CCP-5276:** update documentation headings and category labels ([5a75c75](https://github.com/bcgov/common-hosted-workflow/commit/5a75c75ae1a3030cda56e275bbc9ce055b5198a9))
+
 ## [0.1.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.0.1...v0.1.0) (2026-07-15)
 
 ### Features
