@@ -1,559 +1,1520 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BPMN to n8n Migration</title>
-<style>
-  :root{
-    --bg:#ffffff; --bg2:#f5f7fa; --accent:#003366; --accent2:#1a5a96;
-    --ok:#2e6f40; --warn:#b45309; --danger:#b42318; --text:#172b3a;
-    --muted:#526675; --card:#ffffff; --line:#d9e2e8; --gold:#fcba19;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg);
-    color:var(--text); overflow:hidden;
-  }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BPMN to n8n Migration</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --bg2: #f5f7fa;
+        --accent: #003366;
+        --accent2: #1a5a96;
+        --ok: #2e6f40;
+        --warn: #b45309;
+        --danger: #b42318;
+        --text: #172b3a;
+        --muted: #526675;
+        --card: #ffffff;
+        --line: #d9e2e8;
+        --gold: #fcba19;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family:
+          'Segoe UI',
+          system-ui,
+          -apple-system,
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        overflow: hidden;
+      }
 
-  /* Stage */
-  #stage{position:fixed; inset:0; display:flex; align-items:center; justify-content:center}
-  .slide{
-    position:absolute; inset:0; display:flex; flex-direction:column;
-     padding:44px 64px 88px; opacity:0; transform:translateX(40px); overflow-y:auto;
-    transition:opacity .5s ease, transform .5s ease; pointer-events:none;
-  }
-  .slide.active{opacity:1; transform:none; pointer-events:auto}
-  .slide.prev{transform:translateX(-40px)}
+      /* Stage */
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 44px 64px 88px;
+        opacity: 0;
+        transform: translateX(40px);
+        overflow-y: auto;
+        transition:
+          opacity 0.5s ease,
+          transform 0.5s ease;
+        pointer-events: none;
+      }
+      .slide.active {
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+      }
+      .slide.prev {
+        transform: translateX(-40px);
+      }
 
-  /* Header */
-  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-  .brand{display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.5px}
-  .logo{width:34px;height:34px;border-radius:3px;background:var(--accent);border-bottom:7px solid var(--gold)}
-  .pill{font-size:12px;color:var(--accent);border:1px solid #afbdc8;padding:4px 10px;border-radius:3px;background:var(--bg2)}
-  .progress{flex:1;max-width:380px;margin:0 22px;height:4px;border-radius:3px;background:#e4e9ed;overflow:hidden}
-  .progress>span{display:block;height:100%;width:0;background:var(--accent);transition:width .4s ease}
+      /* Header */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+      .logo {
+        width: 34px;
+        height: 34px;
+        border-radius: 3px;
+        background: var(--accent);
+        border-bottom: 7px solid var(--gold);
+      }
+      .pill {
+        font-size: 12px;
+        color: var(--accent);
+        border: 1px solid #afbdc8;
+        padding: 4px 10px;
+        border-radius: 3px;
+        background: var(--bg2);
+      }
+      .progress {
+        flex: 1;
+        max-width: 380px;
+        margin: 0 22px;
+        height: 4px;
+        border-radius: 3px;
+        background: #e4e9ed;
+        overflow: hidden;
+      }
+      .progress > span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        transition: width 0.4s ease;
+      }
 
-  h1{font-size:46px; line-height:1.1; margin-bottom:10px; letter-spacing:-.5px}
-  h1 .grad{color:var(--accent)}
-  h2{font-size:30px; margin-bottom:14px; letter-spacing:-.3px}
-  .lead{font-size:18px; color:var(--muted); max-width:760px; line-height:1.5}
+      h1 {
+        font-size: 46px;
+        line-height: 1.1;
+        margin-bottom: 10px;
+        letter-spacing: -0.5px;
+      }
+      h1 .grad {
+        color: var(--accent);
+      }
+      h2 {
+        font-size: 30px;
+        margin-bottom: 14px;
+        letter-spacing: -0.3px;
+      }
+      .lead {
+        font-size: 18px;
+        color: var(--muted);
+        max-width: 760px;
+        line-height: 1.5;
+      }
 
-  .grid{display:grid; gap:16px; margin-top:18px}
-  .card{
-    background:var(--card); border:1px solid var(--line); border-radius:5px; padding:16px 18px;
-    box-shadow:0 3px 10px rgba(23,43,58,.07);
-  }
-  .card h3{display:flex;align-items:center;gap:10px;font-size:16px;margin-bottom:6px}
-  .card p{font-size:14px;color:var(--muted);line-height:1.55}
-  .icon{width:26px;height:26px;border-radius:3px;display:grid;place-items:center;font-size:14px;font-weight:700;color:#fff}
-  .ic-accent{background:var(--accent)} .ic-ok{background:var(--ok)}
-  .ic-warn{background:var(--warn)} .ic-danger{background:var(--danger)}
+      .grid {
+        display: grid;
+        gap: 16px;
+        margin-top: 18px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 16px 18px;
+        box-shadow: 0 3px 10px rgba(23, 43, 58, 0.07);
+      }
+      .card h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 16px;
+        margin-bottom: 6px;
+      }
+      .card p {
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 3px;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .ic-accent {
+        background: var(--accent);
+      }
+      .ic-ok {
+        background: var(--ok);
+      }
+      .ic-warn {
+        background: var(--warn);
+      }
+      .ic-danger {
+        background: var(--danger);
+      }
 
-  /* BPMN + n8n diagram */
-  .diagram{display:flex; align-items:center; justify-content:center; gap:30px; flex:1; margin-top:10px}
-  .node{padding:12px 16px;border-radius:5px;font-weight:600;font-size:14px;text-align:center;min-width:120px;box-shadow:0 2px 8px rgba(23,43,58,.12)}
-  .n-start{background:#1f9d55;color:#fff;border-radius:999px}
-  .n-task{background:#fff;border:1px solid #9fb0bd}
-  .n-gateway{background:var(--accent);color:#fff;border-radius:3px}
-  .n-n8n{background:#ea6a47;color:#fff;border-radius:4px}
-  .arrow{color:var(--muted);font-size:22px;position:relative}
-  .slide.active .diagram>.arrow{animation:flow-arrow 1.8s ease-in-out 2}
-  .col{display:flex;flex-direction:column;gap:14px;align-items:center}
-  .col .label{font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
-  .bridge{padding:14px 18px;border-radius:4px;background:#eef4f8;border:1px dashed #8196a5;font-size:13px;text-align:center;max-width:260px}
+      /* BPMN + n8n diagram */
+      .diagram {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        flex: 1;
+        margin-top: 10px;
+      }
+      .node {
+        padding: 12px 16px;
+        border-radius: 5px;
+        font-weight: 600;
+        font-size: 14px;
+        text-align: center;
+        min-width: 120px;
+        box-shadow: 0 2px 8px rgba(23, 43, 58, 0.12);
+      }
+      .n-start {
+        background: #1f9d55;
+        color: #fff;
+        border-radius: 999px;
+      }
+      .n-task {
+        background: #fff;
+        border: 1px solid #9fb0bd;
+      }
+      .n-gateway {
+        background: var(--accent);
+        color: #fff;
+        border-radius: 3px;
+      }
+      .n-n8n {
+        background: #ea6a47;
+        color: #fff;
+        border-radius: 4px;
+      }
+      .arrow {
+        color: var(--muted);
+        font-size: 22px;
+        position: relative;
+      }
+      .slide.active .diagram > .arrow {
+        animation: flow-arrow 1.8s ease-in-out 2;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        align-items: center;
+      }
+      .col .label {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .bridge {
+        padding: 14px 18px;
+        border-radius: 4px;
+        background: #eef4f8;
+        border: 1px dashed #8196a5;
+        font-size: 13px;
+        text-align: center;
+        max-width: 260px;
+      }
 
-  /* Code */
-  pre{background:#f4f6f8;border:1px solid var(--line);border-radius:4px;padding:16px;overflow:auto;font-size:13px;font-family:Consolas,Menlo,monospace;color:#233746}
-  code .k{color:#6f42c1} code .s{color:#2e6f40} code .c{color:#687b88} code .n{color:#1a5a96}
+      /* Code */
+      pre {
+        background: #f4f6f8;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 16px;
+        overflow: auto;
+        font-size: 13px;
+        font-family: Consolas, Menlo, monospace;
+        color: #233746;
+      }
+      code .k {
+        color: #6f42c1;
+      }
+      code .s {
+        color: #2e6f40;
+      }
+      code .c {
+        color: #687b88;
+      }
+      code .n {
+        color: #1a5a96;
+      }
 
-  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
-  tr:hover td{background:#f5f8fa}
-  .mapping-table{font-size:15px;margin-top:6px}
-  .mapping-table th{font-size:13px}
-  .mapping-table th,.mapping-table td{padding:6px 9px;line-height:1.22}
-  .mapping-table td:first-child{font-weight:600;color:var(--accent);width:25%}
-  .slide.active .mapping-table tbody tr{animation:rise-in .3s ease both}
-  .slide.active .mapping-table tbody tr:nth-child(2n){animation-delay:.04s}
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      tr:hover td {
+        background: #f5f8fa;
+      }
+      .mapping-table {
+        font-size: 15px;
+        margin-top: 6px;
+      }
+      .mapping-table th {
+        font-size: 13px;
+      }
+      .mapping-table th,
+      .mapping-table td {
+        padding: 6px 9px;
+        line-height: 1.22;
+      }
+      .mapping-table td:first-child {
+        font-weight: 600;
+        color: var(--accent);
+        width: 25%;
+      }
+      .slide.active .mapping-table tbody tr {
+        animation: rise-in 0.3s ease both;
+      }
+      .slide.active .mapping-table tbody tr:nth-child(2n) {
+        animation-delay: 0.04s;
+      }
 
-  /* Controls */
-  .controls{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:10}
-  .btn{background:#fff;border:1px solid #8295a3;color:var(--accent);padding:9px 15px;border-radius:3px;font-size:14px;cursor:pointer;transition:.2s}
-  .btn:hover{background:#eef4f8}
-  .btn:disabled{opacity:.45;cursor:not-allowed;background:#fff}
-  .counter{font-size:13px;color:var(--muted);min-width:60px;text-align:center}
-  .kbd{font-size:11px;color:var(--muted)}
+      /* Controls */
+      .controls {
+        position: fixed;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        z-index: 10;
+      }
+      .btn {
+        background: #fff;
+        border: 1px solid #8295a3;
+        color: var(--accent);
+        padding: 9px 15px;
+        border-radius: 3px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .btn:hover {
+        background: #eef4f8;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        background: #fff;
+      }
+      .counter {
+        font-size: 13px;
+        color: var(--muted);
+        min-width: 60px;
+        text-align: center;
+      }
+      .kbd {
+        font-size: 11px;
+        color: var(--muted);
+      }
 
-  /* Flow animation */
-  @keyframes dash{to{stroke-dashoffset:-20}}
-  .slide.active .flow-line{stroke-dasharray:6 4;animation:dash 1s linear 2}
-  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:.85}}
-  .slide.active .pulse{animation:pulse 2s ease-in-out 2}
-  @keyframes flow-arrow{0%,100%{transform:translateX(0);opacity:.45}50%{transform:translateX(6px);opacity:1}}
-  @keyframes rise-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-  @keyframes travel{from{left:-12px}to{left:calc(100% + 4px)}}
-  .slide.active .card{animation:rise-in .45s ease both}
-  .slide.active .card:nth-child(2){animation-delay:.07s}
-  .slide.active .card:nth-child(3){animation-delay:.14s}
-  .slide.active .card:nth-child(4){animation-delay:.21s}
-  .slide.active .card:nth-child(5){animation-delay:.28s}
-  .slide.active .card:nth-child(6){animation-delay:.35s}
-  .flow-strip{display:flex;align-items:center;justify-content:center;gap:0;margin:22px 0 8px}
-  .flow-step{min-width:150px;padding:16px 18px;border:1px solid var(--line);border-top:4px solid var(--accent);background:#fff;text-align:center;box-shadow:0 3px 10px rgba(23,43,58,.07)}
-  .flow-step b{display:block;color:var(--accent);margin-bottom:5px}
-  .flow-step span{font-size:12px;color:var(--muted)}
-  .flow-connector{position:relative;width:72px;height:2px;background:#a8b8c3;overflow:visible}
-  .flow-connector::after{content:"";position:absolute;top:-4px;left:-12px;width:10px;height:10px;border-radius:50%;background:var(--gold)}
-  .slide.active .flow-connector::after{animation:travel 1.8s linear 2}
-  .flow-connector::before{content:"";position:absolute;right:-1px;top:-4px;border-left:8px solid #7b8f9d;border-top:5px solid transparent;border-bottom:5px solid transparent}
-  .orbit{position:relative;width:250px;height:250px;margin:auto;border:1px dashed #9db0bd;border-radius:50%}
-  .orbit-core{position:absolute;inset:68px;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:#fff;font-size:20px;font-weight:700;box-shadow:0 8px 24px rgba(0,51,102,.2)}
-  .orbit-item{position:absolute;width:88px;padding:9px 5px;background:#fff;border:1px solid var(--line);border-radius:4px;text-align:center;font-size:12px;font-weight:700;color:var(--accent);box-shadow:0 3px 9px rgba(23,43,58,.1)}
-  .orbit-item:nth-child(2){top:-17px;left:81px}.orbit-item:nth-child(3){right:-37px;top:99px}.orbit-item:nth-child(4){bottom:-17px;left:81px}.orbit-item:nth-child(5){left:-37px;top:99px}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  @keyframes counter-spin{to{transform:rotate(-360deg)}}
-  .eyebrow{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px}
-  .callout{border-left:5px solid var(--gold);background:#f7f8f9;padding:14px 18px;margin-top:16px;color:var(--muted);line-height:1.5}
-  .example-comparison{display:grid;grid-template-rows:1fr 1fr;gap:12px;flex:1;min-height:0;margin-top:16px}
-  .example-panel{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;min-height:0;padding:12px 16px;background:var(--bg2);border:1px solid var(--line);border-radius:5px;overflow:hidden}
-  .example-panel h3{font-size:17px;color:var(--accent);margin-bottom:5px}
-  .example-panel p{font-size:13px;line-height:1.4;color:var(--muted)}
-  .svg-open{width:100%;height:100%;min-height:0;padding:0;border:1px solid #e2e7eb;background:#fff;cursor:zoom-in;overflow:hidden}
-  .svg-open:focus-visible,.btn:focus-visible,.dialog-close:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-  .svg-open img{display:block;width:100%;height:100%;min-height:0;object-fit:contain}
-  .svg-dialog{width:100vw;height:100vh;max-width:none;max-height:none;border:0;padding:0;background:#f4f6f8}
-  .svg-dialog::backdrop{background:rgba(23,43,58,.72)}
-  .svg-dialog img{display:block;width:100%;height:100%;object-fit:contain;padding:56px 24px 24px}
-  .dialog-close{position:fixed;top:16px;right:20px;z-index:1;background:#fff;border:1px solid #8295a3;color:var(--accent);padding:9px 15px;border-radius:3px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(23,43,58,.16)}
-  .dialog-close:hover{background:#eef4f8}
-  @media(max-width:900px), (max-height:700px){
-    body{overflow:auto}.slide{padding:24px 28px 88px;overflow-y:auto}.topbar{margin-bottom:14px}
-    .grid{grid-template-columns:1fr!important;gap:10px}.card{padding:12px}.diagram{gap:12px;flex-wrap:wrap;flex:none}
-    h1{font-size:36px}h2{font-size:26px}.mapping-table{font-size:13px}.mapping-table th{font-size:12px}
-    .flow-strip{flex-wrap:wrap;gap:8px}.flow-step{min-width:120px;padding:12px}.flow-connector{width:28px}
-    .example-comparison{display:block}.example-panel{grid-template-columns:1fr;margin-bottom:12px}.svg-open{min-height:220px}
-    .controls{bottom:12px;background:#fff;padding:6px;border:1px solid var(--line);border-radius:4px}.kbd{display:none}.btn{min-height:44px}
-  }
-  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-</style>
-</head>
-<body>
-<div id="stage">
-
-  <!-- SLIDE 1: Title -->
-  <section class="slide active">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span id="bar"></span></div>
-       <div class="pill">Feasibility Briefing</div>
-    </div>
-    <div style="margin:auto">
-       <div class="eyebrow">Common Hosted Workflow</div>
-       <h1>From <span class="grad">BPMN processes</span><br>to a shared <span class="grad">n8n platform</span></h1>
-       <p class="lead">Which processes can move to n8n, which should stay on BPMN, and how to migrate with controlled risk.</p>
-    </div>
-  </section>
-
-  <!-- SLIDE 2: What is BPMN -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">01 / Context</div>
-    </div>
-    <h2>What does a BPMN engine do?</h2>
-    <p class="lead">A BPMN engine runs formal business processes. It tracks each case, routes work and can wait days or months for people, events or deadlines.</p>
-    <div class="flow-strip">
-      <div class="flow-step"><b>Event</b><span>Starts or resumes work</span></div><div class="flow-connector"></div>
-      <div class="flow-step"><b>Activity</b><span>Human or system task</span></div><div class="flow-connector"></div>
-      <div class="flow-step"><b>Gateway</b><span>Routes execution</span></div><div class="flow-connector"></div>
-      <div class="flow-step"><b>End</b><span>Records an outcome</span></div>
-    </div>
-    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="card"><div class="icon ic-accent">B</div><h3>Remembers each case</h3><p>Process data survives restarts and long waits.</p></div>
-      <div class="card"><div class="icon ic-accent">G</div><h3>Controls routing</h3><p>Formal rules split and join different paths through a process.</p></div>
-      <div class="card"><div class="icon ic-accent">U</div><h3>Manages human work</h3><p>Task lists, assignments, forms and completion are built into many BPMN engines.</p></div>
-      <div class="card"><div class="icon ic-accent">H</div><h3>Keeps history</h3><p>Activity and process history can be retained for operations and audit.</p></div>
-    </div>
-  </section>
-
-  <!-- SLIDE 3: What is n8n -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">02 / Context</div>
-    </div>
-    <h2>What is n8n?</h2>
-    <p class="lead">n8n is a visual automation platform. It connects systems, applies business logic and moves data between services. It can be self-hosted and extended for government use.</p>
-    <div class="flow-strip">
-      <div class="flow-step"><b>Trigger</b><span>Webhook · schedule · queue</span></div><div class="flow-connector"></div>
-      <div class="flow-step"><b>Transform</b><span>Validate · enrich · branch</span></div><div class="flow-connector"></div>
-      <div class="flow-step"><b>Integrate</b><span>API · database · service</span></div><div class="flow-connector"></div>
-      <div class="flow-step"><b>Respond</b><span>Callback · event · result</span></div>
-    </div>
-    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-       <div class="card"><div class="icon ic-ok">T</div><h3>Starts and pauses work</h3><p>Work can start from events or schedules and pause while waiting for a response.</p></div>
-      <div class="card"><div class="icon ic-ok">N</div><h3>Connects many systems</h3><p>Built-in connectors, APIs, databases and approved custom integrations.</p></div>
-       <div class="card"><div class="icon ic-ok">C</div><h3>Can be extended</h3><p>Custom components connect n8n to government services.</p></div>
-      <div class="card"><div class="icon ic-ok">S</div><h3>Can scale</h3><p>Additional workers can handle higher transaction volumes.</p></div>
-    </div>
-  </section>
-
-  <!-- SLIDE 4: Conceptual mapping -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">03 / Mapping</div>
-    </div>
-    <h2>How BPMN concepts <span class="grad">map to n8n</span></h2>
-    <table class="mapping-table">
-      <caption class="sr-only">BPMN concepts, possible n8n approaches and important limits</caption>
-      <thead><tr><th scope="col">BPMN concept</th><th scope="col">n8n approach</th><th scope="col">What to know</th></tr></thead>
-      <tbody>
-        <tr><td>Start event</td><td>Manual, webhook, schedule or app trigger</td><td>Starts work from a person, system or time</td></tr>
-        <tr><td>Automated task</td><td>Integration, HTTP, Code or rules service</td><td>Use a built-in connector where possible</td></tr>
-        <tr><td>Send or receive task</td><td>API, queue, email or Wait node</td><td>Keep a business ID to match every response</td></tr>
-        <tr><td>User or manual task</td><td>WIL action + Wait node</td><td>Supports current WIL interaction types</td></tr>
-        <tr><td>Sub-process</td><td>Sub-workflow</td><td>Reusable, but releases must be managed</td></tr>
-        <tr><td>Decision gateway</td><td>IF, Switch or Code</td><td>Routes work using clear conditions</td></tr>
-        <tr><td>Parallel or inclusive gateway</td><td>Branches + Merge pattern</td><td>Looks similar, but may not run at the same time</td></tr>
-        <tr><td>First event wins</td><td>Callbacks + stored race status</td><td>Needs extra controls for duplicate or late events</td></tr>
-        <tr><td>Timer event</td><td>Wait until or Wait interval</td><td>Resumes the saved workflow when due</td></tr>
-        <tr><td>Message or signal event</td><td>Webhook, Wait node or sub-workflow</td><td>Needs a business ID to match the right case</td></tr>
-        <tr><td>Error attached to a task</td><td>Error output or explicit branch</td><td>Not the same as a separate n8n error workflow</td></tr>
-        <tr><td>Undo, cancel or stop</td><td>Purpose-built recovery logic</td><td>No direct match; prove the behavior before moving</td></tr>
-        <tr><td>Process data</td><td>Workflow data + business systems</td><td>Keep official records in the right system</td></tr>
-        <tr><td>End event</td><td>Final node or response</td><td>Returns a result, sends an event or ends</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- SLIDE 5: DMN decision tables -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">04 / Decisions</div>
-    </div>
-    <h2>Simple business rules with <span class="grad">n8n Data Tables</span></h2>
-    <p class="lead">Many simple DMN decision tables can become lookup tables in n8n. The workflow finds the matching rule and uses its result.</p>
-    <div class="diagram" style="margin-top:22px">
-      <div class="node n-n8n">Workflow input</div><div class="arrow">→</div>
-      <div class="node n-n8n pulse">Query Data Table</div><div class="arrow">→</div>
-      <div class="node n-gateway">Match rule</div><div class="arrow">→</div>
-      <div class="node n-n8n">Route outcome</div>
-    </div>
-    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card"><div class="icon ic-ok">1</div><h3>Keep simple rules in rows</h3><p>Authorized maintainers can update conditions, priorities and results without changing the workflow.</p></div>
-      <div class="card"><div class="icon ic-ok">2</div><h3>Apply rules in the workflow</h3><p>The workflow finds matching rows and uses the selected result.</p></div>
-      <div class="card"><div class="icon ic-warn">!</div><h3>Keep complex DMN where needed</h3><p>Use a DMN engine when formal DMN files, advanced rule logic or strict control over decisions is required.</p></div>
-    </div>
-    <div class="callout"><b>Good fit:</b> small lookup tables owned by one project. Track the rule version, effective date and approval, and test conflicting or missing matches. Data Tables can also save a node's result for later use.</div>
-  </section>
-
-  <!-- SLIDE 6: Visual flow comparison -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">05 / Visual</div>
-    </div>
-    <h2>One business outcome — <span class="grad">two implementations</span></h2>
-    <div class="diagram">
-      <div class="col">
-        <div class="label">BPMN</div>
-        <div class="node n-start pulse">Start</div>
-        <div class="arrow">↓</div>
-        <div class="node n-task">Validate Order</div>
-        <div class="arrow">↓</div>
-        <div class="node n-gateway">◇ Stock?</div>
-        <div class="arrow">↙&nbsp;&nbsp;&nbsp;&nbsp;↘</div>
-        <div style="display:flex;gap:12px">
-          <div class="node n-task">Reserve</div>
-          <div class="node n-task">Backorder</div>
+      /* Flow animation */
+      @keyframes dash {
+        to {
+          stroke-dashoffset: -20;
+        }
+      }
+      .slide.active .flow-line {
+        stroke-dasharray: 6 4;
+        animation: dash 1s linear 2;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.05);
+          opacity: 0.85;
+        }
+      }
+      .slide.active .pulse {
+        animation: pulse 2s ease-in-out 2;
+      }
+      @keyframes flow-arrow {
+        0%,
+        100% {
+          transform: translateX(0);
+          opacity: 0.45;
+        }
+        50% {
+          transform: translateX(6px);
+          opacity: 1;
+        }
+      }
+      @keyframes rise-in {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes travel {
+        from {
+          left: -12px;
+        }
+        to {
+          left: calc(100% + 4px);
+        }
+      }
+      .slide.active .card {
+        animation: rise-in 0.45s ease both;
+      }
+      .slide.active .card:nth-child(2) {
+        animation-delay: 0.07s;
+      }
+      .slide.active .card:nth-child(3) {
+        animation-delay: 0.14s;
+      }
+      .slide.active .card:nth-child(4) {
+        animation-delay: 0.21s;
+      }
+      .slide.active .card:nth-child(5) {
+        animation-delay: 0.28s;
+      }
+      .slide.active .card:nth-child(6) {
+        animation-delay: 0.35s;
+      }
+      .flow-strip {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin: 22px 0 8px;
+      }
+      .flow-step {
+        min-width: 150px;
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--accent);
+        background: #fff;
+        text-align: center;
+        box-shadow: 0 3px 10px rgba(23, 43, 58, 0.07);
+      }
+      .flow-step b {
+        display: block;
+        color: var(--accent);
+        margin-bottom: 5px;
+      }
+      .flow-step span {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .flow-connector {
+        position: relative;
+        width: 72px;
+        height: 2px;
+        background: #a8b8c3;
+        overflow: visible;
+      }
+      .flow-connector::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        left: -12px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--gold);
+      }
+      .slide.active .flow-connector::after {
+        animation: travel 1.8s linear 2;
+      }
+      .flow-connector::before {
+        content: '';
+        position: absolute;
+        right: -1px;
+        top: -4px;
+        border-left: 8px solid #7b8f9d;
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+      }
+      .orbit {
+        position: relative;
+        width: 250px;
+        height: 250px;
+        margin: auto;
+        border: 1px dashed #9db0bd;
+        border-radius: 50%;
+      }
+      .orbit-core {
+        position: absolute;
+        inset: 68px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 20px;
+        font-weight: 700;
+        box-shadow: 0 8px 24px rgba(0, 51, 102, 0.2);
+      }
+      .orbit-item {
+        position: absolute;
+        width: 88px;
+        padding: 9px 5px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+        box-shadow: 0 3px 9px rgba(23, 43, 58, 0.1);
+      }
+      .orbit-item:nth-child(2) {
+        top: -17px;
+        left: 81px;
+      }
+      .orbit-item:nth-child(3) {
+        right: -37px;
+        top: 99px;
+      }
+      .orbit-item:nth-child(4) {
+        bottom: -17px;
+        left: 81px;
+      }
+      .orbit-item:nth-child(5) {
+        left: -37px;
+        top: 99px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes counter-spin {
+        to {
+          transform: rotate(-360deg);
+        }
+      }
+      .eyebrow {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+      .callout {
+        border-left: 5px solid var(--gold);
+        background: #f7f8f9;
+        padding: 14px 18px;
+        margin-top: 16px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .example-comparison {
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+        gap: 12px;
+        flex: 1;
+        min-height: 0;
+        margin-top: 16px;
+      }
+      .example-panel {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        align-items: center;
+        min-height: 0;
+        padding: 12px 16px;
+        background: var(--bg2);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .example-panel h3 {
+        font-size: 17px;
+        color: var(--accent);
+        margin-bottom: 5px;
+      }
+      .example-panel p {
+        font-size: 13px;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+      .svg-open {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        padding: 0;
+        border: 1px solid #e2e7eb;
+        background: #fff;
+        cursor: zoom-in;
+        overflow: hidden;
+      }
+      .svg-open:focus-visible,
+      .btn:focus-visible,
+      .dialog-close:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .svg-open img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        object-fit: contain;
+      }
+      .svg-dialog {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border: 0;
+        padding: 0;
+        background: #f4f6f8;
+      }
+      .svg-dialog::backdrop {
+        background: rgba(23, 43, 58, 0.72);
+      }
+      .svg-dialog img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        padding: 56px 24px 24px;
+      }
+      .dialog-close {
+        position: fixed;
+        top: 16px;
+        right: 20px;
+        z-index: 1;
+        background: #fff;
+        border: 1px solid #8295a3;
+        color: var(--accent);
+        padding: 9px 15px;
+        border-radius: 3px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 3px 10px rgba(23, 43, 58, 0.16);
+      }
+      .dialog-close:hover {
+        background: #eef4f8;
+      }
+      @media (max-width: 900px), (max-height: 700px) {
+        body {
+          overflow: auto;
+        }
+        .slide {
+          padding: 24px 28px 88px;
+          overflow-y: auto;
+        }
+        .topbar {
+          margin-bottom: 14px;
+        }
+        .grid {
+          grid-template-columns: 1fr !important;
+          gap: 10px;
+        }
+        .card {
+          padding: 12px;
+        }
+        .diagram {
+          gap: 12px;
+          flex-wrap: wrap;
+          flex: none;
+        }
+        h1 {
+          font-size: 36px;
+        }
+        h2 {
+          font-size: 26px;
+        }
+        .mapping-table {
+          font-size: 13px;
+        }
+        .mapping-table th {
+          font-size: 12px;
+        }
+        .flow-strip {
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .flow-step {
+          min-width: 120px;
+          padding: 12px;
+        }
+        .flow-connector {
+          width: 28px;
+        }
+        .example-comparison {
+          display: block;
+        }
+        .example-panel {
+          grid-template-columns: 1fr;
+          margin-bottom: 12px;
+        }
+        .svg-open {
+          min-height: 220px;
+        }
+        .controls {
+          bottom: 12px;
+          background: #fff;
+          padding: 6px;
+          border: 1px solid var(--line);
+          border-radius: 4px;
+        }
+        .kbd {
+          display: none;
+        }
+        .btn {
+          min-height: 44px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <!-- SLIDE 1: Title -->
+      <section class="slide active">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span id="bar"></span></div>
+          <div class="pill">Feasibility Briefing</div>
         </div>
-      </div>
-      <div class="bridge">→ Migration mapping →<br>trigger · nodes · IF · merge</div>
-      <div class="col">
-        <div class="label">n8n</div>
-        <div class="node n-n8n pulse">Webhook Trigger</div>
-        <div class="arrow">↓</div>
-        <div class="node n-n8n">HTTP Validate</div>
-        <div class="arrow">↓</div>
-        <div class="node n-n8n">IF · Stock</div>
-        <div class="arrow">↙&nbsp;&nbsp;&nbsp;&nbsp;↘</div>
-        <div style="display:flex;gap:12px">
-          <div class="node n-n8n">Reserve API</div>
-          <div class="node n-n8n">Create PO</div>
+        <div style="margin: auto">
+          <div class="eyebrow">Common Hosted Workflow</div>
+          <h1>From <span class="grad">BPMN processes</span><br />to a shared <span class="grad">n8n platform</span></h1>
+          <p class="lead">
+            Which processes can move to n8n, which should stay on BPMN, and how to migrate with controlled risk.
+          </p>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- SLIDE 7: FOI migration example -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">06 / Example</div>
-    </div>
-    <h2>Example: <span class="grad">FOI request processing</span></h2>
-    <p class="lead">A proposed n8n design for the same service outcome. Testing must confirm tasks, deadlines, retries and failure handling.</p>
-    <div class="example-comparison">
-      <figure class="example-panel">
-        <figcaption><h3>BPMN source</h3><p>The current events, user tasks, decisions and outcomes define what the new design must preserve.</p></figcaption>
-        <button class="svg-open" type="button" data-svg="foi-bpmn.svg" data-alt="BPMN diagram for FOI raw request processing" aria-label="Open BPMN diagram full screen">
-          <img src="foi-bpmn.svg" alt="BPMN diagram for FOI raw request processing">
-        </button>
-      </figure>
-      <figure class="example-panel">
-        <figcaption><h3>n8n target</h3><p>Triggers, waits, routers and integrations form the candidate operational redesign.</p></figcaption>
-        <button class="svg-open" type="button" data-svg="foi-n8n.svg" data-alt="n8n workflow for FOI raw request processing" aria-label="Open n8n diagram full screen">
-          <img src="foi-n8n.svg" alt="n8n workflow for FOI raw request processing">
-        </button>
-      </figure>
-    </div>
-  </section>
+      <!-- SLIDE 2: What is BPMN -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">01 / Context</div>
+        </div>
+        <h2>What does a BPMN engine do?</h2>
+        <p class="lead">
+          A BPMN engine runs formal business processes. It tracks each case, routes work and can wait days or months for
+          people, events or deadlines.
+        </p>
+        <div class="flow-strip">
+          <div class="flow-step"><b>Event</b><span>Starts or resumes work</span></div>
+          <div class="flow-connector"></div>
+          <div class="flow-step"><b>Activity</b><span>Human or system task</span></div>
+          <div class="flow-connector"></div>
+          <div class="flow-step"><b>Gateway</b><span>Routes execution</span></div>
+          <div class="flow-connector"></div>
+          <div class="flow-step"><b>End</b><span>Records an outcome</span></div>
+        </div>
+        <div class="grid" style="grid-template-columns: repeat(4, 1fr)">
+          <div class="card">
+            <div class="icon ic-accent">B</div>
+            <h3>Remembers each case</h3>
+            <p>Process data survives restarts and long waits.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-accent">G</div>
+            <h3>Controls routing</h3>
+            <p>Formal rules split and join different paths through a process.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-accent">U</div>
+            <h3>Manages human work</h3>
+            <p>Task lists, assignments, forms and completion are built into many BPMN engines.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-accent">H</div>
+            <h3>Keeps history</h3>
+            <p>Activity and process history can be retained for operations and audit.</p>
+          </div>
+        </div>
+      </section>
 
-  <!-- SLIDE 8: Migration boundaries and patterns -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">07 / Fit</div>
-    </div>
-    <h2>What can move, and <span class="grad">what needs care?</span></h2>
-    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="icon ic-ok">1</div><h3>Long waits can move</h3><p>n8n saves the workflow while it waits. A worker does not need to stay busy for days or months.</p></div>
-      <div class="card"><div class="icon ic-ok">2</div><h3>Current WIL tasks can move</h3><p>WIL supports assigned approvals, acknowledgements, messages and CHEFS forms. Check any need to claim, reassign or escalate tasks.</p></div>
-      <div class="card"><div class="icon ic-warn">3</div><h3>Complex behavior needs proof</h3><p>If a process must undo completed work or choose the first of several events, build and test that behavior before deciding to move.</p></div>
-      <div class="card"><div class="icon ic-warn">4</div><h3>Some processes should stay</h3><p>Keep BPMN when the organization must exchange BPMN files or run models supplied by another system.</p></div>
-    </div>
-    <div class="callout"><b>What we have seen:</b> across our client engagements, we have not yet found a process where items 3 or 4 prevented migration. This gives us confidence in using n8n as the core workflow engine for existing BPMN processes, while still checking each process during migration.</div>
-  </section>
+      <!-- SLIDE 3: What is n8n -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">02 / Context</div>
+        </div>
+        <h2>What is n8n?</h2>
+        <p class="lead">
+          n8n is a visual automation platform. It connects systems, applies business logic and moves data between
+          services. It can be self-hosted and extended for government use.
+        </p>
+        <div class="flow-strip">
+          <div class="flow-step"><b>Trigger</b><span>Webhook · schedule · queue</span></div>
+          <div class="flow-connector"></div>
+          <div class="flow-step"><b>Transform</b><span>Validate · enrich · branch</span></div>
+          <div class="flow-connector"></div>
+          <div class="flow-step"><b>Integrate</b><span>API · database · service</span></div>
+          <div class="flow-connector"></div>
+          <div class="flow-step"><b>Respond</b><span>Callback · event · result</span></div>
+        </div>
+        <div class="grid" style="grid-template-columns: repeat(4, 1fr)">
+          <div class="card">
+            <div class="icon ic-ok">T</div>
+            <h3>Starts and pauses work</h3>
+            <p>Work can start from events or schedules and pause while waiting for a response.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">N</div>
+            <h3>Connects many systems</h3>
+            <p>Built-in connectors, APIs, databases and approved custom integrations.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">C</div>
+            <h3>Can be extended</h3>
+            <p>Custom components connect n8n to government services.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">S</div>
+            <h3>Can scale</h3>
+            <p>Additional workers can handle higher transaction volumes.</p>
+          </div>
+        </div>
+      </section>
 
-  <!-- SLIDE 9: State strategy -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">08 / State</div>
-    </div>
-    <h2>n8n can <span class="grad">pause and resume</span> long-running work</h2>
-    <p class="lead">When a person or system must respond, the workflow creates a WIL action and pauses. n8n saves the workflow and provides a unique address to resume it.</p>
-    <div class="diagram" style="margin-top:22px">
-      <div class="node n-n8n">Create WIL action</div><div class="arrow">→</div>
-      <div class="node n-n8n pulse">Wait for webhook</div><div class="arrow">··· days ···</div>
-      <div class="node n-task">WIL proxy callback</div><div class="arrow">→</div>
-      <div class="node n-n8n">Resume with response</div>
-    </div>
-    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card"><h3>Saved while waiting</h3><p>n8n stores the workflow instead of keeping a worker busy.</p></div>
-      <div class="card"><h3>Controlled response</h3><p>WIL checks the user and sends the response without exposing the resume address.</p></div>
-      <div class="card"><h3>Operations still matter</h3><p>Plan storage, expiry, cleanup, backup, upgrades and disaster recovery.</p></div>
-    </div>
-    <div class="callout"><b>Keep official business records in the appropriate system</b> when they are needed for reporting, retention or use by other processes. A separate record is not needed only to keep the n8n wait alive.</div>
-  </section>
+      <!-- SLIDE 4: Conceptual mapping -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">03 / Mapping</div>
+        </div>
+        <h2>How BPMN concepts <span class="grad">map to n8n</span></h2>
+        <table class="mapping-table">
+          <caption class="sr-only">
+            BPMN concepts, possible n8n approaches and important limits
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">BPMN concept</th>
+              <th scope="col">n8n approach</th>
+              <th scope="col">What to know</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Start event</td>
+              <td>Manual, webhook, schedule or app trigger</td>
+              <td>Starts work from a person, system or time</td>
+            </tr>
+            <tr>
+              <td>Automated task</td>
+              <td>Integration, HTTP, Code or rules service</td>
+              <td>Use a built-in connector where possible</td>
+            </tr>
+            <tr>
+              <td>Send or receive task</td>
+              <td>API, queue, email or Wait node</td>
+              <td>Keep a business ID to match every response</td>
+            </tr>
+            <tr>
+              <td>User or manual task</td>
+              <td>WIL action + Wait node</td>
+              <td>Supports current WIL interaction types</td>
+            </tr>
+            <tr>
+              <td>Sub-process</td>
+              <td>Sub-workflow</td>
+              <td>Reusable, but releases must be managed</td>
+            </tr>
+            <tr>
+              <td>Decision gateway</td>
+              <td>IF, Switch or Code</td>
+              <td>Routes work using clear conditions</td>
+            </tr>
+            <tr>
+              <td>Parallel or inclusive gateway</td>
+              <td>Branches + Merge pattern</td>
+              <td>Looks similar, but may not run at the same time</td>
+            </tr>
+            <tr>
+              <td>First event wins</td>
+              <td>Callbacks + stored race status</td>
+              <td>Needs extra controls for duplicate or late events</td>
+            </tr>
+            <tr>
+              <td>Timer event</td>
+              <td>Wait until or Wait interval</td>
+              <td>Resumes the saved workflow when due</td>
+            </tr>
+            <tr>
+              <td>Message or signal event</td>
+              <td>Webhook, Wait node or sub-workflow</td>
+              <td>Needs a business ID to match the right case</td>
+            </tr>
+            <tr>
+              <td>Error attached to a task</td>
+              <td>Error output or explicit branch</td>
+              <td>Not the same as a separate n8n error workflow</td>
+            </tr>
+            <tr>
+              <td>Undo, cancel or stop</td>
+              <td>Purpose-built recovery logic</td>
+              <td>No direct match; prove the behavior before moving</td>
+            </tr>
+            <tr>
+              <td>Process data</td>
+              <td>Workflow data + business systems</td>
+              <td>Keep official records in the right system</td>
+            </tr>
+            <tr>
+              <td>End event</td>
+              <td>Final node or response</td>
+              <td>Returns a result, sends an event or ends</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
 
-  <!-- SLIDE 10: Human task pattern -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">09 / User Tasks</div>
-    </div>
-    <h2>WIL connects workflows <span class="grad">with people</span></h2>
-    <p class="lead">The Workflow Interaction Layer gives signed-in users a secure inbox for workflow actions. It shows only work for the user's organization and role.</p>
-    <div class="diagram" style="margin-top:20px">
-      <div class="col">
-        <div class="node n-n8n">1 · Webhook Trigger → starts flow</div>
-        <div class="arrow">↓</div>
-        <div class="node n-n8n">2 · Create WIL action</div>
-        <div class="arrow">↓</div>
-        <div class="node n-n8n pulse">3 · Wait for callback</div>
-      </div>
-      <div class="arrow">→</div>
-      <div class="col">
-        <div class="node n-gateway">WIL authenticated inbox</div>
-        <div class="arrow">↓</div>
-        <div class="node n-gateway">Approval · Event · CHEFS form</div>
-        <div class="arrow">↓</div>
-        <div class="node n-gateway">Proxy authorized response</div>
-      </div>
-      <div class="arrow">→</div>
-      <div class="col">
-        <div class="node n-n8n">4 · Resume execution</div>
-        <div class="arrow">↓</div>
-        <div class="node n-n8n">5 · IF: approve / reject / resubmit</div>
-        <div class="arrow">↓</div>
-        <div class="node n-n8n">6 · Continue or loop back to Wait</div>
-      </div>
-    </div>
-    <p class="lead" style="margin-top:14px"><span class="grad">Available today:</span> assignment by user, role or group; messages; approvals; acknowledgements; CHEFS forms; organization separation; and secure responses. More advanced BPMN task features may need additional work.</p>
-  </section>
+      <!-- SLIDE 5: DMN decision tables -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">04 / Decisions</div>
+        </div>
+        <h2>Simple business rules with <span class="grad">n8n Data Tables</span></h2>
+        <p class="lead">
+          Many simple DMN decision tables can become lookup tables in n8n. The workflow finds the matching rule and uses
+          its result.
+        </p>
+        <div class="diagram" style="margin-top: 22px">
+          <div class="node n-n8n">Workflow input</div>
+          <div class="arrow">→</div>
+          <div class="node n-n8n pulse">Query Data Table</div>
+          <div class="arrow">→</div>
+          <div class="node n-gateway">Match rule</div>
+          <div class="arrow">→</div>
+          <div class="node n-n8n">Route outcome</div>
+        </div>
+        <div class="grid" style="grid-template-columns: repeat(3, 1fr)">
+          <div class="card">
+            <div class="icon ic-ok">1</div>
+            <h3>Keep simple rules in rows</h3>
+            <p>Authorized maintainers can update conditions, priorities and results without changing the workflow.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">2</div>
+            <h3>Apply rules in the workflow</h3>
+            <p>The workflow finds matching rows and uses the selected result.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-warn">!</div>
+            <h3>Keep complex DMN where needed</h3>
+            <p>
+              Use a DMN engine when formal DMN files, advanced rule logic or strict control over decisions is required.
+            </p>
+          </div>
+        </div>
+        <div class="callout">
+          <b>Good fit:</b> small lookup tables owned by one project. Track the rule version, effective date and
+          approval, and test conflicting or missing matches. Data Tables can also save a node's result for later use.
+        </div>
+      </section>
 
-  <!-- SLIDE 11: Custom platform integration -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">10 / Platform</div>
-    </div>
-    <h2>CHWF adds the <span class="grad">shared government capabilities</span></h2>
-    <p class="lead">n8n runs the automation. CHWF connects identity, organizations, project access and human services so each workflow does not have to build them again.</p>
-    <div class="diagram" style="margin-top:22px">
-      <div class="col"><div class="label">Identity & organizations</div><div class="node n-gateway">CSTAR organizations</div><div class="arrow">↓</div><div class="node n-task">Users · roles · groups</div></div>
-      <div class="arrow">→</div>
-      <div class="col"><div class="label">Automation core</div><div class="node n-n8n pulse">CHWF + n8n</div><div class="arrow">↓</div><div class="node n-n8n">Projects · workflows · waits</div></div>
-      <div class="arrow">→</div>
-      <div class="col"><div class="label">Human services</div><div class="node n-gateway">WIL</div><div class="arrow">↓</div><div class="node n-task">CHEFS forms · callbacks</div></div>
-    </div>
-    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card"><h3>Projects created from membership</h3><p>When users sign in, CSTAR membership is matched to the right n8n team project.</p></div>
-      <div class="card"><h3>Clear access levels</h3><p>Editor and viewer access are synchronized without granting project access from unrelated roles.</p></div>
-      <div class="card"><h3>Personal and team spaces</h3><p>Users can work privately or in projects tied to a CSTAR organization.</p></div>
-      <div class="card"><h3>Work sent to the right people</h3><p>WIL can target a user, role or group within an organization.</p></div>
-      <div class="card"><h3>CHEFS forms</h3><p>WIL can open a secure CHEFS form and return the new submission to the waiting workflow.</p></div>
-      <div class="card"><h3>Secrets stay on the server</h3><p>CHEFS keys and workflow resume addresses are not sent to the browser.</p></div>
-    </div>
-  </section>
+      <!-- SLIDE 6: Visual flow comparison -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">05 / Visual</div>
+        </div>
+        <h2>One business outcome — <span class="grad">two implementations</span></h2>
+        <div class="diagram">
+          <div class="col">
+            <div class="label">BPMN</div>
+            <div class="node n-start pulse">Start</div>
+            <div class="arrow">↓</div>
+            <div class="node n-task">Validate Order</div>
+            <div class="arrow">↓</div>
+            <div class="node n-gateway">◇ Stock?</div>
+            <div class="arrow">↙&nbsp;&nbsp;&nbsp;&nbsp;↘</div>
+            <div style="display: flex; gap: 12px">
+              <div class="node n-task">Reserve</div>
+              <div class="node n-task">Backorder</div>
+            </div>
+          </div>
+          <div class="bridge">→ Migration mapping →<br />trigger · nodes · IF · merge</div>
+          <div class="col">
+            <div class="label">n8n</div>
+            <div class="node n-n8n pulse">Webhook Trigger</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n">HTTP Validate</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n">IF · Stock</div>
+            <div class="arrow">↙&nbsp;&nbsp;&nbsp;&nbsp;↘</div>
+            <div style="display: flex; gap: 12px">
+              <div class="node n-n8n">Reserve API</div>
+              <div class="node n-n8n">Create PO</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <!-- SLIDE 12: Migration playbook -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">11 / Playbook</div>
+      <!-- SLIDE 7: FOI migration example -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">06 / Example</div>
+        </div>
+        <h2>Example: <span class="grad">FOI request processing</span></h2>
+        <p class="lead">
+          A proposed n8n design for the same service outcome. Testing must confirm tasks, deadlines, retries and failure
+          handling.
+        </p>
+        <div class="example-comparison">
+          <figure class="example-panel">
+            <figcaption>
+              <h3>BPMN source</h3>
+              <p>The current events, user tasks, decisions and outcomes define what the new design must preserve.</p>
+            </figcaption>
+            <button
+              class="svg-open"
+              type="button"
+              data-svg="foi-bpmn.svg"
+              data-alt="BPMN diagram for FOI raw request processing"
+              aria-label="Open BPMN diagram full screen"
+            >
+              <img src="foi-bpmn.svg" alt="BPMN diagram for FOI raw request processing" />
+            </button>
+          </figure>
+          <figure class="example-panel">
+            <figcaption>
+              <h3>n8n target</h3>
+              <p>Triggers, waits, routers and integrations form the candidate operational redesign.</p>
+            </figcaption>
+            <button
+              class="svg-open"
+              type="button"
+              data-svg="foi-n8n.svg"
+              data-alt="n8n workflow for FOI raw request processing"
+              aria-label="Open n8n diagram full screen"
+            >
+              <img src="foi-n8n.svg" alt="n8n workflow for FOI raw request processing" />
+            </button>
+          </figure>
+        </div>
+      </section>
+
+      <!-- SLIDE 8: Migration boundaries and patterns -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">07 / Fit</div>
+        </div>
+        <h2>What can move, and <span class="grad">what needs care?</span></h2>
+        <div class="grid" style="grid-template-columns: repeat(2, 1fr)">
+          <div class="card">
+            <div class="icon ic-ok">1</div>
+            <h3>Long waits can move</h3>
+            <p>n8n saves the workflow while it waits. A worker does not need to stay busy for days or months.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">2</div>
+            <h3>Current WIL tasks can move</h3>
+            <p>
+              WIL supports assigned approvals, acknowledgements, messages and CHEFS forms. Check any need to claim,
+              reassign or escalate tasks.
+            </p>
+          </div>
+          <div class="card">
+            <div class="icon ic-warn">3</div>
+            <h3>Complex behavior needs proof</h3>
+            <p>
+              If a process must undo completed work or choose the first of several events, build and test that behavior
+              before deciding to move.
+            </p>
+          </div>
+          <div class="card">
+            <div class="icon ic-warn">4</div>
+            <h3>Some processes should stay</h3>
+            <p>Keep BPMN when the organization must exchange BPMN files or run models supplied by another system.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <b>What we have seen:</b> across our client engagements, we have not yet found a process where items 3 or 4
+          prevented migration. This gives us confidence in using n8n as the core workflow engine for existing BPMN
+          processes, while still checking each process during migration.
+        </div>
+      </section>
+
+      <!-- SLIDE 9: State strategy -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">08 / State</div>
+        </div>
+        <h2>n8n can <span class="grad">pause and resume</span> long-running work</h2>
+        <p class="lead">
+          When a person or system must respond, the workflow creates a WIL action and pauses. n8n saves the workflow and
+          provides a unique address to resume it.
+        </p>
+        <div class="diagram" style="margin-top: 22px">
+          <div class="node n-n8n">Create WIL action</div>
+          <div class="arrow">→</div>
+          <div class="node n-n8n pulse">Wait for webhook</div>
+          <div class="arrow">··· days ···</div>
+          <div class="node n-task">WIL proxy callback</div>
+          <div class="arrow">→</div>
+          <div class="node n-n8n">Resume with response</div>
+        </div>
+        <div class="grid" style="grid-template-columns: repeat(3, 1fr)">
+          <div class="card">
+            <h3>Saved while waiting</h3>
+            <p>n8n stores the workflow instead of keeping a worker busy.</p>
+          </div>
+          <div class="card">
+            <h3>Controlled response</h3>
+            <p>WIL checks the user and sends the response without exposing the resume address.</p>
+          </div>
+          <div class="card">
+            <h3>Operations still matter</h3>
+            <p>Plan storage, expiry, cleanup, backup, upgrades and disaster recovery.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <b>Keep official business records in the appropriate system</b> when they are needed for reporting, retention
+          or use by other processes. A separate record is not needed only to keep the n8n wait alive.
+        </div>
+      </section>
+
+      <!-- SLIDE 10: Human task pattern -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">09 / User Tasks</div>
+        </div>
+        <h2>WIL connects workflows <span class="grad">with people</span></h2>
+        <p class="lead">
+          The Workflow Interaction Layer gives signed-in users a secure inbox for workflow actions. It shows only work
+          for the user's organization and role.
+        </p>
+        <div class="diagram" style="margin-top: 20px">
+          <div class="col">
+            <div class="node n-n8n">1 · Webhook Trigger → starts flow</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n">2 · Create WIL action</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n pulse">3 · Wait for callback</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="col">
+            <div class="node n-gateway">WIL authenticated inbox</div>
+            <div class="arrow">↓</div>
+            <div class="node n-gateway">Approval · Event · CHEFS form</div>
+            <div class="arrow">↓</div>
+            <div class="node n-gateway">Proxy authorized response</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="col">
+            <div class="node n-n8n">4 · Resume execution</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n">5 · IF: approve / reject / resubmit</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n">6 · Continue or loop back to Wait</div>
+          </div>
+        </div>
+        <p class="lead" style="margin-top: 14px">
+          <span class="grad">Available today:</span> assignment by user, role or group; messages; approvals;
+          acknowledgements; CHEFS forms; organization separation; and secure responses. More advanced BPMN task features
+          may need additional work.
+        </p>
+      </section>
+
+      <!-- SLIDE 11: Custom platform integration -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">10 / Platform</div>
+        </div>
+        <h2>CHWF adds the <span class="grad">shared government capabilities</span></h2>
+        <p class="lead">
+          n8n runs the automation. CHWF connects identity, organizations, project access and human services so each
+          workflow does not have to build them again.
+        </p>
+        <div class="diagram" style="margin-top: 22px">
+          <div class="col">
+            <div class="label">Identity & organizations</div>
+            <div class="node n-gateway">CSTAR organizations</div>
+            <div class="arrow">↓</div>
+            <div class="node n-task">Users · roles · groups</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="col">
+            <div class="label">Automation core</div>
+            <div class="node n-n8n pulse">CHWF + n8n</div>
+            <div class="arrow">↓</div>
+            <div class="node n-n8n">Projects · workflows · waits</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="col">
+            <div class="label">Human services</div>
+            <div class="node n-gateway">WIL</div>
+            <div class="arrow">↓</div>
+            <div class="node n-task">CHEFS forms · callbacks</div>
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns: repeat(3, 1fr)">
+          <div class="card">
+            <h3>Projects created from membership</h3>
+            <p>When users sign in, CSTAR membership is matched to the right n8n team project.</p>
+          </div>
+          <div class="card">
+            <h3>Clear access levels</h3>
+            <p>Editor and viewer access are synchronized without granting project access from unrelated roles.</p>
+          </div>
+          <div class="card">
+            <h3>Personal and team spaces</h3>
+            <p>Users can work privately or in projects tied to a CSTAR organization.</p>
+          </div>
+          <div class="card">
+            <h3>Work sent to the right people</h3>
+            <p>WIL can target a user, role or group within an organization.</p>
+          </div>
+          <div class="card">
+            <h3>CHEFS forms</h3>
+            <p>WIL can open a secure CHEFS form and return the new submission to the waiting workflow.</p>
+          </div>
+          <div class="card">
+            <h3>Secrets stay on the server</h3>
+            <p>CHEFS keys and workflow resume addresses are not sent to the browser.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 12: Migration playbook -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">11 / Playbook</div>
+        </div>
+        <h2>A controlled path <span class="grad">from pilot to migration</span></h2>
+        <div class="grid" style="grid-template-columns: repeat(2, 1fr)">
+          <div class="card">
+            <div class="icon ic-ok">1</div>
+            <h3>Understand the current process</h3>
+            <p>Record decisions, deadlines, errors, retries, human tasks and any special engine behavior.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">2</div>
+            <h3>Choose good candidates</h3>
+            <p>Start with clear automation, simple decisions, supported WIL tasks and callback-based waits.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">3</div>
+            <h3>Prevent duplicate work</h3>
+            <p>
+              Give every case and request a stable ID. Decide how retries, duplicate responses and late events are
+              handled.
+            </p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">4</div>
+            <h3>Prove difficult behavior</h3>
+            <p>Test work that runs on several paths, competing events, cancellation and undo steps.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">5</div>
+            <h3>Set up human actions</h3>
+            <p>Choose approvals, acknowledgements or CHEFS forms and send them to the right user, role or group.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">6</div>
+            <h3>Protect records and privacy</h3>
+            <p>Record key business events, minimize sensitive data and set access and retention rules.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">7</div>
+            <h3>Plan the changeover</h3>
+            <p>Decide how to promote configurations, roll back and handle cases already running in BPMN.</p>
+          </div>
+          <div class="card">
+            <div class="icon ic-ok">8</div>
+            <h3>Test service readiness</h3>
+            <p>Test volume, failures, recovery, upgrades and backups before moving live services.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 13: Why n8n can be broader -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">12 / Reach</div>
+        </div>
+        <h2>n8n is broader in some areas, <span class="grad">BPMN is deeper in others</span></h2>
+        <p class="lead">
+          n8n is strong for system integration and data automation. BPMN engines are stronger when formal process
+          standards and advanced process behavior are central requirements.
+        </p>
+        <div class="grid" style="grid-template-columns: 320px 1fr; align-items: center">
+          <div class="orbit">
+            <div class="orbit-core">n8n</div>
+            <div class="orbit-item">Integrations</div>
+            <div class="orbit-item">Data</div>
+            <div class="orbit-item">AI</div>
+            <div class="orbit-item">Human tasks</div>
+          </div>
+          <div class="grid" style="grid-template-columns: repeat(2, 1fr); margin-top: 0">
+            <div class="card">
+              <div class="icon ic-ok">I</div>
+              <h3>Connect systems</h3>
+              <p>Link APIs, databases, business applications, messages, files and queues.</p>
+            </div>
+            <div class="card">
+              <div class="icon ic-ok">D</div>
+              <h3>Move and improve data</h3>
+              <p>Validate, transform, enrich and route data between services.</p>
+            </div>
+            <div class="card">
+              <div class="icon ic-ok">A</div>
+              <h3>Add assisted AI</h3>
+              <p>Use approved AI for classification or summaries, with controls and human review.</p>
+            </div>
+            <div class="card">
+              <div class="icon ic-ok">H</div>
+              <h3>Combine people and automation</h3>
+              <p>CHEFS and WIL connect public-service interactions with automated work.</p>
+            </div>
+          </div>
+        </div>
+        <p class="lead" style="margin-top: 18px">
+          <span class="grad">Value beyond migration:</span> one shared platform for suitable workflows, integrations,
+          data and forms. AI use still requires approval, privacy review, testing, fallback and human accountability.
+        </p>
+      </section>
+
+      <!-- SLIDE 14: Summary -->
+      <section class="slide">
+        <div class="topbar">
+          <div class="brand">
+            <div class="logo"></div>
+            BPMN → n8n
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="pill">13 / Recommendation</div>
+        </div>
+        <div style="margin: auto">
+          <div class="eyebrow">Recommendation</div>
+          <h1>Start with a controlled pilot,<br /><span class="grad">decide with evidence</span></h1>
+          <ul style="margin-top: 18px; max-width: 760px; line-height: 2; font-size: 18px; color: var(--muted)">
+            <li>Start with processes that have clear routing, integrations and simple waits.</li>
+            <li>Keep BPMN where formal standards or advanced process behavior are essential.</li>
+            <li>Use WIL for the human actions it supports today.</li>
+            <li>Before launch, prove duplicate prevention, audit, privacy, recovery and changeover plans.</li>
+            <li>Expand migration only when representative pilots meet agreed success measures.</li>
+          </ul>
+        </div>
+      </section>
     </div>
-    <h2>A controlled path <span class="grad">from pilot to migration</span></h2>
-    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card"><div class="icon ic-ok">1</div><h3>Understand the current process</h3><p>Record decisions, deadlines, errors, retries, human tasks and any special engine behavior.</p></div>
-      <div class="card"><div class="icon ic-ok">2</div><h3>Choose good candidates</h3><p>Start with clear automation, simple decisions, supported WIL tasks and callback-based waits.</p></div>
-      <div class="card"><div class="icon ic-ok">3</div><h3>Prevent duplicate work</h3><p>Give every case and request a stable ID. Decide how retries, duplicate responses and late events are handled.</p></div>
-      <div class="card"><div class="icon ic-ok">4</div><h3>Prove difficult behavior</h3><p>Test work that runs on several paths, competing events, cancellation and undo steps.</p></div>
-      <div class="card"><div class="icon ic-ok">5</div><h3>Set up human actions</h3><p>Choose approvals, acknowledgements or CHEFS forms and send them to the right user, role or group.</p></div>
-      <div class="card"><div class="icon ic-ok">6</div><h3>Protect records and privacy</h3><p>Record key business events, minimize sensitive data and set access and retention rules.</p></div>
-      <div class="card"><div class="icon ic-ok">7</div><h3>Plan the changeover</h3><p>Decide how to promote configurations, roll back and handle cases already running in BPMN.</p></div>
-      <div class="card"><div class="icon ic-ok">8</div><h3>Test service readiness</h3><p>Test volume, failures, recovery, upgrades and backups before moving live services.</p></div>
+
+    <dialog class="svg-dialog" id="svg-dialog" aria-label="Full-screen workflow diagram">
+      <button class="dialog-close" id="dialog-close" type="button">Close ×</button>
+      <img id="dialog-image" alt="" />
+    </dialog>
+
+    <div class="controls" aria-label="Slide navigation">
+      <button class="btn" id="prev">← Prev</button>
+      <span class="counter" id="counter" role="status" aria-live="polite">1 / 14</span>
+      <button class="btn" id="next">Next →</button>
+      <span class="kbd">← / → or Space</span>
     </div>
-  </section>
 
-  <!-- SLIDE 13: Why n8n can be broader -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">12 / Reach</div>
-    </div>
-    <h2>n8n is broader in some areas, <span class="grad">BPMN is deeper in others</span></h2>
-    <p class="lead">n8n is strong for system integration and data automation. BPMN engines are stronger when formal process standards and advanced process behavior are central requirements.</p>
-    <div class="grid" style="grid-template-columns:320px 1fr;align-items:center">
-      <div class="orbit">
-        <div class="orbit-core">n8n</div>
-        <div class="orbit-item">Integrations</div><div class="orbit-item">Data</div>
-        <div class="orbit-item">AI</div><div class="orbit-item">Human tasks</div>
-      </div>
-      <div class="grid" style="grid-template-columns:repeat(2,1fr);margin-top:0">
-        <div class="card"><div class="icon ic-ok">I</div><h3>Connect systems</h3><p>Link APIs, databases, business applications, messages, files and queues.</p></div>
-        <div class="card"><div class="icon ic-ok">D</div><h3>Move and improve data</h3><p>Validate, transform, enrich and route data between services.</p></div>
-        <div class="card"><div class="icon ic-ok">A</div><h3>Add assisted AI</h3><p>Use approved AI for classification or summaries, with controls and human review.</p></div>
-        <div class="card"><div class="icon ic-ok">H</div><h3>Combine people and automation</h3><p>CHEFS and WIL connect public-service interactions with automated work.</p></div>
-      </div>
-    </div>
-    <p class="lead" style="margin-top:18px"><span class="grad">Value beyond migration:</span> one shared platform for suitable workflows, integrations, data and forms. AI use still requires approval, privacy review, testing, fallback and human accountability.</p>
-  </section>
+    <style>
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      ul {
+        list-style: none;
+      }
+      ul li::before {
+        content: '◆';
+        color: var(--accent);
+        margin-right: 10px;
+      }
+    </style>
 
-  <!-- SLIDE 14: Summary -->
-  <section class="slide">
-    <div class="topbar">
-      <div class="brand"><div class="logo"></div>BPMN → n8n</div>
-      <div class="progress"><span></span></div>
-      <div class="pill">13 / Recommendation</div>
-    </div>
-    <div style="margin:auto">
-       <div class="eyebrow">Recommendation</div>
-       <h1>Start with a controlled pilot,<br><span class="grad">decide with evidence</span></h1>
-      <ul style="margin-top:18px;max-width:760px;line-height:2;font-size:18px;color:var(--muted)">
-          <li>Start with processes that have clear routing, integrations and simple waits.</li>
-          <li>Keep BPMN where formal standards or advanced process behavior are essential.</li>
-          <li>Use WIL for the human actions it supports today.</li>
-          <li>Before launch, prove duplicate prevention, audit, privacy, recovery and changeover plans.</li>
-          <li>Expand migration only when representative pilots meet agreed success measures.</li>
-      </ul>
-    </div>
-  </section>
-
-</div>
-
-<dialog class="svg-dialog" id="svg-dialog" aria-label="Full-screen workflow diagram">
-  <button class="dialog-close" id="dialog-close" type="button">Close ×</button>
-  <img id="dialog-image" alt="">
-</dialog>
-
-<div class="controls" aria-label="Slide navigation">
-  <button class="btn" id="prev">← Prev</button>
-  <span class="counter" id="counter" role="status" aria-live="polite">1 / 14</span>
-  <button class="btn" id="next">Next →</button>
-  <span class="kbd">← / → or Space</span>
-</div>
-
-<style>
-  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  ul{list-style:none}
-  ul li::before{content:"◆";color:var(--accent);margin-right:10px}
-</style>
-
-<script>
-  const slides=[...document.querySelectorAll('.slide')];
-  let i=0;
-  function show(n){
-    i=Math.max(0,Math.min(n,slides.length-1));
-    slides.forEach((s,idx)=>{
-      s.classList.remove('active','prev');
-      s.inert=true;
-      s.setAttribute('aria-hidden','true');
-      if(idx<i) s.classList.add('prev');
-    });
-    slides[i].classList.add('active');
-    slides[i].inert=false;
-    slides[i].removeAttribute('aria-hidden');
-    document.querySelectorAll('.progress span').forEach(b=>b.style.width=((i+1)/slides.length*100)+'%');
-    document.getElementById('counter').textContent=(i+1)+' / '+slides.length;
-    document.getElementById('prev').disabled=i===0;
-    document.getElementById('next').disabled=i===slides.length-1;
-  }
-  document.getElementById('prev').onclick=()=>show(i-1);
-  document.getElementById('next').onclick=()=>show(i+1);
-  const dialog=document.getElementById('svg-dialog');
-  const dialogImage=document.getElementById('dialog-image');
-  document.querySelectorAll('.svg-open').forEach(button=>{
-    button.addEventListener('click',()=>{
-      dialogImage.src=button.dataset.svg;
-      dialogImage.alt=button.dataset.alt;
-      dialog.showModal();
-    });
-  });
-  document.getElementById('dialog-close').onclick=()=>dialog.close();
-  dialog.addEventListener('click',event=>{
-    if(event.target===dialog) dialog.close();
-  });
-  dialog.addEventListener('close',()=>{
-    dialogImage.removeAttribute('src');
-    dialogImage.alt='';
-  });
-  document.addEventListener('keydown',e=>{
-    if(dialog.open) return;
-    if(e.target.closest('button,a,input,select,textarea,[contenteditable="true"]')) return;
-    if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();show(i+1)}
-    if(e.key==='ArrowLeft'){e.preventDefault();show(i-1)}
-  });
-  show(0);
-</script>
-</body>
+    <script>
+      const slides = [...document.querySelectorAll('.slide')];
+      let i = 0;
+      function show(n) {
+        i = Math.max(0, Math.min(n, slides.length - 1));
+        slides.forEach((s, idx) => {
+          s.classList.remove('active', 'prev');
+          s.inert = true;
+          s.setAttribute('aria-hidden', 'true');
+          if (idx < i) s.classList.add('prev');
+        });
+        slides[i].classList.add('active');
+        slides[i].inert = false;
+        slides[i].removeAttribute('aria-hidden');
+        document
+          .querySelectorAll('.progress span')
+          .forEach((b) => (b.style.width = ((i + 1) / slides.length) * 100 + '%'));
+        document.getElementById('counter').textContent = i + 1 + ' / ' + slides.length;
+        document.getElementById('prev').disabled = i === 0;
+        document.getElementById('next').disabled = i === slides.length - 1;
+      }
+      document.getElementById('prev').onclick = () => show(i - 1);
+      document.getElementById('next').onclick = () => show(i + 1);
+      const dialog = document.getElementById('svg-dialog');
+      const dialogImage = document.getElementById('dialog-image');
+      document.querySelectorAll('.svg-open').forEach((button) => {
+        button.addEventListener('click', () => {
+          dialogImage.src = button.dataset.svg;
+          dialogImage.alt = button.dataset.alt;
+          dialog.showModal();
+        });
+      });
+      document.getElementById('dialog-close').onclick = () => dialog.close();
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+      dialog.addEventListener('close', () => {
+        dialogImage.removeAttribute('src');
+        dialogImage.alt = '';
+      });
+      document.addEventListener('keydown', (e) => {
+        if (dialog.open) return;
+        if (e.target.closest('button,a,input,select,textarea,[contenteditable="true"]')) return;
+        if (e.key === 'ArrowRight' || e.key === ' ') {
+          e.preventDefault();
+          show(i + 1);
+        }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          show(i - 1);
+        }
+      });
+      show(0);
+    </script>
+  </body>
 </html>

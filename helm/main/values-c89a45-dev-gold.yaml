@@ -163,3 +163,6 @@ alloy:
       limits:
         cpu: 100m
         memory: 256Mi
+
+systemLogs:
+  enabled: true

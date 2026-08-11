@@ -1,13 +1,14 @@
 # n8n Observability Dashboards
 
-Grafana provides two dashboards for monitoring n8n in Common Hosted Workflow. They are provisioned automatically — no manual import is needed.
+Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They are provisioned automatically — no manual import is needed.
 
-| Dashboard          | Audience                     | Scope                                       |
-| ------------------ | ---------------------------- | ------------------------------------------- |
-| **n8n Executions** | Workflow authors, team leads | Are my workflows running and how fast?      |
-| **n8n Health**     | Platform / ops team          | Is the n8n process itself healthy?          |
-| **n8n Traces**     | Workflow authors, platform   | What happened inside a single run?          |
-| **n8n Logs**       | Platform / ops team          | What failed, who changed what, audit trail? |
+| Dashboard           | Audience                     | Scope                                         |
+| ------------------- | ---------------------------- | --------------------------------------------- |
+| **n8n Executions**  | Workflow authors, team leads | Are my workflows running and how fast?        |
+| **n8n Health**      | Platform / ops team          | Is the n8n process itself healthy?            |
+| **n8n Traces**      | Workflow authors, platform   | What happened inside a single run?            |
+| **n8n Logs**        | Platform / ops team          | What failed, who changed what, audit trail?   |
+| **n8n System Logs** | Platform / ops team          | What did the n8n pods print to stdout/stderr? |
 
 ---
 
@@ -273,12 +274,53 @@ These panels show data only when n8n runs in queue mode. They will show no data 
 
 ---
 
+## n8n System Logs
+
+Shows raw pod stdout/stderr from all n8n components — main, worker, webhook, and runner. Use this for infrastructure-level debugging: process crashes, startup errors, runner lifecycle events, and anything the application prints outside of structured log streaming.
+
+> **Availability:** This dashboard requires `systemLogs.enabled: true` in Helm values and is only available in OpenShift environments. It will show no data in the local docker-compose sandbox, which has no Kubernetes API for Alloy to read from.
+
+Default time range: **last 1 hour** — widen the time picker for historical investigation.
+
+### Filters
+
+| Filter        | Behaviour                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| **Component** | Filters all panels to a specific n8n container: main, worker, webhook, or runner. Defaults to All. |
+| **Pod**       | Filters all panels to a specific pod. Useful when debugging a specific crashed or misbehaving pod. |
+
+### KPI panels
+
+| Panel               | What it shows                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Total Log Lines** | Count of all log lines from selected pods in the time range. Turns red on zero — a pod that stops logging has likely crashed or been evicted. |
+| **Error Lines**     | Lines matching error keywords (error, exception, fatal, panic). Green at zero, orange at 1+, red at 10+.                                      |
+| **Warn Lines**      | Lines matching warn keywords. Warnings often precede errors — a spike here before an error spike is a useful leading indicator.               |
+| **Error Rate**      | Error lines as a percentage of total output. A persistently high ratio indicates a component in a bad state.                                  |
+
+### Charts
+
+| Panel                           | What it shows                                                                                                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Log Volume by Component**     | Log line throughput per container over time. A gap in a line means that container produced no output — abnormal for main/worker.                                  |
+| **Errors & Warnings Over Time** | Error and warn line counts over time, colour-coded red and orange by severity. Correlate spikes with the workflow execution timeline in the Executions dashboard. |
+| **Error Lines**                 | Raw log lines matching error keywords, most recent first. Expand each line for full JSON context and pod label.                                                   |
+| **All System Logs**             | Full stdout/stderr stream for selected components, pretty-printed as JSON.                                                                                        |
+
+### Cross-dashboard navigation
+
+- The **n8n Logs** link navigates to the log streaming dashboard (audit trail and workflow failures), carrying the current time range.
+- The **n8n Executions** link navigates to the executions dashboard, carrying the current time range.
+
+---
+
 ## How metrics, traces, and logs reach Grafana
 
 ```
-n8n /metrics       →  Alloy (scrapes every 30 s)     →  Mimir  →  Grafana
-n8n OTLP           →  Alloy (OTLP receiver :4318)    →  Tempo  →  Grafana
-n8n log streaming  →  Alloy (syslog TCP :5514)       →  Loki   →  Grafana
+n8n /metrics           →  Alloy (scrapes every 30 s)          →  Mimir  →  Grafana
+n8n OTLP               →  Alloy (OTLP receiver :4318)         →  Tempo  →  Grafana
+n8n log streaming      →  Alloy (syslog TCP :5514)            →  Loki   →  Grafana
+n8n pod stdout/stderr  →  Alloy (loki.source.kubernetes)      →  Loki   →  Grafana
 ```
 
 ---
@@ -308,3 +350,9 @@ The Queue Job Events and Worker Events panels only receive data when n8n runs in
 
 **`anonymizeAuditMessages` is disabled**
 Audit log events include full user details to support accountability and investigation. Access to the Logs dashboard should be restricted to authorized platform and ops team members.
+
+**System Logs Pod filter only lists pods active in the selected time range**
+The Pod variable is populated from Loki label values within the current time window. Pods that crashed and produced no logs in the selected range will not appear in the dropdown — widen the time range if you need to find a pod that died before the current window.
+
+**System Logs not available in the local sandbox**
+The docker-compose environment has no Kubernetes API. `loki.source.kubernetes` requires OpenShift — the dashboard will be empty when running locally.
