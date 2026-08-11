@@ -104,6 +104,57 @@ loki.process "n8n_events" {
   forward_to = [loki.write.loki.receiver]
 }
 
+// Discover pods in Alloy's own namespace via the Kubernetes API.
+// Requires systemLogs.enabled=true in Helm values, which creates the required
+// RBAC resources in templates/rbac/alloy-pod-logs.yaml.
+// If RBAC is missing, the Kubernetes discovery/logging components will report
+// permission errors; other independent pipelines can continue running.
+discovery.kubernetes "n8n_pods" {
+  role = "pod"
+
+  namespaces {
+    own_namespace = true
+  }
+}
+
+// Keep only n8n pods and promote Kubernetes metadata to Loki labels.
+discovery.relabel "n8n_pods" {
+  targets = discovery.kubernetes.n8n_pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    regex         = "chwf-n8n-.+"  // matches the Helm release name; update if release is renamed
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+}
+
+// Collect stdout/stderr container logs from the selected n8n pods.
+loki.source.kubernetes "n8n_system_logs" {
+  targets    = discovery.relabel.n8n_pods.output
+  forward_to = [loki.process.n8n_system_logs.receiver]
+}
+
+// Label system logs distinctly from n8n log-streaming events (job="n8n-log-streaming").
+loki.process "n8n_system_logs" {
+  stage.static_labels {
+    values = {
+      job = "n8n-system-logs",
+    }
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
 loki.write "loki" {
   endpoint {
     url = env("ALLOY_LOKI_URL")

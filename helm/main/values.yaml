@@ -446,6 +446,9 @@ alloy:
   enabled: false
   rbac:
     create: false
+  serviceAccount:
+    create: false          # created by templates/rbac/alloy-pod-logs.yaml when systemLogs.enabled
+    name: chwf-alloy
   controller:
     type: deployment
     replicas: 1
@@ -504,12 +507,13 @@ loki:
             prefix: loki_index_
             period: 24h
     compactor:
-      retention_enabled: true
-      delete_request_store: s3
+      retention_enabled: false
     limits_config:
       retention_period: 720h  # 30 days default, override per environment
   singleBinary:
     replicas: 1
+    extraArgs:
+      - -config.expand-env=true
     persistence:
       enabled: false
     extraVolumes:
@@ -693,3 +697,13 @@ logStreaming:
     - n8n.worker
     # Queue operations — powers: Queue Job Events, Stalled Jobs
     - n8n.queue
+
+# n8n system log collection — collects stdout/stderr from n8n pods via the Kubernetes API.
+#
+# Requires alloy.enabled. RBAC (ServiceAccount, Role, RoleBinding) is created by
+# templates/rbac/alloy-pod-logs.yaml when this is enabled.
+#
+# Logs are labelled job="n8n-system-logs" to distinguish them from log streaming events.
+
+systemLogs:
+  enabled: false  # Enable per environment once RBAC is confirmed working.
