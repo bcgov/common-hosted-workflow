@@ -194,7 +194,24 @@ export class TenantProjectSyncService {
    */
   private async getExistingProjectIdForTenant(tenantId: string): Promise<string | null> {
     const projectIds = await this.customRepositories.tenantProjectRelation.getProjectIdsByTenantId(tenantId);
-    return projectIds.length > 0 ? projectIds[0] : null;
+    const projectId = projectIds[0];
+
+    if (!projectId) {
+      return null;
+    }
+
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (project) {
+      return projectId;
+    }
+
+    await this.customRepositories.tenantProjectRelation.deleteByProjectId(projectId);
+    log.warn('Deleted dangling tenant-project relation for missing n8n project', {
+      tenantId,
+      projectId,
+    });
+
+    return null;
   }
 
   private resolveProjectRole(roleNames: string[]): ManagedProjectRole | null {
