@@ -205,6 +205,10 @@ export class TenantProjectSyncService {
       return projectId;
     }
 
+    await this.customRepositories.workflowTrigger.deleteByProjectId(projectId);
+    await this.customRepositories.message.deleteByProjectId(projectId);
+    await this.customRepositories.actionRequest.deleteByProjectId(projectId);
+    await this.customRepositories.auditLog.deleteByProjectId(projectId);
     await this.customRepositories.tenantProjectRelation.deleteByProjectId(projectId);
     log.warn('Deleted dangling tenant-project relation for missing n8n project', {
       tenantId,

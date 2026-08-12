@@ -14,6 +14,18 @@ describe('TenantProjectSyncService', () => {
           getProjectIdsByTenantId: vi.fn().mockResolvedValue(['project-1']),
           deleteByProjectId: vi.fn().mockResolvedValue(undefined),
         },
+        workflowTrigger: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
+        message: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
+        actionRequest: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
+        auditLog: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
       } as any,
       {} as any,
       {} as any,
@@ -23,6 +35,10 @@ describe('TenantProjectSyncService', () => {
     const projectId = await (service as any).getExistingProjectIdForTenant('tenant-1');
 
     expect(projectId).toBe('project-1');
+    expect(service['customRepositories'].workflowTrigger.deleteByProjectId).not.toHaveBeenCalled();
+    expect(service['customRepositories'].message.deleteByProjectId).not.toHaveBeenCalled();
+    expect(service['customRepositories'].actionRequest.deleteByProjectId).not.toHaveBeenCalled();
+    expect(service['customRepositories'].auditLog.deleteByProjectId).not.toHaveBeenCalled();
     expect(service['customRepositories'].tenantProjectRelation.deleteByProjectId).not.toHaveBeenCalled();
   });
 
@@ -38,6 +54,18 @@ describe('TenantProjectSyncService', () => {
           getProjectIdsByTenantId: vi.fn().mockResolvedValue(['project-1']),
           deleteByProjectId: vi.fn().mockResolvedValue(undefined),
         },
+        workflowTrigger: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
+        message: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
+        actionRequest: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
+        auditLog: {
+          deleteByProjectId: vi.fn().mockResolvedValue(undefined),
+        },
       } as any,
       {} as any,
       {} as any,
@@ -47,6 +75,10 @@ describe('TenantProjectSyncService', () => {
     const projectId = await (service as any).getExistingProjectIdForTenant('tenant-1');
 
     expect(projectId).toBeNull();
+    expect(service['customRepositories'].workflowTrigger.deleteByProjectId).toHaveBeenCalledWith('project-1');
+    expect(service['customRepositories'].message.deleteByProjectId).toHaveBeenCalledWith('project-1');
+    expect(service['customRepositories'].actionRequest.deleteByProjectId).toHaveBeenCalledWith('project-1');
+    expect(service['customRepositories'].auditLog.deleteByProjectId).toHaveBeenCalledWith('project-1');
     expect(service['customRepositories'].tenantProjectRelation.deleteByProjectId).toHaveBeenCalledWith('project-1');
   });
 });

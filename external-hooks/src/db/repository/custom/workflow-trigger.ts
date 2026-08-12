@@ -105,4 +105,9 @@ export class WorkflowTriggerRepository {
       .where(inArray(workflowTrigger.projectId, projectIds));
     return rows.map((r: { id: string }) => r.id);
   }
+
+  /** Deletes all workflow triggers for a project. */
+  async deleteByProjectId(projectId: string): Promise<void> {
+    await this.db.delete(workflowTrigger).where(eq(workflowTrigger.projectId, projectId));
+  }
 }

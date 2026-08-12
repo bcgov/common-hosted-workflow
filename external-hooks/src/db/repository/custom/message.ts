@@ -1,4 +1,4 @@
-import { and, desc } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { message } from '../../schema/workflow-interaction-layer';
 
 export class MessageRepository {
@@ -36,5 +36,10 @@ export class MessageRepository {
       })
       .returning();
     return row;
+  }
+
+  /** Deletes all messages for a project. */
+  async deleteByProjectId(projectId: string): Promise<void> {
+    await this.db.delete(message).where(eq(message.projectId, projectId));
   }
 }

@@ -174,4 +174,9 @@ export class ActionRequestRepository {
       .returning();
     return row ?? null;
   }
+
+  /** Deletes all action requests for a project. */
+  async deleteByProjectId(projectId: string): Promise<void> {
+    await this.db.delete(actionRequest).where(eq(actionRequest.projectId, projectId));
+  }
 }
