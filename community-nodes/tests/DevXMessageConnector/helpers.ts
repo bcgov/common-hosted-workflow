@@ -25,6 +25,12 @@ export type NodeParameters = {
   source?: string;
   mode?: string;
   payload: unknown;
+  mentions?: {
+    mention?: Array<{
+      email: string;
+      name: string;
+    }>;
+  };
 };
 
 type HttpRequestOptions = {
@@ -36,6 +42,10 @@ type HttpRequestOptions = {
       channelId: string;
     };
     content: unknown;
+    mentions?: Array<{
+      id: string;
+      name: string;
+    }>;
   };
 };
 
@@ -84,12 +94,12 @@ export function createExecutionContext(
   return {
     getInputData: vi.fn(() => parametersByIndex.map(() => ({ json: {} }))),
     getCredentials: vi.fn().mockResolvedValue({ channelLink }),
-    getNodeParameter: vi.fn((name: keyof NodeParameters | 'mode', index: number) => {
+    getNodeParameter: vi.fn((name: keyof NodeParameters | 'mode', index: number, fallback?: unknown) => {
       if (name === 'mode') {
         return parametersByIndex[index]?.mode ?? 'send';
       }
 
-      return parametersByIndex[index]?.[name as keyof NodeParameters];
+      return parametersByIndex[index]?.[name as keyof NodeParameters] ?? fallback;
     }),
     getNode: vi.fn(() => ({ name: 'DevXMessageConnector', type: 'custom.devXMessageConnector' })),
     helpers: {

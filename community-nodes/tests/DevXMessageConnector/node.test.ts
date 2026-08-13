@@ -117,6 +117,26 @@ describe('DevXMessageConnector node', () => {
     ]);
   });
 
+  it('maps mention users into the DevX request body', async () => {
+    const { requestOptions } = await executeNode([
+      {
+        type: 'text',
+        payload: 'Hello DevX',
+        mentions: {
+          mention: [
+            { email: 'alice@example.com', name: 'Alice' },
+            { email: 'bob@example.com', name: 'Bob' },
+          ],
+        },
+      },
+    ]);
+
+    expect(requestOptions.body.mentions).toEqual([
+      { id: 'alice@example.com', name: 'Alice' },
+      { id: 'bob@example.com', name: 'Bob' },
+    ]);
+  });
+
   it('wraps circular http request errors before they reach execution persistence', async () => {
     const consoleError = suppressConsoleError();
     const node = createNode();
