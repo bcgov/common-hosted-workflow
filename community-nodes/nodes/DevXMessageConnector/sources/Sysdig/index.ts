@@ -13,8 +13,9 @@ export function sysdigTransform(this: IExecuteFunctions, index: number): SysdigM
 
   const data = {
     severity: payload.alert.severity,
-    state: payload.state ? (payload.state.toLowerCase() as 'active' | 'ok') : undefined,
     alertName: payload.alert.name,
+    subject: payload.alert.subject ?? undefined,
+    state: payload.state ? (payload.state.toUpperCase() as 'ACTIVE' | 'OK') : undefined,
     scope: payload.alert.scope ?? undefined,
     description: payload.alert.description ?? undefined,
     timestamp: formatToIsoTimestamp(payload.timestamp),

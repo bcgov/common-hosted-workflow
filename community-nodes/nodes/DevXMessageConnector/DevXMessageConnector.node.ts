@@ -29,6 +29,7 @@ import type { BackupContainerMessageContent } from './sources/BackupContainer/ty
 import type { GitHubPullRequestMessageContent, GitHubWorkflowRunMessageContent } from './sources/Github/types';
 import type { SysdigMessageContent } from './sources/Sysdig/types';
 import type { UptimeComMessageContent } from './sources/UptimeCom/types';
+import type { StatusCakeMessageContent } from './sources/StatusCake/types';
 
 type MessageContent =
   | TextMessageContent
@@ -38,7 +39,8 @@ type MessageContent =
   | GitHubPullRequestMessageContent
   | GitHubWorkflowRunMessageContent
   | SysdigMessageContent
-  | UptimeComMessageContent;
+  | UptimeComMessageContent
+  | StatusCakeMessageContent;
 
 export class DevXMessageConnector implements INodeType {
   description: INodeTypeDescription = {

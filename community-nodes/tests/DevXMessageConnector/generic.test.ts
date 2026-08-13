@@ -38,6 +38,29 @@ describe('DevXMessageConnector generic', () => {
     });
   });
 
+  it('accepts expanded generic severity values', async () => {
+    const { requestOptions } = await executeNode([
+      {
+        type: 'template',
+        source: 'generic',
+        payload: {
+          title: 'Connector failed',
+          severity: 'error',
+        },
+      },
+    ]);
+
+    expectPostedToDevX(requestOptions);
+    expect(getSentContent(requestOptions)).toEqual({
+      kind: 'template',
+      template: 'generic',
+      data: {
+        title: 'Connector failed',
+        severity: 'error',
+      },
+    });
+  });
+
   it('throws when a generic payload cannot be parsed into message content', async () => {
     const consoleError = suppressConsoleError();
     const node = createNode();
