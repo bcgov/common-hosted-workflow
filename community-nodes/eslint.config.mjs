@@ -54,7 +54,6 @@ export default tseslint.config(
       ...allCommunityRules,
       '@typescript-eslint/no-unused-expressions': 'off',
       '@n8n/community-nodes/package-name-convention': 'off',
-      '@n8n/community-nodes/require-community-node-keyword': 'warn',
       '@n8n/community-nodes/valid-peer-dependencies': 'off',
       '@n8n/community-nodes/no-runtime-dependencies': 'off',
     },
