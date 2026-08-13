@@ -36,8 +36,8 @@
   --color-information-surface: var(--ds-color-information-surface);
   --color-information-foreground: var(--ds-color-information-foreground);
 
-  --radius-control: 0.25rem;
-  --radius-card: 0.5rem;
+  --radius-control: 0.375rem;
+  --radius-card: 0.75rem;
   --radius-dialog: 0.5rem;
 
   --shadow-card: 0 1px 2px rgb(37 36 35 / 8%);

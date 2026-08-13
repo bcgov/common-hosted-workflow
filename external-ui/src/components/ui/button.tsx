@@ -18,8 +18,8 @@ const buttonVariants = cva(
         destructive: 'bg-danger text-white shadow-sm hover:bg-danger-hover active:bg-danger-hover',
       },
       size: {
-        default: 'min-h-10 px-4 py-2.5',
-        sm: 'min-h-9 px-3 py-2 text-xs',
+        default: 'min-h-[37px] px-4 py-2',
+        sm: 'min-h-[33px] px-3 py-1.5 text-xs',
         lg: 'min-h-11 px-6 py-3 text-sm',
         icon: 'size-10 p-0',
       },
