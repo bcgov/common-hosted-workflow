@@ -30,43 +30,43 @@
   font-display: swap;
 }
 
-html {
-  min-width: 20rem;
-  min-height: 100%;
-  background: var(--ds-color-background);
-  color: var(--ds-color-foreground);
-  font-family: 'BC Sans', Arial, sans-serif;
-  font-size: 100%;
-  line-height: 1.5;
-  text-size-adjust: 100%;
-}
-
-body,
-#root {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--ds-color-background);
-  color: var(--ds-color-foreground);
-  font-family: inherit;
-  font-size: 0.875rem;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-img,
-svg {
-  max-width: 100%;
-}
-
 @layer base {
+  html {
+    min-width: 20rem;
+    min-height: 100%;
+    background: var(--ds-color-background);
+    color: var(--ds-color-foreground);
+    font-family: 'BC Sans', Arial, sans-serif;
+    font-size: 100%;
+    line-height: 1.5;
+    text-size-adjust: 100%;
+  }
+
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ds-color-background);
+    color: var(--ds-color-foreground);
+    font-family: inherit;
+    font-size: 0.875rem;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  img,
+  svg {
+    max-width: 100%;
+  }
+
   a {
     color: var(--ds-color-link);
     text-underline-offset: 0.15em;
@@ -80,6 +80,12 @@ svg {
 :focus-visible {
   outline: var(--ds-focus-width) solid var(--ds-color-focus);
   outline-offset: var(--ds-focus-offset);
+}
+
+/* Elements that supply their own visible focus indicator (e.g. a border-color
+   change) opt out of the global outline ring via this class. */
+.ds-focus-border:focus-visible {
+  outline: none;
 }
 
 ::selection {

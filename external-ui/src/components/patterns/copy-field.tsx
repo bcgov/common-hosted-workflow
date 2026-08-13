@@ -24,15 +24,15 @@ function CopyField({ label, value, className }: Readonly<CopyFieldProps>) {
   }
 
   return (
-    <div className={cn('space-y-1.5', className)}>
-      <span id={`${valueId}-label`} className="block text-xs font-bold text-muted-foreground">
+    <div className={cn('space-y-2', className)}>
+      <span id={`${valueId}-label`} className="block text-sm font-bold text-foreground">
         {label}
       </span>
-      <div className="flex min-w-0 items-stretch rounded-control border border-border bg-surface-subtle">
+      <div className="flex min-w-0 items-stretch rounded-lg border border-border bg-surface-subtle">
         <code
           id={valueId}
           aria-labelledby={`${valueId}-label`}
-          className="min-w-0 flex-1 overflow-hidden px-3 py-2.5 font-mono text-xs text-ellipsis whitespace-nowrap text-foreground"
+          className="min-w-0 flex-1 overflow-hidden px-4 py-3 font-mono text-[0.9375rem] leading-normal text-ellipsis whitespace-nowrap text-muted-foreground"
           title={value}
         >
           {value}
@@ -42,7 +42,7 @@ function CopyField({ label, value, className }: Readonly<CopyFieldProps>) {
           variant="ghost"
           size="sm"
           onClick={copyValue}
-          className="rounded-l-none border-l border-border"
+          className="shrink-0 self-center mr-3 text-link"
           aria-describedby={valueId}
         >
           {copyStatus === 'copied' ? (
