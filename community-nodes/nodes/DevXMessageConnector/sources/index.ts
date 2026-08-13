@@ -1,6 +1,7 @@
 export * from './Generic';
 export * from './Text';
 export * from './Html';
+export * from './Card';
 export * from './BackupContainer';
 export * from './Github';
 export * from './RocketChat';

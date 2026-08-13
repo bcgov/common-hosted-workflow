@@ -21,7 +21,7 @@ vi.mock('n8n-workflow', () => ({
 import { DevXMessageConnector } from '../../nodes/DevXMessageConnector/DevXMessageConnector.node';
 
 export type NodeParameters = {
-  type: 'template' | 'text' | 'html' | string;
+  type: 'template' | 'text' | 'html' | 'card' | string;
   source?: string;
   mode?: string;
   payload: unknown;

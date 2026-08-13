@@ -12,6 +12,7 @@ import {
 import {
   textTransform,
   htmlTransform,
+  cardTransform,
   genericTransform,
   backupContainerTransform,
   githubTransform,
@@ -24,6 +25,7 @@ import { parseTeamsLink } from './helpers';
 import { toSerializableNodeJson } from './sources/shared/payload';
 import type { TextMessageContent } from './sources/Text/types';
 import type { HtmlMessageContent } from './sources/Html/types';
+import type { CardMessageContent } from './sources/Card/types';
 import type { GenericMessageContent } from './sources/Generic/types';
 import type { BackupContainerMessageContent } from './sources/BackupContainer/types';
 import type { GitHubPullRequestMessageContent, GitHubWorkflowRunMessageContent } from './sources/Github/types';
@@ -34,6 +36,7 @@ import type { StatusCakeMessageContent } from './sources/StatusCake/types';
 type MessageContent =
   | TextMessageContent
   | HtmlMessageContent
+  | CardMessageContent
   | GenericMessageContent
   | BackupContainerMessageContent
   | GitHubPullRequestMessageContent
@@ -97,6 +100,7 @@ export class DevXMessageConnector implements INodeType {
           { name: 'Template', value: 'template' },
           { name: 'Text', value: 'text' },
           { name: 'HTML', value: 'html' },
+          { name: 'Adaptive Card', value: 'card' },
         ],
         default: 'template',
       },
@@ -158,6 +162,18 @@ export class DevXMessageConnector implements INodeType {
         },
       },
       {
+        displayName: 'Payload',
+        name: 'payload',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: {
+          show: {
+            type: ['card'],
+          },
+        },
+      },
+      {
         displayName: 'Mention Users',
         name: 'mentions',
         type: 'fixedCollection',
@@ -202,7 +218,7 @@ export class DevXMessageConnector implements INodeType {
         default: 'send',
         displayOptions: {
           show: {
-            type: ['template', 'text', 'html'],
+            type: ['template', 'text', 'html', 'card'],
           },
         },
       },
@@ -230,6 +246,8 @@ export class DevXMessageConnector implements INodeType {
           messageContent = textTransform.call(this, i);
         } else if (type === 'html') {
           messageContent = htmlTransform.call(this, i);
+        } else if (type === 'card') {
+          messageContent = cardTransform.call(this, i);
         } else if (type === 'template') {
           const source = this.getNodeParameter('source', i) as string;
           if (source === 'generic') {
