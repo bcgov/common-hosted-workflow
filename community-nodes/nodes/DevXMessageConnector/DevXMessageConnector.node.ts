@@ -42,6 +42,30 @@ type MessageContent =
   | UptimeComMessageContent
   | StatusCakeMessageContent;
 
+interface Target {
+  teamId: string;
+  channelId: string;
+}
+
+export interface MentionTarget {
+  id: string;
+  name: string;
+}
+
+interface MentionCollection {
+  mention?: Array<{
+    email: string;
+    name: string;
+  }>;
+}
+
+interface SendMessageRequest {
+  target: Target;
+  content: MessageContent;
+  metadata?: Record<string, string>;
+  mentions?: MentionTarget[];
+}
+
 export class DevXMessageConnector implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'DevX Message Connector',
@@ -134,6 +158,39 @@ export class DevXMessageConnector implements INodeType {
         },
       },
       {
+        displayName: 'Mention Users',
+        name: 'mentions',
+        type: 'fixedCollection',
+        typeOptions: { multipleValues: true },
+        default: {},
+        options: [
+          {
+            name: 'mention',
+            displayName: 'Mention',
+            values: [
+              {
+                displayName: 'Email',
+                name: 'email',
+                type: 'string',
+                default: '',
+                required: true,
+                description: 'The email address of the user to mention in the message',
+              },
+              {
+                displayName: 'Name',
+                name: 'name',
+                type: 'string',
+                default: '',
+                required: true,
+                description: 'The name of the user to mention in the message.',
+              },
+            ],
+          },
+        ],
+        description:
+          'List of users to mention in the message. Each user is identified by their email address and name.',
+      },
+      {
         displayName: 'Mode',
         name: 'mode',
         type: 'options',
@@ -200,7 +257,15 @@ export class DevXMessageConnector implements INodeType {
           throw new Error('Failed to generate message content');
         }
 
-        const response = await sendMessageToDevXConnector.call(this, messageContent, groupId, channelId, mode);
+        const mentions = resolveMentionTargets(this, i);
+        const response = await sendMessageToDevXConnector.call(
+          this,
+          messageContent,
+          groupId,
+          channelId,
+          mode,
+          mentions,
+        );
         returnData.push({ json: toSerializableNodeJson(response) as IDataObject });
       } catch (error) {
         if ((error as Error & { response?: unknown }).response) {
@@ -215,12 +280,24 @@ export class DevXMessageConnector implements INodeType {
   }
 }
 
+function resolveMentionTargets(context: IExecuteFunctions, itemIndex: number): MentionTarget[] {
+  const collection = context.getNodeParameter('mentions', itemIndex, {}) as MentionCollection;
+
+  return (collection.mention ?? [])
+    .filter(({ email, name }) => email.trim() !== '' || name.trim() !== '')
+    .map(({ email, name }) => ({
+      id: email,
+      name,
+    }));
+}
+
 async function sendMessageToDevXConnector(
   this: IExecuteFunctions,
   content: MessageContent,
   teamId: string,
   channelId: string,
   mode: string,
+  mentions: MentionTarget[],
 ) {
   const apiKey = process.env.DEVX_CONNECTOR_API_KEY;
   const baseUrl = process.env.DEVX_CONNECTOR_API_URL;
@@ -238,12 +315,13 @@ async function sendMessageToDevXConnector(
     'Content-Type': 'application/json',
   };
 
-  const body = {
+  const body: SendMessageRequest = {
     target: {
       teamId,
       channelId,
     },
     content,
+    mentions,
   };
 
   const options = {
