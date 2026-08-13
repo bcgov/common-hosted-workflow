@@ -26,6 +26,20 @@ describe('DevXMessageConnector node', () => {
     const { result, requestOptionsList } = await executeNode([
       { type: 'text', payload: 'Plain text message' },
       {
+        type: 'card',
+        payload: {
+          type: 'AdaptiveCard',
+          $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+          version: '1.5',
+          body: [
+            {
+              type: 'TextBlock',
+              text: 'Card message',
+            },
+          ],
+        },
+      },
+      {
         type: 'template',
         source: 'generic',
         payload: {
@@ -52,12 +66,26 @@ describe('DevXMessageConnector node', () => {
       },
     ]);
 
-    expect(requestOptionsList).toHaveLength(3);
+    expect(requestOptionsList).toHaveLength(4);
     expect(getSentContent(requestOptionsList[0])).toEqual({
       kind: 'text',
       text: 'Plain text message',
     });
     expect(getSentContent(requestOptionsList[1])).toEqual({
+      kind: 'card',
+      card: {
+        type: 'AdaptiveCard',
+        $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+        version: '1.5',
+        body: [
+          {
+            type: 'TextBlock',
+            text: 'Card message',
+          },
+        ],
+      },
+    });
+    expect(getSentContent(requestOptionsList[2])).toEqual({
       kind: 'template',
       template: 'generic',
       data: {
@@ -65,7 +93,7 @@ describe('DevXMessageConnector node', () => {
         severity: 'success',
       },
     });
-    expect(getSentContent(requestOptionsList[2])).toEqual({
+    expect(getSentContent(requestOptionsList[3])).toEqual({
       kind: 'template',
       template: 'github_workflow_run',
       data: {
@@ -80,7 +108,9 @@ describe('DevXMessageConnector node', () => {
         message: 'Ship it',
       },
     });
-    expect(result).toEqual([[{ json: { ok: true } }, { json: { ok: true } }, { json: { ok: true } }]]);
+    expect(result).toEqual([
+      [{ json: { ok: true } }, { json: { ok: true } }, { json: { ok: true } }, { json: { ok: true } }],
+    ]);
   });
 
   it('serializes circular http responses before returning execution data', async () => {
