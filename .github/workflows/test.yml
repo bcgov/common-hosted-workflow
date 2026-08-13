@@ -25,6 +25,7 @@ jobs:
     - name: Run community nodes build & test
       run: |
         pnpm build
+        pnpm lint
         pnpm test
       working-directory: ./community-nodes
       shell: bash

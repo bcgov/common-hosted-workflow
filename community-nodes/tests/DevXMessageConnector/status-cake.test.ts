@@ -12,14 +12,21 @@ import {
 describe('DevXMessageConnector status-cake', () => {
   setupDevXConnectorEnv();
 
-  it('maps status cake UP payloads into the uptime template', async () => {
+  it('maps status cake UP payloads into the statuscake template', async () => {
     const { requestOptions } = await executeNode([
       {
         type: 'template',
         source: 'status-cake',
         payload: {
           Status: 'UP',
+          URL: 'https://example.com',
+          StatusCode: 200,
+          IP: '127.0.0.1',
+          Tags: 'prod,web',
           Name: 'Website Name',
+          Checkrate: 300,
+          TestID: 42,
+          Method: 'GET',
         },
       },
     ]);
@@ -27,15 +34,22 @@ describe('DevXMessageConnector status-cake', () => {
     expectPostedToDevX(requestOptions);
     expect(getSentContent(requestOptions)).toEqual({
       kind: 'template',
-      template: 'uptime',
+      template: 'statuscake',
       data: {
         status: 'up',
-        service: 'Website Name',
+        testName: 'Website Name',
+        websiteUrl: 'https://example.com',
+        statusCode: '200',
+        ip: '127.0.0.1',
+        tags: 'prod,web',
+        checkRate: '300',
+        testId: '42',
+        method: 'GET',
       },
     });
   });
 
-  it('maps status cake DOWN payloads into the uptime template', async () => {
+  it('maps status cake DOWN payloads into the statuscake template', async () => {
     const { requestOptions } = await executeNode([
       {
         type: 'template',
@@ -50,10 +64,10 @@ describe('DevXMessageConnector status-cake', () => {
     expectPostedToDevX(requestOptions);
     expect(getSentContent(requestOptions)).toEqual({
       kind: 'template',
-      template: 'uptime',
+      template: 'statuscake',
       data: {
         status: 'down',
-        service: 'API Health Check',
+        testName: 'API Health Check',
       },
     });
   });
@@ -74,9 +88,8 @@ describe('DevXMessageConnector status-cake', () => {
     expect(context.helpers.httpRequest).not.toHaveBeenCalled();
   });
 
-  it('throws when status cake is missing Name', async () => {
-    const node = createNode();
-    const context = createExecutionContext([
+  it('defaults missing Name values to a string placeholder', async () => {
+    const { requestOptions } = await executeNode([
       {
         type: 'template',
         source: 'status-cake',
@@ -86,13 +99,19 @@ describe('DevXMessageConnector status-cake', () => {
       },
     ]);
 
-    await expect(node.execute.call(context as never)).rejects.toThrow();
-    expect(context.helpers.httpRequest).not.toHaveBeenCalled();
+    expectPostedToDevX(requestOptions);
+    expect(getSentContent(requestOptions)).toEqual({
+      kind: 'template',
+      template: 'statuscake',
+      data: {
+        status: 'up',
+        testName: 'undefined',
+      },
+    });
   });
 
-  it('throws when status cake status is not supported by the uptime schema', async () => {
-    const node = createNode();
-    const context = createExecutionContext([
+  it('maps unsupported status values to down', async () => {
+    const { requestOptions } = await executeNode([
       {
         type: 'template',
         source: 'status-cake',
@@ -103,7 +122,14 @@ describe('DevXMessageConnector status-cake', () => {
       },
     ]);
 
-    await expect(node.execute.call(context as never)).rejects.toThrow();
-    expect(context.helpers.httpRequest).not.toHaveBeenCalled();
+    expectPostedToDevX(requestOptions);
+    expect(getSentContent(requestOptions)).toEqual({
+      kind: 'template',
+      template: 'statuscake',
+      data: {
+        status: 'down',
+        testName: 'Website Name',
+      },
+    });
   });
 });

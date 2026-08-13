@@ -10,7 +10,6 @@ export class DevXConnector implements ICredentialType {
       displayName: 'Teams Channel Link',
       name: 'channelLink',
       type: 'string',
-      typeOptions: { password: true },
       default: '',
     },
   ];

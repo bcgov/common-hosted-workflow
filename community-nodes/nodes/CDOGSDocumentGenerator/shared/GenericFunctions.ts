@@ -1,6 +1,8 @@
-import type { IExecuteFunctions, IHttpRequestOptions, IRequestOptions, IDataObject, JsonObject } from 'n8n-workflow';
+import type { IExecuteFunctions, IHttpRequestOptions, IDataObject, JsonObject } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
 import { CDOGS_OAUTH2_CREDENTIAL } from './constants';
+
+type OAuth2RequestOptions = Parameters<IExecuteFunctions['helpers']['requestOAuth2']>[1];
 
 /**
  * Make a JSON API request to CDOGS and return the parsed response body.
@@ -45,13 +47,13 @@ export async function cdogsApiRequest(
  * Returns the full response including headers and body as Buffer.
  *
  * --- DEPRECATION NOTE / TECH DEBT ---
- * This function uses `requestOAuth2()` with the deprecated `IRequestOptions` interface.
+ * This function uses `requestOAuth2()` with the request option shape that helper expects.
  * This is intentional: as of n8n 2.x, `httpRequestWithAuthentication()` does not reliably
  * handle binary POST responses with `returnFullResponse` semantics that CDOGS requires.
  * The workaround is isolated here to limit blast radius when the modern helper gains support.
  *
  * TODO: Re-evaluate once n8n exposes a stable binary-response + full-headers path in
- * `httpRequestWithAuthentication` / `IHttpRequestOptions`. Track removal as tech debt.
+ * `httpRequestWithAuthentication`. Track removal as tech debt.
  * ---
  */
 export async function cdogsApiBinaryResponse(
@@ -67,7 +69,7 @@ export async function cdogsApiBinaryResponse(
   // Match the transport used by n8n's HTTP Request node for generic OAuth2.
   // On n8n 2.x, the newer authenticated HTTP helper can mishandle some binary
   // POST requests; requestOAuth2 keeps the method/body behavior that CDOGS expects.
-  const options: IRequestOptions = {
+  const options: OAuth2RequestOptions = {
     method,
     url,
     headers: {
@@ -104,7 +106,7 @@ export async function cdogsApiBinaryResponse(
  * includes its hash, the upload objective has still been satisfied.
  *
  * --- DEPRECATION NOTE / TECH DEBT ---
- * Uses `requestOAuth2()` with `IRequestOptions` because `httpRequestWithAuthentication()`
+ * Uses `requestOAuth2()` because `httpRequestWithAuthentication()`
  * does not support multipart `formData` with raw Buffers as of n8n 2.x. The workaround is
  * intentionally isolated to this single function.
  *
@@ -119,7 +121,7 @@ export async function cdogsApiUploadTemplate(
 ): Promise<{ hash: string; cached: boolean }> {
   const baseUrl = this.getNodeParameter('baseUrl', 0) as string;
   const url = `${baseUrl.replace(/\/$/, '')}/template`;
-  const options: IRequestOptions = {
+  const options: OAuth2RequestOptions = {
     method: 'POST',
     url,
     formData: {

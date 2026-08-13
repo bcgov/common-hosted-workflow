@@ -98,8 +98,9 @@ const expectedSysdigContent = {
   template: 'sysdig',
   data: {
     severity: 2,
-    state: 'active',
     alertName: 'CPU temp is High',
+    subject: 'CPU temp is High on homebridge:9100 is Triggered',
+    state: 'ACTIVE',
     scope: undefined,
     description: undefined,
     timestamp: '2021-05-05T13:40:00Z',
@@ -134,6 +135,28 @@ describe('DevXMessageConnector sysdig', () => {
 
     expectPostedToDevX(requestOptions);
     expect(getSentContent(requestOptions)).toEqual(expectedSysdigContent);
+  });
+
+  it('normalizes lowercase sysdig states to uppercase message content values', async () => {
+    const { requestOptions } = await executeNode([
+      {
+        type: 'template',
+        source: 'sysdig',
+        payload: {
+          ...sysdigSuccessPayload,
+          state: 'ok',
+        },
+      },
+    ]);
+
+    expectPostedToDevX(requestOptions);
+    expect(getSentContent(requestOptions)).toEqual({
+      ...expectedSysdigContent,
+      data: {
+        ...expectedSysdigContent.data,
+        state: 'OK',
+      },
+    });
   });
 
   it('throws when a sysdig payload fails schema validation', async () => {
