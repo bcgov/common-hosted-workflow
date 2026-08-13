@@ -1,4 +1,4 @@
-import type { ICredentialType, INodeProperties } from 'n8n-workflow';
+import { type ICredentialType, type INodeProperties, type Icon } from 'n8n-workflow';
 
 /**
  * OAuth2 client-credentials authentication for the Common Document Generation Service.
@@ -9,6 +9,7 @@ import type { ICredentialType, INodeProperties } from 'n8n-workflow';
  */
 export class CDOGSOAuth2Api implements ICredentialType {
   name = 'cdogsOAuth2Api';
+  icon: Icon = { light: 'file:../icons/document-generate.svg', dark: 'file:../icons/document-generate.dark.svg' };
   displayName = 'CDOGS OAuth2 API';
   documentationUrl =
     'https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/cdogs-document-generator';

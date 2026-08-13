@@ -777,7 +777,10 @@ function sanitizeFileName(name: string): string {
   // Remove any path separators — keep only the final segment
   const basename = name.replace(/^.*[/\\]/, '');
   // Remove null bytes and other control characters
-  return basename.replace(/[\x00-\x1f]/g, '').trim();
+  return Array.from(basename)
+    .filter((character) => character >= ' ')
+    .join('')
+    .trim();
 }
 
 function getHeaderValue(headers: IDataObject, headerName: string): string {
