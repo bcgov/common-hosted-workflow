@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getWilTenants, type WilTenantItem } from '../../services/backend/wil';
 import { Label } from '@/components/ui/label';
@@ -8,7 +9,10 @@ interface TenantSelectorProps {
   onTenantChange: (tenant: WilTenantItem | null) => void;
 }
 
-export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSelectorProps>) {
+export const TenantSelector = forwardRef<HTMLSelectElement, Readonly<TenantSelectorProps>>(function TenantSelector(
+  { tenantId, onTenantChange },
+  ref,
+) {
   const tenantsQuery = useQuery({
     queryKey: ['wil-tenants'],
     queryFn: ({ signal }) => getWilTenants(signal),
@@ -27,11 +31,12 @@ export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSele
         Tenant
       </Label>
       <Select
+        ref={ref}
         id="tenant-select"
         value={tenantId}
         onChange={(e) => handleChange(e.target.value)}
         disabled={tenantsQuery.isLoading}
-        className="min-w-48"
+        className="min-w-[260px]"
       >
         <option value="">{tenantsQuery.isLoading ? 'Loading tenants...' : 'Select a tenant'}</option>
         {tenants.map((tenant) => (
@@ -42,4 +47,4 @@ export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSele
       </Select>
     </div>
   );
-}
+});
