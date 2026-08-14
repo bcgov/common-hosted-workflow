@@ -1,11 +1,10 @@
 import { login } from '../auth/session-actions';
 import { useAuthUser, usePermissions } from '../state/session';
-import { IconLogin2, IconActivity, IconArrowsRightLeft, IconCheckbox, IconFolder, IconSend } from '@tabler/icons-react';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { IconActivity, IconArrowsRightLeft, IconCheckbox, IconFolder, IconSend } from '@tabler/icons-react';
 import { PageContainer } from '@/components/layout/page-container';
 import { DashboardCard } from '@/components/patterns/dashboard-card';
 import { PageHeader } from '@/components/patterns/page-header';
+import { SignedOutView } from '@/components/patterns/signed-out-view';
 
 interface NavCard {
   to: string;
@@ -79,25 +78,15 @@ export function Home() {
           description="Manage workflows, user access, and related portal tasks in one place."
         />
 
-        {!user ? (
-          <Alert>
-            <AlertTitle>You are not signed in.</AlertTitle>
-            <AlertDescription>
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button onClick={login}>
-                  <IconLogin2 size={16} aria-hidden="true" />
-                  Sign In
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        ) : null}
+        {!user ? <SignedOutView onSignIn={login} /> : null}
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => (
-            <DashboardCard key={card.to} {...card} />
-          ))}
-        </div>
+        {cards.length > 0 ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map((card) => (
+              <DashboardCard key={card.to} {...card} />
+            ))}
+          </div>
+        ) : null}
       </PageContainer>
     </div>
   );

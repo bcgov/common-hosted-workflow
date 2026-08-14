@@ -1,25 +1,37 @@
-import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface SignedOutViewProps {
-  title?: string;
-  description: string;
   onSignIn: () => void;
 }
 
-function SignedOutView({ title = 'Sign in to continue', description, onSignIn }: Readonly<SignedOutViewProps>) {
+function SignedOutView({ onSignIn }: Readonly<SignedOutViewProps>) {
   return (
-    <section className="mx-auto flex min-h-80 max-w-xl flex-col items-center justify-center px-4 py-10 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full bg-information-surface text-information">
-        <IconLogin2 className="size-6" aria-hidden="true" />
-      </div>
-      <h1 className="mt-4 text-[2rem] leading-10 font-bold text-foreground">{title}</h1>
-      <p className="mt-2 text-sm leading-5 text-muted-foreground">{description}</p>
-      <Button type="button" onClick={onSignIn} className="mt-6">
-        <IconLogin2 className="size-4" aria-hidden="true" />
-        Sign in
-      </Button>
-    </section>
+    <Card>
+      <CardContent className="space-y-5 p-6 sm:p-8">
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold leading-7 text-foreground">Sign in to continue</h2>
+          <p className="text-base leading-6 text-muted-foreground">
+            Sign in with your IDIR account to view workflows shared with you.
+          </p>
+        </div>
+
+        <div>
+          <Button type="button" onClick={onSignIn}>
+            Sign in
+          </Button>
+        </div>
+
+        <hr className="border-border" />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">{`Can't sign in with your IDIR account?`}</span>
+          <Button type="button" variant="ghost" size="sm" asChild>
+            <a href="https://bcgov.github.io/sso-docs/category/frequently-asked-questions">Get help</a>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

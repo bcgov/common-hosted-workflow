@@ -24,7 +24,7 @@ function Field({ label, htmlFor, description, error, required, className, childr
   });
 
   return (
-    <div className={cn('space-y-1.5', className)} {...props}>
+    <div className={cn('space-y-3', className)} {...props}>
       <Label htmlFor={htmlFor}>
         {label}
         {required ? (

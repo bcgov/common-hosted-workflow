@@ -229,7 +229,8 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+      const signInButtons = screen.getAllByRole('button', { name: /sign in/i });
+      expect(signInButtons.length).toBeGreaterThanOrEqual(1);
       expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main-content');
       expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
       expect(screen.getByRole('navigation', { name: 'Legal' })).toBeInTheDocument();

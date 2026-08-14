@@ -58,8 +58,8 @@ tokens:
     body-small: '0.8125rem/1rem'
     caption: '0.75rem/1rem'
   radii:
-    control: '0.25rem'
-    card: '0.5rem'
+    control: '0.375rem'
+    card: '0.75rem'
     dialog: '0.5rem'
     pill: '999px'
   spacing:
