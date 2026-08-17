@@ -15,6 +15,7 @@ n8n:
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:prod:"
     CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
     FEATURES_ENABLED: "workflow-share"
+    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "b0c13b-chwf-prod"
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"
