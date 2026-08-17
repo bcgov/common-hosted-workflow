@@ -21,19 +21,19 @@ function MessageItem({ message }: Readonly<{ message: WilMessageItem }>) {
   const isUnread = message.status === 'active';
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-[#c6c5c3] bg-white px-4 py-3.5">
+    <div className="flex items-start gap-3 rounded-lg border border-[#c6c5c3] bg-white px-4 py-4 md:py-3.5">
       {/* Status dot */}
       <div className="mt-1.5 shrink-0 w-2.5">
         <span
-          className={`block size-2 rounded-full ${isUnread ? 'bg-[#2563eb]' : 'bg-[#c6c5c3]'}`}
+          className={`block size-2.5 rounded-full md:size-2 ${isUnread ? 'bg-[#2563eb]' : 'bg-[#c6c5c3]'}`}
           aria-label={isUnread ? 'Unread' : 'Read'}
         />
       </div>
 
       {/* Text content */}
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-sm font-bold text-foreground truncate">{message.title}</p>
-        <p className="text-[13px] text-[#474543] line-clamp-1">{message.body}</p>
+      <div className="min-w-0 flex-1 space-y-1.5 md:space-y-1">
+        <p className="text-sm font-bold text-foreground leading-snug break-words">{message.title}</p>
+        <p className="text-[13px] text-[#474543] line-clamp-2 md:line-clamp-1 leading-relaxed">{message.body}</p>
         <p className="text-xs text-[#9f9d9c]">{formatMessageDate(message.createdAt)}</p>
       </div>
     </div>
@@ -88,7 +88,7 @@ export function MessagesTab({ tenantId, since, cursor, onLoadMore }: Readonly<Me
       ))}
       {nextCursor ? (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" onClick={() => onLoadMore(nextCursor)}>
+          <Button variant="outline" size="lg" className="w-full md:w-auto" onClick={() => onLoadMore(nextCursor)}>
             Load More
           </Button>
         </div>

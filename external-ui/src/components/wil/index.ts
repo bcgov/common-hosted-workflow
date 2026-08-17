@@ -6,5 +6,6 @@ export { ActionsTab } from './actions-tab';
 export { ActionItem } from './action-item';
 export { MessagesTab } from './messages-tab';
 export { TriggersTab } from './trigger';
+export { MobileDetailView } from './mobile-detail-view';
 
 export type { Tab } from './tab-bar';

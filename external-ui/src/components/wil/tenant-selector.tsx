@@ -36,7 +36,7 @@ export const TenantSelector = forwardRef<HTMLSelectElement, Readonly<TenantSelec
         value={tenantId}
         onChange={(e) => handleChange(e.target.value)}
         disabled={tenantsQuery.isLoading}
-        className="min-w-[260px]"
+        className="w-full sm:min-w-[260px] sm:w-auto"
       >
         <option value="">{tenantsQuery.isLoading ? 'Loading tenants...' : 'Select a tenant'}</option>
         {tenants.map((tenant) => (

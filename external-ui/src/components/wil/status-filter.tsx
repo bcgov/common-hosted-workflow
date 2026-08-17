@@ -71,14 +71,14 @@ export function StatusFilter({ selected, onChange, counts }: Readonly<StatusFilt
       <button
         type="button"
         onClick={selectAll}
-        className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
+        className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors md:min-h-8 md:gap-1 md:px-3 md:py-1 ${
           isAll
             ? 'border-primary bg-primary text-primary-foreground'
             : 'border-border-strong bg-surface text-muted-foreground hover:border-primary hover:text-foreground'
         }`}
         aria-pressed={isAll}
       >
-        <IconList size={12} aria-hidden="true" />
+        <IconList size={14} className="md:size-3" aria-hidden="true" />
         All
         {totalCount !== undefined && totalCount > 0 && (
           <span className={`ml-0.5 text-[10px] font-bold ${isAll ? 'text-white/80' : 'text-foreground'}`}>
@@ -97,14 +97,14 @@ export function StatusFilter({ selected, onChange, counts }: Readonly<StatusFilt
             key={status}
             type="button"
             onClick={() => toggleStatus(status)}
-            className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
+            className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors md:min-h-8 md:gap-1 md:px-3 md:py-1 ${
               isActive
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border-strong bg-surface text-muted-foreground hover:border-primary hover:text-foreground'
             }`}
             aria-pressed={isActive}
           >
-            {Icon && <Icon size={12} aria-hidden="true" />}
+            {Icon && <Icon size={14} className="md:size-3" aria-hidden="true" />}
             {formatStatusLabel(status)}
             {statusCount !== undefined && statusCount > 0 && (
               <span className={`ml-0.5 text-[10px] font-bold ${isActive ? 'text-white/80' : 'text-foreground'}`}>

@@ -8,14 +8,16 @@ import { canUserSeeTrigger } from './trigger-utils';
 import { TRIGGER_TYPES } from '../../../constants/constants';
 import { TriggerListItem } from './trigger-list-item';
 import { TriggerFormPane } from './trigger-form-pane';
+import { MobileDetailView } from '../mobile-detail-view';
 
 interface TriggersTabProps {
   tenantId: string;
   isPersonalTenant: boolean;
   userEmail: string;
+  isMobile?: boolean;
 }
 
-export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<TriggersTabProps>) {
+export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = false }: Readonly<TriggersTabProps>) {
   const hasManageRoles = useHasTenantRoles(tenantId, TRIGGER_MANAGE_ROLE_VALUES);
   const canManage = isPersonalTenant || hasManageRoles;
   const userTenantRoles = useTenantRolesById(tenantId);
@@ -61,6 +63,115 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
       ? pendingDeleteTrigger.config.formName || 'this trigger'
       : pendingDeleteTrigger?.config.buttonText || 'this trigger';
 
+  // --- Mobile: full-screen detail/edit view ---
+  if (isMobile && formMode !== 'idle') {
+    return (
+      <>
+        <MobileDetailView title={formPaneTitle} onBack={cancel}>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#2d2d2d]">{formPaneTitle}</h2>
+              <p className="text-[13px] text-[#605e5c]">* required</p>
+            </div>
+            <div className="h-px bg-[#e0dedc]" />
+          </div>
+          <div className="mt-4">
+            <TriggerFormPane
+              mode={formMode}
+              triggerType={triggerType}
+              onTriggerTypeChange={changeTriggerType}
+              chefsForm={chefsForm}
+              onChefsFormChange={setChefsForm}
+              buttonForm={buttonForm}
+              onButtonFormChange={setButtonForm}
+              onSave={save}
+              onCancel={cancel}
+              isSaving={isSaving}
+              actorsLocked={isPersonalTenant}
+              selectedTrigger={selectedTrigger}
+              tenantId={tenantId}
+              buttonCallbackStatus={buttonCallbackStatus}
+              buttonCallbackError={buttonCallbackError}
+            />
+          </div>
+        </MobileDetailView>
+
+        <ConfirmDialog
+          open={hasPendingNav}
+          title="Unsaved changes"
+          description="You have unsaved changes. Please save or cancel before switching triggers."
+          confirmLabel="Discard changes"
+          cancelLabel="Stay"
+          confirmVariant="destructive"
+          onConfirm={confirmNavigation}
+          onCancel={cancelNavigation}
+        />
+
+        <ConfirmDialog
+          open={pendingDeleteTrigger !== null}
+          title="Delete trigger"
+          description={`Are you sure you want to delete "${deleteTriggerLabel}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          confirmVariant="destructive"
+          isConfirming={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={cancelDelete}
+        />
+      </>
+    );
+  }
+
+  // --- Mobile: card list view ---
+  if (isMobile) {
+    return (
+      <>
+        <div className="space-y-3">
+          {canManage && (
+            <Button type="button" className="w-full" onClick={openCreate}>
+              <IconPlus size={16} aria-hidden="true" />
+              Create Trigger
+            </Button>
+          )}
+          {visibleTriggers.length === 0 ? (
+            <p className="py-8 text-center text-sm text-[var(--bc-muted)]">No triggers found.</p>
+          ) : (
+            visibleTriggers.map((trigger) => (
+              <TriggerListItem
+                key={trigger.id}
+                trigger={trigger}
+                isSelected={selectedTriggerId === trigger.id}
+                canManage={canManage}
+                isCallbackPending={callbackTriggerId === trigger.id}
+                onClick={() => selectTrigger(trigger, canManage)}
+                onEdit={() => selectTrigger(trigger, canManage)}
+                onDelete={() => requestDelete(trigger)}
+                onTriggerCallback={() => {
+                  if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
+                    openChefsPreview(trigger);
+                  } else {
+                    triggerCallback(trigger);
+                  }
+                }}
+              />
+            ))
+          )}
+        </div>
+
+        <ConfirmDialog
+          open={pendingDeleteTrigger !== null}
+          title="Delete trigger"
+          description={`Are you sure you want to delete "${deleteTriggerLabel}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          confirmVariant="destructive"
+          isConfirming={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={cancelDelete}
+        />
+      </>
+    );
+  }
+
+  // --- Desktop: split-pane layout (unchanged) ---
   return (
     <>
       <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-function TabList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function TabList({ className, ...props }: Readonly<React.HTMLAttributes<HTMLDivElement>>) {
   return (
     <div
       role="tablist"
@@ -22,7 +22,7 @@ function TabTrigger({ className, selected, ...props }: Readonly<TabTriggerProps>
       role="tab"
       aria-selected={selected}
       className={cn(
-        'relative min-h-11 shrink-0 border-b-3 border-transparent px-4 py-2 text-sm font-bold text-muted-foreground transition-colors hover:text-foreground',
+        'relative min-h-12 shrink-0 border-b-3 border-transparent px-4 py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:text-foreground md:min-h-11 md:py-2',
         selected && 'border-accent text-foreground',
         className,
       )}
