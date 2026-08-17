@@ -46,7 +46,7 @@ n8n:
     N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
     N8N_EXTERNAL_STORAGE_S3_HOST: "chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333"
     N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "http"
-    N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "us-east-1"
+    N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "ca-central-1"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/security/#security-environment-variables
     N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
     N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
