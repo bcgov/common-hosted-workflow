@@ -1,6 +1,6 @@
 nodejs 26.5.1
 python 3.14.6
-pnpm 11.17.0
+pnpm 11.21.0
 oc 4.22.7
 kubectl 1.36.3
 helm 4.2.3
