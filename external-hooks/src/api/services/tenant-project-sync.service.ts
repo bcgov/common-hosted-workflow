@@ -263,6 +263,7 @@ export class TenantProjectSyncService {
     await this.customRepositories.tenantProjectRelation.insertIgnoreConflict({
       tenantId,
       projectId: savedProject.id,
+      projectType: 'team',
     });
 
     log.info('Created team project for tenant', {
