@@ -1,107 +1,94 @@
 import type { WilActionItem } from '../../services/backend/wil';
-import { Badge } from '@/components/ui/badge';
-import { IconCheck, IconX, IconClockOff, IconTrash } from '@tabler/icons-react';
+import { CopyField } from '@/components/patterns/copy-field';
+import { ActionDetailHeader } from './action-detail-header';
+
+function formatDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function computeDuration(start: string, end: string): string {
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (ms < 0) return '—';
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds} seconds`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) {
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes} minutes`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours} hours`;
+}
+
+function getOutputMessage(action: WilActionItem): string | null {
+  if (action.status === 'completed') {
+    if (action.actionType === 'showform') return 'Form submitted successfully.';
+    if (action.actionType === 'getapproval') return 'Approval decision recorded.';
+    return 'Action completed.';
+  }
+  if (action.status === 'cancelled') return 'Action was cancelled.';
+  if (action.status === 'expired') return 'Action expired before completion.';
+  if (action.status === 'deleted') return 'Action was deleted.';
+  return null;
+}
 
 interface CompletedActionViewProps {
   action: WilActionItem;
 }
 
-function formatActionType(actionType: string): string {
-  return actionType
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/([a-z])([a-z]*)/gi, (_match, first: string, rest: string) => {
-      return first.toUpperCase() + rest.toLowerCase();
-    })
-    .trim();
-}
-
-function formatCompletionTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function getPayloadSummary(action: WilActionItem): string | null {
-  if (action.actionType === 'showform') {
-    const formName = action.payload?.FormName;
-    if (typeof formName === 'string' && formName.length > 0) {
-      return `Form: ${formName}`;
-    }
-  }
-  return null;
-}
-
-function StatusIcon({ status }: Readonly<{ status: WilActionItem['status'] }>) {
-  switch (status) {
-    case 'completed':
-      return <IconCheck size={32} className="text-green-600" aria-hidden="true" />;
-    case 'cancelled':
-      return <IconX size={32} className="text-gray-500" aria-hidden="true" />;
-    case 'expired':
-      return <IconClockOff size={32} className="text-orange-600" aria-hidden="true" />;
-    case 'deleted':
-      return <IconTrash size={32} className="text-red-600" aria-hidden="true" />;
-    default:
-      return <IconCheck size={32} className="text-gray-500" aria-hidden="true" />;
-  }
-}
-
-function StatusBadge({ status }: Readonly<{ status: WilActionItem['status'] }>) {
-  switch (status) {
-    case 'completed':
-      return (
-        <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 border-green-200">
-          Completed
-        </Badge>
-      );
-    case 'cancelled':
-      return (
-        <Badge variant="secondary" className="gap-1 bg-gray-100 text-gray-600 border-gray-200">
-          Cancelled
-        </Badge>
-      );
-    case 'expired':
-      return (
-        <Badge variant="secondary" className="gap-1 bg-orange-100 text-orange-800 border-orange-200">
-          Expired
-        </Badge>
-      );
-    case 'deleted':
-      return (
-        <Badge variant="secondary" className="gap-1 bg-red-100 text-red-800 border-red-200">
-          Deleted
-        </Badge>
-      );
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
-}
-
 export function CompletedActionView({ action }: Readonly<CompletedActionViewProps>) {
-  const payloadSummary = getPayloadSummary(action);
+  const outputMessage = getOutputMessage(action);
+
+  const startedAt = action.createdAt;
+  const finishedAt = action.completedAt ?? action.updatedAt;
+  const duration = computeDuration(startedAt, finishedAt);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-      <StatusIcon status={action.status} />
-      <StatusBadge status={action.status} />
+    <div className="flex h-full flex-col gap-4.5 rounded-card border border-[#e2e8f0] bg-surface p-6">
+      {/* Header: Title + Status badge */}
+      <ActionDetailHeader action={action} />
 
-      <p className="text-sm font-medium text-[var(--bc-text)]">{formatActionType(action.actionType)}</p>
+      {/* Action ID */}
+      <CopyField label="Action ID" value={action.id} />
 
-      {action.completedBy && (
-        <p className="text-xs text-[var(--bc-muted)]">
-          Completed by <span className="font-medium text-[var(--bc-text)]">{action.completedBy}</span>
-        </p>
-      )}
+      {/* Metadata rows */}
+      <div className="flex flex-col gap-3">
+        <MetadataRow label="Priority" value={action.priority === 'critical' ? 'Critical' : 'Normal'} />
+        <MetadataRow label="Started by" value={action.actorId} />
+        <MetadataRow label="Started" value={formatDateTime(startedAt)} />
+        <MetadataRow label="Finished" value={formatDateTime(finishedAt)} />
+        <MetadataRow label="Duration" value={duration} />
+      </div>
 
-      <p className="text-xs text-[var(--bc-muted)]">
-        {action.completedAt ? formatCompletionTime(action.completedAt) : formatCompletionTime(action.updatedAt)}
-      </p>
+      {/* Divider */}
+      <hr className="border-[#e2e8f0]" />
 
-      {payloadSummary && <p className="text-xs text-[var(--bc-muted)]">{payloadSummary}</p>}
+      {/* Output section */}
+      {outputMessage ? (
+        <div className="space-y-2.5">
+          <p className="text-sm font-bold text-foreground">Output</p>
+          <div className="flex items-center justify-between rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3.5 py-3">
+            <p className="text-sm text-[#334155]">{outputMessage}</p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MetadataRow({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="flex gap-4">
+      <span className="w-[150px] shrink-0 text-[13px] text-[#64748b]">{label}</span>
+      <span className="min-w-0 flex-1 text-sm text-foreground">{value}</span>
     </div>
   );
 }

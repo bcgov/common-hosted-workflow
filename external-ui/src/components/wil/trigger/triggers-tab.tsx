@@ -98,9 +98,15 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail }: Readonly<
         </div>
 
         {/* Form / detail pane */}
-        <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
+        <div className="p-6 overflow-y-auto bg-white">
           {formMode !== 'idle' && (
-            <h2 className="text-base font-semibold text-[var(--bc-text)] mb-4">{formPaneTitle}</h2>
+            <div className="mb-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-[#2d2d2d]">{formPaneTitle}</h2>
+                <p className="text-[13px] text-[#605e5c]">* indicates a required field</p>
+              </div>
+              <div className="h-px bg-[#e0dedc]" />
+            </div>
           )}
           <TriggerFormPane
             mode={formMode}

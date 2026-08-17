@@ -36,7 +36,7 @@ export function ActionsTab({
 
   if (actionsQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 py-8 text-sm text-[var(--bc-muted)]">
+      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
         <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />
         Loading actions...
       </div>
@@ -54,13 +54,13 @@ export function ActionsTab({
 
   const data = actionsQuery.data;
   if (!data || data.data.length === 0) {
-    return <p className="py-8 text-center text-sm text-[var(--bc-muted)]">No actions found.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">No actions found.</p>;
   }
 
   const { nextCursor } = data;
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-2">
       {data.data.map((action) => (
         <ActionItem
           key={action.id}
@@ -76,7 +76,7 @@ export function ActionsTab({
           </Button>
         </div>
       ) : (
-        <p className="pt-2 text-center text-xs text-[var(--bc-muted)]">All actions loaded.</p>
+        <p className="pt-2 text-center text-xs text-muted-foreground">All actions loaded.</p>
       )}
     </div>
   );

@@ -1,39 +1,42 @@
 import { useQuery } from '@tanstack/react-query';
-import { IconLoader2, IconBell } from '@tabler/icons-react';
+import { IconLoader2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getWilMessages } from '../../services/backend/wil';
 import type { WilMessageItem } from '../../services/backend/wil';
 import { extractErrorMessage } from '../shared/error-utils';
 
-function MessageStatusBadge({ status }: Readonly<{ status: WilMessageItem['status'] }>) {
-  if (status === 'active') {
-    return <Badge className="gap-1 bg-[var(--bc-blue)] text-white">Active</Badge>;
-  }
-  return (
-    <Badge variant="secondary" className="gap-1">
-      Read
-    </Badge>
-  );
+function formatMessageDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 function MessageItem({ message }: Readonly<{ message: WilMessageItem }>) {
+  const isUnread = message.status === 'active';
+
   return (
-    <Card>
-      <CardContent className="flex items-start gap-3 p-4">
-        <IconBell size={18} className="mt-0.5 shrink-0 text-[var(--bc-muted)]" aria-hidden="true" />
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-[var(--bc-text)] truncate">{message.title}</span>
-            <MessageStatusBadge status={message.status} />
-          </div>
-          <p className="text-sm text-[var(--bc-muted)] line-clamp-2">{message.body}</p>
-          <p className="text-xs text-[var(--bc-muted)]">{new Date(message.createdAt).toLocaleString()}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-start gap-3 rounded-lg border border-[#c6c5c3] bg-white px-4 py-3.5">
+      {/* Status dot */}
+      <div className="mt-1.5 shrink-0 w-2.5">
+        <span
+          className={`block size-2 rounded-full ${isUnread ? 'bg-[#2563eb]' : 'bg-[#c6c5c3]'}`}
+          aria-label={isUnread ? 'Unread' : 'Read'}
+        />
+      </div>
+
+      {/* Text content */}
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="text-sm font-bold text-foreground truncate">{message.title}</p>
+        <p className="text-[13px] text-[#474543] line-clamp-1">{message.body}</p>
+        <p className="text-xs text-[#9f9d9c]">{formatMessageDate(message.createdAt)}</p>
+      </div>
+    </div>
   );
 }
 

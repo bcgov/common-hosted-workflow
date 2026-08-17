@@ -111,7 +111,12 @@ export function TriggerFormPane({
       )}
       {!triggerType && (
         <div className="flex justify-end pt-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-[#013366] text-[#013366] hover:bg-[#013366]/5"
+            onClick={onCancel}
+          >
             <IconX size={16} aria-hidden="true" />
             Cancel
           </Button>
