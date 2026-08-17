@@ -22,14 +22,15 @@ OpenShift uses BC Gov's object storage service (`commonservices.objectstore.gov.
 
 Set in `helm/main/values.yaml` under `n8n.env` and applied to both the main and worker deployments automatically by the Helm chart:
 
-| Variable                                | Value                                                                         |
-| --------------------------------------- | ----------------------------------------------------------------------------- |
-| `N8N_DEFAULT_BINARY_DATA_MODE`          | `filesystem` (temporary — switch to `s3` once Enterprise license is obtained) |
-| `N8N_AVAILABLE_BINARY_DATA_MODES`       | `filesystem,s3`                                                               |
-| `N8N_EXTERNAL_STORAGE_S3_HOST`          | `commonservices.objectstore.gov.bc.ca`                                        |
-| `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`      | `https`                                                                       |
-| `N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME`   | `workflow-dev` / `workflow-test` / `workflow-prod` (set per environment)      |
-| `N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION` | `ca-central-1`                                                                |
+| Variable                                | Value                                                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `N8N_DEFAULT_BINARY_DATA_MODE`          | `s3`                                                                                                                    |
+| `N8N_EXECUTION_DATA_STORAGE_MODE`       | `s3`                                                                                                                    |
+| `N8N_AVAILABLE_BINARY_DATA_MODES`       | `filesystem,s3`                                                                                                         |
+| `N8N_EXTERNAL_STORAGE_S3_HOST`          | `commonservices.objectstore.gov.bc.ca`                                                                                  |
+| `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`      | `https`                                                                                                                 |
+| `N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME`   | `dev-external-storage` / `test-external-storage` / `prod-external-storage` — set per environment in the env values file |
+| `N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION` | `ca-central-1`                                                                                                          |
 
 ### Credentials
 
@@ -72,13 +73,9 @@ N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "http"
 
 ### Enterprise License Required
 
-S3 binary data storage is an n8n Enterprise feature. CHW runs n8n in queue mode, and S3 provides the shared external storage required for binary data to be accessible across worker instances.
+S3 binary data storage and S3 execution data storage are both n8n Enterprise features and require a valid Enterprise license. n8n will not start in `s3` mode for either feature without one.
 
-The current filesystem configuration is temporary and is not supported for CHW's queue-mode topology. While filesystem mode is in use, workflows that require binary data to be accessed across different pods may fail because worker pods do not share a filesystem.
-
-Once an Enterprise license is obtained, switch N8N_DEFAULT_BINARY_DATA_MODE to s3. The remaining S3 configuration is already in place.
-
-If the Enterprise license is approaching expiration, renew the license or switch to a supported alternative storage mode before expiration. n8n will not start in s3 binary data mode without a valid Enterprise license. Do not rely on automatic fallback behavior.
+If the Enterprise license is approaching expiration, renew it before expiry. Do not rely on automatic fallback behavior — n8n will refuse to start rather than silently downgrade to another mode.
 
 ### Binary Data is Not Auto-Pruned from S3
 

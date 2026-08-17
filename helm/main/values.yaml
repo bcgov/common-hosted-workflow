@@ -36,13 +36,14 @@ n8n:
     # See https://docs.n8n.io/hosting/configuration/configuration-examples/user-folder/#specify-user-folder-path
     N8N_BLOCKLIST_FUNCTIONS_ALLOW_BUILTIN: "*"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/binary-data/#binary-data-environment-variables
-    # Using filesystem mode until an enterprise license is obtained.
-    # When a license is active, switch N8N_DEFAULT_BINARY_DATA_MODE to "s3" — all other S3 config below is ready.
-    # AVAILABLE_BINARY_DATA_MODES controls which modes the instance can read from — keeping both listed
-    # ensures binary data written in either mode remains accessible during a transition.
+    # Both binary data and execution data are stored in S3. Requires an Enterprise license.
+    # AVAILABLE_BINARY_DATA_MODES keeps filesystem listed so binary data written before the S3
+    # migration remains readable during the transition.
     # Credentials are injected via extraEnv from the chwf-s3-account secret.
+    # Bucket name is set per environment in values-<namespace>-<env>-<zone>.yaml
     N8N_AVAILABLE_BINARY_DATA_MODES: "filesystem,s3"
-    N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+    N8N_DEFAULT_BINARY_DATA_MODE: "s3"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
     N8N_EXTERNAL_STORAGE_S3_HOST: "commonservices.objectstore.gov.bc.ca"
     N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "https"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "ca-central-1"

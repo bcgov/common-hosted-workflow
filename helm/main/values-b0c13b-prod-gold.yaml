@@ -15,7 +15,8 @@ n8n:
     AUTHZ_ENVIRONMENT: prod
     CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
     FEATURES_ENABLED: "workflow-share"
-    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "b0c13b-chwf-prod"
+    N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "default"
 
   route:
     enabled: true

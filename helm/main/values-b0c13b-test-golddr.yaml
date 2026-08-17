@@ -15,7 +15,8 @@ n8n:
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:test:"
     CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
     FEATURES_ENABLED: "workflow-share"
-    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "b0c13b-chwf-test"
+    N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "default"
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"
