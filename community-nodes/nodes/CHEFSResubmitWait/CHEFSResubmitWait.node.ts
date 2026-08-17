@@ -35,6 +35,22 @@ const lockedResumeProperty: INodeProperties = {
   noDataExpression: true,
 };
 
+const lockedHttpMethodProperty: INodeProperties = {
+  displayName: 'HTTP Method',
+  name: 'httpMethod',
+  type: 'hidden',
+  default: 'POST',
+  noDataExpression: true,
+};
+
+const lockedResponseCodeProperty: INodeProperties = {
+  displayName: 'Response Code',
+  name: 'responseCode',
+  type: 'hidden',
+  default: 200,
+  noDataExpression: true,
+};
+
 // Derive the parent method signatures so the overrides use the same n8n-workflow
 // types as Wait (which resolves to the copy pinned by n8n-nodes-base). This avoids
 // the dual n8n-workflow version boundary at the type level.
@@ -110,6 +126,7 @@ async function registerChefsSubmissionWebhook(
  * Extends the native Wait node, inheriting its full UI properties array and
  * execution/webhook behavior. Overrides:
  *  - Resume is locked to "On Webhook Call" (hidden field).
+ *  - Webhook HTTP method/response code are hidden and locked to POST/200.
  *  - Adds required CHEFS Form ID and Submission ID fields.
  *  - Pre-wait hook reads previous-node output + resumeUrl before delegating to Wait.
  *  - Post-resume webhook hook inspects the incoming webhook request before delegating
@@ -126,11 +143,16 @@ export class CHEFSResubmitWait extends Wait {
 
     const inheritedProperties = this.description.properties ? [...this.description.properties] : [];
 
-    // Replace the visible inherited `resume` options field with the hidden locked one.
-    const withLockedResume = inheritedProperties.map((p) => (p.name === 'resume' ? lockedResumeProperty : p));
+    // Replace selected inherited fields with hidden locked equivalents.
+    const withLockedWebhookSettings = inheritedProperties.map((p) => {
+      if (p.name === 'resume') return lockedResumeProperty;
+      if (p.name === 'httpMethod') return lockedHttpMethodProperty;
+      if (p.name === 'responseCode') return lockedResponseCodeProperty;
+      return p;
+    });
 
     // Prepend CHEFS fields above the inherited Wait properties.
-    const properties = [formIdProperty, submissionIdProperty, ...withLockedResume];
+    const properties = [formIdProperty, submissionIdProperty, ...withLockedWebhookSettings];
 
     this.description = {
       ...this.description,
