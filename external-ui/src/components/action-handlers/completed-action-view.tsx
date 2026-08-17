@@ -1,19 +1,6 @@
 import type { WilActionItem } from '../../services/backend/wil';
 import { CopyField } from '@/components/patterns/copy-field';
-
-const STATUS_BADGE_STYLES: Record<string, string> = {
-  completed: 'bg-[#dcfce7] text-[#166534]',
-  cancelled: 'bg-[#f1f5f9] text-[#475569]',
-  expired: 'bg-[#fef3c7] text-[#92400e]',
-  deleted: 'bg-[#fee2e2] text-[#991b1b]',
-};
-
-function formatStatusLabel(status: string): string {
-  return status
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
+import { ActionDetailHeader } from './action-detail-header';
 
 function formatDateTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString(undefined, {
@@ -58,8 +45,6 @@ interface CompletedActionViewProps {
 }
 
 export function CompletedActionView({ action }: Readonly<CompletedActionViewProps>) {
-  const title = action.actionTitle || formatActionTitle(action.actionType);
-  const statusStyles = STATUS_BADGE_STYLES[action.status] ?? 'bg-[#f1f5f9] text-[#475569]';
   const outputMessage = getOutputMessage(action);
 
   const startedAt = action.createdAt;
@@ -69,22 +54,7 @@ export function CompletedActionView({ action }: Readonly<CompletedActionViewProp
   return (
     <div className="flex h-full flex-col gap-4.5 rounded-card border border-[#e2e8f0] bg-surface p-6">
       {/* Header: Title + Status badge */}
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-xl font-bold text-foreground">
-            {title} &middot; #{action.id.slice(-4)}
-          </p>
-          {action.actionTitle && action.actionType !== action.actionTitle ? (
-            <p className="text-sm text-muted-foreground">{action.actionType}</p>
-          ) : null}
-        </div>
-        <span className={`shrink-0 rounded-full px-3 py-1 text-[13px] font-bold ${statusStyles}`}>
-          {formatStatusLabel(action.status)}
-        </span>
-      </div>
-
-      {/* Divider */}
-      <hr className="border-[#e2e8f0]" />
+      <ActionDetailHeader action={action} />
 
       {/* Action ID */}
       <CopyField label="Action ID" value={action.id} />
@@ -121,8 +91,4 @@ function MetadataRow({ label, value }: Readonly<{ label: string; value: string }
       <span className="min-w-0 flex-1 text-sm text-foreground">{value}</span>
     </div>
   );
-}
-
-function formatActionTitle(actionType: string): string {
-  return actionType.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 }

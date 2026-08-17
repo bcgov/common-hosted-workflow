@@ -44,7 +44,7 @@ export function ActionDetailHeader({ action }: Readonly<ActionDetailHeaderProps>
             <p className="text-sm text-muted-foreground">{action.actionType}</p>
           ) : null}
         </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs ${statusStyles}`}>
+        <span className={`shrink-0 rounded-full px-3 py-1 text-[13px] font-bold ${statusStyles}`}>
           {formatStatusLabel(action.status)}
         </span>
       </div>
