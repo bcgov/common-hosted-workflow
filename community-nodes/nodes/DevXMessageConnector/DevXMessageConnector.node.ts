@@ -205,6 +205,11 @@ export class DevXMessageConnector implements INodeType {
         ],
         description:
           'List of users to mention in the message. Each user is identified by their email address and name.',
+        displayOptions: {
+          show: {
+            type: ['template', 'text', 'html'],
+          },
+        },
       },
       {
         displayName: 'Mode',
