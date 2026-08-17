@@ -16,7 +16,7 @@ CHW runs n8n in queue mode (EXECUTIONS_MODE: queue), where execution jobs are pr
 
 ## OpenShift
 
-OpenShift uses BC Gov's object storage service (`commonservices.objectstore.gov.bc.ca`) as the S3 backend.
+OpenShift uses the SeaweedFS instance deployed in the `c89a45-tools` namespace as the S3 backend. It is the same instance used by the observability stack (Loki, Tempo, Mimir).
 
 ### Environment Variables
 
@@ -27,36 +27,29 @@ Set in `helm/main/values.yaml` under `n8n.env` and applied to both the main and 
 | `N8N_DEFAULT_BINARY_DATA_MODE`          | `s3`                                                                                                                    |
 | `N8N_EXECUTION_DATA_STORAGE_MODE`       | `s3`                                                                                                                    |
 | `N8N_AVAILABLE_BINARY_DATA_MODES`       | `filesystem,s3`                                                                                                         |
-| `N8N_EXTERNAL_STORAGE_S3_HOST`          | `commonservices.objectstore.gov.bc.ca`                                                                                  |
-| `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`      | `https`                                                                                                                 |
+| `N8N_EXTERNAL_STORAGE_S3_HOST`          | `chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333`                                                                 |
+| `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`      | `http`                                                                                                                  |
 | `N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME`   | `dev-external-storage` / `test-external-storage` / `prod-external-storage` — set per environment in the env values file |
 | `N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION` | `ca-central-1`                                                                                                          |
 
 ### Credentials
 
-Access key and secret are injected from the `chwf-s3-account` Kubernetes secret via `n8n.extraEnv` in `helm/main/values.yaml`:
+Access key and secret are injected from the `chwf-observability-s3` Kubernetes secret via `n8n.extraEnv` in `helm/main/values.yaml`:
 
 ```yaml
 N8N_EXTERNAL_STORAGE_S3_ACCESS_KEY:
   valueFrom:
     secretKeyRef:
-      name: chwf-s3-account
-      key: access-key
+      name: chwf-observability-s3
+      key: AWS_ACCESS_KEY_ID
 N8N_EXTERNAL_STORAGE_S3_ACCESS_SECRET:
   valueFrom:
     secretKeyRef:
-      name: chwf-s3-account
-      key: secret-key
+      name: chwf-observability-s3
+      key: AWS_SECRET_ACCESS_KEY
 ```
 
-The `chwf-s3-account` secret must exist in the namespace before deploying. Obtain credentials for the appropriate environment bucket and create the secret:
-
-```
-oc create secret generic chwf-s3-account \
-  --from-literal=access-key=<key> \
-  --from-literal=secret-key=<secret> \
-  -n <namespace>
-```
+The `chwf-observability-s3` secret is the same secret used by the observability stack (Loki, Tempo, Mimir) and must exist in the namespace before deploying.
 
 ### Non-Standard Ports
 
