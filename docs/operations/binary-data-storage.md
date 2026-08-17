@@ -1,6 +1,6 @@
 # n8n Binary Data Storage
 
-n8n nodes that process files — HTTP downloads, PDF generators, email attachments, S3 downloads — produce **binary data** that must be stored somewhere between nodes and across the workflow execution lifetime. This document describes how binary data storage is configured in Common Hosted Workflow and what operators need to know.
+n8n workflows can produce and consume binary data when processing files such as documents, images, PDFs, email attachments, and files downloaded from external services. This binary data must be stored somewhere between nodes and across the workflow execution lifetime. This document describes how binary data storage is configured in Common Hosted Workflow and what operators need to know.
 
 > **Note:** This document applies to the n8n version currently deployed by CHW. Binary data storage behavior and configuration can change between n8n releases. Review the n8n documentation when upgrading.
 
@@ -10,7 +10,7 @@ n8n nodes that process files — HTTP downloads, PDF generators, email attachmen
 
 n8n supports multiple binary data modes, including `default` (in-memory), `filesystem` (pod local disk), `database`, and `s3` (external object storage).
 
-CHW runs n8n in queue mode (`EXECUTIONS_MODE: queue`). In queue mode, all execution work is handled by worker pods. When a workflow processes a file, that binary data must be accessible to any worker that handles a subsequent step — which may run on a different pod. Filesystem mode fails because workers do not share a filesystem. S3 mode solves this by storing binary data in a shared external bucket that every pod can reach.
+CHW runs n8n in queue mode (EXECUTIONS_MODE: queue), where execution jobs are processed by worker pods. Because worker pods have separate local filesystems, binary data stored only on a pod's local filesystem cannot be reliably shared when subsequent execution work runs on another pod. S3 provides shared external storage so binary data can be accessed by the different n8n instances processing the execution.
 
 ---
 
@@ -48,7 +48,7 @@ N8N_EXTERNAL_STORAGE_S3_ACCESS_SECRET:
       key: secret-key
 ```
 
-The `chwf-s3-account` secret must exist in the namespace before deploying. Obtain credentials from the platform team for the appropriate environment bucket and create the secret:
+The `chwf-s3-account` secret must exist in the namespace before deploying. Obtain credentials for the appropriate environment bucket and create the secret:
 
 ```
 oc create secret generic chwf-s3-account \
