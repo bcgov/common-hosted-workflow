@@ -33,6 +33,7 @@ export async function ensurePersonalProjectTenantMapping(params: {
   await tenantProjectRelationRepository.insertIgnoreConflict({
     tenantId,
     projectId: personalProject.id,
+    projectType: 'personal',
   });
 
   log.info('Assigned tenant to personal project', {
