@@ -1,12 +1,18 @@
+import { forwardRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getWilTenants, type WilTenantItem } from '../../services/backend/wil';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 
 interface TenantSelectorProps {
   tenantId: string;
   onTenantChange: (tenant: WilTenantItem | null) => void;
 }
 
-export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSelectorProps>) {
+export const TenantSelector = forwardRef<HTMLSelectElement, Readonly<TenantSelectorProps>>(function TenantSelector(
+  { tenantId, onTenantChange },
+  ref,
+) {
   const tenantsQuery = useQuery({
     queryKey: ['wil-tenants'],
     queryFn: ({ signal }) => getWilTenants(signal),
@@ -20,16 +26,17 @@ export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSele
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor="tenant-select" className="text-sm font-medium text-[var(--bc-text)] whitespace-nowrap">
-        Tenant:
-      </label>
-      <select
+    <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+      <Label htmlFor="tenant-select" className="whitespace-nowrap">
+        Tenant
+      </Label>
+      <Select
+        ref={ref}
         id="tenant-select"
         value={tenantId}
         onChange={(e) => handleChange(e.target.value)}
         disabled={tenantsQuery.isLoading}
-        className="h-9 min-w-48 rounded-md border border-[var(--bc-border)] bg-white px-3 text-sm text-[var(--bc-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bc-blue)]"
+        className="min-w-[260px]"
       >
         <option value="">{tenantsQuery.isLoading ? 'Loading tenants...' : 'Select a tenant'}</option>
         {tenants.map((tenant) => (
@@ -37,7 +44,7 @@ export function TenantSelector({ tenantId, onTenantChange }: Readonly<TenantSele
             {tenant.name}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
-}
+});

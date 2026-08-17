@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from '../src/app';
@@ -221,17 +222,21 @@ describe('Session-driven navigation/gating', () => {
       expect(screen.queryByText('Review Requests')).not.toBeInTheDocument();
     });
 
-    it('shows login button when not authenticated', () => {
+    it('shows sign in button and accessible shell when not authenticated', () => {
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      expect(screen.getByText('Login')).toBeInTheDocument();
+      const signInButtons = screen.getAllByRole('button', { name: /sign in/i });
+      expect(signInButtons.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main-content');
+      expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+      expect(screen.getByRole('navigation', { name: 'Legal' })).toBeInTheDocument();
     });
 
-    it('shows logout button when authenticated', () => {
+    it('shows log out button when authenticated', () => {
       sessionState.session = {
         user: { subject: 'sub-1', email: 'user@example.com' },
         oidc: null,
@@ -256,8 +261,83 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByText('Logout')).toBeInTheDocument();
-      expect(screen.queryByText('Login')).not.toBeInTheDocument();
+      const logoutButton = screen.getByRole('button', { name: 'Log out' });
+      expect(logoutButton).toHaveTextContent('Log out');
+      expect(logoutButton.querySelector('svg')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    });
+
+    it('marks the current page and exposes its active visual treatment', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      const homeLink = screen.getByRole('link', { name: 'Home' });
+      expect(homeLink).toHaveAttribute('aria-current', 'page');
+      expect(homeLink).toHaveClass('bg-white/15', 'font-bold', 'after:left-0', 'after:right-0');
+      expect(homeLink).not.toHaveClass('hover:underline');
+    });
+
+    it('left-aligns a single desktop item', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('xl:ml-20', 'xl:justify-start');
+    });
+
+    it('adds the hover underline treatment only to inactive links', () => {
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: false,
+          role: null,
+        },
+        permissions: {
+          isAdmin: false,
+          canRequestAccess: true,
+          canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
+        },
+      };
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('link', { name: 'Access Request' })).toHaveClass(
+        'hover:underline',
+        'hover:decoration-2',
+        'hover:decoration-white/70',
+      );
+    });
+
+    it('opens and closes the responsive main menu', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      const menuButton = screen.getByRole('button', { name: 'Open main menu' });
+      expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(menuButton);
+      expect(screen.getByRole('button', { name: 'Close main menu' })).toHaveAttribute('aria-expanded', 'true');
+
+      await user.keyboard('{Escape}');
+      expect(screen.getByRole('button', { name: 'Open main menu' })).toHaveAttribute('aria-expanded', 'false');
     });
   });
 });
