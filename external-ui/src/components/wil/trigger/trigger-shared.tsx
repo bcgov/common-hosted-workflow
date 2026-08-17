@@ -29,7 +29,7 @@ export function Select({ id, value, onChange, children, disabled }: Readonly<Sel
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="flex h-10 w-full rounded-md border border-[var(--bc-border)] bg-white px-3 py-2 text-sm text-[var(--bc-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bc-blue)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+      className="flex h-11 w-full rounded-lg border-[1.5px] border-[#c6c5c3] bg-white px-3.5 py-2.5 text-sm text-[#2d2d2d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#013366] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#f3f2f1] disabled:text-[#9f9d9c] appearance-none"
       style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a6475' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
         backgroundRepeat: 'no-repeat',
@@ -47,9 +47,9 @@ export function Select({ id, value, onChange, children, disabled }: Readonly<Sel
 export function ActorIdBanner({ method }: Readonly<{ method: TriggerMethod }>) {
   const detail = method === 'POST' ? 'added as actorId field in the JSON body' : 'added as actorId query parameter';
   return (
-    <div className="flex items-start gap-2 rounded-md border border-[var(--bc-border)] bg-[var(--bc-surface)] px-3 py-2.5">
-      <IconInfoCircle size={15} className="mt-0.5 shrink-0 text-[var(--bc-blue)]" aria-hidden="true" />
-      <p className="text-xs text-[var(--bc-muted)]">Actor ID will be included in the request — {detail}.</p>
+    <div className="flex items-start gap-2.5 rounded-lg border border-[#91c4fa] bg-[#f1f8fe] px-3.5 py-3">
+      <IconInfoCircle size={18} className="mt-0.5 shrink-0 text-[#255a90]" aria-hidden="true" />
+      <p className="text-[13px] text-[#474543]">Actor ID will be included in the request — {detail}.</p>
     </div>
   );
 }
@@ -195,12 +195,22 @@ export function TriggerFormActions({
   isValid,
 }: Readonly<{ onSave: () => void; onCancel: () => void; isSaving: boolean; isValid: boolean }>) {
   return (
-    <div className="flex justify-end gap-2 pt-2">
-      <Button type="button" variant="outline" onClick={onCancel}>
+    <div className="flex justify-end gap-3 pt-2">
+      <Button
+        type="button"
+        variant="outline"
+        className="border-[#013366] text-[#013366] hover:bg-[#013366]/5"
+        onClick={onCancel}
+      >
         <IconX size={16} aria-hidden="true" />
         Cancel
       </Button>
-      <Button type="button" onClick={onSave} disabled={!isValid || isSaving}>
+      <Button
+        type="button"
+        className="bg-[#013366] text-white hover:bg-[#013366]/90"
+        onClick={onSave}
+        disabled={!isValid || isSaving}
+      >
         <IconDeviceFloppy size={16} aria-hidden="true" />
         {isSaving ? 'Saving...' : 'Save Trigger'}
       </Button>
