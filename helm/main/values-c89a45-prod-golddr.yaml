@@ -20,6 +20,7 @@ n8n:
     CSTAR_BASE_URL: https://connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     AUTHZ_ENVIRONMENT: prod
+    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "prod-external-storage"
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"
