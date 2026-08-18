@@ -260,16 +260,19 @@ function WorkflowCard({
         {/* Shared access */}
         <div className="w-full">
           <p className="text-sm font-bold text-foreground">Shared access</p>
-          <div className="flex gap-4 pt-3 pb-2.5 text-[0.8125rem] text-muted-foreground">
+
+          {/* Desktop header row */}
+          <div className="hidden gap-4 pt-3 pb-2.5 text-[0.8125rem] text-muted-foreground sm:flex">
             <span className="w-[280px] shrink-0">Project</span>
             <span className="min-w-0 flex-1">User email</span>
             <span className="w-[120px] shrink-0 text-right sm:w-[300px]">Action</span>
           </div>
-          <div className="border-t border-[#e2e8f0]" />
+          <div className="hidden border-t border-[#e2e8f0] sm:block" />
 
           {workflow.projectShares.map((projectShare) => (
             <div key={projectShare.projectId}>
-              <div className="flex items-center gap-4 border-b border-[#f1f5f9] py-3.5">
+              {/* Desktop row */}
+              <div className="hidden items-center gap-4 border-b border-[#f1f5f9] py-3.5 sm:flex">
                 <span className="w-[280px] shrink-0 truncate text-[0.8125rem] text-muted-foreground">
                   {projectShare.projectId}
                 </span>
@@ -300,6 +303,44 @@ function WorkflowCard({
                     </Button>
                   ) : null}
                 </div>
+              </div>
+
+              {/* Mobile stacked layout */}
+              <div className="flex flex-col gap-2 border-b border-[#f1f5f9] py-3.5 sm:hidden">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">Project</span>
+                  <p className="mt-0.5 truncate text-[0.8125rem] text-foreground">{projectShare.projectId}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">User email</span>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {projectShare.userEmails.length > 0 ? (
+                      projectShare.userEmails.map((email) => (
+                        <span
+                          key={email}
+                          className="inline-flex items-center rounded-control border-[1.5px] border-[#cbd5e1] bg-white px-2.5 py-[5px] text-[0.8125rem] text-[#334155]"
+                        >
+                          {email}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No users</span>
+                    )}
+                  </div>
+                </div>
+                {canUnshare && canRemoveProjects ? (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-[1.5px] border-[#dc2626] px-3.5 py-[7px] text-[0.8125rem] text-[#dc2626] hover:bg-danger-surface"
+                      onClick={() => setConfirmProjectId(projectShare.projectId)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               {confirmProjectId === projectShare.projectId ? (
