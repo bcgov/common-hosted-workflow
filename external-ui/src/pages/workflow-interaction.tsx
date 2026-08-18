@@ -134,8 +134,8 @@ export function WorkflowInteraction() {
       <div className="space-y-5">
         <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} counts={countsQuery.data?.counts} />
         <hr className="border-border mt-4" />
-        <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-card border border-border bg-surface shadow-card overflow-hidden">
-          <div className="overflow-y-auto border-r border-border p-4">
+        <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 rounded-card border border-border bg-surface shadow-card">
+          <div className="overflow-y-auto border-r border-border p-4 max-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height)-280px)]">
             <ActionsTab
               tenantId={tenantId}
               since={sinceDate}
@@ -146,7 +146,7 @@ export function WorkflowInteraction() {
               onSelectAction={setSelectedAction}
             />
           </div>
-          <div className="p-6 overflow-y-auto bg-surface-subtle">
+          <div className="p-6">
             <ActionDetailPane
               action={selectedAction}
               tenantId={tenantId}
@@ -178,7 +178,7 @@ export function WorkflowInteraction() {
 
   if (!user) {
     return (
-      <div className="min-h-full bg-surface-muted">
+      <div className="min-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height))] bg-surface-muted">
         <PageContainer>
           <div className="space-y-6">
             <PageHeader
@@ -193,7 +193,7 @@ export function WorkflowInteraction() {
   }
 
   return (
-    <div className="min-h-full bg-surface-muted">
+    <div className="min-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height))] bg-surface-muted">
       <PageContainer>
         <div className="space-y-6">
           <PageHeader
