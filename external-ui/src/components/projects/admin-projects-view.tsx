@@ -215,7 +215,7 @@ export function AdminProjectsView() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value as ProjectTypeFilter)}
-          className="h-10 rounded-control border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--bc-blue)]"
+          className="h-10 rounded-control border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-border-strong"
           aria-label="Filter by project type"
         >
           <option value="all">All types</option>
