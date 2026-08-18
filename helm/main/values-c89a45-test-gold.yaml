@@ -17,7 +17,7 @@ n8n:
     CSTAR_BASE_URL: https://test.connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     AUTHZ_ENVIRONMENT: test
-    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "test-external-storage"
+    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-test"
 
   route:
     enabled: true

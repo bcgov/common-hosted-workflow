@@ -16,49 +16,39 @@ CHW runs n8n in queue mode (EXECUTIONS_MODE: queue), where execution jobs are pr
 
 ## OpenShift
 
-OpenShift uses the SeaweedFS instance deployed in the `c89a45-tools` namespace as the S3 backend. It is the same instance used by the observability stack (Loki, Tempo, Mimir).
+OpenShift uses the BC Gov OCIO object store (`commonservices.objectstore.gov.bc.ca`) as the S3 backend.
 
 ### Environment Variables
 
 Set in `helm/main/values.yaml` under `n8n.env` and applied to both the main and worker deployments automatically by the Helm chart:
 
-| Variable                                | Value                                                                                                                   |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `N8N_DEFAULT_BINARY_DATA_MODE`          | `s3`                                                                                                                    |
-| `N8N_EXECUTION_DATA_STORAGE_MODE`       | `s3`                                                                                                                    |
-| `N8N_AVAILABLE_BINARY_DATA_MODES`       | `filesystem,s3`                                                                                                         |
-| `N8N_EXTERNAL_STORAGE_S3_HOST`          | `chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333`                                                                 |
-| `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`      | `http`                                                                                                                  |
-| `N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME`   | `dev-external-storage` / `test-external-storage` / `prod-external-storage` — set per environment in the env values file |
-| `N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION` | `ca-central-1`                                                                                                          |
+| Variable                                | Value                                                                                           |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `N8N_DEFAULT_BINARY_DATA_MODE`          | `s3`                                                                                            |
+| `N8N_EXECUTION_DATA_STORAGE_MODE`       | `s3`                                                                                            |
+| `N8N_EXTERNAL_STORAGE_S3_HOST`          | `commonservices.objectstore.gov.bc.ca`                                                          |
+| `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`      | `https`                                                                                         |
+| `N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME`   | `workflow-dev` / `workflow-test` / `workflow-prod` — set per environment in the env values file |
+| `N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION` | `ca-central-1`                                                                                  |
 
 ### Credentials
 
-Access key and secret are injected from the `chwf-observability-s3` Kubernetes secret via `n8n.extraEnv` in `helm/main/values.yaml`:
+Access key and secret are injected from the `chwf-s3-account` Kubernetes secret via `n8n.extraEnv` in `helm/main/values.yaml`:
 
 ```yaml
 N8N_EXTERNAL_STORAGE_S3_ACCESS_KEY:
   valueFrom:
     secretKeyRef:
-      name: chwf-observability-s3
-      key: AWS_ACCESS_KEY_ID
+      name: chwf-s3-account
+      key: access-key
 N8N_EXTERNAL_STORAGE_S3_ACCESS_SECRET:
   valueFrom:
     secretKeyRef:
-      name: chwf-observability-s3
-      key: AWS_SECRET_ACCESS_KEY
+      name: chwf-s3-account
+      key: secret-key
 ```
 
-The `chwf-observability-s3` secret is the same secret used by the observability stack (Loki, Tempo, Mimir) and must exist in the namespace before deploying.
-
-### Non-Standard Ports
-
-For S3-compatible endpoints using a non-standard port, include the port in `N8N_EXTERNAL_STORAGE_S3_HOST` and set the protocol separately with `N8N_EXTERNAL_STORAGE_S3_PROTOCOL`. For example:
-
-```
-N8N_EXTERNAL_STORAGE_S3_HOST: "s3.example.internal:8333"
-N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "http"
-```
+The `chwf-s3-account` secret must exist in the namespace and contain credentials with read/write access to the n8n S3 bucket before deploying.
 
 ---
 
