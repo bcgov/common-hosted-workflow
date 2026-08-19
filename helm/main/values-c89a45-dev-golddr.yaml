@@ -18,6 +18,7 @@ n8n:
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
     AUTHZ_ENVIRONMENT: dev
     N8N_LICENSE_AUTO_RENEW_ENABLED: "true"
+    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-dev"
 
   extraExcludedNodes:
     - "n8n-nodes-base.scheduleTrigger"

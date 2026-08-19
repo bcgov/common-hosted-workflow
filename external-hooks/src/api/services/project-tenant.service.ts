@@ -82,7 +82,8 @@ export class ProjectTenantService {
       }
     }
 
-    await this.customRepositories.tenantProjectRelation.upsertByProjectId({ tenantId, projectId });
+    const projectType = project.type === 'personal' ? 'personal' : 'team';
+    await this.customRepositories.tenantProjectRelation.upsertByProjectId({ tenantId, projectId, projectType });
   }
 
   /**

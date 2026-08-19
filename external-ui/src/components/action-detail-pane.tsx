@@ -3,6 +3,7 @@ import { GetApprovalHandler } from './action-handlers/get-approval-handler';
 import { ShowFormHandler } from './action-handlers/show-form-handler';
 import { WaitOnEventHandler } from './action-handlers/wait-on-event-handler';
 import { CompletedActionView } from './action-handlers/completed-action-view';
+import { ActionDetailHeader } from './action-handlers/action-detail-header';
 import { ClaimGate } from './action-handlers/claim-gate';
 import { Badge } from '@/components/ui/badge';
 import { IconAlertTriangle } from '@tabler/icons-react';
@@ -77,15 +78,18 @@ export function ActionDetailPane({
   const handler = renderActionHandler(action, tenantId, onInteractionSuccess, handleRefresh);
 
   return (
-    <ClaimGate
-      action={action}
-      tenantId={tenantId}
-      userEmail={userEmail}
-      onInteractionSuccess={onInteractionSuccess}
-      onActionUpdated={onActionUpdated}
-    >
-      {handler}
-    </ClaimGate>
+    <div className="flex h-full flex-col gap-4.5 rounded-card border border-[#e2e8f0] bg-surface p-6">
+      <ActionDetailHeader action={action} />
+      <ClaimGate
+        action={action}
+        tenantId={tenantId}
+        userEmail={userEmail}
+        onInteractionSuccess={onInteractionSuccess}
+        onActionUpdated={onActionUpdated}
+      >
+        {handler}
+      </ClaimGate>
+    </div>
   );
 }
 

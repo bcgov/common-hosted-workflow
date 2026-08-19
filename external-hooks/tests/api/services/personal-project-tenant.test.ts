@@ -22,6 +22,7 @@ describe('ensurePersonalProjectTenantMapping', () => {
     expect(tenantProjectRelationRepository.insertIgnoreConflict).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: 'project-1',
+        projectType: 'personal',
         tenantId: expect.any(String),
       }),
     );

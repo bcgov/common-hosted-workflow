@@ -16,7 +16,7 @@ seaweedfs:
 
   master:
     replicas: 1
-    volumeSizeLimitMB: 100
+    volumeSizeLimitMB: 50
     data:
       type: persistentVolumeClaim
       size: 512Mi
@@ -40,7 +40,7 @@ seaweedfs:
     dataDirs:
       - name: data1
         type: persistentVolumeClaim
-        size: 1Gi
+        size: 2Gi
         storageClass: netapp-block-standard
         maxVolumes: 0
     logs:

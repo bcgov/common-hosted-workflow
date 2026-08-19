@@ -20,6 +20,7 @@ n8n:
     CSTAR_BASE_URL: https://connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     AUTHZ_ENVIRONMENT: prod
+    N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-prod"
 
   route:
     enabled: true
@@ -71,6 +72,8 @@ loki:
         ruler: prod-loki-ruler
       s3:
         endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
+    limits_config:
+      retention_period: 2160h  # 90 days
   singleBinary:
     resources:
       requests:
@@ -87,6 +90,7 @@ loki:
 tempo:
   enabled: false
   tempo:
+    retention: 2160h  # 90 days
     storage:
       trace:
         s3:

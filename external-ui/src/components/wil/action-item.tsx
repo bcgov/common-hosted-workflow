@@ -1,46 +1,36 @@
 import type { WilActionItem } from '../../services/backend/wil';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { IconClock, IconPlayerPlay, IconAlertTriangle, IconHandGrab } from '@tabler/icons-react';
 
-function ActionStatusBadge({ status }: Readonly<{ status: WilActionItem['status'] }>) {
-  switch (status) {
-    case 'pending':
-      return (
-        <Badge variant="secondary" className="gap-1">
-          <IconClock size={12} aria-hidden="true" />
-          Status: Pending
-        </Badge>
-      );
-    case 'claimed':
-      return (
-        <Badge className="gap-1 bg-amber-100 text-amber-800 border-amber-200">
-          <IconHandGrab size={12} aria-hidden="true" />
-          Status: Claimed
-        </Badge>
-      );
-    case 'in_progress':
-      return (
-        <Badge className="gap-1 bg-[var(--bc-blue)] text-white">
-          <IconPlayerPlay size={12} aria-hidden="true" />
-          Status: In Progress
-        </Badge>
-      );
-    default:
-      return <Badge variant="outline">Status: {status}</Badge>;
-  }
+const STATUS_BADGE_STYLES: Record<string, string> = {
+  completed: 'bg-[#dcfce7] text-[#166534]',
+  pending: 'bg-[#fef9c3] text-[#854d0e]',
+  claimed: 'bg-[#fef3c7] text-[#92400e]',
+  in_progress: 'bg-[#dbeafe] text-[#1e40af]',
+  cancelled: 'bg-[#f1f5f9] text-[#475569]',
+  expired: 'bg-[#f1f5f9] text-[#475569]',
+  deleted: 'bg-[#fee2e2] text-[#991b1b]',
+};
+
+const PRIORITY_BADGE_STYLES: Record<string, string> = {
+  normal: 'bg-[#f1f5f9] text-[#475569]',
+  critical: 'bg-[#fee2e2] text-[#991b1b]',
+};
+
+function formatStatusLabel(status: string): string {
+  return status
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
-function ActionPriorityBadge({ priority }: Readonly<{ priority: WilActionItem['priority'] }>) {
-  if (priority === 'critical') {
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <IconAlertTriangle size={12} aria-hidden="true" />
-        Priority: Critical
-      </Badge>
-    );
-  }
-  return <Badge variant="secondary">Priority: Normal</Badge>;
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function formatActorId(actorId: string): string {
+  // Strip domain part if it's an email
+  const atIndex = actorId.indexOf('@');
+  return atIndex > 0 ? actorId.slice(0, atIndex) : actorId;
 }
 
 interface ActionItemProps {
@@ -51,22 +41,43 @@ interface ActionItemProps {
 
 export function ActionItem({ action, isSelected, onClick }: Readonly<ActionItemProps>) {
   const title = action.actionTitle || action.actionType;
+  const statusStyles = STATUS_BADGE_STYLES[action.status] ?? 'bg-[#f1f5f9] text-[#475569]';
+  const priorityStyles = PRIORITY_BADGE_STYLES[action.priority] ?? PRIORITY_BADGE_STYLES.normal;
+  const priorityLabel = action.priority === 'critical' ? 'Critical' : 'Normal';
 
   return (
-    <Card
-      className={`cursor-pointer transition-all duration-150 shadow-sm ${isSelected ? 'ring-2 ring-[var(--bc-blue)] border-[var(--bc-blue)]' : 'hover:border-[var(--bc-blue)]/50 hover:shadow-md'}`}
+    <button
+      type="button"
+      className={`w-full cursor-pointer rounded-lg border px-3.5 py-3 text-left transition-colors ${
+        isSelected
+          ? 'border-[1.5px] border-primary bg-[#f5f8fc]'
+          : 'border-[#e2e8f0] bg-surface hover:border-primary/40'
+      }`}
       onClick={onClick}
+      aria-pressed={isSelected}
     >
-      <CardContent className="space-y-3 p-4">
-        <div className="min-w-0 space-y-1.5">
-          <p className="text-sm font-semibold leading-snug text-[var(--bc-text)] break-words">{title}</p>
-          <p className="text-xs text-[var(--bc-muted)]">{new Date(action.createdAt).toLocaleString()}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ActionPriorityBadge priority={action.priority} />
-          <ActionStatusBadge status={action.status} />
-        </div>
-      </CardContent>
-    </Card>
+      {/* Row 1: Title + Status badge */}
+      <div className="flex items-center gap-2">
+        <p className="min-w-0 flex-1 truncate text-sm font-bold text-foreground">
+          {title} &middot; #{action.id.slice(-4)}
+        </p>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs ${statusStyles}`}>
+          {formatStatusLabel(action.status)}
+        </span>
+      </div>
+
+      {/* Row 2: Description / workflow name */}
+      {action.actionTitle && action.actionType !== action.actionTitle ? (
+        <p className="mt-1.5 text-[13px] text-[#334155]">{action.actionType}</p>
+      ) : null}
+
+      {/* Row 3: Actor · Time + Priority badge */}
+      <div className="mt-1.5 flex items-center gap-2">
+        <p className="min-w-0 flex-1 truncate text-xs text-[#94a3b8]">
+          {formatActorId(action.actorId)} &middot; {formatTime(action.createdAt)}
+        </p>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs ${priorityStyles}`}>{priorityLabel}</span>
+      </div>
+    </button>
   );
 }

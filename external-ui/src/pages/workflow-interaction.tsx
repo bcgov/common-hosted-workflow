@@ -1,15 +1,17 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { IconChevronDown, IconArrowsShuffle2 } from '@tabler/icons-react';
 import { login } from '../auth/session-actions';
 import type { WilActionItem, WilTenantItem } from '../services/backend/wil';
 import { getWilActionCounts } from '../services/backend/wil';
 import { useAuthUser } from '../state/session';
 import { isPersonalTenant } from '../lib/tenant';
-import { IconLogin2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ActionDetailPane } from '@/components/action-detail-pane';
+import { PageContainer } from '@/components/layout/page-container';
+import { PageHeader } from '@/components/patterns/page-header';
+import { EmptyState } from '@/components/patterns/empty-state';
+import { SignedOutView } from '@/components/patterns/signed-out-view';
 import {
   TenantSelector,
   DateFilter,
@@ -27,6 +29,7 @@ const ACTION_LIST_REFRESH_DELAY_MS = 1500;
 export function WorkflowInteraction() {
   const user = useAuthUser();
   const queryClient = useQueryClient();
+  const tenantSelectRef = useRef<HTMLSelectElement>(null);
 
   const [selectedTenant, setSelectedTenant] = useState<WilTenantItem | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('actions');
@@ -77,14 +80,19 @@ export function WorkflowInteraction() {
     setSelectedAction(null);
   }
 
+  function handleChooseTenant() {
+    tenantSelectRef.current?.focus();
+    tenantSelectRef.current?.click();
+  }
+
   function renderTabContent() {
     if (activeTab === 'actions') {
       return (
         <div className="space-y-5">
           <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} counts={countsQuery.data?.counts} />
-          <hr className="border-[var(--bc-border)] mt-4" />
-          <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
-            <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4">
+          <hr className="border-border mt-4" />
+          <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-card border border-border bg-surface shadow-card overflow-hidden">
+            <div className="overflow-y-auto border-r border-border p-4">
               <ActionsTab
                 tenantId={tenantId}
                 since={sinceDate}
@@ -95,7 +103,7 @@ export function WorkflowInteraction() {
                 onSelectAction={setSelectedAction}
               />
             </div>
-            <div className="p-6 overflow-y-auto bg-[var(--bc-surface,#f8fafc)]">
+            <div className="p-6 overflow-y-auto bg-surface-subtle">
               <ActionDetailPane
                 action={selectedAction}
                 tenantId={tenantId}
@@ -113,54 +121,59 @@ export function WorkflowInteraction() {
     return <MessagesTab tenantId={tenantId} since={sinceDate} cursor={messagesCursor} onLoadMore={setMessagesCursor} />;
   }
 
-  return (
-    <div className="mx-auto max-w-7xl px-6 py-10 lg:py-12">
-      <section className="max-w-6xl space-y-6">
-        <div className="space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-[var(--bc-text)] lg:text-4xl">
-            Workflow Interaction
-          </h1>
-          <p className="max-w-4xl text-base text-[var(--bc-muted)]">
-            View your assigned workflow actions and messages for a selected tenant.
-          </p>
-        </div>
-
-        {user ? (
+  if (!user) {
+    return (
+      <div className="min-h-full bg-surface-muted">
+        <PageContainer>
           <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-4">
-              <TenantSelector tenantId={tenantId} onTenantChange={handleTenantChange} />
-              <DateFilter selected={dateFilter} onChange={handleDateFilterChange} />
-            </div>
-
-            {tenantId ? (
-              <div className="space-y-4">
-                <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
-
-                {renderTabContent()}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="p-6 text-sm text-[var(--bc-muted)]">
-                  Select a tenant above to view your actions and messages.
-                </CardContent>
-              </Card>
-            )}
+            <PageHeader
+              title="Workflow Interaction"
+              description="View and respond to workflow actions and messages assigned to your account for a selected tenant."
+            />
+            <SignedOutView onSignIn={login} />
           </div>
-        ) : (
-          <Alert>
-            <AlertTitle>Sign in required</AlertTitle>
-            <AlertDescription>
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <p className="text-sm text-[var(--bc-muted)]">Sign in to view your workflow interactions.</p>
-                <Button onClick={login}>
-                  <IconLogin2 size={16} aria-hidden="true" />
-                  Sign In
+        </PageContainer>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-full bg-surface-muted">
+      <PageContainer>
+        <div className="space-y-6">
+          <PageHeader
+            title="Workflow Interaction"
+            description="View and respond to workflow actions and messages assigned to your account for a selected tenant."
+          />
+
+          {/* Filter bar */}
+          <div className="flex flex-wrap items-center gap-6 rounded-card border border-[#e2e8f0] bg-surface px-5 py-4">
+            <TenantSelector tenantId={tenantId} onTenantChange={handleTenantChange} ref={tenantSelectRef} />
+            <div className="hidden h-8 w-px bg-[#e2e8f0] sm:block" aria-hidden="true" />
+            <DateFilter selected={dateFilter} onChange={handleDateFilterChange} />
+          </div>
+
+          {tenantId ? (
+            <div className="space-y-4">
+              <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+              {renderTabContent()}
+            </div>
+          ) : (
+            <EmptyState
+              className="border-[#e2e8f0]"
+              icon={<IconArrowsShuffle2 size={28} aria-hidden="true" />}
+              title="Select a tenant to view workflow actions"
+              description="Once you choose a tenant, the pending actions and messages assigned to your account appear here. Use the Status filter to narrow the list."
+              action={
+                <Button onClick={handleChooseTenant}>
+                  Choose tenant
+                  <IconChevronDown size={14} aria-hidden="true" className="ml-1" />
                 </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-      </section>
+              }
+            />
+          )}
+        </div>
+      </PageContainer>
     </div>
   );
 }
