@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, or, ilike } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
@@ -60,6 +60,12 @@ function buildStatusFilter(status?: string): SQL[] {
   return [eq(accessRequest.status, status)];
 }
 
+function buildSearchFilter(search?: string): SQL[] {
+  if (!search) return [];
+  const pattern = `%${search}%`;
+  return [or(ilike(accessRequest.requesterEmail, pattern), ilike(accessRequest.justification, pattern))!];
+}
+
 function isUniqueViolation(error: unknown): error is { code: string } {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505';
 }
@@ -104,11 +110,12 @@ export class AccessRequestService {
 
   async listAccessRequests(params: {
     status?: string;
+    search?: string;
     limit?: number;
     offset?: number;
   }): Promise<AccessRequestListResult> {
-    const { status, limit = 50, offset = 0 } = params;
-    const where = buildStatusFilter(status);
+    const { status, search, limit = 50, offset = 0 } = params;
+    const where = [...buildStatusFilter(status), ...buildSearchFilter(search)];
 
     const [items, total] = await Promise.all([
       this.customRepositories.accessRequest.list({ where, limit, offset }),

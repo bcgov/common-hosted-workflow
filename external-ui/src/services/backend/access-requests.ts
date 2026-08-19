@@ -44,12 +44,13 @@ export function getMyAccessRequest(params?: { signal?: AbortSignal }) {
 }
 
 export function listAccessRequests(
-  query?: { status?: string; limit?: number; offset?: number },
+  query?: { status?: string; search?: string; limit?: number; offset?: number },
   params?: { signal?: AbortSignal },
 ) {
+  const { status, search, ...rest } = query ?? {};
   return instance
     .get<ListAccessRequestsResponse>('/ui-api/access-requests', {
-      params: query,
+      params: { ...rest, ...(status ? { status } : {}), ...(search ? { search } : {}) },
       signal: params?.signal,
     })
     .then((res) => res.data);

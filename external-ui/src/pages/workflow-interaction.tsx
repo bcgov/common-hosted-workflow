@@ -12,6 +12,7 @@ import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/patterns/page-header';
 import { EmptyState } from '@/components/patterns/empty-state';
 import { SignedOutView } from '@/components/patterns/signed-out-view';
+import { MobileDetailView } from '@/components/wil/mobile-detail-view';
 import {
   TenantSelector,
   DateFilter,
@@ -23,6 +24,7 @@ import {
   TriggersTab,
 } from '@/components/wil';
 import type { Tab } from '@/components/wil';
+import { useIsMobile } from '../hooks/use-is-mobile';
 
 const ACTION_LIST_REFRESH_DELAY_MS = 1500;
 
@@ -30,13 +32,12 @@ export function WorkflowInteraction() {
   const user = useAuthUser();
   const queryClient = useQueryClient();
   const tenantSelectRef = useRef<HTMLSelectElement>(null);
+  const isMobile = useIsMobile();
 
   const [selectedTenant, setSelectedTenant] = useState<WilTenantItem | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [actionsCursor, setActionsCursor] = useState<string | null>(null);
-  const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<WilActionItem | null>(null);
 
   const tenantId = selectedTenant?.id ?? '';
@@ -58,21 +59,16 @@ export function WorkflowInteraction() {
 
   function handleTenantChange(tenant: WilTenantItem | null) {
     setSelectedTenant(tenant);
-    setActionsCursor(null);
-    setMessagesCursor(null);
     setSelectedAction(null);
   }
 
   function handleDateFilterChange(value: string | undefined) {
     setDateFilter(value);
-    setActionsCursor(null);
-    setMessagesCursor(null);
   }
 
   function handleStatusFilterChange(statuses: string[]) {
     setStatusFilter(statuses);
     setSelectedAction(null);
-    setActionsCursor(null);
   }
 
   function handleTabChange(tab: Tab) {
@@ -85,45 +81,93 @@ export function WorkflowInteraction() {
     tenantSelectRef.current?.click();
   }
 
-  function renderTabContent() {
-    if (activeTab === 'actions') {
+  function handleBackFromDetail() {
+    setSelectedAction(null);
+  }
+
+  // --- Mobile: show full-screen detail view when an action is selected ---
+  if (isMobile && selectedAction && activeTab === 'actions') {
+    const detailTitle = selectedAction.actionTitle || selectedAction.actionType;
+    return (
+      <div className="flex min-h-full flex-col bg-surface-muted">
+        <MobileDetailView title={detailTitle} onBack={handleBackFromDetail}>
+          <ActionDetailPane
+            action={selectedAction}
+            tenantId={tenantId}
+            onInteractionSuccess={onInteractionSuccess}
+            onActionUpdated={setSelectedAction}
+          />
+        </MobileDetailView>
+      </div>
+    );
+  }
+
+  function renderActionsContent() {
+    if (isMobile) {
+      // Mobile: single-column card list
       return (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} counts={countsQuery.data?.counts} />
-          <hr className="border-border mt-4" />
-          <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-card border border-border bg-surface shadow-card overflow-hidden">
-            <div className="overflow-y-auto border-r border-border p-4">
-              <ActionsTab
-                tenantId={tenantId}
-                since={sinceDate}
-                statusFilter={statusFilter}
-                cursor={actionsCursor}
-                onLoadMore={setActionsCursor}
-                selectedAction={selectedAction}
-                onSelectAction={setSelectedAction}
-              />
-            </div>
-            <div className="p-6 overflow-y-auto bg-surface-subtle">
-              <ActionDetailPane
-                action={selectedAction}
-                tenantId={tenantId}
-                onInteractionSuccess={onInteractionSuccess}
-                onActionUpdated={setSelectedAction}
-              />
-            </div>
-          </div>
+          <hr className="border-border" />
+          <ActionsTab
+            tenantId={tenantId}
+            since={sinceDate}
+            statusFilter={statusFilter}
+            selectedAction={selectedAction}
+            onSelectAction={setSelectedAction}
+          />
         </div>
       );
     }
-    if (activeTab === 'triggers') {
-      return <TriggersTab tenantId={tenantId} isPersonalTenant={personalTenant} userEmail={user?.email ?? ''} />;
+
+    // Desktop: split-pane layout
+    return (
+      <div className="space-y-5">
+        <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} counts={countsQuery.data?.counts} />
+        <hr className="border-border mt-4" />
+        <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 rounded-card border border-border bg-surface shadow-card">
+          <div className="overflow-y-auto border-r border-border p-4 max-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height)-280px)]">
+            <ActionsTab
+              tenantId={tenantId}
+              since={sinceDate}
+              statusFilter={statusFilter}
+              selectedAction={selectedAction}
+              onSelectAction={setSelectedAction}
+            />
+          </div>
+          <div className="p-6">
+            <ActionDetailPane
+              action={selectedAction}
+              tenantId={tenantId}
+              onInteractionSuccess={onInteractionSuccess}
+              onActionUpdated={setSelectedAction}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderTabContent() {
+    if (activeTab === 'actions') {
+      return renderActionsContent();
     }
-    return <MessagesTab tenantId={tenantId} since={sinceDate} cursor={messagesCursor} onLoadMore={setMessagesCursor} />;
+    if (activeTab === 'triggers') {
+      return (
+        <TriggersTab
+          tenantId={tenantId}
+          isPersonalTenant={personalTenant}
+          userEmail={user?.email ?? ''}
+          isMobile={isMobile}
+        />
+      );
+    }
+    return <MessagesTab tenantId={tenantId} since={sinceDate} />;
   }
 
   if (!user) {
     return (
-      <div className="min-h-full bg-surface-muted">
+      <div className="min-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height))] bg-surface-muted">
         <PageContainer>
           <div className="space-y-6">
             <PageHeader
@@ -138,7 +182,7 @@ export function WorkflowInteraction() {
   }
 
   return (
-    <div className="min-h-full bg-surface-muted">
+    <div className="min-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height))] bg-surface-muted">
       <PageContainer>
         <div className="space-y-6">
           <PageHeader
@@ -147,7 +191,7 @@ export function WorkflowInteraction() {
           />
 
           {/* Filter bar */}
-          <div className="flex flex-wrap items-center gap-6 rounded-card border border-[#e2e8f0] bg-surface px-5 py-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-card border border-[#e2e8f0] bg-surface px-4 py-3 md:gap-6 md:px-5 md:py-4">
             <TenantSelector tenantId={tenantId} onTenantChange={handleTenantChange} ref={tenantSelectRef} />
             <div className="hidden h-8 w-px bg-[#e2e8f0] sm:block" aria-hidden="true" />
             <DateFilter selected={dateFilter} onChange={handleDateFilterChange} />

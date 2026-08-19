@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { nextCursorFromPagedItems } from '../helpers/list-query';
+import { nextCursorFromPagedItems, paginateOverfetchedRows } from '../helpers/list-query';
 import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import { buildPatchSetValues } from './helpers/patch-action-set-values';
@@ -65,16 +65,17 @@ export function buildActionRouter({
       const { actorId, since, limit, workflowInstanceId } = parsed.query;
 
       const pageLimit = limit ?? 50;
-      const rows = await services.action.list({
+      const rawRows = await services.action.list({
         allowedProjectIds,
         actorId,
         workflowInstanceId,
         limit: pageLimit,
         since,
       });
+      const { rows, hasMore } = paginateOverfetchedRows(rawRows, pageLimit);
       const items = rows.map(mapActionRequestRowToResponse);
 
-      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
+      const nextCursor = nextCursorFromPagedItems(items, hasMore);
       OkResponse(res, { items, nextCursor }, listActionsResponseSchema);
     },
   );

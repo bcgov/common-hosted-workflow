@@ -422,10 +422,11 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     checkRole('global:owner', 'global:admin'),
     createRequestParser(listAccessRequestsSchema),
     async (req: UiApiTypedRequest<zInfer<typeof listAccessRequestsSchema>>, res) => {
-      const { status, limit, offset } = req.parsed.query ?? {};
+      const { status, search, limit, offset } = req.parsed.query ?? {};
 
       const result = await services.accessRequest.listAccessRequests({
         status,
+        search,
         limit: limit ?? 50,
         offset: offset ?? 0,
       });

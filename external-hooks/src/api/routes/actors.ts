@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { nextCursorFromPagedItems } from '../helpers/list-query';
+import { nextCursorFromPagedItems, paginateOverfetchedRows } from '../helpers/list-query';
 import { OkResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import { buildPatchSetValues } from './helpers/patch-action-set-values';
@@ -32,13 +32,17 @@ export function buildActorRouter({
       const allowedProjectIds = getTenantScopedProjectIds(res, 'GET /v1/actors/:actorId/messages', 'messages');
       const { workflowInstanceId } = parsed.query;
 
-      const rows = await services.message.list({
+      const pageLimit = parsed.query.limit ?? 50;
+      const rawRows = await services.message.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
         workflowInstanceId,
-        limit: parsed.query.limit ?? 50,
+        limit: pageLimit,
         since: parsed.query.since,
       });
+      // This endpoint doesn't paginate (no nextCursor in its response); trim the
+      // repository's overfetched extra row so callers never see more than `limit` items.
+      const { rows } = paginateOverfetchedRows(rawRows, pageLimit);
       OkResponse(res, rows.map(mapMessageRowToResponse), listActorMessagesResponseSchema);
     },
   );
@@ -71,15 +75,16 @@ export function buildActorRouter({
       const { since, limit, workflowInstanceId } = parsed.query;
 
       const pageLimit = limit ?? 50;
-      const rows = await services.action.list({
+      const rawRows = await services.action.list({
         allowedProjectIds,
         actorId: parsed.params.actorId,
         workflowInstanceId,
         limit: pageLimit,
         since,
       });
+      const { rows, hasMore } = paginateOverfetchedRows(rawRows, pageLimit);
       const items = rows.map(mapActionRequestRowToResponse);
-      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
+      const nextCursor = nextCursorFromPagedItems(items, hasMore);
       OkResponse(res, { items, nextCursor }, listActionsResponseSchema);
     },
   );

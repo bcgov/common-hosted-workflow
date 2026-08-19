@@ -20,8 +20,8 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
     '/projects',
     createRequestParser(adminProjectsQuerySchema),
     async (req: UiApiTypedRequest<zInfer<typeof adminProjectsQuerySchema>>, res) => {
-      const { page, pageSize } = req.parsed.query;
-      const result = await services.projectTenant.listAllProjectsWithTenants(page, pageSize);
+      const { page, pageSize, search, type } = req.parsed.query;
+      const result = await services.projectTenant.listAllProjectsWithTenants(page, pageSize, { search, type });
       OkResponse(res, result);
     },
   );

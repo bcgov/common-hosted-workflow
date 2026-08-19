@@ -78,14 +78,7 @@
 }
 
 :focus-visible {
-  outline: var(--ds-focus-width) solid var(--ds-color-focus);
-  outline-offset: var(--ds-focus-offset);
-}
-
-/* Elements that supply their own visible focus indicator (e.g. a border-color
-   change) opt out of the global outline ring via this class. */
-.ds-focus-border:focus-visible {
-  outline: none;
+  outline: none !important;
 }
 
 ::selection {
@@ -101,11 +94,5 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-@media (forced-colors: active) {
-  :focus-visible {
-    outline-color: Highlight;
   }
 }
