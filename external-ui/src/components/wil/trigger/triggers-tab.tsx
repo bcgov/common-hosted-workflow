@@ -1,12 +1,10 @@
-import { IconPlus } from '@tabler/icons-react';
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TRIGGER_MANAGE_ROLE_VALUES } from '../../../lib/trigger-manage-roles';
 import { useHasTenantRoles, useTenantRolesById } from '../../../state/session';
 import { useTriggers } from './use-triggers';
 import { canUserSeeTrigger } from './trigger-utils';
 import { TRIGGER_TYPES } from '../../../constants/constants';
-import { TriggerListItem } from './trigger-list-item';
+import { TriggerListContent } from './trigger-list-content';
 import { TriggerFormPane } from './trigger-form-pane';
 import { MobileDetailView } from '../mobile-detail-view';
 
@@ -126,35 +124,17 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
     return (
       <>
         <div className="space-y-3">
-          {canManage && (
-            <Button type="button" className="w-full" onClick={openCreate}>
-              <IconPlus size={16} aria-hidden="true" />
-              Create Trigger
-            </Button>
-          )}
-          {visibleTriggers.length === 0 ? (
-            <p className="py-8 text-center text-sm text-[var(--bc-muted)]">No triggers found.</p>
-          ) : (
-            visibleTriggers.map((trigger) => (
-              <TriggerListItem
-                key={trigger.id}
-                trigger={trigger}
-                isSelected={selectedTriggerId === trigger.id}
-                canManage={canManage}
-                isCallbackPending={callbackTriggerId === trigger.id}
-                onClick={() => selectTrigger(trigger, canManage)}
-                onEdit={() => selectTrigger(trigger, canManage)}
-                onDelete={() => requestDelete(trigger)}
-                onTriggerCallback={() => {
-                  if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
-                    openChefsPreview(trigger);
-                  } else {
-                    triggerCallback(trigger);
-                  }
-                }}
-              />
-            ))
-          )}
+          <TriggerListContent
+            canManage={canManage}
+            visibleTriggers={visibleTriggers}
+            selectedTriggerId={selectedTriggerId}
+            callbackTriggerId={callbackTriggerId}
+            openCreate={openCreate}
+            selectTrigger={selectTrigger}
+            requestDelete={requestDelete}
+            openChefsPreview={openChefsPreview}
+            triggerCallback={triggerCallback}
+          />
         </div>
 
         <ConfirmDialog
@@ -177,35 +157,17 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
       <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 min-h-[500px] rounded-xl border border-[var(--bc-border)] bg-white shadow-sm overflow-hidden">
         {/* List pane */}
         <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4 space-y-3">
-          {canManage && (
-            <Button type="button" className="w-full" onClick={openCreate}>
-              <IconPlus size={16} aria-hidden="true" />
-              Create Trigger
-            </Button>
-          )}
-          {visibleTriggers.length === 0 ? (
-            <p className="py-8 text-center text-sm text-[var(--bc-muted)]">No triggers found.</p>
-          ) : (
-            visibleTriggers.map((trigger) => (
-              <TriggerListItem
-                key={trigger.id}
-                trigger={trigger}
-                isSelected={selectedTriggerId === trigger.id}
-                canManage={canManage}
-                isCallbackPending={callbackTriggerId === trigger.id}
-                onClick={() => selectTrigger(trigger, canManage)}
-                onEdit={() => selectTrigger(trigger, canManage)}
-                onDelete={() => requestDelete(trigger)}
-                onTriggerCallback={() => {
-                  if (trigger.config.type === TRIGGER_TYPES.CHEFS_FORM) {
-                    openChefsPreview(trigger);
-                  } else {
-                    triggerCallback(trigger);
-                  }
-                }}
-              />
-            ))
-          )}
+          <TriggerListContent
+            canManage={canManage}
+            visibleTriggers={visibleTriggers}
+            selectedTriggerId={selectedTriggerId}
+            callbackTriggerId={callbackTriggerId}
+            openCreate={openCreate}
+            selectTrigger={selectTrigger}
+            requestDelete={requestDelete}
+            openChefsPreview={openChefsPreview}
+            triggerCallback={triggerCallback}
+          />
         </div>
 
         {/* Form / detail pane */}
