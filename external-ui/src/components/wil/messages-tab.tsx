@@ -1,10 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
 import { IconLoader2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getWilMessages } from '../../services/backend/wil';
 import type { WilMessageItem } from '../../services/backend/wil';
 import { extractErrorMessage } from '../shared/error-utils';
+import { useInfiniteList } from '../../hooks/use-infinite-list';
 
 function formatMessageDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString(undefined, {
@@ -43,20 +43,16 @@ function MessageItem({ message }: Readonly<{ message: WilMessageItem }>) {
 interface MessagesTabProps {
   tenantId: string;
   since: string | undefined;
-  cursor: string | null;
-  onLoadMore: (nextCursor: string) => void;
 }
 
-export function MessagesTab({ tenantId, since, cursor, onLoadMore }: Readonly<MessagesTabProps>) {
-  const sinceParam = cursor ?? since;
-
-  const messagesQuery = useQuery({
-    queryKey: ['wil-messages', tenantId, sinceParam],
-    queryFn: ({ signal }) => getWilMessages({ tenantId, since: sinceParam, signal }),
+export function MessagesTab({ tenantId, since }: Readonly<MessagesTabProps>) {
+  const { items, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error } = useInfiniteList<WilMessageItem>({
+    queryKey: ['wil-messages', tenantId, since],
+    queryFn: ({ cursor, signal }) => getWilMessages({ tenantId, since: cursor ?? since, signal }),
     enabled: Boolean(tenantId),
   });
 
-  if (messagesQuery.isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-[var(--bc-muted)]">
         <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />
@@ -65,31 +61,41 @@ export function MessagesTab({ tenantId, since, cursor, onLoadMore }: Readonly<Me
     );
   }
 
-  if (messagesQuery.error) {
+  if (error) {
     return (
       <Alert variant="destructive">
         <AlertTitle>Error loading messages</AlertTitle>
-        <AlertDescription>{extractErrorMessage(messagesQuery.error, 'An error occurred')}</AlertDescription>
+        <AlertDescription>{extractErrorMessage(error, 'An error occurred')}</AlertDescription>
       </Alert>
     );
   }
 
-  const data = messagesQuery.data;
-  if (!data || data.data.length === 0) {
+  if (items.length === 0) {
     return <p className="py-8 text-center text-sm text-[var(--bc-muted)]">No messages found.</p>;
   }
 
-  const { nextCursor } = data;
-
   return (
     <div className="space-y-3">
-      {data.data.map((message) => (
+      {items.map((message) => (
         <MessageItem key={message.id} message={message} />
       ))}
-      {nextCursor ? (
+      {hasNextPage ? (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" size="lg" className="w-full md:w-auto" onClick={() => onLoadMore(nextCursor)}>
-            Load More
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full md:w-auto"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? (
+              <span className="flex items-center gap-2">
+                <IconLoader2 size={14} className="animate-spin" aria-hidden="true" />
+                Loading...
+              </span>
+            ) : (
+              'Load More'
+            )}
           </Button>
         </div>
       ) : (

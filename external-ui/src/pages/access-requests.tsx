@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { login } from '../auth/session-actions';
 import { listAccessRequests, reviewAccessRequest } from '../services/backend/access-requests';
@@ -6,6 +6,7 @@ import type { AccessRequestListItem } from '../services/backend/access-requests'
 import { AccessRequestStatusBadge } from '../components/access-request-status-badge';
 import { useAuthUser, useSession } from '../state/session';
 import { toast } from '../hooks/use-toasts';
+import { useDebouncedValue } from '../hooks/use-debounced-value';
 import { IconLogin2, IconCheck, IconX, IconChevronLeft, IconChevronRight, IconSearch } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -176,14 +177,20 @@ function AccessRequestsListView({
   const user = useAuthUser();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
   const [currentPage, setCurrentPage] = useState(1);
 
   const offset = (currentPage - 1) * PAGE_SIZE;
 
   const listQuery = useQuery({
-    queryKey: ['access-requests', 'admin', user?.email ?? '', statusFilter, currentPage],
-    queryFn: ({ signal }) => listAccessRequests({ status: statusFilter, limit: PAGE_SIZE, offset }, { signal }),
+    queryKey: ['access-requests', 'admin', user?.email ?? '', statusFilter, debouncedSearchQuery, currentPage],
+    queryFn: ({ signal }) =>
+      listAccessRequests(
+        { status: statusFilter, search: debouncedSearchQuery.trim() || undefined, limit: PAGE_SIZE, offset },
+        { signal },
+      ),
     enabled: Boolean(user),
+    placeholderData: keepPreviousData,
   });
 
   const requests = listQuery.data?.items ?? [];
@@ -195,14 +202,6 @@ function AccessRequestsListView({
       setCurrentPage(totalPages);
     }
   }, [currentPage, listQuery.isLoading, requests.length, total, totalPages]);
-
-  const filteredRequests = useMemo(() => {
-    if (!searchQuery.trim()) return requests;
-    const lower = searchQuery.toLowerCase();
-    return requests.filter(
-      (r) => r.requesterEmail.toLowerCase().includes(lower) || r.justification.toLowerCase().includes(lower),
-    );
-  }, [requests, searchQuery]);
 
   const summaryText = useMemo(() => {
     const statusLabel = statusFilter || 'total';
@@ -242,7 +241,10 @@ function AccessRequestsListView({
           <Input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Search by email or justification..."
             className="pl-9"
             aria-label="Search access requests"
@@ -265,13 +267,13 @@ function AccessRequestsListView({
       <p className="text-[0.8125rem] text-muted-foreground">{summaryText}</p>
 
       {/* Request Cards */}
-      {filteredRequests.length === 0 ? (
+      {requests.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
           No {statusFilter ? statusFilter : ''} access requests found.
         </p>
       ) : (
         <div className="space-y-3">
-          {filteredRequests.map((request) => (
+          {requests.map((request) => (
             <RequestCard
               key={request.id}
               request={request}

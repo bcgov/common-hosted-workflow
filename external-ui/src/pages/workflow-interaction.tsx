@@ -38,8 +38,6 @@ export function WorkflowInteraction() {
   const [activeTab, setActiveTab] = useState<Tab>('actions');
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [actionsCursor, setActionsCursor] = useState<string | null>(null);
-  const [messagesCursor, setMessagesCursor] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<WilActionItem | null>(null);
 
   const tenantId = selectedTenant?.id ?? '';
@@ -61,21 +59,16 @@ export function WorkflowInteraction() {
 
   function handleTenantChange(tenant: WilTenantItem | null) {
     setSelectedTenant(tenant);
-    setActionsCursor(null);
-    setMessagesCursor(null);
     setSelectedAction(null);
   }
 
   function handleDateFilterChange(value: string | undefined) {
     setDateFilter(value);
-    setActionsCursor(null);
-    setMessagesCursor(null);
   }
 
   function handleStatusFilterChange(statuses: string[]) {
     setStatusFilter(statuses);
     setSelectedAction(null);
-    setActionsCursor(null);
   }
 
   function handleTabChange(tab: Tab) {
@@ -120,8 +113,6 @@ export function WorkflowInteraction() {
             tenantId={tenantId}
             since={sinceDate}
             statusFilter={statusFilter}
-            cursor={actionsCursor}
-            onLoadMore={setActionsCursor}
             selectedAction={selectedAction}
             onSelectAction={setSelectedAction}
           />
@@ -140,8 +131,6 @@ export function WorkflowInteraction() {
               tenantId={tenantId}
               since={sinceDate}
               statusFilter={statusFilter}
-              cursor={actionsCursor}
-              onLoadMore={setActionsCursor}
               selectedAction={selectedAction}
               onSelectAction={setSelectedAction}
             />
@@ -173,7 +162,7 @@ export function WorkflowInteraction() {
         />
       );
     }
-    return <MessagesTab tenantId={tenantId} since={sinceDate} cursor={messagesCursor} onLoadMore={setMessagesCursor} />;
+    return <MessagesTab tenantId={tenantId} since={sinceDate} />;
   }
 
   if (!user) {

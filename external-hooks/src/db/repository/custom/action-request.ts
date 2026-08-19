@@ -4,14 +4,21 @@ import { actionRequest, type ActionRequest } from '../../schema/workflow-interac
 export class ActionRequestRepository {
   constructor(private readonly db: any) {}
 
-  /** List action requests matching the provided where clauses. */
+  /**
+   * List action requests matching the provided where clauses.
+   *
+   * Fetches one extra row beyond `limit` so callers can detect whether
+   * another page exists without guessing from `rows.length === limit`
+   * (which is wrong whenever the result set ends exactly on a page boundary).
+   * Callers should trim the result via `paginateOverfetchedRows`.
+   */
   async list(params: { where: any[]; limit: number }): Promise<ActionRequest[]> {
     return await this.db
       .select()
       .from(actionRequest)
       .where(and(...params.where))
       .orderBy(desc(actionRequest.createdAt), desc(actionRequest.id))
-      .limit(params.limit);
+      .limit(params.limit + 1);
   }
 
   /** Returns counts grouped by status for actions matching the provided where clauses. */

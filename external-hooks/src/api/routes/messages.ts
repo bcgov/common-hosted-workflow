@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { nextCursorFromPagedItems } from '../helpers/list-query';
+import { nextCursorFromPagedItems, paginateOverfetchedRows } from '../helpers/list-query';
 import { OkResponse, CreatedResponse } from './responses';
 import { getTenantScopedProjectIds } from './helpers/tenant-scope';
 import {
@@ -30,16 +30,17 @@ export function buildMessageRouter({
       const { workflowInstanceId } = parsed.query;
       const pageLimit = parsed.query.limit ?? 50;
 
-      const rows = await services.message.list({
+      const rawRows = await services.message.list({
         allowedProjectIds,
         actorId: parsed.query.actorId,
         workflowInstanceId,
         limit: pageLimit,
         since: parsed.query.since,
       });
+      const { rows, hasMore } = paginateOverfetchedRows(rawRows, pageLimit);
       const items = rows.map(mapMessageRowToResponse);
 
-      const nextCursor = nextCursorFromPagedItems(items, pageLimit);
+      const nextCursor = nextCursorFromPagedItems(items, hasMore);
       OkResponse(res, { items, nextCursor }, listMessagesResponseSchema);
     },
   );

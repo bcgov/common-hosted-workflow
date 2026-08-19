@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import axios from 'axios';
 import { IconChevronLeft, IconChevronRight, IconSearch } from '@tabler/icons-react';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toasts';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
   getAdminProjects,
   updateProjectTenant,
@@ -48,18 +49,11 @@ function getMutationErrorMessage(error: unknown): string {
   return 'Network error';
 }
 
-function matchesSearch(project: AdminProjectItem, query: string): boolean {
-  const lower = query.toLowerCase();
-  if (project.projectName.toLowerCase().includes(lower)) return true;
-  if (project.projectId.toLowerCase().includes(lower)) return true;
-  if (project.tenantId && project.tenantId.toLowerCase().includes(lower)) return true;
-  return false;
-}
-
 export function AdminProjectsView() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
   const [typeFilter, setTypeFilter] = useState<ProjectTypeFilter>('all');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -68,8 +62,16 @@ export function AdminProjectsView() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const projectsQuery = useQuery({
-    queryKey: ['admin-projects', page],
-    queryFn: ({ signal }) => getAdminProjects({ page, pageSize: PAGE_SIZE, signal }),
+    queryKey: ['admin-projects', page, debouncedSearchQuery, typeFilter],
+    queryFn: ({ signal }) =>
+      getAdminProjects({
+        page,
+        pageSize: PAGE_SIZE,
+        search: debouncedSearchQuery.trim() || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        signal,
+      }),
+    placeholderData: keepPreviousData,
   });
 
   const updateMutation = useMutation({
@@ -97,27 +99,12 @@ export function AdminProjectsView() {
     },
   });
 
-  const filteredProjects = useMemo(() => {
-    if (!projectsQuery.data) return [];
-    let items = projectsQuery.data.data;
-
-    if (typeFilter !== 'all') {
-      items = items.filter((p) => p.projectType === typeFilter);
-    }
-
-    if (searchQuery.trim()) {
-      items = items.filter((p) => matchesSearch(p, searchQuery.trim()));
-    }
-
-    return items;
-  }, [projectsQuery.data, typeFilter, searchQuery]);
+  const projects = projectsQuery.data?.data ?? [];
 
   const summaryText = useMemo(() => {
     if (!projectsQuery.data) return '';
-    const all = projectsQuery.data.data;
-    const mapped = all.filter((p) => p.tenantId !== null).length;
-    const unmapped = all.length - mapped;
-    return `${all.length} projects · ${mapped} mapped to a tenant, ${unmapped} not mapped`;
+    const { pagination } = projectsQuery.data;
+    return `${pagination.totalItems} projects`;
   }, [projectsQuery.data]);
 
   function startEditing(projectId: string, currentValue: string | null) {
@@ -186,7 +173,7 @@ export function AdminProjectsView() {
   }
 
   const data = projectsQuery.data;
-  if (!data || data.data.length === 0) {
+  if (!data) {
     return <p className="text-sm text-muted-foreground">No projects found.</p>;
   }
 
@@ -206,7 +193,10 @@ export function AdminProjectsView() {
           <Input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search by project name, ID, or tenant ID..."
             className="pl-9"
             aria-label="Search projects"
@@ -214,7 +204,10 @@ export function AdminProjectsView() {
         </div>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as ProjectTypeFilter)}
+          onChange={(e) => {
+            setTypeFilter(e.target.value as ProjectTypeFilter);
+            setPage(1);
+          }}
           className="h-10 rounded-control border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-border-strong"
           aria-label="Filter by project type"
         >
@@ -228,11 +221,11 @@ export function AdminProjectsView() {
       <p className="text-[0.8125rem] text-muted-foreground">{summaryText}</p>
 
       {/* Project List */}
-      {filteredProjects.length === 0 ? (
+      {projects.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">No projects match your filters.</p>
       ) : (
         <div className="space-y-3">
-          {filteredProjects.map((project) => (
+          {projects.map((project) => (
             <ProjectRow
               key={project.projectId}
               project={project}

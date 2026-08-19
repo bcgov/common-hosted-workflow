@@ -27,11 +27,18 @@ export type UserProjectsResponse = {
   data: UserProjectTenantItem[];
 };
 
-export function getAdminProjects(params: { page: number; pageSize: number; signal?: AbortSignal }) {
+export function getAdminProjects(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  type?: string;
+  signal?: AbortSignal;
+}) {
+  const { signal, search, type, ...rest } = params;
   return instance
     .get<AdminProjectsResponse>('/ui-api/admin/projects', {
-      params: { page: params.page, pageSize: params.pageSize },
-      signal: params.signal,
+      params: { ...rest, ...(search ? { search } : {}), ...(type && type !== 'all' ? { type } : {}) },
+      signal,
     })
     .then((res) => res.data);
 }
