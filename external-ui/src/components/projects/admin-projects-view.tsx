@@ -393,8 +393,17 @@ function ProjectRow({
       {/* Header: Name + Type Badge */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-foreground">{project.projectName}</h3>
-          {isPersonal && <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">{project.projectId}</p>}
+          <h3 className="truncate text-base font-semibold text-foreground">
+            <a
+              href={`${globalThis.location.origin}/projects/${encodeURIComponent(project.projectId)}/workflows`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+            >
+              {project.projectName}
+            </a>
+          </h3>
+          <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">{project.projectId}</p>
         </div>
         <span className={`shrink-0 rounded-md px-2.5 py-0.5 text-xs font-medium ${typeBadgeClasses}`}>
           {isPersonal ? 'Personal' : 'Team'}

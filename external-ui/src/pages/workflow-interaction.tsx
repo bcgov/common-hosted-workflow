@@ -125,15 +125,17 @@ export function WorkflowInteraction() {
       <div className="space-y-5">
         <StatusFilter selected={statusFilter} onChange={handleStatusFilterChange} counts={countsQuery.data?.counts} />
         <hr className="border-border mt-4" />
-        <div className="grid grid-cols-[minmax(320px,420px)_1fr] gap-0 rounded-card border border-border bg-surface shadow-card">
-          <div className="overflow-y-auto border-r border-border p-4 max-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height)-280px)]">
-            <ActionsTab
-              tenantId={tenantId}
-              since={sinceDate}
-              statusFilter={statusFilter}
-              selectedAction={selectedAction}
-              onSelectAction={setSelectedAction}
-            />
+        <div className="grid grid-cols-[minmax(320px,420px)_1fr] grid-rows-[1fr] gap-0 rounded-card border border-border bg-surface shadow-card min-h-[480px]">
+          <div className="relative border-r border-border">
+            <div className="absolute inset-0 overflow-y-auto p-4">
+              <ActionsTab
+                tenantId={tenantId}
+                since={sinceDate}
+                statusFilter={statusFilter}
+                selectedAction={selectedAction}
+                onSelectAction={setSelectedAction}
+              />
+            </div>
           </div>
           <div className="p-6">
             <ActionDetailPane
