@@ -35,16 +35,17 @@ n8n:
   runner:
     enabled: true
 
-redis:
-  enabled: true
+  persistence:
+    size: 1Gi
 
 pgo:
   enabled: true
   instance:
+    replicas: 2
     dataVolumeClaimSpec:
       resources:
         requests:
-          storage: 2Gi
+          storage: 1Gi
 
   pgBackRest:
     repos:
@@ -98,6 +99,7 @@ backup-storage:
     0 2 * * * default ./backup.sh -s -v all
 
 redis:
+  enabled: true
   master:
     persistence:
       size: 256Mi
