@@ -95,7 +95,7 @@ n8n:
     AUTHZ_TOKEN_ENDPOINT: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
     EXTERNAL_UI_ENABLED: 'true'
     # Prometheus metrics → Alloy → Mimir
-    N8N_METRICS: "true"
+    N8N_METRICS: "false"
     # Executions dashboard — labels on execution_duration_seconds needed for workflow name join
     N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL: "true"
     N8N_METRICS_INCLUDE_WORKFLOW_NAME_LABEL: "true"
@@ -106,7 +106,7 @@ n8n:
     N8N_METRICS_INCLUDE_WORKFLOW_STATISTICS: "true"
     N8N_METRICS_INCLUDE_CACHE_METRICS: "true"
     # OpenTelemetry tracing — exports spans to Alloy → Tempo
-    N8N_OTEL_ENABLED: "true"
+    N8N_OTEL_ENABLED: "false"
     N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://chwf-alloy:4318  # NOSONAR - internal cluster service URL
     N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"
     # Log streaming — event list is in logStreaming.subscribedEvents.

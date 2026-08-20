@@ -20,6 +20,8 @@ n8n:
     N8N_OTEL_TRACES_PRODUCTION_ONLY: "false"  # trace all executions in dev, not just production triggers
     N8N_LICENSE_AUTO_RENEW_ENABLED: "true"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-dev"
+    N8N_METRICS: "true"
+    N8N_OTEL_ENABLED: "true"
 
   route:
     enabled: true

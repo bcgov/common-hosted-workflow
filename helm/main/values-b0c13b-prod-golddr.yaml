@@ -47,9 +47,6 @@ n8n:
   runner:
     enabled: true
 
-redis:
-  enabled: true
-
 pgo:
   enabled: true
 
@@ -57,7 +54,7 @@ pgo:
     dataVolumeClaimSpec:
       resources:
         requests:
-          storage: 2Gi
+          storage: 1Gi
 
   pgBackRest:
   conditionalRestore:
@@ -70,6 +67,7 @@ backup-storage:
   enabled: false
 
 redis:
+  enabled: true
   master:
     persistence:
       size: 256Mi
