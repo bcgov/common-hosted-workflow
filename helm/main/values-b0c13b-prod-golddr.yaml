@@ -69,6 +69,11 @@ pgo:
 backup-storage:
   enabled: false
 
+redis:
+  master:
+    persistence:
+      size: 256Mi
+
 dns-probe:
   enabled: false
   env:
