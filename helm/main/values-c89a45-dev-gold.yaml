@@ -22,6 +22,7 @@ n8n:
     N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-dev"
     N8N_METRICS: "true"
     N8N_OTEL_ENABLED: "true"
+    N8N_LOG_STREAMING_MANAGED_BY_ENV: "true"
 
   route:
     enabled: true
@@ -61,6 +62,21 @@ pgo:
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+
+      - name: repo2
+        secretName: chwf-pgo-s3 # pragma: allowlist secret
+        retention:
+          full: "30"
+          fullType: time
+        path: /backups/pgo/platform
+        uriStyle: path
+        s3:
+          bucket: workflow-dev
+          endpoint: commonservices.objectstore.gov.bc.ca
+          region: ca-central-1
+        schedules:
+          full: "0 7 * * 1-5"             # Environment reset/cleanup at 7:00 AM before work starts (Mon-Fri)
+          incremental: "0 9-17/2 * * 1-5" # Fast sync every 2 hours during working hours (Mon-Fri)
 
 sdg-mock-app:
   enabled: true
@@ -167,5 +183,26 @@ alloy:
         cpu: 100m
         memory: 256Mi
 
+logStreaming:
+  enabled: true
+
 systemLogs:
   enabled: true
+
+backup-storage:
+  enabled: true
+
+  image:
+    tag: "2.13.0"
+    pullPolicy: IfNotPresent
+
+  env:
+    S3_BUCKET:
+      value: workflow-dev/backups/pgdump/platform/
+
+  backupConfig: |
+    postgres=chwf-pgo-replicas:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n-custom
+
+    */10 * * * * default ./backup.sh -s
+    0 7 * * 1-5 default ./backup.sh -s -v all

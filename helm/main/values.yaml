@@ -39,8 +39,8 @@ n8n:
     # Both binary data and execution data are stored in S3. Requires an Enterprise license.
     # Credentials are injected via extraEnv from the chwf-s3-account secret.
     # Bucket name is set per environment in values-<namespace>-<env>-<zone>.yaml
-    N8N_DEFAULT_BINARY_DATA_MODE: "s3"
-    N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
+    N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "default"
     N8N_EXTERNAL_STORAGE_S3_HOST: "commonservices.objectstore.gov.bc.ca"
     N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "https"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "ca-central-1"
@@ -111,7 +111,7 @@ n8n:
     N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"
     # Log streaming — event list is in logStreaming.subscribedEvents.
     # Rendered to JSON by configmaps/n8n-log-streaming.yaml and injected via extraEnv below.
-    N8N_LOG_STREAMING_MANAGED_BY_ENV: "true"
+    N8N_LOG_STREAMING_MANAGED_BY_ENV: "false"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
@@ -694,7 +694,7 @@ grafana:
 # N8N_LOG_STREAMING_DESTINATIONS is injected via n8n.extraEnv.configMapKeyRef above.
 # To add or remove an event type, edit subscribedEvents here.
 logStreaming:
-  enabled: true  # set false to disable without removing the ConfigMap or extraEnv reference
+  enabled: false  # enabled only in c89a45 environments where Alloy is deployed
   anonymizeAuditMessages: false  # audit trail requires identifiable users; restrict Grafana access instead
   syslog:
     host: chwf-alloy

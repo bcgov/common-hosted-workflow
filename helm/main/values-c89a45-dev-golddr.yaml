@@ -59,8 +59,16 @@ pgo:
         requests:
           storage: 1.5Gi
   pgBackRest:
+  conditionalRestore:
+    enabled: true
+    s3:
+      bucket: workflow-dev/backups/pgdump/platform
+
+# backup-storage is intentionally disabled on GoldDR — backups are created on Gold only
+backup-storage:
+  enabled: false
 
 dns-probe:
-  enabled: false
+  enabled: true
   env:
     APP_ENV: "dev"
