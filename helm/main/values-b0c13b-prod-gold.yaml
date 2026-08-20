@@ -96,3 +96,8 @@ backup-storage:
 
     */10 * * * * default ./backup.sh -s
     0 2 * * * default ./backup.sh -s -v all
+
+redis:
+  master:
+    persistence:
+      size: 256Mi
