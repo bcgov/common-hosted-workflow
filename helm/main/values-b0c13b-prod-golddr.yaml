@@ -61,7 +61,7 @@ pgo:
 
   pgBackRest:
   conditionalRestore:
-    enabled: false  # enable when dns-probe is enabled for prod-golddr
+    enabled: true
     s3:
       bucket: workflow-prod/backups/pgdump
 
@@ -70,6 +70,6 @@ backup-storage:
   enabled: false
 
 dns-probe:
-  enabled: false
+  enabled: true
   env:
     APP_ENV: "production"
