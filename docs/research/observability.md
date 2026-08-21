@@ -409,6 +409,10 @@ s3://chwf-observability/
 
 ### Retention policies
 
+> **Historical POC recommendation:** The values below capture the original POC sizing
+> recommendation. The current policy baseline, implementation status, and known enforcement gaps
+> are defined in [Audit Events and Execution Traces](../platform/audit-events-and-execution-traces.md#retention-policy).
+
 | Data                               | Recommended retention | Where configured                                 |
 | ---------------------------------- | --------------------- | ------------------------------------------------ |
 | n8n execution history (PostgreSQL) | 30 days               | `EXECUTIONS_DATA_MAX_AGE` on n8n                 |
