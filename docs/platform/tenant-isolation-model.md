@@ -246,6 +246,7 @@ Current status:
 
 - [High-Level Architecture](./high-level-architecture.md)
 - [Authentication And Authorization](./authentication-and-authorization.md)
+- [Audit Events and Execution Traces](./audit-events-and-execution-traces.md)
 - [Personal Project Tenant Mapping](./personal-project-tenant-mapping.md)
 - [Tenant Project Sync](../external-ui/tenant-project-sync.md)
 - [Workflow interaction layer - headers and n8n validations](../external-hooks/workflow-interaction-api-validations.md)
