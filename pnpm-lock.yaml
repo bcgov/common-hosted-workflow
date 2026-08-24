@@ -21,8 +21,8 @@ importers:
         specifier: ^7.0.6
         version: 7.0.6(release-it@20.2.1(@types/node@25.9.5))
       '@repo-toolkit/changelog':
-        specifier: ^0.9.0
-        version: 0.9.0
+        specifier: ^0.13.0
+        version: 0.13.0
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
@@ -393,13 +393,13 @@ packages:
     peerDependencies:
       release-it: ^18.0.0 || ^19.0.0 || ^20.0.0
 
-  '@repo-toolkit/changelog@0.9.0':
-    resolution: {integrity: sha512-EA5cOG1pV/JdX4j1JVC2nINvum6Yd1hOh+IE6niK0gpeB3IRDTe+rq3kmM4e7B4aUhuQko1ymhHqeAubUmYw6A==}
+  '@repo-toolkit/changelog@0.13.0':
+    resolution: {integrity: sha512-RHNK9jB/ojqzRpZ6h3v8vfa6q0xRg0GK3LvpX3/IUHwvn7VnWJRNUbsNK8E0/A7Aaz8Wfx9/mhPv+QuSf2c1zw==}
     engines: {node: '>=20'}
     hasBin: true
 
-  '@repo-toolkit/publish-package@0.9.0':
-    resolution: {integrity: sha512-GXhB+rpuiyJ1Dm64cq1QDANKCh8ruK5aES9pR2KAX82AMPwRlqABGpjLEuHHjbVKPQJ3MxIifttXwE7wPoVhxA==}
+  '@repo-toolkit/publish-package@0.13.0':
+    resolution: {integrity: sha512-0OBO0MwVqy6Gks1pgpRo9MUN+cPhCZT1OQ/0Gm3vdTk8ZMcX3mH5wT6LS+yvAH+41onicxhY6bZkOC+IKduuGg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -2032,15 +2032,15 @@ snapshots:
       release-it: 20.2.1(@types/node@25.9.5)
       semver: 7.8.5
 
-  '@repo-toolkit/changelog@0.9.0':
+  '@repo-toolkit/changelog@0.13.0':
     dependencies:
-      '@repo-toolkit/publish-package': 0.9.0
+      '@repo-toolkit/publish-package': 0.13.0
       conventional-changelog: 7.2.1
       conventional-changelog-conventionalcommits: 9.3.1
     transitivePeerDependencies:
       - conventional-commits-filter
 
-  '@repo-toolkit/publish-package@0.9.0':
+  '@repo-toolkit/publish-package@0.13.0':
     dependencies:
       '@clack/prompts': 1.7.0
 
