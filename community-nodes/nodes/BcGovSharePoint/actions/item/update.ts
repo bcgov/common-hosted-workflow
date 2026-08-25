@@ -3,6 +3,12 @@ import { graphRequest, type GraphContext, type RetryOptions } from '../../transp
 import { coerceFieldsForWrite } from '../../transport/coerce';
 import type { ColumnMap } from '../../transport/resolve';
 
+export interface UpdateItemTarget {
+  siteId: string;
+  listId: string;
+  itemId: string;
+}
+
 export interface UpdateItemOptions {
   /** Optional ETag for optimistic concurrency (spec section 7.2). */
   ifMatchEtag?: string;
@@ -16,19 +22,17 @@ export async function updateItem(
   context: GraphContext,
   baseUrl: string,
   retry: RetryOptions,
-  siteId: string,
-  listId: string,
-  itemId: string,
+  target: UpdateItemTarget,
   columnMap: ColumnMap,
   rawFields: IDataObject,
   options: UpdateItemOptions = {},
 ): Promise<IDataObject> {
-  const fields = await coerceFieldsForWrite(context, baseUrl, retry, siteId, columnMap, rawFields);
+  const fields = await coerceFieldsForWrite(context, baseUrl, retry, target.siteId, columnMap, rawFields);
   return graphRequest<IDataObject>(
     context,
     {
       method: 'PATCH',
-      url: `${baseUrl}/sites/${siteId}/lists/${listId}/items/${itemId}/fields`,
+      url: `${baseUrl}/sites/${target.siteId}/lists/${target.listId}/items/${target.itemId}/fields`,
       body: fields,
       ...(options.ifMatchEtag ? { headers: { 'If-Match': options.ifMatchEtag } } : {}),
       json: true,

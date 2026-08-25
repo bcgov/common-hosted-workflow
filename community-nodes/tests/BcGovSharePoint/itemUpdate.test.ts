@@ -29,9 +29,7 @@ describe('updateItem', () => {
       context,
       'https://graph.microsoft.com/v1.0',
       { maxRetries: 1 },
-      'site-1',
-      'list-1',
-      '42',
+      { siteId: 'site-1', listId: 'list-1', itemId: '42' },
       map,
       {
         Title: 'Updated',
@@ -55,9 +53,7 @@ describe('updateItem', () => {
       context,
       'https://graph.microsoft.com/v1.0',
       { maxRetries: 1 },
-      'site-1',
-      'list-1',
-      '42',
+      { siteId: 'site-1', listId: 'list-1', itemId: '42' },
       map,
       { Title: 'Updated' },
       { ifMatchEtag: 'W/"1"' },
@@ -73,9 +69,16 @@ describe('updateItem', () => {
     const context = makeContext(httpRequestWithAuthentication);
     const map = columnMap([{ internalName: 'Title', displayName: 'Title', type: 'text', required: false }]);
 
-    await updateItem(context, 'https://graph.microsoft.com/v1.0', { maxRetries: 1 }, 'site-1', 'list-1', '42', map, {
-      Title: 'Updated',
-    });
+    await updateItem(
+      context,
+      'https://graph.microsoft.com/v1.0',
+      { maxRetries: 1 },
+      { siteId: 'site-1', listId: 'list-1', itemId: '42' },
+      map,
+      {
+        Title: 'Updated',
+      },
+    );
 
     expect(httpRequestWithAuthentication.mock.calls[0][1].headers).toBeUndefined();
   });

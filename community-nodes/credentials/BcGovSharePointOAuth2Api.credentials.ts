@@ -100,7 +100,7 @@ export class BcGovSharePointOAuth2Api implements ICredentialType {
   test: ICredentialTestRequest = {
     request: {
       baseURL: '={{$credentials.graphBaseUrl}}',
-      url: '=/sites/{{$credentials.defaultSiteUrl.replace(/^https?:\\/\\//, "").split("/")[0]}}:/{{$credentials.defaultSiteUrl.replace(/^https?:\\/\\/[^/]+\\//, "")}}',
+      url: '=/sites/{{$credentials.defaultSiteUrl.replace(/^https?:\\/\\//, "").split("/")[0]}}:/{{$credentials.defaultSiteUrl.replace(/^https?:\\/\\/[^/]+\\//, "")}}', // NOSONAR — n8n expression template requires escaped regex, String.raw is not applicable,
       method: 'GET',
     },
   };

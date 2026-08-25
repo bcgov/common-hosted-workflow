@@ -15,6 +15,13 @@ export interface UploadFileOptions {
   createParentFolders: boolean;
 }
 
+export interface UploadTarget {
+  siteId: string;
+  driveId: string;
+  folderPath: string;
+  fileName: string;
+}
+
 const SMALL_FILE_THRESHOLD_BYTES = 4 * 1024 * 1024;
 const CHUNK_ALIGNMENT_BYTES = 320 * 1024;
 
@@ -65,8 +72,7 @@ async function uploadLargeFile(
   context: GraphContext & BinaryRequestContext,
   baseUrl: string,
   retry: RetryOptions,
-  siteId: string,
-  driveId: string,
+  target: UploadTarget,
   itemPath: string,
   buffer: Buffer,
   options: UploadFileOptions,
@@ -75,7 +81,7 @@ async function uploadLargeFile(
     context,
     {
       method: 'POST',
-      url: `${baseUrl}/sites/${siteId}/drives/${driveId}/root:/${itemPath}:/createUploadSession`,
+      url: `${baseUrl}/sites/${target.siteId}/drives/${target.driveId}/root:/${itemPath}:/createUploadSession`,
       body: { item: { '@microsoft.graph.conflictBehavior': options.conflictBehavior } },
       json: true,
     },
@@ -120,10 +126,7 @@ export async function uploadFile(
   context: GraphContext & BinaryRequestContext,
   baseUrl: string,
   retry: RetryOptions,
-  siteId: string,
-  driveId: string,
-  folderPath: string,
-  fileName: string,
+  target: UploadTarget,
   buffer: Buffer,
   options: UploadFileOptions,
 ): Promise<IDataObject> {
@@ -134,13 +137,13 @@ export async function uploadFile(
     );
   }
 
-  const normalizedFolder = folderPath.replace(/^\/+|\/+$/g, '');
+  const normalizedFolder = target.folderPath.replace(/^\/+/, '').replace(/\/+$/, '');
   const itemPath = normalizedFolder
-    ? `${encodePathSegments(normalizedFolder)}/${encodeURIComponent(fileName)}`
-    : encodeURIComponent(fileName);
+    ? `${encodePathSegments(normalizedFolder)}/${encodeURIComponent(target.fileName)}`
+    : encodeURIComponent(target.fileName);
 
   if (!options.createParentFolders && normalizedFolder) {
-    await assertParentFolderExists(context, baseUrl, retry, siteId, driveId, normalizedFolder);
+    await assertParentFolderExists(context, baseUrl, retry, target.siteId, target.driveId, normalizedFolder);
   }
 
   if (buffer.length <= SMALL_FILE_THRESHOLD_BYTES) {
@@ -148,7 +151,7 @@ export async function uploadFile(
       context,
       {
         method: 'PUT',
-        url: `${baseUrl}/sites/${siteId}/drives/${driveId}/root:/${itemPath}:/content?@microsoft.graph.conflictBehavior=${options.conflictBehavior}`,
+        url: `${baseUrl}/sites/${target.siteId}/drives/${target.driveId}/root:/${itemPath}:/content?@microsoft.graph.conflictBehavior=${options.conflictBehavior}`,
         body: buffer,
       },
       retry,
@@ -156,5 +159,5 @@ export async function uploadFile(
     return parseJsonBody(response.body);
   }
 
-  return uploadLargeFile(context, baseUrl, retry, siteId, driveId, itemPath, buffer, options);
+  return uploadLargeFile(context, baseUrl, retry, target, itemPath, buffer, options);
 }

@@ -5,6 +5,11 @@ import { ensureUser } from './ensureUser';
 
 export type OnNotFoundBehavior = 'error' | 'continue' | 'ensureUser';
 
+export interface EnsureUserSiteInfo {
+  hostname: string;
+  path: string;
+}
+
 /**
  * Resolve a person's SharePoint LookupId by email (spec section 7.4).
  * `onNotFound: 'continue'` returns null instead of throwing — the caller
@@ -20,8 +25,7 @@ export async function getUserLookupId(
   siteId: string,
   email: string,
   onNotFound: OnNotFoundBehavior,
-  siteHostname?: string,
-  sitePath?: string,
+  siteInfo?: EnsureUserSiteInfo,
 ): Promise<PersonLookupResult | null> {
   try {
     return await resolvePersonLookupId(context, baseUrl, retry, siteId, email);
@@ -30,13 +34,13 @@ export async function getUserLookupId(
       return null;
     }
     if (onNotFound === 'ensureUser' && error instanceof NodeOperationError) {
-      if (!siteHostname || !sitePath) {
+      if (!siteInfo) {
         throw new NodeOperationError(
           context.getNode(),
           `Ensure User requires a resolvable site URL — the site hostname and path could not be determined.`,
         );
       }
-      const result = await ensureUser(context, retry, siteHostname, sitePath, email);
+      const result = await ensureUser(context, retry, siteInfo.hostname, siteInfo.path, email);
       return {
         email,
         lookupId: result.lookupId,

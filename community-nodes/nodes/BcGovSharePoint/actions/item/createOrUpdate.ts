@@ -6,6 +6,11 @@ import { createItem } from './create';
 import { updateItem } from './update';
 import type { ColumnMap } from '../../transport/resolve';
 
+export interface ItemLocation {
+  siteId: string;
+  listId: string;
+}
+
 /**
  * Create-or-update a SharePoint list item (spec section 7.2). Match fields
  * are AND-composed into a filter; a match PATCHes, no match POSTs a new
@@ -15,8 +20,7 @@ export async function createOrUpdateItem(
   context: GraphContext,
   baseUrl: string,
   retry: RetryOptions,
-  siteId: string,
-  listId: string,
+  location: ItemLocation,
   columnMap: ColumnMap,
   rawFields: IDataObject,
   matchFields: IDataObject,
@@ -37,7 +41,7 @@ export async function createOrUpdateItem(
     context,
     {
       method: 'GET',
-      url: `${baseUrl}/sites/${siteId}/lists/${listId}/items`,
+      url: `${baseUrl}/sites/${location.siteId}/lists/${location.listId}/items`,
       qs: { $expand: 'fields', $filter: filter },
       headers: { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' },
       json: true,
@@ -48,7 +52,17 @@ export async function createOrUpdateItem(
 
   const match = existing[0];
   if (match) {
-    return updateItem(context, baseUrl, retry, siteId, listId, match.id, columnMap, rawFields);
+    return updateItem(
+      context,
+      baseUrl,
+      retry,
+      { siteId: location.siteId, listId: location.listId, itemId: match.id },
+      columnMap,
+      rawFields,
+    );
   }
-  return createItem(context, baseUrl, retry, siteId, listId, columnMap, { ...matchFields, ...rawFields });
+  return createItem(context, baseUrl, retry, location.siteId, location.listId, columnMap, {
+    ...matchFields,
+    ...rawFields,
+  });
 }

@@ -39,5 +39,6 @@ export class TtlCache<T = unknown> {
 }
 
 export function buildCacheKey(credentialId: string, scopeKey: string): string {
-  return createHash('sha1').update(`${credentialId}:${scopeKey}`).digest('hex');
+  // sha256 used for deterministic cache-key derivation — not a security context.
+  return createHash('sha256').update(`${credentialId}:${scopeKey}`).digest('hex');
 }

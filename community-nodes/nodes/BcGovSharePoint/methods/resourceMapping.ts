@@ -46,6 +46,17 @@ function entryToField(displayName: string, entry: ColumnMapEntry): ResourceMappe
   return field;
 }
 
+function resolveSiteInput(siteRaw: { mode: string; value?: string }, siteValue: string): SiteInput {
+  if (siteRaw.mode === 'id') {
+    return { mode: 'id', value: siteRaw.value?.trim() ?? '' };
+  }
+  if (siteRaw.mode === 'hostPath') {
+    const [hostname, ...pathParts] = (siteRaw.value?.trim() ?? '').split('/');
+    return { mode: 'hostPath', hostname, path: `/${pathParts.join('/')}` };
+  }
+  return { mode: 'url', value: siteValue };
+}
+
 /**
  * Resource mapper backing for Item Create / Update / Create or Update.
  * Returns the writable columns for the selected list as ResourceMapperFields,
@@ -66,15 +77,7 @@ export async function getListColumns(this: ILoadOptionsFunctions): Promise<Resou
   // Resolve site
   const siteRaw = this.getNodeParameter('site', { mode: 'url', value: '' }) as { mode: string; value?: string };
   const siteValue = siteRaw.value?.trim() ? siteRaw.value : credentials.defaultSiteUrl;
-  const siteInput: SiteInput =
-    siteRaw.mode === 'id'
-      ? { mode: 'id', value: siteRaw.value?.trim() ?? '' }
-      : siteRaw.mode === 'hostPath'
-        ? (() => {
-            const [hostname, ...pathParts] = (siteRaw.value?.trim() ?? '').split('/');
-            return { mode: 'hostPath' as const, hostname, path: `/${pathParts.join('/')}` };
-          })()
-        : { mode: 'url', value: siteValue };
+  const siteInput: SiteInput = resolveSiteInput(siteRaw, siteValue);
   const { siteId } = await resolveSiteId(context, baseUrl, retry, siteInput);
 
   // Resolve list

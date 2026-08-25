@@ -27,6 +27,10 @@ import { getManyUsers } from './actions/user/getMany';
 import { downloadFile } from './actions/file/download';
 import { uploadFile, type UploadFileOptions } from './actions/file/upload';
 import { updateFile, type UpdateFileOptions } from './actions/file/update';
+import { getFile } from './actions/file/get';
+import { getManyFiles } from './actions/file/getMany';
+import { listFolder } from './actions/file/listFolder';
+import { deleteFile } from './actions/file/delete';
 import { getList } from './actions/list/get';
 import { getManyLists } from './actions/list/getMany';
 import { searchLists, searchDrives, getColumnNames } from './methods/loadOptions';
@@ -165,7 +169,11 @@ export class BcGovSharePoint implements INodeType {
         noDataExpression: true,
         displayOptions: { show: { resource: ['file'] } },
         options: [
+          { name: 'Delete', value: 'delete', action: 'Delete a file' },
           { name: 'Download', value: 'download', action: 'Download a file' },
+          { name: 'Get', value: 'get', action: 'Get file metadata' },
+          { name: 'Get Many', value: 'getMany', action: 'List and search files' },
+          { name: 'List Folder', value: 'listFolder', action: 'List files and folders' },
           { name: 'Update', value: 'update', action: "Update a file's metadata or content" },
           { name: 'Upload', value: 'upload', action: 'Upload a file' },
         ],
@@ -249,7 +257,7 @@ export class BcGovSharePoint implements INodeType {
         type: 'string',
         default: '',
         required: true,
-        displayOptions: { show: { resource: ['file'], fileOperation: ['download', 'update'] } },
+        displayOptions: { show: { resource: ['file'], fileOperation: ['download', 'get', 'update', 'delete'] } },
         description: 'The Graph drive-item ID of the file',
       },
       {
@@ -343,6 +351,39 @@ export class BcGovSharePoint implements INodeType {
         default: 5,
         displayOptions: { show: { resource: ['file'], fileOperation: ['upload'] } },
         description: 'Must be a multiple of 0.3125 MiB (320 KiB); only used above the 4 MiB simple-upload threshold',
+      },
+      {
+        displayName: 'Folder Path',
+        name: 'fileFolderPath',
+        type: 'string',
+        default: '',
+        displayOptions: { show: { resource: ['file'], fileOperation: ['listFolder', 'getMany'] } },
+        description:
+          'Folder path within the document library to list, e.g. Reports/2026. Leave empty for the library root.',
+      },
+      {
+        displayName: 'Name Filter',
+        name: 'fileNameFilter',
+        type: 'string',
+        default: '',
+        displayOptions: { show: { resource: ['file'], fileOperation: ['getMany'] } },
+        description: 'Filter files by name (case-insensitive contains match). Leave empty to return all files.',
+      },
+      {
+        displayName: 'Return All',
+        name: 'fileReturnAll',
+        type: 'boolean',
+        default: false,
+        displayOptions: { show: { resource: ['file'], fileOperation: ['listFolder', 'getMany'] } },
+      },
+      {
+        displayName: 'Limit',
+        name: 'fileLimit',
+        type: 'number',
+        default: 50,
+        displayOptions: {
+          show: { resource: ['file'], fileOperation: ['listFolder', 'getMany'], fileReturnAll: [false] },
+        },
       },
       {
         displayName: 'Include Columns',
@@ -678,139 +719,261 @@ async function executeItem(
 
   const siteRaw = this.getNodeParameter('site', itemIndex) as { mode: string; value?: string };
   const siteValue = siteRaw.value?.trim() ? siteRaw : { mode: 'url', value: credentials.defaultSiteUrl };
-  const { siteId } = await resolvers.resolveSiteId(parseSiteInput(siteValue));
+  const resolvedSite = await resolvers.resolveSiteId(parseSiteInput(siteValue));
+  const siteId = resolvedSite.siteId;
 
   if (resource === 'file') {
-    const driveRaw = this.getNodeParameter('drive', itemIndex) as { mode: string; value?: string };
-    const driveId = await resolvers.resolveDriveId(siteId, parseDriveInput(driveRaw));
-    const operation = this.getNodeParameter('fileOperation', itemIndex) as string;
-
-    if (operation === 'download') {
-      const itemId = this.getNodeParameter('itemId', itemIndex) as string;
-      const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
-      const { buffer, fileName, mimeType } = await downloadFile(context, baseUrl, retry, siteId, driveId, itemId);
-      const binary = await this.helpers.prepareBinaryData(buffer, fileName, mimeType);
-      return this.helpers.constructExecutionMetaData(
-        [{ json: { fileName, mimeType }, binary: { [outputField]: binary } }],
-        {
-          itemData: { item: itemIndex },
-        },
-      );
-    }
-
-    if (operation === 'upload') {
-      const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
-      const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
-      const folderPath = this.getNodeParameter('folderPath', itemIndex) as string;
-      const fileName = this.getNodeParameter('uploadFileName', itemIndex) as string;
-      const conflictBehavior = this.getNodeParameter(
-        'conflictBehavior',
-        itemIndex,
-      ) as UploadFileOptions['conflictBehavior'];
-      const createParentFolders = this.getNodeParameter('createParentFolders', itemIndex) as boolean;
-      const chunkSizeMiB = this.getNodeParameter('chunkSizeMiB', itemIndex) as number;
-      const result = await uploadFile(context, baseUrl, retry, siteId, driveId, folderPath, fileName, buffer, {
-        conflictBehavior,
-        chunkSizeBytes: Math.round(chunkSizeMiB * 1024 * 1024),
-        createParentFolders,
-      });
-      return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
-        itemData: { item: itemIndex },
-      });
-    }
-
-    // operation === 'update'
-    const itemId = this.getNodeParameter('itemId', itemIndex) as string;
-    const updateMode = this.getNodeParameter('updateMode', itemIndex) as UpdateFileOptions['mode'];
-    const updateOptions: UpdateFileOptions = { mode: updateMode };
-    if (updateMode === 'updateMetadata' || updateMode === 'both') {
-      updateOptions.metadata = parseFieldsJson.call(this, itemIndex, 'updateMetadataJson');
-    }
-    if (updateMode === 'replaceContents' || updateMode === 'both') {
-      const updateBinaryPropertyName = this.getNodeParameter('updateBinaryPropertyName', itemIndex) as string;
-      updateOptions.newContent = await this.helpers.getBinaryDataBuffer(itemIndex, updateBinaryPropertyName);
-    }
-    const result = await updateFile(context, baseUrl, retry, siteId, driveId, itemId, updateOptions);
-    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
-      itemData: { item: itemIndex },
-    });
+    return executeFileOperation.call(this, context, baseUrl, retry, resolvers, siteId, itemIndex);
   }
-
   if (resource === 'list') {
-    const operation = this.getNodeParameter('listOperation', itemIndex) as string;
-    const includeColumns = this.getNodeParameter('includeColumns', itemIndex) as boolean;
-
-    if (operation === 'get') {
-      const listRaw = this.getNodeParameter('listResourceId', itemIndex) as { mode: string; value?: string };
-      const listId = await resolvers.resolveListId(siteId, parseListInput(listRaw));
-      const columnMap = includeColumns ? await resolvers.getColumnMap(siteId, listId) : undefined;
-      const result = await getList(context, baseUrl, retry, siteId, listId, columnMap);
-      return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
-        itemData: { item: itemIndex },
-      });
-    }
-
-    // operation === 'getMany'
-    const includeHiddenLists = this.getNodeParameter('includeHiddenLists', itemIndex) as boolean;
-    const returnAll = this.getNodeParameter('listReturnAll', itemIndex) as boolean;
-    const limit = returnAll ? undefined : (this.getNodeParameter('listLimit', itemIndex) as number);
-    const result = await getManyLists(
+    return executeListOperation.call(this, context, baseUrl, retry, resolvers, siteId, itemIndex);
+  }
+  if (resource === 'user') {
+    return executeUserOperation.call(
+      this,
       context,
       baseUrl,
       retry,
       siteId,
-      { includeHiddenLists, returnAll, limit },
-      includeColumns ? (listId: string) => resolvers.getColumnMap(siteId, listId) : undefined,
+      itemIndex,
+      resolvedSite,
+      siteValue,
+      credentials,
     );
+  }
+  return executeItemOperation.call(this, context, baseUrl, retry, resolvers, siteId, itemIndex);
+}
+
+async function executeFileOperation(
+  this: IExecuteFunctions,
+  context: GraphContext & BinaryRequestContext,
+  baseUrl: string,
+  retry: RetryOptions,
+  resolvers: ReturnType<typeof createCachedResolvers>,
+  siteId: string,
+  itemIndex: number,
+): Promise<INodeExecutionData[]> {
+  const driveRaw = this.getNodeParameter('drive', itemIndex) as { mode: string; value?: string };
+  const driveId = await resolvers.resolveDriveId(siteId, parseDriveInput(driveRaw));
+  const operation = this.getNodeParameter('fileOperation', itemIndex) as string;
+
+  if (operation === 'download') {
+    const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+    const outputField = this.getNodeParameter('outputBinaryPropertyName', itemIndex) as string;
+    const { buffer, fileName, mimeType } = await downloadFile(context, baseUrl, retry, siteId, driveId, itemId);
+    const binary = await this.helpers.prepareBinaryData(buffer, fileName, mimeType);
+    return this.helpers.constructExecutionMetaData(
+      [{ json: { fileName, mimeType }, binary: { [outputField]: binary } }],
+      { itemData: { item: itemIndex } },
+    );
+  }
+
+  if (operation === 'upload') {
+    const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
+    const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
+    const folderPath = this.getNodeParameter('folderPath', itemIndex) as string;
+    const fileName = this.getNodeParameter('uploadFileName', itemIndex) as string;
+    const conflictBehavior = this.getNodeParameter(
+      'conflictBehavior',
+      itemIndex,
+    ) as UploadFileOptions['conflictBehavior'];
+    const createParentFolders = this.getNodeParameter('createParentFolders', itemIndex) as boolean;
+    const chunkSizeMiB = this.getNodeParameter('chunkSizeMiB', itemIndex) as number;
+    const result = await uploadFile(context, baseUrl, retry, { siteId, driveId, folderPath, fileName }, buffer, {
+      conflictBehavior,
+      chunkSizeBytes: Math.round(chunkSizeMiB * 1024 * 1024),
+      createParentFolders,
+    });
     return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
       itemData: { item: itemIndex },
     });
   }
 
-  if (resource === 'user') {
-    const operation = this.getNodeParameter('userOperation', itemIndex) as string;
-    if (operation === 'getLookupId') {
-      const email = this.getNodeParameter('email', itemIndex) as string;
-      const onNotFound = this.getNodeParameter('onNotFound', itemIndex) as 'error' | 'continue' | 'ensureUser';
-
-      // For ensureUser fallback, we need the site hostname + path
-      let siteHostname: string | undefined;
-      let sitePath: string | undefined;
-      if (onNotFound === 'ensureUser') {
-        const rawSiteUrl = siteRaw.value?.trim() || credentials.defaultSiteUrl;
-        try {
-          const parsed = new URL(rawSiteUrl);
-          siteHostname = parsed.hostname;
-          sitePath = parsed.pathname.replace(/\/$/, '');
-        } catch {
-          // If we can't parse the URL, ensureUser will fail with a clear message
-        }
-      }
-
-      const result = await getUserLookupId(context, baseUrl, retry, siteId, email, onNotFound, siteHostname, sitePath);
-      return this.helpers.constructExecutionMetaData(
-        this.helpers.returnJsonArray((result ?? { email, lookupId: null }) as IDataObject),
-        {
-          itemData: { item: itemIndex },
-        },
-      );
-    }
-    if (operation === 'getMany') {
-      const excludeSystemAccounts = this.getNodeParameter('excludeSystemAccounts', itemIndex) as boolean;
-      const returnAll = this.getNodeParameter('userReturnAll', itemIndex) as boolean;
-      const limit = returnAll ? undefined : (this.getNodeParameter('userLimit', itemIndex) as number);
-      const result = await getManyUsers(context, baseUrl, retry, siteId, {
-        excludeSystemAccounts,
-        returnAll,
-        limit,
-      });
-      return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
-        itemData: { item: itemIndex },
-      });
-    }
-    throw new NodeOperationError(this.getNode(), `Unknown user operation "${operation}"`, { itemIndex });
+  if (operation === 'get') {
+    const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+    const result = await getFile(context, baseUrl, retry, siteId, driveId, itemId);
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
   }
 
+  if (operation === 'getMany') {
+    const folderPath = this.getNodeParameter('fileFolderPath', itemIndex) as string;
+    const nameFilter = this.getNodeParameter('fileNameFilter', itemIndex, '') as string;
+    const returnAll = this.getNodeParameter('fileReturnAll', itemIndex) as boolean;
+    const limit = returnAll ? undefined : (this.getNodeParameter('fileLimit', itemIndex) as number);
+    const result = await getManyFiles(context, baseUrl, retry, siteId, driveId, {
+      folderPath,
+      nameFilter: nameFilter || undefined,
+      returnAll,
+      limit,
+    });
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
+  }
+
+  if (operation === 'listFolder') {
+    const folderPath = this.getNodeParameter('fileFolderPath', itemIndex) as string;
+    const returnAll = this.getNodeParameter('fileReturnAll', itemIndex) as boolean;
+    const limit = returnAll ? undefined : (this.getNodeParameter('fileLimit', itemIndex) as number);
+    const result = await listFolder(context, baseUrl, retry, siteId, driveId, { folderPath, returnAll, limit });
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
+  }
+
+  if (operation === 'delete') {
+    const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+    const result = await deleteFile(context, baseUrl, retry, siteId, driveId, itemId);
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
+  }
+
+  // operation === 'update'
+  const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+  const updateMode = this.getNodeParameter('updateMode', itemIndex) as UpdateFileOptions['mode'];
+  const updateOptions: UpdateFileOptions = { mode: updateMode };
+  if (updateMode === 'updateMetadata' || updateMode === 'both') {
+    updateOptions.metadata = parseFieldsJson.call(this, itemIndex, 'updateMetadataJson');
+  }
+  if (updateMode === 'replaceContents' || updateMode === 'both') {
+    const updateBinaryPropertyName = this.getNodeParameter('updateBinaryPropertyName', itemIndex) as string;
+    updateOptions.newContent = await this.helpers.getBinaryDataBuffer(itemIndex, updateBinaryPropertyName);
+  }
+  const result = await updateFile(context, baseUrl, retry, siteId, driveId, itemId, updateOptions);
+  return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+    itemData: { item: itemIndex },
+  });
+}
+
+async function executeListOperation(
+  this: IExecuteFunctions,
+  context: GraphContext & BinaryRequestContext,
+  baseUrl: string,
+  retry: RetryOptions,
+  resolvers: ReturnType<typeof createCachedResolvers>,
+  siteId: string,
+  itemIndex: number,
+): Promise<INodeExecutionData[]> {
+  const operation = this.getNodeParameter('listOperation', itemIndex) as string;
+  const includeColumns = this.getNodeParameter('includeColumns', itemIndex) as boolean;
+
+  if (operation === 'get') {
+    const listRaw = this.getNodeParameter('listResourceId', itemIndex) as { mode: string; value?: string };
+    const listId = await resolvers.resolveListId(siteId, parseListInput(listRaw));
+    const columnMap = includeColumns ? await resolvers.getColumnMap(siteId, listId) : undefined;
+    const result = await getList(context, baseUrl, retry, siteId, listId, columnMap);
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
+  }
+
+  // operation === 'getMany'
+  const includeHiddenLists = this.getNodeParameter('includeHiddenLists', itemIndex) as boolean;
+  const returnAll = this.getNodeParameter('listReturnAll', itemIndex) as boolean;
+  const limit = returnAll ? undefined : (this.getNodeParameter('listLimit', itemIndex) as number);
+  const result = await getManyLists(
+    context,
+    baseUrl,
+    retry,
+    siteId,
+    { includeHiddenLists, returnAll, limit },
+    includeColumns ? (listId: string) => resolvers.getColumnMap(siteId, listId) : undefined,
+  );
+  return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+    itemData: { item: itemIndex },
+  });
+}
+
+interface UserOperationContext {
+  resolvedSite: { hostname: string; siteId: string; siteCollectionId: string; webId: string };
+  siteValue: { mode: string; value?: string };
+  credentials: BcGovSharePointCredentials;
+}
+
+async function executeUserOperation(
+  this: IExecuteFunctions,
+  context: GraphContext & BinaryRequestContext,
+  baseUrl: string,
+  retry: RetryOptions,
+  siteId: string,
+  itemIndex: number,
+  resolvedSite: UserOperationContext['resolvedSite'],
+  siteValue: UserOperationContext['siteValue'],
+  credentials: BcGovSharePointCredentials,
+): Promise<INodeExecutionData[]> {
+  const operation = this.getNodeParameter('userOperation', itemIndex) as string;
+
+  if (operation === 'getLookupId') {
+    const email = this.getNodeParameter('email', itemIndex) as string;
+    const onNotFound = this.getNodeParameter('onNotFound', itemIndex) as 'error' | 'continue' | 'ensureUser';
+    const siteInfo = resolveEnsureUserSiteInfo(resolvedSite, siteValue, credentials, onNotFound);
+    const result = await getUserLookupId(context, baseUrl, retry, siteId, email, onNotFound, siteInfo);
+    return this.helpers.constructExecutionMetaData(
+      this.helpers.returnJsonArray((result ?? { email, lookupId: null }) as IDataObject),
+      { itemData: { item: itemIndex } },
+    );
+  }
+
+  if (operation === 'getMany') {
+    const excludeSystemAccounts = this.getNodeParameter('excludeSystemAccounts', itemIndex) as boolean;
+    const returnAll = this.getNodeParameter('userReturnAll', itemIndex) as boolean;
+    const limit = returnAll ? undefined : (this.getNodeParameter('userLimit', itemIndex) as number);
+    const result = await getManyUsers(context, baseUrl, retry, siteId, { excludeSystemAccounts, returnAll, limit });
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
+  }
+
+  throw new NodeOperationError(this.getNode(), `Unknown user operation "${operation}"`, { itemIndex });
+}
+
+function resolveEnsureUserSiteInfo(
+  resolvedSite: { hostname: string },
+  siteValue: { mode: string; value?: string },
+  credentials: BcGovSharePointCredentials,
+  onNotFound: string,
+): { hostname: string; path: string } | undefined {
+  if (onNotFound !== 'ensureUser') return undefined;
+
+  const siteHostname = resolvedSite.hostname;
+  let sitePath: string | undefined;
+
+  const parsedInput = parseSiteInput(siteValue);
+  if (parsedInput.mode === 'url') {
+    try {
+      const parsed = new URL(parsedInput.value);
+      sitePath = parsed.pathname.replace(/\/$/, '');
+    } catch {
+      // Fall through
+    }
+  } else if (parsedInput.mode === 'hostPath') {
+    sitePath = parsedInput.path;
+  } else {
+    try {
+      const parsed = new URL(credentials.defaultSiteUrl);
+      if (parsed.hostname === siteHostname) {
+        sitePath = parsed.pathname.replace(/\/$/, '');
+      }
+    } catch {
+      // sitePath stays undefined
+    }
+  }
+
+  return sitePath ? { hostname: siteHostname, path: sitePath } : undefined;
+}
+
+async function executeItemOperation(
+  this: IExecuteFunctions,
+  context: GraphContext & BinaryRequestContext,
+  baseUrl: string,
+  retry: RetryOptions,
+  resolvers: ReturnType<typeof createCachedResolvers>,
+  siteId: string,
+  itemIndex: number,
+): Promise<INodeExecutionData[]> {
   const operation = this.getNodeParameter('itemOperation', itemIndex) as string;
   const listRaw = this.getNodeParameter('list', itemIndex) as { mode: string; value?: string };
   const listId = await resolvers.resolveListId(siteId, parseListInput(listRaw));
@@ -850,12 +1013,9 @@ async function executeItem(
     const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
     const limit = returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number);
     const simpleConditionsRaw = (
-      this.getNodeParameter('simpleConditions', itemIndex, {}) as {
-        condition?: SimpleFilterCondition[];
-      }
+      this.getNodeParameter('simpleConditions', itemIndex, {}) as { condition?: SimpleFilterCondition[] }
     ).condition;
     const odataFilter = this.getNodeParameter('odataFilter', itemIndex, '') as string;
-
     const result = await getManyItems(context, baseUrl, retry, siteId, listId, columnMap, {
       filterMode,
       simpleConditions: simpleConditionsRaw,
@@ -871,19 +1031,7 @@ async function executeItem(
   }
 
   const columnMap = await resolvers.getColumnMap(siteId, listId);
-  const fieldInputMode = this.getNodeParameter('fieldInputMode', itemIndex) as 'json' | 'fields';
-  let rawFields: IDataObject;
-  if (fieldInputMode === 'fields') {
-    const entries =
-      (this.getNodeParameter('fieldEntries', itemIndex, {}) as { field?: Array<{ column: string; value: string }> })
-        .field ?? [];
-    rawFields = {};
-    for (const entry of entries) {
-      if (entry.column) rawFields[entry.column] = entry.value;
-    }
-  } else {
-    rawFields = parseFieldsJson.call(this, itemIndex, 'fieldsJson');
-  }
+  const rawFields = readFieldsFromInput.call(this, itemIndex);
 
   if (operation === 'create') {
     const result = await createItem(context, baseUrl, retry, siteId, listId, columnMap, rawFields);
@@ -894,7 +1042,7 @@ async function executeItem(
 
   if (operation === 'update') {
     const itemId = this.getNodeParameter('itemId', itemIndex) as string;
-    const result = await updateItem(context, baseUrl, retry, siteId, listId, itemId, columnMap, rawFields);
+    const result = await updateItem(context, baseUrl, retry, { siteId, listId, itemId }, columnMap, rawFields);
     return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
       itemData: { item: itemIndex },
     });
@@ -902,11 +1050,34 @@ async function executeItem(
 
   if (operation === 'createOrUpdate') {
     const matchFields = parseFieldsJson.call(this, itemIndex, 'matchFieldsJson');
-    const result = await createOrUpdateItem(context, baseUrl, retry, siteId, listId, columnMap, rawFields, matchFields);
+    const result = await createOrUpdateItem(
+      context,
+      baseUrl,
+      retry,
+      { siteId, listId },
+      columnMap,
+      rawFields,
+      matchFields,
+    );
     return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
       itemData: { item: itemIndex },
     });
   }
 
   throw new NodeOperationError(this.getNode(), `Unknown item operation "${operation}"`, { itemIndex });
+}
+
+function readFieldsFromInput(this: IExecuteFunctions, itemIndex: number): IDataObject {
+  const fieldInputMode = this.getNodeParameter('fieldInputMode', itemIndex) as 'json' | 'fields';
+  if (fieldInputMode === 'fields') {
+    const entries =
+      (this.getNodeParameter('fieldEntries', itemIndex, {}) as { field?: Array<{ column: string; value: string }> })
+        .field ?? [];
+    const rawFields: IDataObject = {};
+    for (const entry of entries) {
+      if (entry.column) rawFields[entry.column] = entry.value;
+    }
+    return rawFields;
+  }
+  return parseFieldsJson.call(this, itemIndex, 'fieldsJson');
 }

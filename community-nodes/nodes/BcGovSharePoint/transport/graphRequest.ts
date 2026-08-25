@@ -60,7 +60,7 @@ export async function graphRequest<T = unknown>(
         throw new NodeApiError(context.getNode(), error as JsonObject);
       }
       const backoffMs = getRetryAfterMs(error) ?? (retry.baseDelayMs ?? DEFAULT_BASE_DELAY_MS) * 2 ** attempt;
-      await delay(backoffMs + Math.random() * 100);
+      await delay(backoffMs + Math.random() * 100); // NOSONAR — non-cryptographic jitter for retry backoff
     }
   }
 
@@ -170,7 +170,7 @@ export async function graphBinaryRequest(
         throw new NodeApiError(context.getNode(), error as JsonObject);
       }
       const backoffMs = getRetryAfterMs(error) ?? (retry.baseDelayMs ?? DEFAULT_BASE_DELAY_MS) * 2 ** attempt;
-      await delay(backoffMs + Math.random() * 100);
+      await delay(backoffMs + Math.random() * 100); // NOSONAR — non-cryptographic jitter for retry backoff
     }
   }
 

@@ -66,7 +66,7 @@ export function coerceBoolean(fieldLabel: string, value: unknown): boolean {
 export function coerceNumber(fieldLabel: string, value: unknown): number {
   const num = typeof value === 'number' ? value : Number(value);
   if (Number.isNaN(num)) {
-    throw new Error(`Field "${fieldLabel}" must be a number — received: ${JSON.stringify(value)}`);
+    throw new TypeError(`Field "${fieldLabel}" must be a number — received: ${JSON.stringify(value)}`);
   }
   return num;
 }
