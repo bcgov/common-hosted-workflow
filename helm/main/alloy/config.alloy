@@ -145,10 +145,45 @@ loki.source.kubernetes "n8n_system_logs" {
 }
 
 // Label system logs distinctly from n8n log-streaming events (job="n8n-log-streaming").
+// Also extracts level/module from JSON-structured logs and tags execution-lifecycle
+// messages so alert rules can use stream label selectors instead of regex blocklists.
 loki.process "n8n_system_logs" {
   stage.static_labels {
     values = {
       job = "n8n-system-logs",
+    }
+  }
+
+  // Extract level and module from JSON-structured n8n application logs.
+  // Plain text lines (runner/lifecycle messages) produce empty strings — they remain
+  // distinguishable from JSON logs by level="" in stream label selectors.
+  stage.json {
+    expressions = {
+      log_level  = "level",
+      log_module = "module",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level  = "log_level",
+      module = "log_module",
+    }
+  }
+
+  // Tag execution-lifecycle messages with log_context=execution so alert rules can
+  // exclude workflow noise with a stream label selector instead of growing regex lists.
+  // Covers: worker start/finish, queue enqueue, runner lifecycle, node execution errors,
+  // n8n's built-in workflow failure log lines, and task-runner JavaScript stack traces.
+  // Note: the leading "Error: <user message>" line from Code node throws is indistinguishable
+  // from infrastructure errors in plain text — only the stack trace continuation lines are tagged.
+  stage.match {
+    selector = `{job="n8n-system-logs"} |~ "(?i)(execution [0-9]|enqueued execution|worker (started|finished) execution|node has thrown|registered runner|runner process exited|task broker|launcher:js|there was a problem running|workflow execution failed|error in node execution|NodeError:|\[line [0-9]+\])"`
+
+    stage.static_labels {
+      values = {
+        log_context = "execution",
+      }
     }
   }
 

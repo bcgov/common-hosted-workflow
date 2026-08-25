@@ -1,0 +1,37 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: n8n-ops-email
+    receivers:
+      - uid: n8n-ops-email
+        type: email
+        settings:
+          addresses: $__env{GRAFANA_ALERT_EMAIL_TO}
+          subject: '{{ template "n8n.alert.subject" . }}'
+          message: '{{ template "n8n.alert.body" . }}'
+          singleEmail: true
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: n8n-workflows-email
+    receivers:
+      - uid: n8n-workflows-email
+        type: email
+        settings:
+          addresses: $__env{GRAFANA_ALERT_EMAIL_WORKFLOWS}
+          subject: '{{ template "n8n.alert.subject" . }}'
+          message: '{{ template "n8n.alert.body" . }}'
+          singleEmail: true
+        disableResolveMessage: true
+
+  # Template for adding a new team contact point:
+  # - orgId: 1
+  #   name: infra-team-email
+  #   receivers:
+  #     - uid: infra-team-email
+  #       type: email
+  #       settings:
+  #         addresses: $__env{GRAFANA_ALERT_EMAIL_INFRA}
+  #         singleEmail: true
+  #       disableResolveMessage: false

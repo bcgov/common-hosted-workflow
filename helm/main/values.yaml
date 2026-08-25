@@ -490,6 +490,13 @@ alloy:
         port: 5514
         targetPort: 5514
         protocol: TCP
+  # config-reloader defaults (runAsUser: 65534, container-level seccompProfile) violate OpenShift restricted-v2 SCC.
+  # Null out both so OCP assigns the UID from the namespace range and handles seccomp at the pod level.
+  configReloader:
+    securityContext:
+      runAsUser: null
+      runAsGroup: null
+      seccompProfile: null
 
 # See https://github.com/grafana/loki/tree/main/production/helm/loki
 loki:
@@ -639,6 +646,12 @@ grafana:
         name: chwf # pragma: allowlist secret
         key: OIDC_CLIENT_SECRET
   grafana.ini:
+    smtp:
+      enabled: true
+      host: apps.smtp.gov.bc.ca:25
+      from_address: DoNotReplyCITZ@gov.bc.ca
+      from_name: Grafana Alerts
+      startTLS_policy: NoStartTLS
     auth:
       disable_login_form: true
     auth.generic_oauth:
@@ -655,6 +668,11 @@ grafana:
       folderAnnotation: grafana_dashboard_folder
       provider:
         foldersFromFilesStructure: true
+    alerts:
+      enabled: true
+      label: grafana_alert
+      labelValue: "1"
+      reloadURL: http://localhost:3000/api/admin/provisioning/alerting/reload
   # Helm/OpenShift datasource provisioning.
   # Docker-compose equivalents: docker-compose/observability/grafana/datasources.yaml and dashboards.yaml
   # Keep in sync when adding or changing datasources.

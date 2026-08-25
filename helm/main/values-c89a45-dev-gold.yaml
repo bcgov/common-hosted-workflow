@@ -157,6 +157,18 @@ grafana:
     enabled: true
     host: dev-grafana-workflow.apps.gold.devops.gov.bc.ca
   enabled: true
+  # Prerequisites: the `chwf-grafana` secret must contain these keys before deploying.
+  # Add them with: oc patch secret chwf-grafana -n <namespace> --type=merge \
+  #   -p '{"stringData":{"GRAFANA_ALERT_EMAIL_TO":"ops@example.com","GRAFANA_ALERT_EMAIL_WORKFLOWS":"workflows@example.com"}}'
+  envValueFrom:
+    GRAFANA_ALERT_EMAIL_TO:
+      secretKeyRef:
+        name: chwf-grafana # pragma: allowlist secret
+        key: GRAFANA_ALERT_EMAIL_TO
+    GRAFANA_ALERT_EMAIL_WORKFLOWS:
+      secretKeyRef:
+        name: chwf-grafana # pragma: allowlist secret
+        key: GRAFANA_ALERT_EMAIL_WORKFLOWS
   grafana.ini:
     server:
       root_url: https://dev-grafana-workflow.apps.gold.devops.gov.bc.ca
