@@ -1,0 +1,15 @@
+{{- if .Values.grafana.enabled }}
+{{- range $path, $_ := .Files.Glob "grafana-alerting/**/*.yaml" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" $ }}-alert-{{ base $path | trimSuffix ".yaml" }}
+  labels:
+    {{- include "_.labels" $ | nindent 4 }}
+    grafana_alert: "1"
+data:
+  {{ base $path }}: |
+    {{- $.Files.Get $path | replace "__NAMESPACE__" $.Release.Namespace | nindent 4 }}
+{{- end }}
+{{- end }}
