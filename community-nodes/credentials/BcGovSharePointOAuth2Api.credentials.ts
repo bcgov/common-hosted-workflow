@@ -10,7 +10,7 @@ export class BcGovSharePointOAuth2Api implements ICredentialType {
   name = 'bcGovSharePointOAuth2Api';
   icon: Icon = { light: 'file:../icons/sharepoint.svg', dark: 'file:../icons/sharepoint.dark.svg' };
   displayName = 'BC Gov SharePoint OAuth2 API';
-  documentationUrl = 'https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/bcgov-sharepoint';
+  documentationUrl = 'https://bcgov.github.io/common-hosted-workflow/community-nodes/bcgov-sharepoint/credentials';
   extends = ['oAuth2Api'];
   properties: INodeProperties[] = [
     {
