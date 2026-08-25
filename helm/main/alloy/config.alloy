@@ -174,11 +174,13 @@ loki.process "n8n_system_logs" {
   // Tag execution-lifecycle messages with log_context=execution so alert rules can
   // exclude workflow noise with a stream label selector instead of growing regex lists.
   // Covers: worker start/finish, queue enqueue, runner lifecycle, node execution errors,
-  // n8n's built-in workflow failure log lines, and task-runner JavaScript stack traces.
+  // and n8n's built-in workflow failure log lines.
+  //
   // Note: the leading "Error: <user message>" line from Code node throws is indistinguishable
-  // from infrastructure errors in plain text — only the stack trace continuation lines are tagged.
+  // from infrastructure errors in plain text and cannot be reliably classified here.
+  // Known execution-related continuation lines are tagged where their format is identifiable.
   stage.match {
-    selector = `{job="n8n-system-logs"} |~ "(?i)(execution [0-9]|enqueued execution|worker (started|finished) execution|node has thrown|registered runner|runner process exited|task broker|launcher:js|there was a problem running|workflow execution failed|error in node execution|NodeError:|\[line [0-9]+\])"`
+    selector = `{job="n8n-system-logs"} |~ "(?i)(execution [0-9]|enqueued execution|worker (started|finished) execution|node has thrown|registered runner|runner process exited|task broker|launcher:js|there was a problem running|workflow execution failed|error in node execution|NodeError:)"`
 
     stage.static_labels {
       values = {

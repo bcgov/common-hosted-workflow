@@ -491,8 +491,12 @@ alloy:
         port: 5514
         targetPort: 5514
         protocol: TCP
-  # config-reloader defaults (runAsUser: 65534, container-level seccompProfile) violate OpenShift restricted-v2 SCC.
-  # Null out both so OCP assigns the UID from the namespace range and handles seccomp at the pod level.
+  # config-reloader defaults include a fixed UID (65534), which is incompatible
+  # with OpenShift restricted-v2's namespace UID range.
+  #
+  # Let OpenShift assign the UID/GID instead of forcing the image's nobody UID.
+  # Also remove the chart-level seccomp setting so OpenShift's restricted-v2 SCC
+  # can apply its default runtime/default seccomp policy.
   configReloader:
     securityContext:
       runAsUser: null
@@ -669,6 +673,8 @@ grafana:
       folderAnnotation: grafana_dashboard_folder
       provider:
         foldersFromFilesStructure: true
+    # Sidecar watches for ConfigMaps labelled grafana_alert=1 and hot-reloads
+    # Grafana's alert provisioning without a pod restart.
     alerts:
       enabled: true
       label: grafana_alert
