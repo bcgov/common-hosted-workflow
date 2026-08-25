@@ -30,6 +30,21 @@ groups:
               instant: true
               queryType: instant
               refId: A
+          - refId: G
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              expr: 'topk(10, sum by (error_line) (count_over_time({job="n8n-system-logs", level="", log_context!="execution"} |~ "(?i)(error|exception|fatal|panic)" | regexp "(?i)(?P<error_line>(?:error|exception|fatal|panic).{0,100})" [5m])))'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: G
           - refId: B
             datasourceUid: __expr__
             model:
@@ -59,6 +74,7 @@ groups:
         annotations:
           summary: "Infrastructure-level errors were detected in n8n pods."
           description: 'Unstructured error lines appeared in pod logs in the last 5 minutes. These catch Redis/database connection failures, startup crashes, and runner panics. Workflow node failures are excluded.'
+          error_messages: '{{ range $k, $v := $values }}{{ if $v.Labels.error_line }}• {{ $v.Labels.error_line }}{{ "\n" }}{{ end }}{{ end }}'
         labels:
           category: infrastructure
           environment: __NAMESPACE__
@@ -83,7 +99,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: 'sum(count_over_time({job="n8n-system-logs", level="error"} | module != "ErrorHandler" [5m]))'
+              expr: 'sum(count_over_time({job="n8n-system-logs", level="error", log_context!="execution"} | module != "ErrorHandler" [5m]))'
               hide: false
               instant: true
               queryType: instant
@@ -98,7 +114,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: 'topk(5, sum by (msg) (count_over_time({job="n8n-system-logs", level="error", module!="ErrorHandler"} | json msg | msg != "" [5m])))'
+              expr: 'sum by (message) (count_over_time({job="n8n-system-logs", level="error", log_context!="execution", module!="ErrorHandler"} | json message | message != "" [5m]))'
               hide: false
               instant: true
               queryType: instant
@@ -132,7 +148,7 @@ groups:
         annotations:
           summary: "JSON-structured errors were detected in n8n pods."
           description: 'Error-level log entries appeared from non-ErrorHandler modules in the last 5 minutes. These are application-level errors from infrastructure components such as the database, queue, or scheduler. Workflow node failures are excluded.'
-          error_messages: '{{ range $k, $v := $values }}{{ if $v.Labels.msg }}• {{ $v.Labels.msg }}{{ "\n" }}{{ end }}{{ end }}'
+          error_messages: '{{ range $k, $v := $values }}{{ if $v.Labels.message }}• {{ $v.Labels.message }}{{ "\n" }}{{ end }}{{ end }}'
         labels:
           category: infrastructure
           environment: __NAMESPACE__

@@ -28,7 +28,7 @@ templates:
       ────────────────────────────────────────────────────────
       {{ .Annotations.description }}
       {{ if eq .Labels.category "workflow" -}}
-      {{ if .Annotations.workflow_failures -}}
+      {{ if .Annotations.workflow_failures }}
       Failed workflows
       ────────────────────────────────────────────────────────
       {{ .Annotations.workflow_failures }}
@@ -38,7 +38,7 @@ templates:
       📊 n8n Executions
       {{ $.ExternalURL }}d/n8n-executions/n8n-executions?from={{ with .StartsAt.UTC.Add -300000000000 }}{{ .UnixMilli }}{{ end }}&to={{ with .StartsAt.UTC.Add 300000000000 }}{{ .UnixMilli }}{{ end }}&refresh=30s
       {{ else if eq .Labels.category "infrastructure" -}}
-      {{ if .Annotations.error_messages -}}
+      {{ if .Annotations.error_messages }}
       Recent errors
       {{ .Annotations.error_messages }}
       {{ end -}}

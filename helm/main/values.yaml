@@ -111,6 +111,7 @@ n8n:
     N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"
     # Log streaming — event list is in logStreaming.subscribedEvents.
     # Rendered to JSON by configmaps/n8n-log-streaming.yaml and injected via extraEnv below.
+    N8N_LOG_FORMAT: "json"
     N8N_LOG_STREAMING_MANAGED_BY_ENV: "false"
 
   extraEnv:
