@@ -26,7 +26,7 @@ function getOptions(ctx: IExecuteFunctions, itemIndex: number): ExtractionOption
     pageSegmentationMode: ctx.getNodeParameter('pageSegmentationMode', 0) as PageSegmentationMode,
     renderScale: ctx.getNodeParameter('renderScale', itemIndex) as number,
     maxPages: ctx.getNodeParameter('maxPages', itemIndex) as number,
-    minimumTextLength: ctx.getNodeParameter('minimumTextLength', itemIndex) as number,
+    minimumTextLength: ctx.getNodeParameter('minimumTextLength', itemIndex, 20) as number,
     pageSeparator: ctx.getNodeParameter('pageSeparator', itemIndex) as string,
     maxCharacters: ctx.getNodeParameter('maxCharacters', itemIndex) as number,
     documentTimeoutMs: ctx.getNodeParameter('documentTimeoutMs', 0) as number,
