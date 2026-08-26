@@ -8,6 +8,7 @@ allowBuilds:
   oracledb: false
   protobufjs: false
   ssh2: false
+  tesseract.js: false
   unrs-resolver: false
 confirmModulesPurge: false
 blockExoticSubdeps: false

@@ -45,6 +45,7 @@
       "dist/nodes/CHEFSResubmitWait/CHEFSResubmitWait.node.js",
       "dist/nodes/CHEFSSubmissionExtractor/CHEFSSubmissionExtractor.node.js",
       "dist/nodes/DevXMessageConnector/DevXMessageConnector.node.js",
+      "dist/nodes/DocumentTextExtractor/DocumentTextExtractor.node.js",
       "dist/nodes/OidcToken/OidcToken.node.js",
       "dist/nodes/MultiWebhookWait/MultiWebhookWait.node.js",
       "dist/nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node.js"
@@ -71,7 +72,10 @@
     "n8n-workflow": "^2.16.0"
   },
   "dependencies": {
+    "image-size": "2.0.2",
+    "pdf-parse": "2.4.5",
     "sanitize-html": "^2.17.6",
+    "tesseract.js": "6.0.1",
     "zod": "^4.4.3"
   },
   "pnpm": {
