@@ -51,7 +51,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@n8n/eslint-plugin-community-nodes": "^0.29.0",
-    "@n8n/node-cli": "^0.44.0",
+    "@n8n/node-cli": "^0.45.0",
     "@types/node": "^26.2.0",
     "@types/sanitize-html": "^2.16.1",
     "eslint": "10.8.1",
