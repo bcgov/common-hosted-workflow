@@ -88,7 +88,7 @@ services:
   grafana:
     <<: *common-props
     container_name: grafana
-    image: grafana/grafana:12.4.8
+    image: grafana/grafana:12.4.9
     environment:
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_SECURITY_ADMIN_USER: admin
