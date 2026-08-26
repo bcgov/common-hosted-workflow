@@ -34,6 +34,86 @@ function getOptions(ctx: IExecuteFunctions, itemIndex: number): ExtractionOption
   };
 }
 
+function validateLanguage(ctx: IExecuteFunctions, language: string): void {
+  if (!/^\w{2,16}(?:\+\w{2,16}){0,4}$/.test(language)) {
+    throw new NodeOperationError(ctx.getNode(), 'OCR Language must contain up to five language codes separated by +');
+  }
+}
+
+function validateDestinationField(ctx: IExecuteFunctions, value: string, itemIndex: number): void {
+  if (!value) {
+    throw new NodeOperationError(ctx.getNode(), 'Destination Field is required', { itemIndex });
+  }
+}
+
+function validatePageSeparator(ctx: IExecuteFunctions, value: string, itemIndex: number): void {
+  if (value.length > 1000) {
+    throw new NodeOperationError(ctx.getNode(), 'Page Separator cannot exceed 1,000 characters', {
+      itemIndex,
+    });
+  }
+}
+
+function validateFileSize(ctx: IExecuteFunctions, buffer: Buffer, itemIndex: number): void {
+  if (buffer.length > MAX_FILE_SIZE_BYTES) {
+    throw new NodeOperationError(ctx.getNode(), 'The input file exceeds the 25 MB limit', { itemIndex });
+  }
+}
+
+function buildSuccessOutput(
+  item: INodeExecutionData,
+  result: Awaited<ReturnType<typeof extractDocumentText>>,
+  binary: { fileName?: string; mimeType?: string },
+  destinationField: string,
+  itemIndex: number,
+): INodeExecutionData {
+  return {
+    json: {
+      ...item.json,
+      [destinationField]: {
+        ...result,
+        pages: result.pages as unknown as IDataObject[],
+        sourceFileName: binary.fileName ?? null,
+        sourceMimeType: binary.mimeType ?? null,
+      },
+    },
+    pairedItem: { item: itemIndex },
+  };
+}
+
+function buildErrorOutput(item: INodeExecutionData, error: unknown, itemIndex: number): INodeExecutionData {
+  return {
+    json: { ...item.json, error: getErrorMessage(error) },
+    pairedItem: { item: itemIndex },
+  };
+}
+
+function rethrowAsNodeError(ctx: IExecuteFunctions, error: unknown, itemIndex: number): never {
+  if (error instanceof NodeOperationError) throw error;
+  throw new NodeOperationError(ctx.getNode(), getErrorMessage(error), { itemIndex });
+}
+
+async function processItem(
+  ctx: IExecuteFunctions,
+  item: INodeExecutionData,
+  itemIndex: number,
+  ocrEngine: OcrProvider & { terminate(): Promise<void> },
+): Promise<INodeExecutionData> {
+  const binaryPropertyName = ctx.getNodeParameter('binaryPropertyName', itemIndex) as string;
+  const destinationField = (ctx.getNodeParameter('destinationField', itemIndex) as string).trim();
+  validateDestinationField(ctx, destinationField, itemIndex);
+
+  const options = getOptions(ctx, itemIndex);
+  validatePageSeparator(ctx, options.pageSeparator, itemIndex);
+
+  const binary = ctx.helpers.assertBinaryData(itemIndex, binaryPropertyName);
+  const buffer = await ctx.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
+  validateFileSize(ctx, buffer, itemIndex);
+
+  const result = await extractDocumentText(buffer, binary.mimeType, options, ocrEngine);
+  return buildSuccessOutput(item, result, binary, destinationField, itemIndex);
+}
+
 export class DocumentTextExtractor implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Document Text Extractor',
@@ -187,12 +267,7 @@ export class DocumentTextExtractor implements INodeType {
     if (items.length === 0) return [[]];
 
     const language = (this.getNodeParameter('language', 0) as string).trim();
-    if (!/^[a-zA-Z0-9_]{2,16}(?:\+[a-zA-Z0-9_]{2,16}){0,4}$/.test(language)) {
-      throw new NodeOperationError(
-        this.getNode(),
-        'OCR Language must contain up to five language codes separated by +',
-      );
-    }
+    validateLanguage(this, language);
 
     const pageSegmentationMode = this.getNodeParameter('pageSegmentationMode', 0) as PageSegmentationMode;
     const documentTimeoutMs = this.getNodeParameter('documentTimeoutMs', 0) as number;
@@ -207,51 +282,17 @@ export class DocumentTextExtractor implements INodeType {
       for (const [itemIndex, item] of items.entries()) {
         const keepBinary = this.getNodeParameter('keepBinary', itemIndex) as boolean;
         try {
-          const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
-          const destinationField = (this.getNodeParameter('destinationField', itemIndex) as string).trim();
-          if (!destinationField) {
-            throw new NodeOperationError(this.getNode(), 'Destination Field is required', { itemIndex });
-          }
-          const options = getOptions(this, itemIndex);
-          if (options.pageSeparator.length > 1000) {
-            throw new NodeOperationError(this.getNode(), 'Page Separator cannot exceed 1,000 characters', {
-              itemIndex,
-            });
-          }
-          const binary = this.helpers.assertBinaryData(itemIndex, binaryPropertyName);
-          const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
-
-          if (buffer.length > MAX_FILE_SIZE_BYTES) {
-            throw new NodeOperationError(this.getNode(), 'The input file exceeds the 25 MB limit', { itemIndex });
-          }
-
-          const result = await extractDocumentText(buffer, binary.mimeType, options, ocrEngine);
-          const output: INodeExecutionData = {
-            json: {
-              ...item.json,
-              [destinationField]: {
-                ...result,
-                pages: result.pages as unknown as IDataObject[],
-                sourceFileName: binary.fileName ?? null,
-                sourceMimeType: binary.mimeType ?? null,
-              },
-            },
-            pairedItem: { item: itemIndex },
-          };
+          const output = await processItem(this, item, itemIndex, ocrEngine);
           if (keepBinary) output.binary = item.binary;
           returnData.push(output);
         } catch (error) {
           if (this.continueOnFail()) {
-            const errorItem: INodeExecutionData = {
-              json: { ...item.json, error: getErrorMessage(error) },
-              pairedItem: { item: itemIndex },
-            };
+            const errorItem = buildErrorOutput(item, error, itemIndex);
             if (keepBinary) errorItem.binary = item.binary;
             returnData.push(errorItem);
             continue;
           }
-          if (error instanceof NodeOperationError) throw error;
-          throw new NodeOperationError(this.getNode(), getErrorMessage(error), { itemIndex });
+          rethrowAsNodeError(this, error, itemIndex);
         }
       }
     } finally {

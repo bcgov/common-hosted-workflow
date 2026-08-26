@@ -1,6 +1,6 @@
 import { imageSize } from 'image-size';
 import { PdfEngine } from './pdfEngine';
-import type { PdfProviderFactory } from './pdfProvider';
+import type { PdfProvider, PdfProviderFactory } from './pdfProvider';
 
 export type ExtractionMode = 'auto' | 'text' | 'ocr';
 export type PageSegmentationMode = 'auto' | 'singleBlock' | 'singleColumn' | 'sparseText';
@@ -76,6 +76,128 @@ function summarizeMethod(pages: ExtractedPage[]): ExtractionResult['method'] {
   return methods.has('ocr') ? 'ocr' : 'pdfText';
 }
 
+async function loadEmbeddedText(
+  parser: PdfProvider,
+  options: ExtractionOptions,
+  deadline: number,
+): Promise<{ totalPages: number; pages: ExtractedPage[] }> {
+  if (options.mode === 'ocr') {
+    return { totalPages: 0, pages: [] };
+  }
+
+  const textResult = await parser.getText(options.maxPages, getRemainingTime(deadline));
+  const pages: ExtractedPage[] = textResult.pages.map((page) => ({
+    pageNumber: page.pageNumber,
+    text: page.text.trim(),
+    method: 'pdfText',
+    confidence: null,
+  }));
+  return { totalPages: textResult.total, pages };
+}
+
+async function determineOcrPlan(
+  parser: PdfProvider,
+  options: ExtractionOptions,
+  textPages: ExtractedPage[],
+  textTotal: number,
+  deadline: number,
+): Promise<{
+  totalPages: number;
+  pageDimensions: Map<number, { width: number; height: number }>;
+  pagesToOcr: number[];
+}> {
+  if (options.mode === 'ocr') {
+    const info = await parser.inspect(undefined, options.maxPages, getRemainingTime(deadline));
+    const pageDimensions = new Map(info.pages.map((page) => [page.pageNumber, page]));
+    const pagesToOcr = Array.from({ length: Math.min(info.total, options.maxPages) }, (_, index) => index + 1);
+    return { totalPages: info.total, pageDimensions, pagesToOcr };
+  }
+
+  if (options.mode === 'auto') {
+    const pagesToOcr = textPages
+      .filter((page) => page.text.replace(/\s/g, '').length < options.minimumTextLength)
+      .map((page) => page.pageNumber);
+    return { totalPages: textTotal, pageDimensions: new Map(), pagesToOcr };
+  }
+
+  return { totalPages: textTotal, pageDimensions: new Map(), pagesToOcr: [] };
+}
+
+async function resolvePageDimensions(
+  parser: PdfProvider,
+  pagesToOcr: number[],
+  pageDimensions: Map<number, { width: number; height: number }>,
+  options: ExtractionOptions,
+  deadline: number,
+): Promise<Map<number, { width: number; height: number }>> {
+  if (pagesToOcr.length === 0 || pageDimensions.size > 0) {
+    return pageDimensions;
+  }
+
+  const info = await parser.inspect(pagesToOcr, options.maxPages, getRemainingTime(deadline));
+  return new Map(info.pages.map((page) => [page.pageNumber, page]));
+}
+
+function assertPageDimensions(
+  pageNumber: number,
+  pageDimensions: Map<number, { width: number; height: number }>,
+  renderScale: number,
+): { width: number; height: number } {
+  const dimensions = pageDimensions.get(pageNumber);
+  if (!dimensions) throw new Error(`Unable to inspect PDF page ${pageNumber}`);
+  const renderedPixels = dimensions.width * dimensions.height * renderScale ** 2;
+  if (renderedPixels > MAX_PIXELS) {
+    throw new Error(`PDF page ${pageNumber} exceeds the ${MAX_PIXELS.toLocaleString()} rendered-pixel limit`);
+  }
+  return dimensions;
+}
+
+async function runOcrForPages(
+  parser: PdfProvider,
+  ocrProvider: OcrProvider,
+  pagesToOcr: number[],
+  pageDimensions: Map<number, { width: number; height: number }>,
+  options: ExtractionOptions,
+  deadline: number,
+): Promise<ExtractedPage[]> {
+  const ocrPages: ExtractedPage[] = [];
+  for (const pageNumber of pagesToOcr) {
+    assertPageDimensions(pageNumber, pageDimensions, options.renderScale);
+    const screenshot = await parser.renderPage(pageNumber, options.renderScale, getRemainingTime(deadline));
+    const recognized = await ocrProvider.recognize(screenshot, getRemainingTime(deadline));
+    ocrPages.push({
+      pageNumber,
+      text: recognized.text,
+      method: 'ocr',
+      confidence: recognized.confidence,
+    });
+  }
+  return ocrPages;
+}
+
+function mergeExtractedPages(pages: ExtractedPage[], ocrPages: ExtractedPage[], mode: ExtractionMode): ExtractedPage[] {
+  if (mode === 'ocr') return ocrPages;
+  const ocrByPage = new Map(ocrPages.map((page) => [page.pageNumber, page]));
+  return pages.map((page) => ocrByPage.get(page.pageNumber) ?? page);
+}
+
+function finalizePdfResult(pages: ExtractedPage[], totalPages: number, options: ExtractionOptions): ExtractionResult {
+  pages.sort((left, right) => left.pageNumber - right.pageNumber);
+  let textTruncated = limitOutput(pages, options.maxCharacters);
+  const combinedText = pages.map((page) => page.text).join(options.pageSeparator);
+  if (combinedText.length > options.maxCharacters) textTruncated = true;
+
+  return {
+    text: combinedText.slice(0, options.maxCharacters),
+    method: summarizeMethod(pages),
+    pages,
+    pageCount: totalPages,
+    processedPageCount: pages.length,
+    truncated: totalPages > options.maxPages,
+    textTruncated,
+  };
+}
+
 async function extractPdf(
   buffer: Buffer,
   options: ExtractionOptions,
@@ -86,82 +208,25 @@ async function extractPdf(
   const parser = pdfProviderFactory(buffer, options.password || undefined, options.documentTimeoutMs);
 
   try {
-    let totalPages = 0;
-    let pages: ExtractedPage[] = [];
+    const embedded = await loadEmbeddedText(parser, options, deadline);
+    const plan = await determineOcrPlan(parser, options, embedded.pages, embedded.totalPages, deadline);
 
-    if (options.mode !== 'ocr') {
-      const textResult = await parser.getText(options.maxPages, getRemainingTime(deadline));
-      totalPages = textResult.total;
-      pages = textResult.pages.map((page) => ({
-        pageNumber: page.pageNumber,
-        text: page.text.trim(),
-        method: 'pdfText',
-        confidence: null,
-      }));
+    let pages = embedded.pages;
+    const totalPages = plan.totalPages;
+
+    if (plan.pagesToOcr.length > 0) {
+      const pageDimensions = await resolvePageDimensions(
+        parser,
+        plan.pagesToOcr,
+        plan.pageDimensions,
+        options,
+        deadline,
+      );
+      const ocrPages = await runOcrForPages(parser, ocrProvider, plan.pagesToOcr, pageDimensions, options, deadline);
+      pages = mergeExtractedPages(pages, ocrPages, options.mode);
     }
 
-    let pagesToOcr: number[];
-    let pageDimensions = new Map<number, { width: number; height: number }>();
-    if (options.mode === 'ocr') {
-      const info = await parser.inspect(undefined, options.maxPages, getRemainingTime(deadline));
-      totalPages = info.total;
-      pageDimensions = new Map(info.pages.map((page) => [page.pageNumber, page]));
-      pagesToOcr = Array.from({ length: Math.min(totalPages, options.maxPages) }, (_, index) => index + 1);
-    } else if (options.mode === 'auto') {
-      pagesToOcr = pages
-        .filter((page) => page.text.replace(/\s/g, '').length < options.minimumTextLength)
-        .map((page) => page.pageNumber);
-    } else {
-      pagesToOcr = [];
-    }
-
-    if (pagesToOcr.length > 0) {
-      if (pageDimensions.size === 0) {
-        const info = await parser.inspect(pagesToOcr, options.maxPages, getRemainingTime(deadline));
-        pageDimensions = new Map(info.pages.map((page) => [page.pageNumber, page]));
-      }
-
-      const ocrPages: ExtractedPage[] = [];
-      for (const pageNumber of pagesToOcr) {
-        const dimensions = pageDimensions.get(pageNumber);
-        if (!dimensions) throw new Error(`Unable to inspect PDF page ${pageNumber}`);
-        const renderedPixels = dimensions.width * dimensions.height * options.renderScale ** 2;
-        if (renderedPixels > MAX_PIXELS) {
-          throw new Error(`PDF page ${pageNumber} exceeds the ${MAX_PIXELS.toLocaleString()} rendered-pixel limit`);
-        }
-
-        const screenshot = await parser.renderPage(pageNumber, options.renderScale, getRemainingTime(deadline));
-        const recognized = await ocrProvider.recognize(screenshot, getRemainingTime(deadline));
-        ocrPages.push({
-          pageNumber,
-          text: recognized.text,
-          method: 'ocr',
-          confidence: recognized.confidence,
-        });
-      }
-
-      if (options.mode === 'ocr') {
-        pages = ocrPages;
-      } else {
-        const ocrByPage = new Map(ocrPages.map((page) => [page.pageNumber, page]));
-        pages = pages.map((page) => ocrByPage.get(page.pageNumber) ?? page);
-      }
-    }
-
-    pages.sort((left, right) => left.pageNumber - right.pageNumber);
-    let textTruncated = limitOutput(pages, options.maxCharacters);
-    const combinedText = pages.map((page) => page.text).join(options.pageSeparator);
-    if (combinedText.length > options.maxCharacters) textTruncated = true;
-
-    return {
-      text: combinedText.slice(0, options.maxCharacters),
-      method: summarizeMethod(pages),
-      pages,
-      pageCount: totalPages,
-      processedPageCount: pages.length,
-      truncated: totalPages > options.maxPages,
-      textTruncated,
-    };
+    return finalizePdfResult(pages, totalPages, options);
   } finally {
     await parser.terminate();
   }
