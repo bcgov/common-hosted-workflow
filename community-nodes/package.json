@@ -30,6 +30,7 @@
     "n8nNodesApiVersion": 1,
     "strict": false,
     "credentials": [
+      "dist/credentials/BcGovSharePointOAuth2Api.credentials.js",
       "dist/credentials/ChefsApi.credentials.js",
       "dist/credentials/ChefsFormAuth.credentials.js",
       "dist/credentials/CDOGSOAuth2Api.credentials.js",
@@ -38,6 +39,7 @@
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],
     "nodes": [
+      "dist/nodes/BcGovSharePoint/BcGovSharePoint.node.js",
       "dist/nodes/CDOGSDocumentGenerator/CDOGSDocumentGenerator.node.js",
       "dist/nodes/CHEFS/CHEFS.node.js",
       "dist/nodes/CHEFSResubmitWait/CHEFSResubmitWait.node.js",
