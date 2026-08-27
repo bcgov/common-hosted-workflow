@@ -1,10 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from '../src/app';
 import { sessionState } from '../src/state/session';
+import { openN8n } from '../src/auth/session-actions';
 
 vi.mock('../src/state/session', () => ({
   sessionState: {
@@ -25,6 +26,7 @@ vi.mock('../src/services/backend/auth', () => ({
 vi.mock('../src/auth/session-actions', () => ({
   login: vi.fn(),
   logout: vi.fn(),
+  openN8n: vi.fn(),
 }));
 
 function createQueryClient() {
@@ -45,6 +47,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('Session-driven navigation/gating', () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
     sessionState.session = null;
     sessionState.isLoading = false;
   });
@@ -231,9 +234,42 @@ describe('Session-driven navigation/gating', () => {
 
       const signInButtons = screen.getAllByRole('button', { name: /sign in/i });
       expect(signInButtons.length).toBeGreaterThanOrEqual(1);
+      const openN8nButton = screen.getByRole('button', { name: 'Open n8n' });
+      expect(openN8nButton).toBeInTheDocument();
+      expect(openN8nButton).toHaveClass('w-[4.5rem]', 'sm:w-20');
+      expect(signInButtons[0]).toHaveClass('w-[4.5rem]', 'sm:w-20');
       expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main-content');
       expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
       expect(screen.getByRole('navigation', { name: 'Legal' })).toBeInTheDocument();
+    });
+
+    it('opens n8n from the header when not authenticated', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Open n8n' }));
+
+      expect(openN8n).toHaveBeenCalledOnce();
+    });
+
+    it('shows open n8n while the session is loading', () => {
+      sessionState.isLoading = true;
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('button', { name: 'Open n8n' })).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Loading session');
+      const header = screen.getAllByRole('banner')[0];
+      expect(within(header).queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+      expect(within(header).queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
     });
 
     it('shows log out button when authenticated', () => {
@@ -263,8 +299,41 @@ describe('Session-driven navigation/gating', () => {
 
       const logoutButton = screen.getByRole('button', { name: 'Log out' });
       expect(logoutButton).toHaveTextContent('Log out');
+      expect(screen.getByRole('button', { name: 'Open n8n' })).toBeInTheDocument();
       expect(logoutButton.querySelector('svg')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    });
+
+    it('opens n8n from the header when authenticated', async () => {
+      const user = userEvent.setup();
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: false,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        permissions: {
+          isAdmin: false,
+          canRequestAccess: false,
+          canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
+        },
+      };
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Open n8n' }));
+
+      expect(openN8n).toHaveBeenCalledOnce();
+      expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
     });
 
     it('marks the current page and exposes its active visual treatment', () => {

@@ -8,20 +8,20 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 - Authorization code login flow.
 - Just-in-time user provisioning.
 - Role sync from OIDC claims.
-- Frontend sign-in customization to expose an SSO button.
+- External UI entry into the n8n OIDC login flow.
 
 ---
 
 ## Source layout
 
-| Path                                                  | Role                                                            |
-| ----------------------------------------------------- | --------------------------------------------------------------- |
-| `external-hooks/src/api/hooks.ts`                     | Serves the OIDC frontend assets under `/assets`.                |
-| `external-hooks/src/api/routes/oidc.ts`               | Registers the OIDC login and callback routes.                   |
-| `external-hooks/src/api/helpers/oidc-provider.ts`     | Shared OIDC discovery, PKCE, token exchange, and identity flow. |
-| `external-hooks/src/api/helpers/n8n-oidc.ts`          | n8n-specific OIDC config, cookies, and role helpers.            |
-| `external-hooks/src/api/assets/oidc-frontend-hook.js` | Standalone browser script for the sign-in page.                 |
-| `external-hooks/src/api/utils/logger.ts`              | Structured request, response, and error logging helpers.        |
+| Path                                                  | Role                                                                                                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `external-hooks/src/api/hooks.ts`                     | Serves the OIDC frontend assets under `/assets`.                                                                              |
+| `external-hooks/src/api/routes/oidc.ts`               | Registers the OIDC login and callback routes.                                                                                 |
+| `external-hooks/src/api/helpers/oidc-provider.ts`     | Shared OIDC discovery, PKCE, token exchange, and identity flow.                                                               |
+| `external-hooks/src/api/helpers/n8n-oidc.ts`          | n8n-specific OIDC config, cookies, and role helpers.                                                                          |
+| `external-hooks/src/api/assets/oidc-frontend-hook.js` | Standalone browser script for n8n login-route redirects and logout interception (mode selected by `OIDC_FRONTEND_HOOK_MODE`). |
+| `external-hooks/src/api/utils/logger.ts`              | Structured request, response, and error logging helpers.                                                                      |
 
 ---
 
@@ -32,6 +32,8 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 - **URL:** `GET /rest/auth/oidc/login`
 - **Implementation:** registered in `external-hooks/src/api/routes/oidc.ts`
 - **Behavior:**
+- If the request already has a valid n8n `n8n-auth` session cookie, redirects directly to `/` without contacting the OIDC provider.
+- If the request is unauthenticated, or has a stale or invalid n8n session cookie, starts the OIDC authorization flow.
 - Fetches the OIDC discovery document, unless endpoints are provided directly by environment variables.
 - Generates `state` and `nonce` values.
 - Stores both values in signed cookies.
@@ -47,16 +49,25 @@ This hook adds a full OIDC sign-in flow on top of n8n external hooks, including:
 - Verifies the `nonce` from the ID token when present.
 - Fetches user claims from the `userinfo` endpoint, with fallback to ID token claims.
 - Resolves the n8n user by email, creates the user if needed, syncs role, then issues the n8n auth cookie.
-- Redirects to `/` on success or back to `/signin?error=...` on failure.
+- Redirects to `/` on success or to `/ui?error=...` on failure.
 
-### 3. Frontend helper script
+### 3. External UI entry
+
+- **URL:** `/ui`
+- **Behavior:**
+- The external UI header exposes a persistent `Open n8n` action regardless of external UI authentication state.
+- Activating the action performs full-page navigation to `/rest/auth/oidc/login` using the external UI API base URL configuration.
+- A valid n8n session continues directly to `/`; otherwise the OIDC flow starts.
+
+### 4. Frontend helper script
 
 - **URL:** `GET /assets/oidc-frontend-hook.js`
 - **Behavior:**
-- Injects an SSO button into the sign-in page.
-- Hides the normal email/password form by default.
-- Allows fallback to the normal form with `?showLogin=true`.
-- **Implementation:** served as a static file from `external-hooks/src/api/assets`.
+- Single asset whose content is selected server-side by `OIDC_FRONTEND_HOOK_MODE` (default `redirect`):
+  - `redirect`: browser navigation to n8n `/login` or `/signin` is replaced with `/ui` so the external UI remains the public login landing page. Logout returns to `/ui`.
+  - `legacy`: injects an SSO button into the n8n sign-in form (hides email/password inputs, shows `Sign in with SSO` → `/rest/auth/oidc/login`; escape hatch `?showLogin=true`). Logout returns to `/`.
+- Logout clicks in the n8n frontend are intercepted and routed through `/rest/auth/oidc/logout`.
+- **Implementation:** single file `external-hooks/src/api/assets/oidc-frontend-hook.js` containing both modes; `external-hooks/src/api/bootstrap/assets.ts` serves it dynamically via placeholder replacement. `Dockerfile` keeps a single `EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js` entry.
 
 ---
 
@@ -98,19 +109,23 @@ When `OIDC_ISSUER` is not set, all of the following must be provided:
 - `SSO_RESTRICT_NO_ROLE`
   When `true`, users without a mapped OIDC role are checked for CSTAR managed project roles during sign-in. If they have one, they receive `global:member`. If they do not, new users are not provisioned and existing users are synced to an empty role. If CSTAR verification fails, sign-in fails.
 
+- `OIDC_FRONTEND_HOOK_MODE`
+  Controls which browser logic is served at `/assets/oidc-frontend-hook.js`. `redirect` (default) uses the `/ui` redirect mode; `legacy` restores the SSO-button injection mode. Any other value falls back to `redirect`. Set in `Dockerfile` as `OIDC_FRONTEND_HOOK_MODE=redirect` and overridable per environment (docker-compose, Helm).
+
 ---
 
 ## Authentication flow
 
-1. User opens `/rest/auth/oidc/login`.
-2. The hook creates signed `state` and `nonce` cookies.
-3. The browser is redirected to the OIDC provider.
-4. The provider returns to `/rest/auth/oidc/callback` with an authorization code.
-5. The hook exchanges the code for tokens.
-6. The hook loads user claims from `userinfo` or falls back to the ID token.
-7. The hook validates `email` and resolves the user in n8n.
-8. The hook provisions or updates the user role.
-9. The hook signs the n8n auth token using n8n `JwtService` and sets the `n8n-auth` cookie.
+1. User opens `/ui` and activates `Open n8n`, which navigates to `/rest/auth/oidc/login`.
+2. If the user already has a valid n8n session, the hook redirects to `/`.
+3. If the user does not have a valid n8n session, the hook creates signed `state` and `nonce` cookies.
+4. The browser is redirected to the OIDC provider.
+5. The provider returns to `/rest/auth/oidc/callback` with an authorization code.
+6. The hook exchanges the code for tokens.
+7. The hook loads user claims from `userinfo` or falls back to the ID token.
+8. The hook validates `email` and resolves the user in n8n.
+9. The hook provisions or updates the user role.
+10. The hook signs the n8n auth token using n8n `JwtService`, sets the `n8n-auth` cookie, and redirects to `/`.
 
 ---
 
@@ -171,7 +186,7 @@ Before changing a user from `global:owner` to any other role:
 
 - It counts other users that still have `global:owner`.
 - If no other owner exists, the role change is blocked.
-- The user is redirected back to sign-in with an error message instead of changing the role.
+- The user continues signing in without changing the role.
 
 This prevents accidental lockout of the instance through upstream role changes.
 
@@ -189,6 +204,8 @@ The hook also modifies frontend settings through the `frontend.settings` externa
 
 This makes the frontend treat OIDC as the primary authentication method.
 
+When `OIDC_FRONTEND_HOOK_MODE=redirect` (default) the frontend hook keeps `/ui` as the browser login landing page by replacing initial loads and client-side navigation to `/login` or `/signin` with `/ui`. When `OIDC_FRONTEND_HOOK_MODE=legacy` the hook instead injects the SSO button on `/login`/`/signin` and respects `?showLogin=true`. OIDC start and callback errors are generated server-side and delivered to `/ui?error=...`.
+
 ---
 
 ## Security notes
@@ -204,5 +221,5 @@ This makes the frontend treat OIDC as the primary authentication method.
 
 - If required environment variables are missing, the hook logs a warning and does not register OIDC routes.
 - Discovery results are cached in memory for one hour.
-- Callback failures are surfaced to the UI through `/signin?error=...`.
+- OIDC start and callback failures are surfaced to the external UI through `/ui?error=...`.
 - Logging uses the shared logger helpers from `external-hooks/src/api/utils/logger.ts`.

@@ -24,12 +24,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-    - name: Sync Markdown to Confluence
-      uses: Bhacaz/docs-as-code-confluence@a869d3d27b293b12cc3bf86c95b6e72a29030bea
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Sync Docs to Confluence
+      uses: egose/actions/confluence@dfe5d14c69e654ca87d9f6fc491084a59eed6181
       with:
         folder: docs
         username: ${{ secrets.CONFLUENCE_USERNAME }}
-        password: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
         confluence-base-url: ${{ vars.CONFLUENCE_BASE_URL }}
         space-key: ${{ vars.CONFLUENCE_SPACE_KEY }}
         parent-page-id: ${{ vars.CONFLUENCE_PARENT_PAGE_ID }}

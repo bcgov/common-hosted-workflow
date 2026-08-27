@@ -33,7 +33,6 @@ import { getOidcConfigFromEnv } from '../helpers/ui-oidc';
 import { appendSessionToReturnTo, buildUiAppUrl } from '../helpers/url';
 import { isManagedProjectRole } from '../constants/project-roles';
 import { createLogger, logError } from '../utils/logger';
-import { InternalServerErrorResponse } from './responses';
 import type { N8nUser } from '../types/user';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
@@ -76,6 +75,10 @@ function getAuthCookieOptions() {
   };
 }
 
+function buildExternalUiErrorRedirect(message: string) {
+  return '/ui?error=' + encodeURIComponent(message);
+}
+
 async function redirectToAccessRequest(
   params: {
     user: N8nOidcUser | null;
@@ -111,6 +114,19 @@ export function buildOidcRouter({
   const cookieSecret = getCookieSecret();
 
   router.get('/login', async (req: Request, res: Response) => {
+    const existingToken = req.cookies['n8n-auth'];
+    if (existingToken) {
+      try {
+        const [user] = await authService.resolveJwt(existingToken, req, res);
+        if (user) {
+          log.debug('OIDC login: existing n8n session is valid, redirecting to app', { userId: user.id });
+          return res.redirect('/');
+        }
+      } catch (error) {
+        log.debug('OIDC login: existing n8n session is invalid, starting OIDC flow', { error: String(error) });
+      }
+    }
+
     try {
       const authRequest = await beginOidcAuthorization({
         config,
@@ -135,7 +151,8 @@ export function buildOidcRouter({
       res.redirect(authRequest.authorizationUrl);
     } catch (error) {
       logError(log, error, { context: 'OIDC login' });
-      InternalServerErrorResponse(res, { context: 'OIDC login' });
+      const message = error instanceof Error ? error.message : String(error);
+      res.redirect(buildExternalUiErrorRedirect(message));
     }
   });
 
@@ -167,7 +184,7 @@ export function buildOidcRouter({
       });
 
       if (!identity.email || !isValidEmail(identity.email)) {
-        return res.redirect('/signin?error=' + encodeURIComponent('No valid email in OIDC response'));
+        return res.redirect(buildExternalUiErrorRedirect('No valid email in OIDC response'));
       }
 
       const oidcIdentity: UiOidcIdentity = {
@@ -210,7 +227,7 @@ export function buildOidcRouter({
       }
 
       if (!user) {
-        return res.redirect('/signin?error=' + encodeURIComponent('Failed to create or find user'));
+        return res.redirect(buildExternalUiErrorRedirect('Failed to create or find user'));
       }
 
       await syncUserRole(user, nextRole, userRepository, userService, identity.email);
@@ -258,7 +275,7 @@ export function buildOidcRouter({
     } catch (error) {
       logError(log, error, { context: 'OIDC callback' });
       const message = error instanceof Error ? error.message : String(error);
-      res.redirect('/signin?error=' + encodeURIComponent('Authentication failed: ' + message));
+      res.redirect(buildExternalUiErrorRedirect('Authentication failed: ' + message));
     }
   });
 
@@ -415,7 +432,7 @@ function validateCallbackRequest(req: Request, cookieSecret: string): CallbackVa
   if (error) {
     log.error('OIDC error from provider', { error, errorDescription: error_description });
     return {
-      redirect: '/signin?error=' + encodeURIComponent(String(error_description || error)),
+      redirect: buildExternalUiErrorRedirect(String(error_description || error)),
       code: null,
       statePayload: null,
       noncePayload: null,
@@ -424,7 +441,7 @@ function validateCallbackRequest(req: Request, cookieSecret: string): CallbackVa
 
   if (!code || !state) {
     return {
-      redirect: '/signin?error=' + encodeURIComponent('Missing authorization code or state'),
+      redirect: buildExternalUiErrorRedirect('Missing authorization code or state'),
       code: null,
       statePayload: null,
       noncePayload: null,
@@ -436,7 +453,7 @@ function validateCallbackRequest(req: Request, cookieSecret: string): CallbackVa
 
   if (!stateCookie || !nonceCookie) {
     return {
-      redirect: '/signin?error=' + encodeURIComponent('Missing state cookies - session expired'),
+      redirect: buildExternalUiErrorRedirect('Missing state cookies - session expired'),
       code: null,
       statePayload: null,
       noncePayload: null,
@@ -448,7 +465,7 @@ function validateCallbackRequest(req: Request, cookieSecret: string): CallbackVa
 
   if (!statePayload || statePayload.state !== state) {
     return {
-      redirect: '/signin?error=' + encodeURIComponent('Invalid state - possible CSRF attack'),
+      redirect: buildExternalUiErrorRedirect('Invalid state - possible CSRF attack'),
       code: null,
       statePayload: null,
       noncePayload: null,

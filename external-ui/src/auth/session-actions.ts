@@ -1,5 +1,6 @@
 import { buildApiUrl, clearStoredAppToken } from '../services/backend/axios';
 import { sessionState } from '../state/session';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/';
 
 function getCurrentUiPath() {
   const url = new URL(globalThis.location.href);
@@ -20,6 +21,14 @@ function buildAuthRouteUrl(path: string, params: Record<string, string>) {
 
 export function login() {
   globalThis.location.assign(buildAuthRouteUrl('/ui-api/auth/login', { returnTo: getCurrentUiPath() }));
+}
+
+export function getN8nLoginUrl() {
+  return buildApiUrl(`${API_BASE_URL}/rest/auth/oidc/login`);
+}
+
+export function openN8n() {
+  globalThis.location.assign(getN8nLoginUrl());
 }
 
 export function logout() {
