@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">OIDC external hook | Common Hosted Workflow</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="OIDC external hook | Common Hosted Workflow"><meta data-rh="true" name="description" content="Custom OIDC authentication for n8n is implemented in external-hooks/src/api/hooks.ts and related helpers/routes."><meta data-rh="true" property="og:description" content="Custom OIDC authentication for n8n is implemented in external-hooks/src/api/hooks.ts and related helpers/routes."><link data-rh="true" rel="icon" href="/common-hosted-workflow/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc" hreflang="en"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"OIDC external hook","item":"https://bcgov.github.io/common-hosted-workflow/external-hooks/oidc"}]}</script><link rel="stylesheet" href="/common-hosted-workflow/assets/css/styles.dd79eb43.css">
-<script src="/common-hosted-workflow/assets/js/runtime~main.982ea5e6.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/runtime~main.1316b676.js" defer="defer"></script>
 <script src="/common-hosted-workflow/assets/js/main.9efcf8b7.js" defer="defer"></script>
 </head>
 <body>
@@ -19,11 +19,11 @@
 <li class="">Authorization code login flow.</li>
 <li class="">Just-in-time user provisioning.</li>
 <li class="">Role sync from OIDC claims.</li>
-<li class="">Frontend sign-in customization to expose an SSO button.</li>
+<li class="">External UI entry into the n8n OIDC login flow.</li>
 </ul>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="source-layout">Source layout<a href="#source-layout" class="hash-link" aria-label="Direct link to Source layout" title="Direct link to Source layout" translate="no">​</a></h2>
-<table><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>external-hooks/src/api/hooks.ts</code></td><td>Serves the OIDC frontend assets under <code>/assets</code>.</td></tr><tr><td><code>external-hooks/src/api/routes/oidc.ts</code></td><td>Registers the OIDC login and callback routes.</td></tr><tr><td><code>external-hooks/src/api/helpers/oidc-provider.ts</code></td><td>Shared OIDC discovery, PKCE, token exchange, and identity flow.</td></tr><tr><td><code>external-hooks/src/api/helpers/n8n-oidc.ts</code></td><td>n8n-specific OIDC config, cookies, and role helpers.</td></tr><tr><td><code>external-hooks/src/api/assets/oidc-frontend-hook.js</code></td><td>Standalone browser script for the sign-in page.</td></tr><tr><td><code>external-hooks/src/api/utils/logger.ts</code></td><td>Structured request, response, and error logging helpers.</td></tr></tbody></table>
+<table><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>external-hooks/src/api/hooks.ts</code></td><td>Serves the OIDC frontend assets under <code>/assets</code>.</td></tr><tr><td><code>external-hooks/src/api/routes/oidc.ts</code></td><td>Registers the OIDC login and callback routes.</td></tr><tr><td><code>external-hooks/src/api/helpers/oidc-provider.ts</code></td><td>Shared OIDC discovery, PKCE, token exchange, and identity flow.</td></tr><tr><td><code>external-hooks/src/api/helpers/n8n-oidc.ts</code></td><td>n8n-specific OIDC config, cookies, and role helpers.</td></tr><tr><td><code>external-hooks/src/api/assets/oidc-frontend-hook.js</code></td><td>Standalone browser script for n8n login-route redirects and logout interception (mode selected by <code>OIDC_FRONTEND_HOOK_MODE</code>).</td></tr><tr><td><code>external-hooks/src/api/utils/logger.ts</code></td><td>Structured request, response, and error logging helpers.</td></tr></tbody></table>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="routes">Routes<a href="#routes" class="hash-link" aria-label="Direct link to Routes" title="Direct link to Routes" translate="no">​</a></h2>
 <h3 class="anchor anchorTargetStickyNavbar_lel1" id="1-start-login">1. Start login<a href="#1-start-login" class="hash-link" aria-label="Direct link to 1. Start login" title="Direct link to 1. Start login" translate="no">​</a></h3>
@@ -31,6 +31,8 @@
 <li class=""><strong>URL:</strong> <code>GET /rest/auth/oidc/login</code></li>
 <li class=""><strong>Implementation:</strong> registered in <code>external-hooks/src/api/routes/oidc.ts</code></li>
 <li class=""><strong>Behavior:</strong></li>
+<li class="">If the request already has a valid n8n <code>n8n-auth</code> session cookie, redirects directly to <code>/</code> without contacting the OIDC provider.</li>
+<li class="">If the request is unauthenticated, or has a stale or invalid n8n session cookie, starts the OIDC authorization flow.</li>
 <li class="">Fetches the OIDC discovery document, unless endpoints are provided directly by environment variables.</li>
 <li class="">Generates <code>state</code> and <code>nonce</code> values.</li>
 <li class="">Stores both values in signed cookies.</li>
@@ -46,16 +48,28 @@
 <li class="">Verifies the <code>nonce</code> from the ID token when present.</li>
 <li class="">Fetches user claims from the <code>userinfo</code> endpoint, with fallback to ID token claims.</li>
 <li class="">Resolves the n8n user by email, creates the user if needed, syncs role, then issues the n8n auth cookie.</li>
-<li class="">Redirects to <code>/</code> on success or back to <code>/signin?error=...</code> on failure.</li>
+<li class="">Redirects to <code>/</code> on success or to <code>/ui?error=...</code> on failure.</li>
 </ul>
-<h3 class="anchor anchorTargetStickyNavbar_lel1" id="3-frontend-helper-script">3. Frontend helper script<a href="#3-frontend-helper-script" class="hash-link" aria-label="Direct link to 3. Frontend helper script" title="Direct link to 3. Frontend helper script" translate="no">​</a></h3>
+<h3 class="anchor anchorTargetStickyNavbar_lel1" id="3-external-ui-entry">3. External UI entry<a href="#3-external-ui-entry" class="hash-link" aria-label="Direct link to 3. External UI entry" title="Direct link to 3. External UI entry" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>URL:</strong> <code>/ui</code></li>
+<li class=""><strong>Behavior:</strong></li>
+<li class="">The external UI header exposes a persistent <code>Open n8n</code> action regardless of external UI authentication state.</li>
+<li class="">Activating the action performs full-page navigation to <code>/rest/auth/oidc/login</code> using the external UI API base URL configuration.</li>
+<li class="">A valid n8n session continues directly to <code>/</code>; otherwise the OIDC flow starts.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_lel1" id="4-frontend-helper-script">4. Frontend helper script<a href="#4-frontend-helper-script" class="hash-link" aria-label="Direct link to 4. Frontend helper script" title="Direct link to 4. Frontend helper script" translate="no">​</a></h3>
 <ul>
 <li class=""><strong>URL:</strong> <code>GET /assets/oidc-frontend-hook.js</code></li>
 <li class=""><strong>Behavior:</strong></li>
-<li class="">Injects an SSO button into the sign-in page.</li>
-<li class="">Hides the normal email/password form by default.</li>
-<li class="">Allows fallback to the normal form with <code>?showLogin=true</code>.</li>
-<li class=""><strong>Implementation:</strong> served as a static file from <code>external-hooks/src/api/assets</code>.</li>
+<li class="">Single asset whose content is selected server-side by <code>OIDC_FRONTEND_HOOK_MODE</code> (default <code>redirect</code>):<!-- -->
+<ul>
+<li class=""><code>redirect</code>: browser navigation to n8n <code>/login</code> or <code>/signin</code> is replaced with <code>/ui</code> so the external UI remains the public login landing page. Logout returns to <code>/ui</code>.</li>
+<li class=""><code>legacy</code>: injects an SSO button into the n8n sign-in form (hides email/password inputs, shows <code>Sign in with SSO</code> → <code>/rest/auth/oidc/login</code>; escape hatch <code>?showLogin=true</code>). Logout returns to <code>/</code>.</li>
+</ul>
+</li>
+<li class="">Logout clicks in the n8n frontend are intercepted and routed through <code>/rest/auth/oidc/logout</code>.</li>
+<li class=""><strong>Implementation:</strong> single file <code>external-hooks/src/api/assets/oidc-frontend-hook.js</code> containing both modes; <code>external-hooks/src/api/bootstrap/assets.ts</code> serves it dynamically via placeholder replacement. <code>Dockerfile</code> keeps a single <code>EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js</code> entry.</li>
 </ul>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="environment-variables">Environment variables<a href="#environment-variables" class="hash-link" aria-label="Direct link to Environment variables" title="Direct link to Environment variables" translate="no">​</a></h2>
@@ -98,19 +112,24 @@ When <code>OIDC_ISSUER</code> is not set, this provides the IDP logout URL for u
 <p><code>SSO_RESTRICT_NO_ROLE</code>
 When <code>true</code>, users without a mapped OIDC role are checked for CSTAR managed project roles during sign-in. If they have one, they receive <code>global:member</code>. If they do not, new users are not provisioned and existing users are synced to an empty role. If CSTAR verification fails, sign-in fails.</p>
 </li>
+<li class="">
+<p><code>OIDC_FRONTEND_HOOK_MODE</code>
+Controls which browser logic is served at <code>/assets/oidc-frontend-hook.js</code>. <code>redirect</code> (default) uses the <code>/ui</code> redirect mode; <code>legacy</code> restores the SSO-button injection mode. Any other value falls back to <code>redirect</code>. Set in <code>Dockerfile</code> as <code>OIDC_FRONTEND_HOOK_MODE=redirect</code> and overridable per environment (docker-compose, Helm).</p>
+</li>
 </ul>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="authentication-flow">Authentication flow<a href="#authentication-flow" class="hash-link" aria-label="Direct link to Authentication flow" title="Direct link to Authentication flow" translate="no">​</a></h2>
 <ol>
-<li class="">User opens <code>/rest/auth/oidc/login</code>.</li>
-<li class="">The hook creates signed <code>state</code> and <code>nonce</code> cookies.</li>
+<li class="">User opens <code>/ui</code> and activates <code>Open n8n</code>, which navigates to <code>/rest/auth/oidc/login</code>.</li>
+<li class="">If the user already has a valid n8n session, the hook redirects to <code>/</code>.</li>
+<li class="">If the user does not have a valid n8n session, the hook creates signed <code>state</code> and <code>nonce</code> cookies.</li>
 <li class="">The browser is redirected to the OIDC provider.</li>
 <li class="">The provider returns to <code>/rest/auth/oidc/callback</code> with an authorization code.</li>
 <li class="">The hook exchanges the code for tokens.</li>
 <li class="">The hook loads user claims from <code>userinfo</code> or falls back to the ID token.</li>
 <li class="">The hook validates <code>email</code> and resolves the user in n8n.</li>
 <li class="">The hook provisions or updates the user role.</li>
-<li class="">The hook signs the n8n auth token using n8n <code>JwtService</code> and sets the <code>n8n-auth</code> cookie.</li>
+<li class="">The hook signs the n8n auth token using n8n <code>JwtService</code>, sets the <code>n8n-auth</code> cookie, and redirects to <code>/</code>.</li>
 </ol>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="user-provisioning">User provisioning<a href="#user-provisioning" class="hash-link" aria-label="Direct link to User provisioning" title="Direct link to User provisioning" translate="no">​</a></h2>
@@ -163,7 +182,7 @@ When <code>true</code>, users without a mapped OIDC role are checked for CSTAR m
 <ul>
 <li class="">It counts other users that still have <code>global:owner</code>.</li>
 <li class="">If no other owner exists, the role change is blocked.</li>
-<li class="">The user is redirected back to sign-in with an error message instead of changing the role.</li>
+<li class="">The user continues signing in without changing the role.</li>
 </ul>
 <p>This prevents accidental lockout of the instance through upstream role changes.</p>
 <hr>
@@ -177,6 +196,7 @@ When <code>true</code>, users without a mapped OIDC role are checked for CSTAR m
 <li class=""><code>frontendSettings.enterprise.oidc = true</code></li>
 </ul>
 <p>This makes the frontend treat OIDC as the primary authentication method.</p>
+<p>When <code>OIDC_FRONTEND_HOOK_MODE=redirect</code> (default) the frontend hook keeps <code>/ui</code> as the browser login landing page by replacing initial loads and client-side navigation to <code>/login</code> or <code>/signin</code> with <code>/ui</code>. When <code>OIDC_FRONTEND_HOOK_MODE=legacy</code> the hook instead injects the SSO button on <code>/login</code>/<code>/signin</code> and respects <code>?showLogin=true</code>. OIDC start and callback errors are generated server-side and delivered to <code>/ui?error=...</code>.</p>
 <hr>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="security-notes">Security notes<a href="#security-notes" class="hash-link" aria-label="Direct link to Security notes" title="Direct link to Security notes" translate="no">​</a></h2>
 <ul>
@@ -190,8 +210,8 @@ When <code>true</code>, users without a mapped OIDC role are checked for CSTAR m
 <ul>
 <li class="">If required environment variables are missing, the hook logs a warning and does not register OIDC routes.</li>
 <li class="">Discovery results are cached in memory for one hour.</li>
-<li class="">Callback failures are surfaced to the UI through <code>/signin?error=...</code>.</li>
+<li class="">OIDC start and callback failures are surfaced to the external UI through <code>/ui?error=...</code>.</li>
 <li class="">Logging uses the shared logger helpers from <code>external-hooks/src/api/utils/logger.ts</code>.</li>
-</ul></div></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/common-hosted-workflow/external-hooks/custom-api"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">n8n custom admin API</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/common-hosted-workflow/external-hooks/workflow-interaction-api-validations"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Workflow interaction layer — headers and n8n validations</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_nh3p thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#source-layout" class="table-of-contents__link toc-highlight">Source layout</a></li><li><a href="#routes" class="table-of-contents__link toc-highlight">Routes</a><ul><li><a href="#1-start-login" class="table-of-contents__link toc-highlight">1. Start login</a></li><li><a href="#2-oidc-callback" class="table-of-contents__link toc-highlight">2. OIDC callback</a></li><li><a href="#3-frontend-helper-script" class="table-of-contents__link toc-highlight">3. Frontend helper script</a></li></ul></li><li><a href="#environment-variables" class="table-of-contents__link toc-highlight">Environment variables</a><ul><li><a href="#required" class="table-of-contents__link toc-highlight">Required</a></li><li><a href="#discovery-mode" class="table-of-contents__link toc-highlight">Discovery mode</a></li><li><a href="#manual-endpoint-mode" class="table-of-contents__link toc-highlight">Manual endpoint mode</a></li><li><a href="#optional" class="table-of-contents__link toc-highlight">Optional</a></li></ul></li><li><a href="#authentication-flow" class="table-of-contents__link toc-highlight">Authentication flow</a></li><li><a href="#user-provisioning" class="table-of-contents__link toc-highlight">User provisioning</a></li><li><a href="#role-mapping-and-sync" class="table-of-contents__link toc-highlight">Role mapping and sync</a><ul><li><a href="#sso_restrict_no_role-behavior" class="table-of-contents__link toc-highlight"><code>SSO_RESTRICT_NO_ROLE</code> behavior</a></li></ul></li><li><a href="#last-owner-protection" class="table-of-contents__link toc-highlight">Last owner protection</a></li><li><a href="#frontend-integration" class="table-of-contents__link toc-highlight">Frontend integration</a></li><li><a href="#security-notes" class="table-of-contents__link toc-highlight">Security notes</a></li><li><a href="#operational-notes" class="table-of-contents__link toc-highlight">Operational notes</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 Government of British Columbia</div></div></div></footer></div>
+</ul></div></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/common-hosted-workflow/external-hooks/custom-api"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">n8n custom admin API</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/common-hosted-workflow/external-hooks/workflow-interaction-api-validations"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Workflow interaction layer — headers and n8n validations</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_nh3p thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#source-layout" class="table-of-contents__link toc-highlight">Source layout</a></li><li><a href="#routes" class="table-of-contents__link toc-highlight">Routes</a><ul><li><a href="#1-start-login" class="table-of-contents__link toc-highlight">1. Start login</a></li><li><a href="#2-oidc-callback" class="table-of-contents__link toc-highlight">2. OIDC callback</a></li><li><a href="#3-external-ui-entry" class="table-of-contents__link toc-highlight">3. External UI entry</a></li><li><a href="#4-frontend-helper-script" class="table-of-contents__link toc-highlight">4. Frontend helper script</a></li></ul></li><li><a href="#environment-variables" class="table-of-contents__link toc-highlight">Environment variables</a><ul><li><a href="#required" class="table-of-contents__link toc-highlight">Required</a></li><li><a href="#discovery-mode" class="table-of-contents__link toc-highlight">Discovery mode</a></li><li><a href="#manual-endpoint-mode" class="table-of-contents__link toc-highlight">Manual endpoint mode</a></li><li><a href="#optional" class="table-of-contents__link toc-highlight">Optional</a></li></ul></li><li><a href="#authentication-flow" class="table-of-contents__link toc-highlight">Authentication flow</a></li><li><a href="#user-provisioning" class="table-of-contents__link toc-highlight">User provisioning</a></li><li><a href="#role-mapping-and-sync" class="table-of-contents__link toc-highlight">Role mapping and sync</a><ul><li><a href="#sso_restrict_no_role-behavior" class="table-of-contents__link toc-highlight"><code>SSO_RESTRICT_NO_ROLE</code> behavior</a></li></ul></li><li><a href="#last-owner-protection" class="table-of-contents__link toc-highlight">Last owner protection</a></li><li><a href="#frontend-integration" class="table-of-contents__link toc-highlight">Frontend integration</a></li><li><a href="#security-notes" class="table-of-contents__link toc-highlight">Security notes</a></li><li><a href="#operational-notes" class="table-of-contents__link toc-highlight">Operational notes</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 Government of British Columbia</div></div></div></footer></div>
 </body>
 </html>
