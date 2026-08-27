@@ -4,8 +4,15 @@
   "codexVersion": "1.0",
   "categories": ["Development", "Transform"],
   "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/oidc-token/credentials"
+      }
+    ],
     "primaryDocumentation": [
-      { "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/oidc-token" }
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/oidc-token"
+      }
     ]
   }
 }

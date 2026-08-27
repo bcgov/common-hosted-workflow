@@ -3,5 +3,16 @@
   "nodeVersion": "0.1",
   "codexVersion": "0.1",
   "categories": [],
-  "resources": {}
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/devx-message-connector/workflow-guide"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/devx-message-connector/workflow-guide"
+      }
+    ]
+  }
 }

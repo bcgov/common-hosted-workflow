@@ -4,9 +4,14 @@
   "codexVersion": "1.0",
   "categories": ["Development"],
   "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/workflow-interaction-layer/credentials"
+      }
+    ],
     "primaryDocumentation": [
       {
-        "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/workflow-interaction-layer"
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/workflow-interaction-layer"
       }
     ]
   }
