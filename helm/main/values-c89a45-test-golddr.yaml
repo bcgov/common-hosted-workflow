@@ -12,7 +12,6 @@ n8n:
     N8N_ENV_FEAT_ENCRYPTION_KEY_ROTATION: "true"
     N8N_BASE_URL: https://test-workflow.apps.golddr.devops.gov.bc.ca
     OIDC_ISSUER: https://test.loginproxy.gov.bc.ca/auth/realms/standard
-    CHEFS_GATEWAY_URL: https://chefs-test.apps.silver.devops.gov.bc.ca/app/gateway/v1
     CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
     CSTAR_BASE_URL: https://test.connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
@@ -55,8 +54,16 @@ pgo:
         requests:
           storage: 1.5Gi
   pgBackRest:
+  conditionalRestore:
+    enabled: true
+    s3:
+      bucket: workflow-test/backups/pgdump/platform
+
+# backup-storage is intentionally disabled on GoldDR — backups are created on Gold only
+backup-storage:
+  enabled: false
 
 dns-probe:
-  enabled: false
+  enabled: true
   env:
     APP_ENV: "test"

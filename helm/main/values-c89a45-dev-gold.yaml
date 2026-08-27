@@ -211,10 +211,3 @@ backup-storage:
   env:
     S3_BUCKET:
       value: workflow-dev/backups/pgdump/platform/
-
-  backupConfig: |
-    postgres=chwf-pgo-replicas:5432/n8n
-    postgres=chwf-pgo-replicas:5432/n8n-custom
-
-    */10 * * * * default ./backup.sh -s
-    0 7 * * 1-5 default ./backup.sh -s -v all
