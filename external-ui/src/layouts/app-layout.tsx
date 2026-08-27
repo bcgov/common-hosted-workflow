@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { login, logout } from '../auth/session-actions';
+import { login, logout, openN8n } from '../auth/session-actions';
 import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
 import { ToastContainer } from '../components/toast-container';
 import { AppHeader, type AppNavItem } from '@/components/layout/app-header';
@@ -30,7 +30,14 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <ToastContainer />
-      <AppHeader navItems={navItems} userEmail={user?.email} isLoading={isLoading} onLogin={login} onLogout={logout} />
+      <AppHeader
+        navItems={navItems}
+        userEmail={user?.email}
+        isLoading={isLoading}
+        onLogin={login}
+        onLogout={logout}
+        onOpenN8n={openN8n}
+      />
       <main id="main-content" tabIndex={-1} className="flex-1">
         {children}
       </main>

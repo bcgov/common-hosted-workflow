@@ -17,6 +17,7 @@ interface AppHeaderProps {
   isLoading: boolean;
   onLogin: () => void;
   onLogout: () => void;
+  onOpenN8n: () => void;
 }
 
 function navLinkClassName({ isActive }: { isActive: boolean }) {
@@ -29,9 +30,9 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
 }
 
 const shellActionClassName =
-  'h-[2.125rem] min-h-0 w-20 border-white/30 bg-white/10 px-0 py-0 text-[0.8125rem] leading-none font-normal text-white shadow-none hover:bg-white/15 hover:text-white active:bg-white/20 focus-visible:outline-accent';
+  'h-[2.125rem] min-h-0 w-[4.5rem] border-white/30 bg-white/10 px-0 py-0 text-[0.8125rem] leading-none font-normal text-white shadow-none hover:bg-white/15 hover:text-white active:bg-white/20 focus-visible:outline-accent sm:w-20';
 
-function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout }: Readonly<AppHeaderProps>) {
+function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout, onOpenN8n }: Readonly<AppHeaderProps>) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const hasSingleNavItem = navItems.length === 1;
@@ -62,7 +63,7 @@ function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout }: Readon
         Skip to main content
       </a>
 
-      <div className="mx-auto flex h-full w-full max-w-[80rem] items-center gap-3 px-4 sm:px-6 xl:px-0">
+      <div className="mx-auto flex h-full w-full max-w-[80rem] items-center gap-2 px-3 sm:gap-3 sm:px-6 xl:px-0">
         <Link
           to="/"
           aria-label="Workflow User Portal home"
@@ -134,7 +135,7 @@ function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout }: Readon
           </div>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {isLoading ? (
             <span className="hidden text-xs text-white/80 xl:inline" role="status">
               Loading session…
@@ -170,6 +171,16 @@ function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout }: Readon
               Sign in
             </Button>
           )}
+          <Button
+            type="button"
+            onClick={onOpenN8n}
+            variant="ghost"
+            size="sm"
+            aria-label="Open n8n"
+            className={shellActionClassName}
+          >
+            Open n8n
+          </Button>
         </div>
       </div>
     </header>

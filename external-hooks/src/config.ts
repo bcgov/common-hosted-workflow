@@ -56,6 +56,14 @@ export const OIDC_SCOPES = process.env.OIDC_SCOPES || 'openid email profile';
 export const OIDC_ROLES_CLAIM = process.env.OIDC_ROLES_CLAIM || 'roles';
 export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 
+// OIDC frontend hook – controls which browser logic is served at /assets/oidc-frontend-hook.js
+// 'redirect' (default): /login and /signin are replaced with /ui; logout returns to /ui
+// 'legacy': legacy SSO button injection on /login and /signin; logout returns to /
+export const OIDC_FRONTEND_HOOK_MODE = (() => {
+  const raw = (process.env.OIDC_FRONTEND_HOOK_MODE ?? 'redirect').trim().toLowerCase();
+  return raw === 'legacy' ? 'legacy' : 'redirect';
+})();
+
 // UI OIDC – only redirect remains UI-specific; shared provider/client config comes from OIDC_*
 export const UI_OIDC_REDIRECT_URI = `${UI_API_BASE_URL}/auth/callback`;
 
