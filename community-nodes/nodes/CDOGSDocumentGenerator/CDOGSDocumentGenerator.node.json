@@ -6,12 +6,12 @@
   "resources": {
     "credentialDocumentation": [
       {
-        "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/cdogs-document-generator/credentials.md"
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/cdogs-document-generator/credentials"
       }
     ],
     "primaryDocumentation": [
       {
-        "url": "https://bcgov.github.io/common-service-showcase/services/cdogs.html"
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/cdogs-document-generator"
       }
     ]
   }

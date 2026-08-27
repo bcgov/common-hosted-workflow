@@ -4,9 +4,14 @@
   "codexVersion": "1.0",
   "categories": ["Files", "Transform"],
   "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/document-text-extractor"
+      }
+    ],
     "primaryDocumentation": [
       {
-        "url": "https://github.com/bcgov/common-hosted-workflow/tree/main/docs/community-nodes/document-text-extractor"
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/document-text-extractor"
       }
     ]
   }
