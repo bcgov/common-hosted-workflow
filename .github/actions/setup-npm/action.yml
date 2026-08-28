@@ -4,7 +4,7 @@ runs:
   using: composite
   steps:
   - name: Setup Tools
-    uses: egose/actions/pnpm-packages@799b388fb3497236093c6eb7e3eac0b4c8f956ce
+    uses: egose/actions/pnpm-packages@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
     with:
       frozen: 'true'
       ignore-scripts: 'true'
@@ -15,6 +15,8 @@ runs:
         external-hooks
         docker-compose/sdg-mock-app
         doc-site
+      tools: |
+        @mermaid-js/mermaid-cli
 
   - name: Set executable permissions for local format scripts
     run: |

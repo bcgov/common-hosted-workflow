@@ -28,7 +28,7 @@ jobs:
       run: npx commitlint --last --verbose
 
     - name: Run pre-commit
-      uses: egose/actions/precommit@799b388fb3497236093c6eb7e3eac0b4c8f956ce
+      uses: egose/actions/precommit@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
       with:
         config: .pre-commit-config.yaml
         commit-on-push: true
