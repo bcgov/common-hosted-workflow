@@ -4,7 +4,7 @@ runs:
   using: composite
   steps:
   - name: Setup Tools
-    uses: egose/actions/pnpm-packages@e3f0eea78b2bd0b3cfe6b2b9eb6485b000cabfeb
+    uses: egose/actions/pnpm-packages@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
     with:
       frozen: 'true'
       ignore-scripts: 'true'
@@ -15,14 +15,8 @@ runs:
         external-hooks
         docker-compose/sdg-mock-app
         doc-site
-
-  - name: Install mermaid-cli
-    run: |
-      echo "PNPM_HOME=$HOME/.local/share/pnpm" >> "$GITHUB_ENV"
-      echo "$HOME/.local/share/pnpm" >> "$GITHUB_PATH"
-      export PATH="$HOME/.local/share/pnpm:$PATH"
-      pnpm add -g @mermaid-js/mermaid-cli --ignore-scripts
-    shell: bash
+      tools: |
+        @mermaid-js/mermaid-cli
 
   - name: Set executable permissions for local format scripts
     run: |

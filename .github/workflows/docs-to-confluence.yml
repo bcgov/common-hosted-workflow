@@ -28,7 +28,7 @@ jobs:
       uses: ./.github/actions/setup-tools
 
     - name: Sync Docs to Confluence
-      uses: egose/actions/confluence@e3f0eea78b2bd0b3cfe6b2b9eb6485b000cabfeb
+      uses: egose/actions/confluence@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
       with:
         folder: docs
         username: ${{ secrets.CONFLUENCE_USERNAME }}
