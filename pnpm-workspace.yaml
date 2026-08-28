@@ -1,3 +1,4 @@
 confirmModulesPurge: false
 minimumReleaseAgeExclude:
-- '@repo-toolkit/changelog@0.2.0'
+- '@repo-toolkit/changelog@0.20.0'
+- '@repo-toolkit/publish-package@0.20.0'
