@@ -1,5 +1,3 @@
-allowBuilds:
-  puppeteer: false
 confirmModulesPurge: false
 minimumReleaseAgeExclude:
 - '@repo-toolkit/changelog@0.2.0'
