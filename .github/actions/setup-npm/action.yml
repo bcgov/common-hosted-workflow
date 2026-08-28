@@ -4,7 +4,7 @@ runs:
   using: composite
   steps:
   - name: Setup Tools
-    uses: egose/actions/pnpm-packages@799b388fb3497236093c6eb7e3eac0b4c8f956ce
+    uses: egose/actions/pnpm-packages@e3f0eea78b2bd0b3cfe6b2b9eb6485b000cabfeb
     with:
       frozen: 'true'
       ignore-scripts: 'true'
@@ -15,6 +15,10 @@ runs:
         external-hooks
         docker-compose/sdg-mock-app
         doc-site
+
+  - name: Install mermaid-cli
+    run: pnpm add -g @mermaid-js/mermaid-cli
+    shell: bash
 
   - name: Set executable permissions for local format scripts
     run: |
