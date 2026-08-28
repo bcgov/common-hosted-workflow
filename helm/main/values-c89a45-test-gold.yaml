@@ -12,7 +12,6 @@ n8n:
     N8N_ENV_FEAT_ENCRYPTION_KEY_ROTATION: "true"
     N8N_BASE_URL: https://test-workflow.apps.gold.devops.gov.bc.ca
     OIDC_ISSUER: https://test.loginproxy.gov.bc.ca/auth/realms/standard
-    CHEFS_GATEWAY_URL: https://chefs-test.apps.silver.devops.gov.bc.ca/app/gateway/v1
     CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
     CSTAR_BASE_URL: https://test.connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
@@ -54,6 +53,21 @@ pgo:
         schedules:
           full: 0 8 * * *
           incremental: 0 0,4,12,16,20 * * *
+
+      - name: repo2
+        secretName: chwf-pgo-s3 # pragma: allowlist secret
+        retention:
+          full: "30"
+          fullType: time
+        path: /backups/pgo/platform
+        uriStyle: path
+        s3:
+          bucket: workflow-test
+          endpoint: commonservices.objectstore.gov.bc.ca
+          region: ca-central-1
+        schedules:
+          full: "0 7 * * 1-5"             # Environment reset/cleanup at 7:00 AM before work starts (Mon-Fri)
+          incremental: "0 9-17/2 * * 1-5" # Fast sync every 2 hours during working hours (Mon-Fri)
 
 loki:
   enabled: false
@@ -117,6 +131,18 @@ grafana:
     enabled: true
     host: test-grafana-workflow.apps.gold.devops.gov.bc.ca
   enabled: false
+  # Prerequisites: the `chwf-grafana` secret must contain these keys before deploying.
+  # Add them with: oc patch secret chwf-grafana -n <namespace> --type=merge \
+  #   -p '{"stringData":{"GRAFANA_ALERT_EMAIL_TO":"ops@example.com","GRAFANA_ALERT_EMAIL_WORKFLOWS":"workflows@example.com"}}'
+  envValueFrom:
+    GRAFANA_ALERT_EMAIL_TO:
+      secretKeyRef:
+        name: chwf-grafana # pragma: allowlist secret
+        key: GRAFANA_ALERT_EMAIL_TO
+    GRAFANA_ALERT_EMAIL_WORKFLOWS:
+      secretKeyRef:
+        name: chwf-grafana # pragma: allowlist secret
+        key: GRAFANA_ALERT_EMAIL_WORKFLOWS
   grafana.ini:
     server:
       root_url: https://test-grafana-workflow.apps.gold.devops.gov.bc.ca
@@ -135,8 +161,6 @@ grafana:
 alloy:
   enabled: false
   alloy:
-    configMap:
-      content: ""
     resources:
       requests:
         cpu: 5m
@@ -144,3 +168,14 @@ alloy:
       limits:
         cpu: 100m
         memory: 256Mi
+
+backup-storage:
+  enabled: true
+
+  image:
+    tag: "2.13.0"
+    pullPolicy: IfNotPresent
+
+  env:
+    S3_BUCKET:
+      value: workflow-test/backups/pgdump/platform/

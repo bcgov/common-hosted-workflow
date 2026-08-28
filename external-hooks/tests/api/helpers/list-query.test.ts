@@ -3,6 +3,7 @@ import {
   optionalSinceOrCursorQueryParam,
   encodeListNextCursor,
   nextCursorFromPagedItems,
+  paginateOverfetchedRows,
   limitQueryString,
 } from '../../../src/api/helpers/list-query';
 
@@ -51,22 +52,57 @@ describe('encodeListNextCursor', () => {
 });
 
 describe('nextCursorFromPagedItems', () => {
-  it('returns cursor when items.length equals pageLimit', () => {
+  it('returns cursor when hasMore is true', () => {
     const items = [
       { createdAt: new Date('2025-06-01T12:00:00.000Z'), id: 'item-1' },
       { createdAt: new Date('2025-06-01T11:00:00.000Z'), id: 'item-2' },
     ];
-    const cursor = nextCursorFromPagedItems(items, 2);
+    const cursor = nextCursorFromPagedItems(items, true);
     expect(cursor).toBe('2025-06-01T11:00:00.000Z|item-2');
   });
 
-  it('returns null when items.length is less than pageLimit', () => {
+  it('returns null when hasMore is false', () => {
     const items = [{ createdAt: new Date('2025-06-01T12:00:00.000Z'), id: 'item-1' }];
-    expect(nextCursorFromPagedItems(items, 10)).toBeNull();
+    expect(nextCursorFromPagedItems(items, false)).toBeNull();
   });
 
-  it('returns null for empty items', () => {
-    expect(nextCursorFromPagedItems([], 10)).toBeNull();
+  it('returns null for empty items even when hasMore is true', () => {
+    expect(nextCursorFromPagedItems([], true)).toBeNull();
+  });
+});
+
+describe('paginateOverfetchedRows', () => {
+  it('reports hasMore=false and returns all rows when count is within limit', () => {
+    const rows = ['a', 'b'];
+    const result = paginateOverfetchedRows(rows, 5);
+
+    expect(result.hasMore).toBe(false);
+    expect(result.rows).toEqual(['a', 'b']);
+  });
+
+  it('reports hasMore=false when rows.length exactly equals limit (the off-by-one case)', () => {
+    // This is the scenario that broke keyset pagination: the DB happened to return exactly
+    // `limit` rows because the result set ends there, not because there's another page.
+    const rows = ['a', 'b', 'c'];
+    const result = paginateOverfetchedRows(rows, 3);
+
+    expect(result.hasMore).toBe(false);
+    expect(result.rows).toEqual(['a', 'b', 'c']);
+  });
+
+  it('reports hasMore=true and trims the extra row when rows.length exceeds limit', () => {
+    const rows = ['a', 'b', 'c', 'd'];
+    const result = paginateOverfetchedRows(rows, 3);
+
+    expect(result.hasMore).toBe(true);
+    expect(result.rows).toEqual(['a', 'b', 'c']);
+  });
+
+  it('handles an empty result set', () => {
+    const result = paginateOverfetchedRows([], 10);
+
+    expect(result.hasMore).toBe(false);
+    expect(result.rows).toEqual([]);
   });
 });
 

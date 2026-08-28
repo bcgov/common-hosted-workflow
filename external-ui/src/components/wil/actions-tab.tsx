@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { IconLoader2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -6,13 +5,12 @@ import { getWilActions } from '../../services/backend/wil';
 import type { WilActionItem } from '../../services/backend/wil';
 import { ActionItem } from './action-item';
 import { extractErrorMessage } from '../shared/error-utils';
+import { useInfiniteList } from '../../hooks/use-infinite-list';
 
 interface ActionsTabProps {
   tenantId: string;
   since: string | undefined;
   statusFilter: string[];
-  cursor: string | null;
-  onLoadMore: (nextCursor: string) => void;
   selectedAction: WilActionItem | null;
   onSelectAction: (action: WilActionItem) => void;
 }
@@ -21,20 +19,16 @@ export function ActionsTab({
   tenantId,
   since,
   statusFilter,
-  cursor,
-  onLoadMore,
   selectedAction,
   onSelectAction,
 }: Readonly<ActionsTabProps>) {
-  const sinceParam = cursor ?? since;
-
-  const actionsQuery = useQuery({
-    queryKey: ['wil-actions', tenantId, sinceParam, statusFilter],
-    queryFn: ({ signal }) => getWilActions({ tenantId, since: sinceParam, status: statusFilter, signal }),
+  const { items, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error } = useInfiniteList<WilActionItem>({
+    queryKey: ['wil-actions', tenantId, since, statusFilter],
+    queryFn: ({ cursor, signal }) => getWilActions({ tenantId, since: cursor ?? since, status: statusFilter, signal }),
     enabled: Boolean(tenantId),
   });
 
-  if (actionsQuery.isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
         <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />
@@ -43,25 +37,22 @@ export function ActionsTab({
     );
   }
 
-  if (actionsQuery.error) {
+  if (error) {
     return (
       <Alert variant="destructive">
         <AlertTitle>Error loading actions</AlertTitle>
-        <AlertDescription>{extractErrorMessage(actionsQuery.error, 'An error occurred')}</AlertDescription>
+        <AlertDescription>{extractErrorMessage(error, 'An error occurred')}</AlertDescription>
       </Alert>
     );
   }
 
-  const data = actionsQuery.data;
-  if (!data || data.data.length === 0) {
+  if (items.length === 0) {
     return <p className="py-8 text-center text-sm text-muted-foreground">No actions found.</p>;
   }
 
-  const { nextCursor } = data;
-
   return (
     <div className="flex flex-col gap-2">
-      {data.data.map((action) => (
+      {items.map((action) => (
         <ActionItem
           key={action.id}
           action={action}
@@ -69,10 +60,17 @@ export function ActionsTab({
           onClick={() => onSelectAction(action)}
         />
       ))}
-      {nextCursor ? (
+      {hasNextPage ? (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" onClick={() => onLoadMore(nextCursor)}>
-            Load More
+          <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+            {isFetchingNextPage ? (
+              <span className="flex items-center gap-2">
+                <IconLoader2 size={14} className="animate-spin" aria-hidden="true" />
+                Loading...
+              </span>
+            ) : (
+              'Load More'
+            )}
           </Button>
         </div>
       ) : (

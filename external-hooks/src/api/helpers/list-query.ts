@@ -46,15 +46,27 @@ export function encodeListNextCursor(row: { createdAt: Date; id: string }): stri
 }
 
 /**
- * When `items.length === pageLimit`, there may be another page; return a keyset cursor from the last row.
- * Otherwise `null`.
+ * Trims rows fetched with an "overfetch by one" query (`limit + 1`) back down to `limit`,
+ * and reports whether another page actually exists.
+ *
+ * Repositories backing keyset-paginated lists (e.g. `ActionRequestRepository.list`,
+ * `MessageRepository.list`) fetch `limit + 1` rows so callers can answer "is there a next
+ * page?" directly instead of guessing from `rows.length === limit` — that guess is wrong
+ * whenever the result set happens to end exactly on a page boundary, which produces a
+ * `nextCursor` pointing past the last row and an empty "Load More" response.
  */
+export function paginateOverfetchedRows<T>(rows: T[], limit: number): { rows: T[]; hasMore: boolean } {
+  const hasMore = rows.length > limit;
+  return { rows: hasMore ? rows.slice(0, limit) : rows, hasMore };
+}
+
+/** Returns a keyset cursor from the last row when `hasMore` is true, otherwise `null`. */
 export function nextCursorFromPagedItems<T extends { createdAt: Date; id: string }>(
   items: T[],
-  pageLimit: number,
+  hasMore: boolean,
 ): string | null {
   const last = items.at(-1);
-  return items.length === pageLimit && last ? encodeListNextCursor(last) : null;
+  return hasMore && last ? encodeListNextCursor(last) : null;
 }
 
 type LimitQueryOptions = {

@@ -72,7 +72,7 @@ function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout, onOpenN8
           <img
             src={withAppBasePath('/figma-assets/navbar-image-2.png')}
             alt="Government of British Columbia"
-            className="h-[1.9375rem] w-20 shrink-0 object-contain"
+            className="h-10 w-[100px] shrink-0 object-contain aspect-[80/31]"
           />
           <span className="hidden text-base leading-[1.375rem] font-bold whitespace-nowrap sm:inline">
             Workflow User Portal

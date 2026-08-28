@@ -5,6 +5,7 @@ import type { UiApiTypedRequest } from '../types/ui-api';
 import { resolveWilTenantProjectIds } from './helpers/wil-tenant';
 import { resolveActorMatchers } from './helpers/wil-actor';
 import { formatListResponse, mapActionToUiResponse } from './helpers/wil-response';
+import { paginateOverfetchedRows } from '../helpers/list-query';
 import { createRequestParser } from '../utils/validation';
 import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilListQuery } from '../schemas/wil';
 import { OkResponse } from './responses';
@@ -54,14 +55,15 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       const actorMatchers = resolveActorMatchers(session, tenantId);
       const { limit, since } = req.parsed.query;
 
-      const items = await services.message.list({
+      const rows = await services.message.list({
         allowedProjectIds,
         actorMatchers,
         limit,
         since,
       });
+      const { rows: items, hasMore } = paginateOverfetchedRows(rows, limit);
 
-      OkResponse(res, formatListResponse(items, limit));
+      OkResponse(res, formatListResponse(items, hasMore));
     },
   );
 
@@ -89,16 +91,17 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
     const actorMatchers = resolveActorMatchers(session, tenantId);
     const { limit, since, status } = req.parsed.query;
 
-    const items = await services.action.list({
+    const rows = await services.action.list({
       allowedProjectIds,
       actorMatchers,
       limit,
       since,
       status,
     });
+    const { rows: items, hasMore } = paginateOverfetchedRows(rows, limit);
 
     const mapped = items.map(mapActionToUiResponse);
-    OkResponse(res, formatListResponse(mapped, limit));
+    OkResponse(res, formatListResponse(mapped, hasMore));
   });
 
   router.post(

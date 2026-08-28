@@ -39,24 +39,24 @@ function makeActionRequest(overrides: Partial<ActionRequest> = {}): ActionReques
 }
 
 describe('formatListResponse', () => {
-  it('returns null nextCursor when items are fewer than limit', () => {
+  it('returns null nextCursor when hasMore is false', () => {
     const items = [makeItem('a'), makeItem('b')];
-    const result = formatListResponse(items, 10);
+    const result = formatListResponse(items, false);
 
     expect(result.data).toEqual(items);
     expect(result.nextCursor).toBeNull();
   });
 
   it('returns null nextCursor when items list is empty', () => {
-    const result = formatListResponse([], 20);
+    const result = formatListResponse([], false);
 
     expect(result.data).toEqual([]);
     expect(result.nextCursor).toBeNull();
   });
 
-  it('returns a cursor when items.length equals limit', () => {
+  it('returns a cursor when hasMore is true', () => {
     const items = [makeItem('a'), makeItem('b'), makeItem('c')];
-    const result = formatListResponse(items, 3);
+    const result = formatListResponse(items, true);
 
     expect(result.nextCursor).not.toBeNull();
   });
@@ -64,28 +64,30 @@ describe('formatListResponse', () => {
   it('cursor format is ISO|id of the last item', () => {
     const lastDate = new Date('2025-06-15T08:30:00.000Z');
     const items = [makeItem('first'), makeItem('last', lastDate)];
-    const result = formatListResponse(items, 2);
+    const result = formatListResponse(items, true);
 
     expect(result.nextCursor).toBe(`${lastDate.toISOString()}|last`);
   });
 
   it('preserves all item data in the response', () => {
     const items = [{ id: 'x', createdAt: new Date('2025-01-01T00:00:00.000Z'), extra: 'data' }];
-    const result = formatListResponse(items, 5);
+    const result = formatListResponse(items, false);
 
     expect(result.data[0]).toEqual(items[0]);
   });
 
-  it('returns null nextCursor when limit is 1 and only 0 items', () => {
-    const result = formatListResponse([], 1);
+  it('returns null nextCursor when hasMore is true but items is empty', () => {
+    // Defensive case: hasMore should never be true with no items, but the
+    // function still falls back to null since there's no last row to encode.
+    const result = formatListResponse([], true);
 
     expect(result.nextCursor).toBeNull();
   });
 
-  it('returns cursor when exactly 1 item matches limit of 1', () => {
+  it('returns cursor for a single item when hasMore is true', () => {
     const date = new Date('2025-03-10T14:00:00.000Z');
     const items = [makeItem('only-one', date)];
-    const result = formatListResponse(items, 1);
+    const result = formatListResponse(items, true);
 
     expect(result.nextCursor).toBe(`${date.toISOString()}|only-one`);
   });

@@ -39,8 +39,8 @@ n8n:
     # Both binary data and execution data are stored in S3. Requires an Enterprise license.
     # Credentials are injected via extraEnv from the chwf-s3-account secret.
     # Bucket name is set per environment in values-<namespace>-<env>-<zone>.yaml
-    N8N_DEFAULT_BINARY_DATA_MODE: "s3"
-    N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
+    N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "default"
     N8N_EXTERNAL_STORAGE_S3_HOST: "commonservices.objectstore.gov.bc.ca"
     N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "https"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "ca-central-1"
@@ -111,7 +111,8 @@ n8n:
     N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"
     # Log streaming — event list is in logStreaming.subscribedEvents.
     # Rendered to JSON by configmaps/n8n-log-streaming.yaml and injected via extraEnv below.
-    N8N_LOG_STREAMING_MANAGED_BY_ENV: "true"
+    N8N_LOG_FORMAT: "json"
+    N8N_LOG_STREAMING_MANAGED_BY_ENV: "false"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
@@ -220,7 +221,7 @@ n8n:
 
     image:
       repository: n8nio/runners
-      tag: 2.31.2
+      tag: 2.35.3
       pullPolicy: IfNotPresent
 
     env:
@@ -401,6 +402,13 @@ backup-storage:
     S3_PRUNE_BACKUPS:
       value: "false"
 
+  backupConfig: |
+    postgres=chwf-pgo-replicas:5432/n8n
+    postgres=chwf-pgo-replicas:5432/n8n-custom
+
+    */10 * * * * default ./backup.sh -s
+    0 7 * * 1-5 default ./backup.sh -s -v all
+
 # dns-probe — disabled by default, enabled only for golddr deployments
 dns-probe:
   enabled: false
@@ -490,6 +498,17 @@ alloy:
         port: 5514
         targetPort: 5514
         protocol: TCP
+  # config-reloader defaults include a fixed UID (65534), which is incompatible
+  # with OpenShift restricted-v2's namespace UID range.
+  #
+  # Let OpenShift assign the UID/GID instead of forcing the image's nobody UID.
+  # Also remove the chart-level seccomp setting so OpenShift's restricted-v2 SCC
+  # can apply its default runtime/default seccomp policy.
+  configReloader:
+    securityContext:
+      runAsUser: null
+      runAsGroup: null
+      seccompProfile: null
 
 # See https://github.com/grafana/loki/tree/main/production/helm/loki
 loki:
@@ -639,6 +658,12 @@ grafana:
         name: chwf # pragma: allowlist secret
         key: OIDC_CLIENT_SECRET
   grafana.ini:
+    smtp:
+      enabled: true
+      host: apps.smtp.gov.bc.ca:25
+      from_address: DoNotReplyCITZ@gov.bc.ca
+      from_name: Grafana Alerts
+      startTLS_policy: NoStartTLS
     auth:
       disable_login_form: true
     auth.generic_oauth:
@@ -655,6 +680,13 @@ grafana:
       folderAnnotation: grafana_dashboard_folder
       provider:
         foldersFromFilesStructure: true
+    # Sidecar watches for ConfigMaps labelled grafana_alert=1 and hot-reloads
+    # Grafana's alert provisioning without a pod restart.
+    alerts:
+      enabled: true
+      label: grafana_alert
+      labelValue: "1"
+      reloadURL: http://localhost:3000/api/admin/provisioning/alerting/reload
   # Helm/OpenShift datasource provisioning.
   # Docker-compose equivalents: docker-compose/observability/grafana/datasources.yaml and dashboards.yaml
   # Keep in sync when adding or changing datasources.
@@ -694,7 +726,7 @@ grafana:
 # N8N_LOG_STREAMING_DESTINATIONS is injected via n8n.extraEnv.configMapKeyRef above.
 # To add or remove an event type, edit subscribedEvents here.
 logStreaming:
-  enabled: true  # set false to disable without removing the ConfigMap or extraEnv reference
+  enabled: false  # enabled only in c89a45 environments where Alloy is deployed
   anonymizeAuditMessages: false  # audit trail requires identifiable users; restrict Grafana access instead
   syslog:
     host: chwf-alloy

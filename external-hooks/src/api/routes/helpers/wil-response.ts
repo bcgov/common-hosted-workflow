@@ -57,16 +57,21 @@ export function mapActionToUiResponse(action: ActionRequest): UiActionResponse {
 /**
  * Formats a paginated list response with a keyset cursor.
  *
- * When the number of returned items equals the requested limit, a `nextCursor`
- * is generated from the last item's `createdAt` and `id` in the format `ISO|uuid`.
- * Otherwise `nextCursor` is null, indicating no more pages.
+ * Expects `items` to have been fetched via the repository's "overfetch by one"
+ * pattern (`limit + 1` rows) and trimmed with `paginateOverfetchedRows`, so `hasMore`
+ * reflects whether another page actually exists — rather than guessing from
+ * `items.length === limit`, which is wrong whenever the result set ends exactly on
+ * a page boundary.
+ *
+ * When `hasMore` is true, `nextCursor` is generated from the last item's `createdAt`
+ * and `id` in the format `ISO|uuid`. Otherwise `nextCursor` is null.
  */
 export function formatListResponse<T extends { createdAt: Date; id: string }>(
   items: T[],
-  limit: number,
+  hasMore: boolean,
 ): { data: T[]; nextCursor: string | null } {
   const last = items.at(-1);
-  if (items.length === limit && last) {
+  if (hasMore && last) {
     return { data: items, nextCursor: `${last.createdAt.toISOString()}|${last.id}` };
   }
   return { data: items, nextCursor: null };

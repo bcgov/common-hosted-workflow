@@ -30,6 +30,7 @@
     "n8nNodesApiVersion": 1,
     "strict": false,
     "credentials": [
+      "dist/credentials/BcGovSharePointOAuth2Api.credentials.js",
       "dist/credentials/ChefsApi.credentials.js",
       "dist/credentials/ChefsFormAuth.credentials.js",
       "dist/credentials/CDOGSOAuth2Api.credentials.js",
@@ -38,6 +39,7 @@
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js"
     ],
     "nodes": [
+      "dist/nodes/BcGovSharePoint/BcGovSharePoint.node.js",
       "dist/nodes/CDOGSDocumentGenerator/CDOGSDocumentGenerator.node.js",
       "dist/nodes/CHEFS/CHEFS.node.js",
       "dist/nodes/CHEFSResubmitWait/CHEFSResubmitWait.node.js",
@@ -52,7 +54,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@n8n/eslint-plugin-community-nodes": "^0.29.0",
-    "@n8n/node-cli": "^0.44.0",
+    "@n8n/node-cli": "^0.45.0",
     "@types/node": "^26.2.0",
     "@types/sanitize-html": "^2.16.1",
     "eslint": "10.8.1",

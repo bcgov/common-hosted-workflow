@@ -38,7 +38,8 @@ export const listAccessRequestsSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   query: z
     .object({
-      status: accessRequestStatusSchema.optional(),
+      status: z.preprocess((v) => (v === '' ? undefined : v), accessRequestStatusSchema.optional()),
+      search: z.preprocess((v) => (v === '' ? undefined : v), z.string().max(200).optional()),
       limit: z.preprocess(parsePositiveInt, z.number().int().min(1).max(100)).optional(),
       offset: z.preprocess(parsePositiveInt, z.number().int().min(0)).optional(),
     })

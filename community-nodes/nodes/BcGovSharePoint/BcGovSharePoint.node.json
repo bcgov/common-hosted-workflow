@@ -1,0 +1,18 @@
+{
+  "node": "community-nodes.bcGovSharePoint",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Utility"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/bcgov-sharepoint/credentials"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/bcgov-sharepoint"
+      }
+    ]
+  }
+}

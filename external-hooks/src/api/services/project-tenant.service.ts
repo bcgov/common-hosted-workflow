@@ -39,8 +39,12 @@ export class ProjectTenantService {
    * Lists all n8n projects with their tenant mappings, paginated.
    * Merges project data from n8n with tenant-project relations from the custom DB.
    */
-  async listAllProjectsWithTenants(page: number, pageSize: number): Promise<AdminProjectsPage> {
-    const { projects, totalCount } = await this.n8nRepositories.project.listPaginated(page, pageSize);
+  async listAllProjectsWithTenants(
+    page: number,
+    pageSize: number,
+    filters?: { search?: string; type?: string },
+  ): Promise<AdminProjectsPage> {
+    const { projects, totalCount } = await this.n8nRepositories.project.listPaginated(page, pageSize, filters);
     const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
 
     const data: AdminProjectItem[] = projects.map((p) => ({

@@ -1,3 +1,33 @@
+## [0.3.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.2.0...v0.3.0) (2026-08-21)
+
+### Features
+
+* **CCP-5306:** enable n8n log streaming and dashboards ([#425](https://github.com/bcgov/common-hosted-workflow/issues/425)) ([72fb543](https://github.com/bcgov/common-hosted-workflow/commit/72fb5434ebaaa1aa40fae82e698e22e09c564578))
+* **CCP-5338:** configure n8n S3 binary data storage ([#441](https://github.com/bcgov/common-hosted-workflow/issues/441)) ([df9419f](https://github.com/bcgov/common-hosted-workflow/commit/df9419f9c45cca62787ece7f6eb1f7d6088c5dba))
+* **CCP-5338:** switch n8n binary storage to OCIO S3 backend ([#448](https://github.com/bcgov/common-hosted-workflow/issues/448)) ([e193199](https://github.com/bcgov/common-hosted-workflow/commit/e1931991f259fb67ffa008ea7d054e3a0453eb5d))
+* **CCP-5345:** centralize n8n system logs in Loki ([#432](https://github.com/bcgov/common-hosted-workflow/issues/432)) ([70b5f2c](https://github.com/bcgov/common-hosted-workflow/commit/70b5f2c69435ec4660833d39535312131c510d53))
+* **CCP-5356:** migrate workflow user portal with new designs ([#443](https://github.com/bcgov/common-hosted-workflow/issues/443)) ([4791380](https://github.com/bcgov/common-hosted-workflow/commit/4791380647f72a9ff61d1ccd0cf70b6a06754b95)), closes [#403](https://github.com/bcgov/common-hosted-workflow/issues/403) [#410](https://github.com/bcgov/common-hosted-workflow/issues/410) [#418](https://github.com/bcgov/common-hosted-workflow/issues/418) [#439](https://github.com/bcgov/common-hosted-workflow/issues/439) [#442](https://github.com/bcgov/common-hosted-workflow/issues/442)
+* **CCP-5356:** update workflow user portal with new responsive design - phase2 ([#449](https://github.com/bcgov/common-hosted-workflow/issues/449)) ([f443f40](https://github.com/bcgov/common-hosted-workflow/commit/f443f40ffa1e574f5c13721b5fb5c24a2a85cffc))
+* **CCP-5554:** enable external secrets module in n8n ([333917e](https://github.com/bcgov/common-hosted-workflow/commit/333917e20f7ef979ae92279853a78bcebabdca78))
+* **CCP-5554:** remove orphaned project data during tenant sync ([338bbaf](https://github.com/bcgov/common-hosted-workflow/commit/338bbaf6ef3b46d064caacf2fc667e71b34fc627))
+* **CCP-5563:** add adaptive card message support to the DevX connector ([1ed4fe7](https://github.com/bcgov/common-hosted-workflow/commit/1ed4fe72fe8a1a9aa7a299cf60ef8f175ff44f16))
+* **CCP-5563:** add mention targets to message requests ([e3c62a3](https://github.com/bcgov/common-hosted-workflow/commit/e3c62a34e565ece6fae45dacb4b04911c5a9f935))
+* **CCP-5563:** add statuscake message support and expand sysdig and generic mappings ([0ade39b](https://github.com/bcgov/common-hosted-workflow/commit/0ade39b2919ea54f252a402a0e23de83bfb4966c))
+* **CCP-5563:** lock inherited webhook settings on wait node ([e6dfdb6](https://github.com/bcgov/common-hosted-workflow/commit/e6dfdb6f1ed229fec0daa6debf27e14f48f12b83))
+* **CCP-5563:** set redis persistence size for prod gold and golddr ([ede780c](https://github.com/bcgov/common-hosted-workflow/commit/ede780cb13fb60c8dc8d6ea5f22028725a8425d5))
+* **CCP-5563:** show mention field only for message content types ([956fdba](https://github.com/bcgov/common-hosted-workflow/commit/956fdba19ec436af673b43ebc0a354bd69e8f248))
+* **CCP-5563:** update metrics and tracing defaults for n8n environments ([f28cd9d](https://github.com/bcgov/common-hosted-workflow/commit/f28cd9d8a5707081218874df536f015498f6f692))
+* **CCP-5586:** fix project type ([#445](https://github.com/bcgov/common-hosted-workflow/issues/445)) ([be4c047](https://github.com/bcgov/common-hosted-workflow/commit/be4c0479c5398ad4eccc4363a516e4e8d6289178))
+* enable pgdump backup storage for c89a45-dev ([#459](https://github.com/bcgov/common-hosted-workflow/issues/459)) ([530fe42](https://github.com/bcgov/common-hosted-workflow/commit/530fe4271d771d451acae864e13ee002ff97f918))
+
+### Bug Fixes
+
+* **CCP-5338:** increase SeaweedFS volume capacity and fix S3 secret reference ([#444](https://github.com/bcgov/common-hosted-workflow/issues/444)) ([36700c1](https://github.com/bcgov/common-hosted-workflow/commit/36700c18985962c5df7f727aef5bc1fdd5f0d112))
+* **CCP-5356:** fix WIL page designs ([#458](https://github.com/bcgov/common-hosted-workflow/issues/458)) ([11f1b01](https://github.com/bcgov/common-hosted-workflow/commit/11f1b0184dc77cfe0a39f97c57d80531879a6873))
+* **CCP-5554:** validate mapped tenant project ids and clean up dangling relations ([90fe755](https://github.com/bcgov/common-hosted-workflow/commit/90fe755e7f855e12ccfc9aa6f59207fd7bcb1175))
+* **CCP-5563:** adjust production postgres and redis sizing ([1167fee](https://github.com/bcgov/common-hosted-workflow/commit/1167fee6d50192c77d35a3d9ce5a52a870ab2382))
+* **CCP-5563:** harden cdogs filename sanitization and update oauth request typing ([c32ab43](https://github.com/bcgov/common-hosted-workflow/commit/c32ab43c10f430f6101fdcb3821dd9ce8d5f64ec))
+
 ## [0.2.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.1.0...v0.2.0) (2026-08-06)
 
 ### Features

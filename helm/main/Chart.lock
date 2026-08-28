@@ -7,7 +7,7 @@ dependencies:
   version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 18.8.7
+  version: 18.8.12
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 25.5.3
@@ -25,7 +25,7 @@ dependencies:
   version: 1.11.1
 - name: loki
   repository: https://grafana.github.io/helm-charts
-  version: 7.2.0
+  version: 7.3.0
 - name: tempo
   repository: https://grafana.github.io/helm-charts
   version: 1.24.4
@@ -35,5 +35,5 @@ dependencies:
 - name: grafana
   repository: https://grafana.github.io/helm-charts
   version: 10.5.15
-digest: sha256:5ba8e2ba062ab5c9271ba59a5f4ebec51c2d6814168610461b8264d18bfc6155
-generated: "2026-08-17T14:11:00.497849477Z"
+digest: sha256:dcf9b54c321afdec0541f265051eb6c93d7317a1edd0b1fe4a9bf5146140c52b
+generated: "2026-08-26T10:57:19.278045525Z"

@@ -84,7 +84,31 @@ describe('GET /messages/', () => {
     expect(payload).toHaveProperty('nextCursor');
   });
 
-  it('returns nextCursor when items.length equals pageLimit', async () => {
+  it('returns nextCursor when repo returns one more row than pageLimit (overfetch signal)', async () => {
+    const { router, messageRepo } = createTestRouter();
+    // The repository overfetches by 1 (limit + 1) so the route can detect a real
+    // next page. 51 rows for a limit of 50 means there IS another page.
+    messageRepo.list.mockResolvedValue(
+      Array.from({ length: 51 }, (_, i) => makeMessageRow({ id: `msg-${String(i).padStart(3, '0')}` })),
+    );
+
+    const handlers = getRouteHandlers(router, 'get', '/messages/');
+    const req = createMockRequest({ params: {}, query: {} });
+    const res = createMockResponse({ chwfAllowedProjectIds: [VALID_PROJECT_ID] });
+
+    await runHandlerChain(handlers!, req, res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.nextCursor).not.toBeNull();
+    // The extra overfetched row must be trimmed from the response.
+    expect(payload.items).toHaveLength(50);
+  });
+
+  it('returns nextCursor as null when the result set ends exactly on the page boundary', async () => {
+    // Regression test: previously the route assumed rows.length === limit meant
+    // "there might be more," which produced a nextCursor pointing past the last row
+    // and an empty response on the next "Load More" click. The repo now returns
+    // exactly `limit` rows (not limit + 1) whenever the result set truly ends there.
     const { router, messageRepo } = createTestRouter();
     messageRepo.list.mockResolvedValue(
       Array.from({ length: 50 }, (_, i) => makeMessageRow({ id: `msg-${String(i).padStart(3, '0')}` })),
@@ -96,7 +120,9 @@ describe('GET /messages/', () => {
 
     await runHandlerChain(handlers!, req, res);
 
-    expect(res.json.mock.calls[0][0].nextCursor).not.toBeNull();
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.nextCursor).toBeNull();
+    expect(payload.items).toHaveLength(50);
   });
 
   it('returns nextCursor as null when fewer items than limit', async () => {

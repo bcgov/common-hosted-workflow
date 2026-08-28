@@ -1,17 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import axios from 'axios';
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconEdit,
-  IconCheck,
-  IconX,
-  IconSearch,
-  IconExternalLink,
-} from '@tabler/icons-react';
+import { IconChevronLeft, IconChevronRight, IconSearch } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
@@ -21,10 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toasts';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
   getAdminProjects,
   updateProjectTenant,
@@ -59,18 +49,11 @@ function getMutationErrorMessage(error: unknown): string {
   return 'Network error';
 }
 
-function matchesSearch(project: AdminProjectItem, query: string): boolean {
-  const lower = query.toLowerCase();
-  if (project.projectName.toLowerCase().includes(lower)) return true;
-  if (project.projectId.toLowerCase().includes(lower)) return true;
-  if (project.tenantId && project.tenantId.toLowerCase().includes(lower)) return true;
-  return false;
-}
-
 export function AdminProjectsView() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
   const [typeFilter, setTypeFilter] = useState<ProjectTypeFilter>('all');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -79,8 +62,16 @@ export function AdminProjectsView() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
   const projectsQuery = useQuery({
-    queryKey: ['admin-projects', page],
-    queryFn: ({ signal }) => getAdminProjects({ page, pageSize: PAGE_SIZE, signal }),
+    queryKey: ['admin-projects', page, debouncedSearchQuery, typeFilter],
+    queryFn: ({ signal }) =>
+      getAdminProjects({
+        page,
+        pageSize: PAGE_SIZE,
+        search: debouncedSearchQuery.trim() || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        signal,
+      }),
+    placeholderData: keepPreviousData,
   });
 
   const updateMutation = useMutation({
@@ -89,6 +80,7 @@ export function AdminProjectsView() {
     onSuccess: () => {
       setEditingProjectId(null);
       queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
+      toast.success('Tenant ID updated');
     },
     onError: (error) => {
       toast.error(getMutationErrorMessage(error));
@@ -100,27 +92,20 @@ export function AdminProjectsView() {
     onSuccess: () => {
       setEditingProjectId(null);
       queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
+      toast.success('Tenant ID removed');
     },
     onError: (error) => {
       toast.error(getMutationErrorMessage(error));
     },
   });
 
-  // Client-side filtering of the current page's data
-  const filteredProjects = useMemo(() => {
-    if (!projectsQuery.data) return [];
-    let items = projectsQuery.data.data;
+  const projects = projectsQuery.data?.data ?? [];
 
-    if (typeFilter !== 'all') {
-      items = items.filter((p) => p.projectType === typeFilter);
-    }
-
-    if (searchQuery.trim()) {
-      items = items.filter((p) => matchesSearch(p, searchQuery.trim()));
-    }
-
-    return items;
-  }, [projectsQuery.data, typeFilter, searchQuery]);
+  const summaryText = useMemo(() => {
+    if (!projectsQuery.data) return '';
+    const { pagination } = projectsQuery.data;
+    return `${pagination.totalItems} projects`;
+  }, [projectsQuery.data]);
 
   function startEditing(projectId: string, currentValue: string | null) {
     setEditingProjectId(projectId);
@@ -137,7 +122,6 @@ export function AdminProjectsView() {
   function saveEdit(projectId: string, originalValue: string | null, projectName: string) {
     const trimmed = editValue.trim();
 
-    // If cleared, delete the mapping
     if (trimmed === '') {
       if (originalValue !== null) {
         setPendingDelete({ projectId, projectName, tenantId: originalValue });
@@ -147,13 +131,11 @@ export function AdminProjectsView() {
       return;
     }
 
-    // Validate UUID
     if (!UUID_REGEX.test(trimmed)) {
       setValidationError('Invalid UUID format');
       return;
     }
 
-    // No change
     if (trimmed === originalValue) {
       cancelEditing();
       return;
@@ -176,7 +158,7 @@ export function AdminProjectsView() {
   }
 
   if (projectsQuery.isLoading) {
-    return <p className="text-sm text-[var(--bc-muted)]">Loading projects...</p>;
+    return <p className="text-sm text-muted-foreground">Loading projects...</p>;
   }
 
   if (projectsQuery.error) {
@@ -191,40 +173,42 @@ export function AdminProjectsView() {
   }
 
   const data = projectsQuery.data;
-  if (!data || data.data.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-sm text-[var(--bc-muted)]">No projects found.</CardContent>
-      </Card>
-    );
+  if (!data) {
+    return <p className="text-sm text-muted-foreground">No projects found.</p>;
   }
 
   const { pagination } = data;
   const totalPages = pagination.totalPages;
 
   return (
-    <div className="space-y-4">
-      {/* Search and Filter Controls */}
+    <div className="space-y-5">
+      {/* Search and Filter Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <IconSearch
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--bc-muted)]"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
           />
           <Input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by project name, project ID, or tenant ID..."
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by project name, ID, or tenant ID..."
             className="pl-9"
             aria-label="Search projects"
           />
         </div>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as ProjectTypeFilter)}
-          className="h-9 rounded-md border border-[var(--bc-border)] bg-white px-3 text-sm text-[var(--bc-text)] focus:outline-none focus:ring-2 focus:ring-[var(--bc-blue)]"
+          onChange={(e) => {
+            setTypeFilter(e.target.value as ProjectTypeFilter);
+            setPage(1);
+          }}
+          className="h-10 rounded-control border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-border-strong"
           aria-label="Filter by project type"
         >
           <option value="all">All types</option>
@@ -233,141 +217,41 @@ export function AdminProjectsView() {
         </select>
       </div>
 
-      {/* Filtered Results */}
-      {filteredProjects.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-sm text-[var(--bc-muted)]">No projects match your filters.</CardContent>
-        </Card>
+      {/* Summary Count */}
+      <p className="text-[0.8125rem] text-muted-foreground">{summaryText}</p>
+
+      {/* Project List */}
+      {projects.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">No projects match your filters.</p>
       ) : (
-        filteredProjects.map((project) => {
-          const isEditing = editingProjectId === project.projectId;
-          const isSaving =
-            (updateMutation.isPending && updateMutation.variables?.projectId === project.projectId) ||
-            (deleteMutation.isPending && deleteMutation.variables === project.projectId);
-
-          return (
-            <Card key={project.projectId}>
-              <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">{project.projectName}</CardTitle>
-                  <CardDescription className="font-mono text-xs break-all">{project.projectId}</CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-md bg-[var(--bc-surface)] px-2.5 py-0.5 text-xs font-medium text-[var(--bc-muted)]">
-                    {project.projectType}
-                  </span>
-                  <Button type="button" variant="outline" size="sm" asChild>
-                    <a
-                      href={`${globalThis.location.origin}/projects/${encodeURIComponent(project.projectId)}/workflows`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <IconExternalLink size={16} aria-hidden="true" />
-                      Open
-                    </a>
-                  </Button>
-                </div>
-              </CardHeader>
-
-              <CardContent>
-                <ScrollArea className="w-full rounded-md border border-[var(--bc-border)]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-[var(--bc-surface)] hover:bg-[var(--bc-surface)]">
-                        <TableHead>Tenant ID</TableHead>
-                        <TableHead className="w-[100px] text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>
-                          {isEditing ? (
-                            <div className="flex flex-col gap-1">
-                              <Input
-                                type="text"
-                                value={editValue}
-                                onChange={(e) => {
-                                  setEditValue(e.target.value);
-                                  if (validationError) setValidationError(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    saveEdit(project.projectId, project.tenantId, project.projectName);
-                                  } else if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    cancelEditing();
-                                  }
-                                }}
-                                placeholder="Enter tenant UUID"
-                                aria-label="Tenant ID"
-                                aria-invalid={!!validationError}
-                                className="h-8 font-mono text-xs"
-                                autoFocus
-                                disabled={isSaving}
-                              />
-                              {validationError && (
-                                <span className="text-xs text-red-600" role="alert">
-                                  {validationError}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="font-mono text-xs break-all">
-                              {project.tenantId ?? <span className="text-[var(--bc-muted)]">—</span>}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isEditing ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => saveEdit(project.projectId, project.tenantId, project.projectName)}
-                                disabled={isSaving}
-                                aria-label="Save"
-                              >
-                                <IconCheck size={16} className="text-green-600" aria-hidden="true" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={cancelEditing}
-                                disabled={isSaving}
-                                aria-label="Cancel"
-                              >
-                                <IconX size={16} className="text-red-600" aria-hidden="true" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditing(project.projectId, project.tenantId)}
-                              aria-label="Edit tenant ID"
-                            >
-                              <IconEdit size={16} aria-hidden="true" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          );
-        })
+        <div className="space-y-3">
+          {projects.map((project) => (
+            <ProjectRow
+              key={project.projectId}
+              project={project}
+              isEditing={editingProjectId === project.projectId}
+              editValue={editValue}
+              validationError={editingProjectId === project.projectId ? validationError : null}
+              isSaving={
+                (updateMutation.isPending && updateMutation.variables?.projectId === project.projectId) ||
+                (deleteMutation.isPending && deleteMutation.variables === project.projectId)
+              }
+              onStartEdit={() => startEditing(project.projectId, project.tenantId)}
+              onCancelEdit={cancelEditing}
+              onSaveEdit={() => saveEdit(project.projectId, project.tenantId, project.projectName)}
+              onEditValueChange={(val) => {
+                setEditValue(val);
+                if (validationError) setValidationError(null);
+              }}
+            />
+          ))}
+        </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-[var(--bc-muted)]">
+          <p className="text-sm text-muted-foreground">
             Page {page} of {totalPages} ({pagination.totalItems} projects)
           </p>
           <div className="flex items-center gap-2">
@@ -407,20 +291,20 @@ export function AdminProjectsView() {
             <DialogTitle>Confirm Tenant Update</DialogTitle>
             <DialogDescription>
               You are about to change the tenant mapping for project{' '}
-              <strong className="text-[var(--bc-text)]">{pendingUpdate?.projectName}</strong>.
+              <strong className="text-foreground">{pendingUpdate?.projectName}</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             {pendingUpdate?.oldTenantId ? (
               <p>
-                <span className="text-[var(--bc-muted)]">Current tenant:</span>{' '}
+                <span className="text-muted-foreground">Current tenant:</span>{' '}
                 <code className="font-mono text-xs">{pendingUpdate.oldTenantId}</code>
               </p>
             ) : (
-              <p className="text-[var(--bc-muted)]">No tenant currently assigned.</p>
+              <p className="text-muted-foreground">No tenant currently assigned.</p>
             )}
             <p>
-              <span className="text-[var(--bc-muted)]">New tenant:</span>{' '}
+              <span className="text-muted-foreground">New tenant:</span>{' '}
               <code className="font-mono text-xs">{pendingUpdate?.newTenantId}</code>
             </p>
           </div>
@@ -447,12 +331,12 @@ export function AdminProjectsView() {
             <DialogTitle>Confirm Tenant Removal</DialogTitle>
             <DialogDescription>
               You are about to remove the tenant mapping for project{' '}
-              <strong className="text-[var(--bc-text)]">{pendingDelete?.projectName}</strong>.
+              <strong className="text-foreground">{pendingDelete?.projectName}</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <p>
-              <span className="text-[var(--bc-muted)]">Tenant to remove:</span>{' '}
+              <span className="text-muted-foreground">Tenant to remove:</span>{' '}
               <code className="font-mono text-xs">{pendingDelete?.tenantId}</code>
             </p>
           </div>
@@ -466,6 +350,134 @@ export function AdminProjectsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ---------- Project Row Component ---------- */
+
+interface ProjectRowProps {
+  project: AdminProjectItem;
+  isEditing: boolean;
+  editValue: string;
+  validationError: string | null;
+  isSaving: boolean;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onEditValueChange: (value: string) => void;
+}
+
+function ProjectRow({
+  project,
+  isEditing,
+  editValue,
+  validationError,
+  isSaving,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditValueChange,
+}: Readonly<ProjectRowProps>) {
+  const isPersonal = project.projectType === 'personal';
+  const typeBadgeClasses = isPersonal
+    ? 'bg-[#f1f8fe] text-[#1e5189] border border-[#c1ddfc]'
+    : 'bg-[#f3f2f1] text-[#605e5c] border border-[#e0dedc]';
+
+  return (
+    <div
+      className={`rounded-[12px] bg-white px-5 py-4 ${
+        isEditing ? 'border-[1.5px] border-[#013366]' : 'border border-border'
+      }`}
+    >
+      {/* Header: Name + Type Badge */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold text-foreground">
+            <a
+              href={`${globalThis.location.origin}/projects/${encodeURIComponent(project.projectId)}/workflows`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+            >
+              {project.projectName}
+            </a>
+          </h3>
+          <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">{project.projectId}</p>
+        </div>
+        <span className={`shrink-0 rounded-md px-2.5 py-0.5 text-xs font-medium ${typeBadgeClasses}`}>
+          {isPersonal ? 'Personal' : 'Team'}
+        </span>
+      </div>
+
+      {/* Tenant ID Row */}
+      <div className="mt-3">
+        {isEditing ? (
+          <div className="space-y-3">
+            <label className="block text-[0.8125rem] font-bold text-[#2D2D2D]">Tenant ID</label>
+            <Input
+              type="text"
+              value={editValue}
+              onChange={(e) => onEditValueChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSaveEdit();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onCancelEdit();
+                }
+              }}
+              placeholder="Enter tenant UUID"
+              aria-label="Tenant ID"
+              aria-invalid={!!validationError}
+              className="font-mono text-sm"
+              autoFocus
+              disabled={isSaving}
+            />
+            {validationError && (
+              <span className="text-xs text-red-600" role="alert">
+                {validationError}
+              </span>
+            )}
+            <div className="flex items-center gap-3">
+              <Button type="button" size="sm" onClick={onSaveEdit} disabled={isSaving}>
+                Save
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onCancelEdit} disabled={isSaving}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[0.8125rem] font-medium text-muted-foreground">Tenant ID</span>
+            {project.tenantId ? (
+              <>
+                <span className="font-mono text-[0.8125rem] text-foreground">{project.tenantId}</span>
+                <button
+                  type="button"
+                  onClick={onStartEdit}
+                  className="text-[0.8125rem] font-medium text-[#255a90] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+                >
+                  Edit
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-[0.8125rem] text-muted-foreground">No tenant mapped</span>
+                <button
+                  type="button"
+                  onClick={onStartEdit}
+                  className="text-[0.8125rem] font-medium text-[#255a90] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+                >
+                  Add tenant ID
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
