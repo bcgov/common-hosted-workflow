@@ -17,7 +17,7 @@ runs:
         doc-site
 
   - name: Install mermaid-cli
-    run: pnpm add -g @mermaid-js/mermaid-cli
+    run: pnpm add -g @mermaid-js/mermaid-cli --ignore-scripts
     shell: bash
 
   - name: Set executable permissions for local format scripts
