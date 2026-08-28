@@ -27,6 +27,9 @@ jobs:
     - name: Setup Tools
       uses: ./.github/actions/setup-tools
 
+    - name: Setup NPM Packages
+      uses: ./.github/actions/setup-npm
+
     - name: Sync Docs to Confluence
       uses: egose/actions/confluence@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
       with:
