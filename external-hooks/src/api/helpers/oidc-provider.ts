@@ -15,7 +15,9 @@ export type OidcProviderConfig = Pick<
   | 'clientSecret'
   | 'redirectUri'
   | 'scopes'
->;
+> & {
+  useManualEndpoints?: boolean;
+};
 
 export type OidcAuthorizationState = {
   nonce: string;
@@ -152,6 +154,26 @@ function getDiscoveryCacheKey(config: OidcProviderConfig) {
 export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
   if (!config.issuerUrl) {
     throw new Error('OIDC issuer is required in manual endpoint mode');
+  }
+
+  // A container may need internal provider endpoints while the issuer remains
+  // browser-facing. When every endpoint is explicitly configured, discovery
+  // would incorrectly try to reach that browser address from the container.
+  if (
+    config.useManualEndpoints &&
+    config.authorizationEndpoint &&
+    config.tokenEndpoint &&
+    config.userinfoEndpoint &&
+    config.jwksUri
+  ) {
+    return {
+      issuer: config.issuerUrl,
+      authorization_endpoint: config.authorizationEndpoint,
+      token_endpoint: config.tokenEndpoint,
+      userinfo_endpoint: config.userinfoEndpoint,
+      jwks_uri: config.jwksUri,
+      end_session_endpoint: config.endSessionEndpoint || undefined,
+    };
   }
 
   const cacheKey = getDiscoveryCacheKey(config);

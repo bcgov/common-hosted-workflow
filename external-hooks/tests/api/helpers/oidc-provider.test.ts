@@ -585,6 +585,21 @@ describe('oidc-provider issuer and manual mode hardening', () => {
     ).rejects.toThrow(/discovery issuer mismatch/i);
   });
 
+  it('uses complete manual endpoint configuration without fetching discovery', async () => {
+    const config = createBaseConfig({ useManualEndpoints: true });
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+
+    await expect(fetchOidcDiscoveryDocument(config)).resolves.toEqual({
+      issuer: ISSUER,
+      authorization_endpoint: `${ISSUER}/auth`,
+      token_endpoint: TOKEN_ENDPOINT,
+      userinfo_endpoint: USERINFO_ENDPOINT,
+      jwks_uri: JWKS_URI,
+      end_session_endpoint: undefined,
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('rejects issuer-less manual configuration at fetch stage', async () => {
     const config = createBaseConfig({ issuerUrl: '' });
     await expect(fetchOidcDiscoveryDocument(config)).rejects.toThrow(/OIDC issuer is required/i);
