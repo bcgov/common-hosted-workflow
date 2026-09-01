@@ -1,6 +1,6 @@
 import { UI_APP_BASE_URL } from '@config';
 
-const RELATIVE_URL_BASE = 'http://relative.invalid';
+const RELATIVE_URL_BASE = 'https://relative.invalid';
 
 function isAbsoluteUrl(value: string): boolean {
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value);

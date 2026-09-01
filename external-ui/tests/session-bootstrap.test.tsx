@@ -333,6 +333,7 @@ describe('resolveContinuationUrl', () => {
     ['authority-relative path', '//evil.test'],
     ['backslash network path', '/\\evil.test/path'],
     ['foreign origin', 'https://evil.test/ui'],
+    ['same-origin absolute URL', 'https://ui.example.com/ui/settings'],
     ['non-http scheme', 'javascript:alert(1)'],
     ['unparseable URL', 'https://'],
   ])('rejects a %s', (_label, value) => {
@@ -342,7 +343,6 @@ describe('resolveContinuationUrl', () => {
   it.each([
     ['local path', '/ui/projects', '/ui/projects'],
     ['local path with query and fragment', '/ui/projects?filter=active#top', '/ui/projects?filter=active#top'],
-    ['absolute same-origin URL', 'https://ui.example.com/ui/settings', '/ui/settings'],
   ])('allows a %s', (_label, value, expected) => {
     expect(resolveContinuationUrl(value, origin)).toBe(expected);
   });

@@ -62,10 +62,9 @@ function consumeSignedOutMarker() {
 export function resolveContinuationUrl(continueTo: string | null, origin: string): string | null {
   if (!continueTo) return null;
 
-  // Resolve against the current origin and require the result to stay local:
-  // reject authority-relative forms, backslashes, and foreign origins so the
-  // browser never navigates to a non-local continuation.
-  if (continueTo.startsWith('//') || continueTo.includes('\\')) return null;
+  // Continuations are application-relative paths only, never URLs supplied by
+  // a caller. This keeps the redirect target within this UI application.
+  if (!continueTo.startsWith('/') || continueTo.startsWith('//') || continueTo.includes('\\')) return null;
 
   try {
     const resolved = new URL(continueTo, origin);
