@@ -5,13 +5,44 @@ import { UI_AUTH_JWT_SECRET, UI_AUTH_JWT_ISSUER, UI_AUTH_JWT_AUDIENCE, UI_AUTH_U
 import { type UiAuthTokenPayload, type UiSession, type UiSerializedN8nUser } from './ui-oidc';
 import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo, refreshOidcTokens } from './oidc-provider';
 import {
-  getUiOidcAccessTokenRecord,
-  getUiOidcRefreshTokenRecord,
-  getUiSessionIssueId,
-  setUiOidcAccessTokenRecord,
-  setUiOidcIdToken,
-  setUiOidcRefreshTokenWithExpiry,
+  getUiOidcAccessTokenRecord as defaultGetUiOidcAccessTokenRecord,
+  getUiOidcRefreshTokenRecord as defaultGetUiOidcRefreshTokenRecord,
+  getUiSessionIssueId as defaultGetUiSessionIssueId,
+  normalizeUiIdentityEmail,
+  setUiOidcAccessTokenRecord as defaultSetUiOidcAccessTokenRecord,
+  setUiOidcIdToken as defaultSetUiOidcIdToken,
+  setUiOidcRefreshTokenWithExpiry as defaultSetUiOidcRefreshTokenWithExpiry,
 } from './ui-oidc-store';
+
+// AUTH-07: Minimal injectable boundary for deterministic unit/contract tests.
+// Default implementations are the real store helpers; tests can pass fakes via
+// the `deps` param to `getUiSession` / `refreshSessionByEmail` without mocking
+// the `redis` module or env.
+export type UiOidcSessionStoreDeps = {
+  getUiOidcAccessTokenRecord?: typeof defaultGetUiOidcAccessTokenRecord;
+  getUiOidcRefreshTokenRecord?: typeof defaultGetUiOidcRefreshTokenRecord;
+  getUiSessionIssueId?: typeof defaultGetUiSessionIssueId;
+  setUiOidcAccessTokenRecord?: typeof defaultSetUiOidcAccessTokenRecord;
+  setUiOidcIdToken?: typeof defaultSetUiOidcIdToken;
+  setUiOidcRefreshTokenWithExpiry?: typeof defaultSetUiOidcRefreshTokenWithExpiry;
+};
+const defaultSessionStoreDeps: Required<UiOidcSessionStoreDeps> = {
+  getUiOidcAccessTokenRecord: defaultGetUiOidcAccessTokenRecord,
+  getUiOidcRefreshTokenRecord: defaultGetUiOidcRefreshTokenRecord,
+  getUiSessionIssueId: defaultGetUiSessionIssueId,
+  setUiOidcAccessTokenRecord: defaultSetUiOidcAccessTokenRecord,
+  setUiOidcIdToken: defaultSetUiOidcIdToken,
+  setUiOidcRefreshTokenWithExpiry: defaultSetUiOidcRefreshTokenWithExpiry,
+};
+let sessionStoreOverride: UiOidcSessionStoreDeps | null = null;
+export function setUiSessionStoreForTests(deps: UiOidcSessionStoreDeps | null): void {
+  sessionStoreOverride = deps;
+}
+function resolveSessionStore(deps?: UiOidcSessionStoreDeps): Required<UiOidcSessionStoreDeps> {
+  const base = sessionStoreOverride ?? {};
+  const merged = { ...defaultSessionStoreDeps, ...base, ...deps } as Required<UiOidcSessionStoreDeps>;
+  return merged;
+}
 import {
   issueUiSessionToken,
   resolveAccessTokenExpiresAt,
@@ -26,6 +57,44 @@ import { invalidateTenantGroups } from './tenant-groups';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('UiSession');
+
+/**
+ * AUTH-05: Email-scoped single-flight for provider refresh.
+ *
+ * - Scope: per normalized email (one active UI session per email).
+ * - At most one `refreshOidcTokens` provider call runs for the same email
+ *   inside the refresh window when locking is required. Concurrent callers
+ *   share the same promise (single-flight) rather than issuing duplicate
+ *   refresh requests that could exhaust single-use refresh tokens.
+ * - Lock timeout: 10s. If the in-flight promise does not settle within
+ *   the timeout, the lock is considered stale, removed, and the next caller
+ *   creates a fresh attempt (fail closed — the timed-out attempt does not
+ *   delete newer state; see ui-oidc-store Lua CAS).
+ * - Crash recovery: in-memory Map is per-process; process death clears
+ *   all locks. Next request after restart acquires a new lock normally.
+ * - Retry: waiters receive the same result as the leader. If refresh
+ *   fails (null), the lock is cleared and the next request in the refresh
+ *   window will attempt a new provider call (single retry per window).
+ * - Rotation: if the provider returns a new `refresh_token`, it is persisted
+ *   via `setUiOidcRefreshTokenWithExpiry`; if not, the existing token is
+ *   kept. The access-token forward/reverse replacement is atomic via Lua
+ *   in the store and prevents stale writers from deleting newer mappings.
+ */
+export const REFRESH_SINGLE_FLIGHT_TIMEOUT_MS = 10_000;
+type RefreshLockEntry = { promise: Promise<UiSessionResult | null>; startedAt: number };
+const refreshSingleFlight = new Map<string, RefreshLockEntry>();
+
+export function clearRefreshSingleFlightForTests() {
+  refreshSingleFlight.clear();
+}
+
+export function getRefreshSingleFlightSizeForTests() {
+  return refreshSingleFlight.size;
+}
+
+function getRefreshLockKey(email: string) {
+  return normalizeUiIdentityEmail(email);
+}
 
 export function getBearerToken(req: Request) {
   const header = req.header('authorization');
@@ -68,7 +137,8 @@ function tryGetTokenExpiryMs(token: string) {
   }
 }
 
-async function tryGetLocalUiSession(token: string): Promise<UiSession | null> {
+async function tryGetLocalUiSession(token: string, deps?: UiOidcSessionStoreDeps): Promise<UiSession | null> {
+  const { getUiSessionIssueId } = resolveSessionStore(deps);
   if (!UI_AUTH_JWT_SECRET) {
     return null;
   }
@@ -149,7 +219,18 @@ async function buildUpstreamSessionFromToken(token: string, expiresAt?: number) 
   return session;
 }
 
-async function refreshSessionByEmail(email: string, currentAccessToken?: string): Promise<UiSessionResult | null> {
+async function refreshSessionByEmailInner(
+  email: string,
+  _currentAccessToken?: string,
+  deps?: UiOidcSessionStoreDeps,
+): Promise<UiSessionResult | null> {
+  const {
+    getUiOidcRefreshTokenRecord,
+    getUiSessionIssueId: getSid,
+    setUiOidcAccessTokenRecord,
+    setUiOidcIdToken,
+    setUiOidcRefreshTokenWithExpiry,
+  } = resolveSessionStore(deps);
   const refreshTokenRecord = await getUiOidcRefreshTokenRecord(email);
   if (!refreshTokenRecord?.token) {
     log.debug('Refresh attempted but no refresh token stored', { email });
@@ -208,7 +289,7 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
       },
       upstreamAccessToken: refreshed.access_token,
       upstreamExpiresAt: refreshedExpiresAt,
-      sessionId: (await getUiSessionIssueId(email)) ?? undefined,
+      sessionId: (await getSid(email)) ?? undefined,
     });
 
     return { session, refreshedToken, upstreamAccessToken: refreshed.access_token };
@@ -221,10 +302,43 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
   }
 }
 
-async function resolveLocalUiSession(token: string): Promise<UiSessionResult | null> {
+function refreshSessionByEmail(
+  email: string,
+  currentAccessToken?: string,
+  deps?: UiOidcSessionStoreDeps,
+): Promise<UiSessionResult | null> {
+  const lockKey = getRefreshLockKey(email);
+  const now = Date.now();
+  const existing = refreshSingleFlight.get(lockKey);
+  if (existing) {
+    if (now - existing.startedAt < REFRESH_SINGLE_FLIGHT_TIMEOUT_MS) {
+      return existing.promise;
+    }
+    // Timeout: stale lock, fail closed for previous attempt and allow new attempt
+    log.warn('Refresh single-flight timeout, releasing stale lock', { email });
+    refreshSingleFlight.delete(lockKey);
+  }
+
+  const promise = (async () => {
+    try {
+      // Bounded provider call: refreshSessionByEmailInner has its own try/catch
+      // and returns null on failure (fail closed). No deletion of newer state
+      // occurs on timeout — the store's Lua CAS prevents stale delete.
+      const result = await refreshSessionByEmailInner(email, currentAccessToken, deps);
+      return result;
+    } finally {
+      refreshSingleFlight.delete(lockKey);
+    }
+  })();
+
+  refreshSingleFlight.set(lockKey, { promise, startedAt: now });
+  return promise;
+}
+
+async function resolveLocalUiSession(token: string, deps?: UiOidcSessionStoreDeps): Promise<UiSessionResult | null> {
   let session: UiSession | null;
   try {
-    session = await tryGetLocalUiSession(token);
+    session = await tryGetLocalUiSession(token, deps);
   } catch (error) {
     // jose.jwtVerify throws JWTExpired for fully expired tokens. Those must be
     // rejected without attempting a refresh; the caller will see a null session
@@ -248,7 +362,7 @@ async function resolveLocalUiSession(token: string): Promise<UiSessionResult | n
     return { session };
   }
 
-  const refreshed = await refreshSessionByEmail(session.email);
+  const refreshed = await refreshSessionByEmail(session.email, undefined, deps);
 
   if (refreshed) {
     return refreshed;
@@ -259,7 +373,8 @@ async function resolveLocalUiSession(token: string): Promise<UiSessionResult | n
   return null;
 }
 
-async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult | null> {
+async function resolveUpstreamUiSession(token: string, deps?: UiOidcSessionStoreDeps): Promise<UiSessionResult | null> {
+  const { getUiOidcAccessTokenRecord } = resolveSessionStore(deps);
   const record = await getUiOidcAccessTokenRecord(token);
 
   // Raw access tokens must be server-known: logout deletes the record, so a
@@ -272,10 +387,10 @@ async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult 
   if (shouldRefreshAccessToken(knownExpiresAt)) {
     const session = await buildUpstreamSessionFromToken(token, knownExpiresAt);
     if (!session) {
-      return await refreshSessionByEmail(record.email, token);
+      return await refreshSessionByEmail(record.email, token, deps);
     }
 
-    const refreshed = await refreshSessionByEmail(record.email, token);
+    const refreshed = await refreshSessionByEmail(record.email, token, deps);
 
     return refreshed ?? null;
   }
@@ -285,15 +400,17 @@ async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult 
     return { session };
   }
 
-  return await refreshSessionByEmail(record.email, token);
+  return await refreshSessionByEmail(record.email, token, deps);
 }
 
-export async function getUiSession(req: Request) {
+export async function getUiSession(req: Request, deps?: UiOidcSessionStoreDeps) {
   const token = getBearerToken(req);
   if (!token) return null;
 
   try {
-    return UI_AUTH_USE_SEPARATE_TOKEN ? await resolveLocalUiSession(token) : await resolveUpstreamUiSession(token);
+    return UI_AUTH_USE_SEPARATE_TOKEN
+      ? await resolveLocalUiSession(token, deps)
+      : await resolveUpstreamUiSession(token, deps);
   } catch {
     return null;
   }

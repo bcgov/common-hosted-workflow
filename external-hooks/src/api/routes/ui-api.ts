@@ -25,7 +25,15 @@ import {
   reviewAccessRequestResponseSchema,
 } from '../schemas/access-request';
 import { consumeUiSessionExchange, setUiLogoutHandle } from '../helpers/ui-oidc-store';
-import { getBearerToken, getUiSession, serializeN8nUser, refreshSessionByEmail } from '../helpers/ui-oidc-session';
+import {
+  getBearerToken,
+  getUiSession,
+  serializeN8nUser,
+  refreshSessionByEmail,
+  type UiOidcSessionStoreDeps,
+} from '../helpers/ui-oidc-session';
+import { getUiOidcAccessTokenByEmail } from '../helpers/ui-oidc-store';
+import { getAuthCookieOptions, getSecureCookieFlag } from '../helpers/cookie';
 import { computePermissions, type Permissions } from '../helpers/permissions';
 import { buildSessionSummary, buildWhoamiResponse, type UiSerializedN8nUser } from '../helpers/ui-oidc';
 import { appendQueryParam } from '../helpers/url';
@@ -46,8 +54,75 @@ function setRefreshedUiTokenHeader(res: Response, token?: string) {
   }
 }
 
-async function resolveUiRequestContext(req: Request, services: ApiRouteContext['services']) {
-  const rawSessionResult = await getUiSession(req);
+function clearN8nAuthCookie(res: Response) {
+  const clearCookie = (res as unknown as { clearCookie?: (name: string, opts?: unknown) => void }).clearCookie;
+  if (typeof clearCookie !== 'function') return;
+  try {
+    const isSecure = getSecureCookieFlag();
+    clearCookie.call(res as unknown as Record<string, unknown>, 'n8n-auth', {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax' as const,
+      path: '/' as const,
+    });
+  } catch {
+    // getSecureCookieFlag throws in production on misconfigured
+    // N8N_BASE_URL/N8N_PROTOCOL — fall back to path-only clear so
+    // an expired OIDC session still removes the browser cookie.
+    try {
+      clearCookie.call(res as unknown as Record<string, unknown>, 'n8n-auth', { path: '/' });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function extendN8nAuthCookie(req: Request, res: Response) {
+  const cookies = (req as unknown as { cookies?: Record<string, string | undefined> }).cookies;
+  const token = cookies?.['n8n-auth'];
+  if (!token) return;
+  const cookieFn = (res as unknown as { cookie?: (name: string, val: string, opts?: unknown) => void }).cookie;
+  if (typeof cookieFn !== 'function') return;
+  try {
+    const isSecure = getSecureCookieFlag();
+    cookieFn.call(res as unknown as Record<string, unknown>, 'n8n-auth', token, getAuthCookieOptions(isSecure));
+  } catch {
+    // misconfigured Secure derivation must not break refresh
+  }
+}
+
+function shouldClearN8nCookieOnExpiry(req: Request, resolved: unknown) {
+  // OIDC session expired/revoked but the browser still presents
+  // n8n-auth — remove it so both sessions end together.
+  // Only when a UI bearer was presented; anonymous without a bearer
+  // must not clear a valid n8n-only session.
+  return !resolved && !!getBearerToken(req);
+}
+
+// AUTH-07: Authenticated context — explicit UI credential (bearer via getUiSession),
+// upstream credential (server-side, never bearer in separate-token mode),
+// identity (session.email/subject/claims), and authorization (permissions/n8nUser).
+// Routes consume capabilities (checkPermission/checkRole) rather than inferring
+// from token shape. Smallest injectable boundary for tests: optional sessionDeps
+// allows faking the store without module-global Redis/env mutation.
+export type UiRequestContextDeps = {
+  sessionStoreDeps?: UiOidcSessionStoreDeps;
+  getUiSessionFn?: typeof getUiSession;
+  getAccessTokenByEmailFn?: typeof getUiOidcAccessTokenByEmail;
+};
+async function resolveUiRequestContext(
+  req: Request,
+  services: ApiRouteContext['services'],
+  injected?: UiRequestContextDeps,
+) {
+  const getSession = injected?.getUiSessionFn ?? getUiSession;
+  const getAccessByEmail = injected?.getAccessTokenByEmailFn ?? getUiOidcAccessTokenByEmail;
+  const rawSessionResult = injected?.sessionStoreDeps
+    ? await (getSession as unknown as (r: Request, d: unknown) => Promise<unknown>)(
+        req,
+        injected.sessionStoreDeps as unknown,
+      )
+    : await (getSession as unknown as (r: Request) => Promise<unknown>)(req);
   if (!rawSessionResult) {
     return null;
   }
@@ -56,6 +131,10 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
     typeof rawSessionResult === 'object' && rawSessionResult !== null && 'session' in rawSessionResult;
   const session = hasWrappedSession ? rawSessionResult.session : rawSessionResult;
   const sessionRefreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
+  // Upstream credential is distinct from the UI bearer. In separate-token mode the bearer
+  // is an app JWT (HS256, sid-checked) while the upstream OIDC access token lives server-side.
+  // Track the authoritative upstream token (refreshed within this request if needed).
+  let upstreamAccessToken: string | undefined = hasWrappedSession ? rawSessionResult.upstreamAccessToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
   const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
@@ -64,9 +143,16 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
   const resolvedN8nUser = serializeN8nUser(context.n8nUser);
 
   const refreshAccessToken = async () => {
-    const result = await refreshSessionByEmail(session.email);
+    const result = injected?.sessionStoreDeps
+      ? ((await (refreshSessionByEmail as unknown as (e: string, t: unknown, d: unknown) => Promise<unknown>)(
+          session.email,
+          undefined,
+          injected.sessionStoreDeps as unknown,
+        )) as unknown as Awaited<ReturnType<typeof refreshSessionByEmail>>)
+      : await refreshSessionByEmail(session.email);
     if (!result) return null;
     if (!result.upstreamAccessToken) return null;
+    upstreamAccessToken = result.upstreamAccessToken;
     return { accessToken: result.upstreamAccessToken, refreshedToken: result.refreshedToken };
   };
 
@@ -84,6 +170,13 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
 
   const refreshedToken = tenantRolesResult.refreshedToken ?? tenantGroupsResult.refreshedToken ?? sessionRefreshedToken;
 
+  // Fallback to server-side store for the authoritative upstream credential (never the UI bearer).
+  // If refresh occurred via getUiSession or tenant refreshAccessToken, upstreamAccessToken already holds the fresh value.
+  if (!upstreamAccessToken) {
+    const access = await getAccessByEmail(session.email);
+    upstreamAccessToken = (access as string | null) ?? undefined;
+  }
+
   return {
     session: {
       ...session,
@@ -91,20 +184,28 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
       permissions: computePermissions(resolvedN8nUser, services.featureFlag),
       tenantRoles: tenantRolesResult.roles,
       tenantGroups: tenantGroupsResult.groups,
+      // Internal use only — excluded from buildSessionSummary/buildWhoamiResponse public types
+      upstreamAccessToken,
     },
     context,
     refreshedToken,
+    upstreamAccessToken,
   };
 }
 
-function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
+function createUiRequestContextMiddleware(services: ApiRouteContext['services'], injected?: UiRequestContextDeps) {
   return async (req: UiApiMutableRequest, _res: Response, next: NextFunction) => {
     try {
-      const resolved = await resolveUiRequestContext(req, services);
+      const resolved = await resolveUiRequestContext(req, services, injected);
       if (resolved) {
         req.session = resolved.session;
         req.context = resolved.context;
         setRefreshedUiTokenHeader(_res, resolved.refreshedToken);
+        if (resolved.refreshedToken) {
+          extendN8nAuthCookie(req, _res);
+        }
+      } else if (shouldClearN8nCookieOnExpiry(req, resolved)) {
+        clearN8nAuthCookie(_res);
       }
 
       next();
@@ -114,8 +215,8 @@ function createUiRequestContextMiddleware(services: ApiRouteContext['services'])
   };
 }
 
-function requireUiRequestContextMiddleware(services: ApiRouteContext['services']) {
-  const loadUiRequestContext = createUiRequestContextMiddleware(services);
+function requireUiRequestContextMiddleware(services: ApiRouteContext['services'], injected?: UiRequestContextDeps) {
+  const loadUiRequestContext = createUiRequestContextMiddleware(services, injected);
 
   return async (req: UiApiMutableRequest, res: Response, next: NextFunction) => {
     await loadUiRequestContext(req, res, (error?: unknown) => {
@@ -133,7 +234,7 @@ function requireUiRequestContextMiddleware(services: ApiRouteContext['services']
   };
 }
 
-export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware };
+export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware, resolveUiRequestContext };
 
 function checkPermission(permissionKey: keyof Permissions) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -166,6 +267,11 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
 
   router.get('/session', async (req, res) => {
     const resolved = await resolveUiRequestContext(req, services);
+    if (resolved?.refreshedToken) {
+      extendN8nAuthCookie(req, res);
+    } else if (shouldClearN8nCookieOnExpiry(req, resolved)) {
+      clearN8nAuthCookie(res);
+    }
     setRefreshedUiTokenHeader(res, resolved?.refreshedToken);
 
     res.json(buildSessionSummary(resolved?.session ?? null));
@@ -371,16 +477,18 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   );
 
   // List user personal project and their tenant projects (non-admin API)
+  // Upstream credential is resolved from the authenticated session context (server-side store / refresh),
+  // never by rereading the UI bearer (which is an app JWT in separate-token mode).
   router.get('/projects', requireUiRequestContext, checkPermission('canManageProject'), async (req, res) => {
     const session = (req as UiApiRequest).session;
-    const accessToken = getBearerToken(req) ?? '';
+    const upstreamAccessToken = session.upstreamAccessToken ?? '';
     const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
     const n8nUserId = session.n8nUser?.id ?? '';
 
     const data = await services.projectTenant.listUserProjectTenants({
       ssoUserId,
       n8nUserId,
-      accessToken,
+      upstreamAccessToken,
     });
 
     OkResponse(res, { data });

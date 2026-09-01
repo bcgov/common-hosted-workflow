@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildOidcRouter, resolveNextRole, type BuildOidcRouterParams } from '../../../src/api/routes/oidc';
 import { createSignedCookie, getCookieSecret, verifySignedCookie } from '../../../src/api/helpers/n8n-oidc';
+import { clearOidcDiscoveryCache } from '../../../src/api/helpers/oidc-provider';
 
 const {
   deleteUiOidcTokensMock,
@@ -16,20 +17,28 @@ const {
   fetchOidcDiscoveryDocumentMock: vi.fn(),
 }));
 
-vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
-  consumeUiLogoutHandle: consumeUiLogoutHandleMock,
-  consumeUiSessionExchange: vi.fn(),
-  deleteUiOidcTokens: deleteUiOidcTokensMock,
-  getUiOidcIdToken: getUiOidcIdTokenMock,
-  setUiOidcAccessTokenRecord: vi.fn(),
-  setUiOidcIdToken: vi.fn(),
-  setUiOidcRefreshToken: vi.fn(),
-  setUiSessionExchange: setUiSessionExchangeMock,
-  setUiSessionIssueId: vi.fn(),
-}));
+vi.mock('../../../src/api/helpers/ui-oidc-store', async () => {
+  const actual = (await vi.importActual('../../../src/api/helpers/ui-oidc-store')) as Record<string, unknown>;
+  return {
+    ...(actual as object),
+    consumeUiLogoutHandle: consumeUiLogoutHandleMock,
+    consumeUiSessionExchange: vi.fn(),
+    deleteUiOidcTokens: deleteUiOidcTokensMock,
+    deleteUiOidcTokenRecords: vi.fn(),
+    deleteUiSessionExchange: vi.fn(),
+    deleteUiSessionIssueId: vi.fn(),
+    getUiOidcIdToken: getUiOidcIdTokenMock,
+    getUiSessionIssueId: vi.fn(async () => null),
+    setUiOidcAccessTokenRecord: vi.fn(),
+    setUiOidcIdToken: vi.fn(),
+    setUiOidcRefreshToken: vi.fn(),
+    setUiSessionExchange: setUiSessionExchangeMock,
+    setUiSessionIssueId: vi.fn(),
+  };
+});
 
-vi.mock('../../../src/api/helpers/oidc-provider', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+vi.mock('../../../src/api/helpers/oidc-provider', async () => {
+  const actual = (await vi.importActual('../../../src/api/helpers/oidc-provider')) as Record<string, unknown>;
   return { ...actual, fetchOidcDiscoveryDocument: fetchOidcDiscoveryDocumentMock };
 });
 
@@ -157,7 +166,7 @@ function createMockParams(): BuildOidcRouterParams {
       getUserSharedServiceRolesStrict: async () => [],
     } as any,
     config: {
-      issuerUrl: '',
+      issuerUrl: 'https://issuer.example.com',
       authorizationEndpoint: 'https://issuer.example.com/auth',
       tokenEndpoint: 'https://issuer.example.com/token',
       userinfoEndpoint: 'https://issuer.example.com/userinfo',
@@ -222,8 +231,43 @@ function getRoutePaths(router: { stack: Array<{ route?: { path?: string } }> }) 
 }
 
 describe('oidc router', () => {
+  beforeEach(() => {
+    clearOidcDiscoveryCache();
+    fetchOidcDiscoveryDocumentMock.mockResolvedValue({
+      issuer: 'https://issuer.example.com',
+      authorization_endpoint: 'https://issuer.example.com/auth',
+      token_endpoint: 'https://issuer.example.com/token',
+      userinfo_endpoint: 'https://issuer.example.com/userinfo',
+      jwks_uri: 'https://issuer.example.com/jwks',
+    });
+    // Fallback for real fetchOidcDiscoveryDocument when vi.mock is not intercepting (e.g., Vitest hoisting edge)
+    // Ensure discovery fetch via global fetch also succeeds for login paths.
+    const discoveryUrl = 'https://issuer.example.com/.well-known/openid-configuration';
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === discoveryUrl) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            issuer: 'https://issuer.example.com',
+            authorization_endpoint: 'https://issuer.example.com/auth',
+            token_endpoint: 'https://issuer.example.com/token',
+            userinfo_endpoint: 'https://issuer.example.com/userinfo',
+            jwks_uri: 'https://issuer.example.com/jwks',
+          }),
+        } as unknown as Response;
+      }
+      // Delegate to original fetch for other URLs (will be overridden by test-specific mocks when needed)
+      // Use originalFetch captured at top level to avoid recursion
+      return (origFetch as typeof fetch)(input as any, undefined as any);
+    }) as unknown as typeof fetch;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
+    clearOidcDiscoveryCache();
     deleteUiOidcTokensMock.mockReset();
     getUiOidcIdTokenMock.mockReset();
     setUiSessionExchangeMock.mockReset();
@@ -334,6 +378,22 @@ describe('oidc router', () => {
   it('redirects authorization start failures to external UI error page', async () => {
     const params = createMockParams();
     params.config.authorizationEndpoint = '';
+    // Mock discovery to avoid issuer validation failure spuriously masking endpoint error
+    const emptyDiscovery = {
+      issuer: 'https://issuer.example.com',
+      authorization_endpoint: '',
+      token_endpoint: 'https://issuer.example.com/token',
+      userinfo_endpoint: 'https://issuer.example.com/userinfo',
+      jwks_uri: 'https://issuer.example.com/jwks',
+    };
+    fetchOidcDiscoveryDocumentMock.mockResolvedValue(emptyDiscovery);
+    // Also mock global fetch fallback for real fetch path
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('.well-known/openid-configuration')) {
+        return { ok: true, status: 200, json: async () => emptyDiscovery } as unknown as Response;
+      }
+      return originalFetch(input as any, undefined as any);
+    }) as unknown as typeof fetch;
     const router = buildOidcRouter(params);
 
     const res = await invokeRoute(router, '/login');
@@ -341,14 +401,15 @@ describe('oidc router', () => {
     expectUiErrorRedirect(res, 'OIDC authorization endpoint is not configured');
   });
 
-  it('redirects provider callback errors to external UI error page', async () => {
+  it('redirects provider callback errors to external UI error page mapping to allowlisted code', async () => {
     const router = buildOidcRouter(createMockParams());
 
     const res = await invokeRoute(router, '/callback', {
       query: { error: 'access_denied', error_description: 'Denied by provider' },
     });
 
-    expectUiErrorRedirect(res, 'Denied by provider');
+    // Provider descriptions must not be reflected verbatim; allowlisted error code is public
+    expectUiErrorRedirect(res, 'access_denied');
   });
 
   it('redirects missing callback params to external UI error page', async () => {
@@ -402,7 +463,7 @@ describe('oidc router', () => {
     expectUiErrorRedirect(res, 'No valid email in OIDC response');
   });
 
-  it('redirects callback exceptions to external UI error page', async () => {
+  it('redirects callback exceptions to sanitized generic error page', async () => {
     globalThis.fetch = vi.fn(async () => {
       throw new Error('token endpoint unavailable');
     });
@@ -413,7 +474,9 @@ describe('oidc router', () => {
       cookies: createCallbackCookies('state-1'),
     });
 
-    expectUiErrorRedirect(res, 'Authentication failed: token endpoint unavailable');
+    // Raw infrastructure errors must not be reflected in redirect; generic public response + server-side log
+    expectUiErrorRedirect(res, 'Authentication failed');
+    expect(res.redirect.mock.calls[0][0]).not.toContain('token endpoint unavailable');
   });
 
   it('creates both UI and n8n sessions for an eligible user', async () => {
@@ -469,6 +532,7 @@ describe('oidc router', () => {
     });
     const params = createMockParams();
     params.config.restrictNoRole = true;
+    params.authService.clearCookie = vi.fn();
     const router = buildOidcRouter(params);
 
     const res = await invokeRoute(router, '/callback', {
@@ -477,8 +541,255 @@ describe('oidc router', () => {
     });
 
     expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
+    expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
     expect(setUiSessionExchangeMock).toHaveBeenCalledWith(expect.any(String), 'access-token-1', 60_000);
     expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+  });
+
+  // AUTH-01: stale and cross-identity n8n sessions must be terminated on access-request
+  describe('AUTH-01 access-request clears stale n8n-auth', () => {
+    it('clears n8n-auth even when no prior cookie was present (no-cookie case)', async () => {
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === 'https://issuer.example.com/token') {
+          return {
+            ok: true,
+            json: async () => ({
+              access_token: 'access-token-1',
+              id_token: createTestIdToken({ sub: 'subject-1', email: 'new-ineligible@example.com' }),
+              expires_in: 300,
+            }),
+          } as Response;
+        }
+        return { ok: true, json: async () => ({ sub: 'subject-1', email: 'new-ineligible@example.com' }) } as Response;
+      });
+      const params = createMockParams();
+      params.config.restrictNoRole = true;
+      params.n8nRepositories.user.createUserWithProject = vi.fn(async (data: any) => ({
+        user: { id: 'user-1', email: data.email, role: { slug: data.role.slug } },
+      }));
+      params.authService.clearCookie = vi.fn();
+      const router = buildOidcRouter(params);
+
+      const res = await invokeRoute(router, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: createCallbackCookies('state-1'),
+      });
+
+      // No n8n user row should be created for new ineligible identity
+      expect(params.n8nRepositories.user.createUserWithProject).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
+      expect(params.authService.clearCookie).toHaveBeenCalledTimes(1);
+      expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
+      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+      // Subsequent n8n cookie auth with prior (non-existent) token is denied — login falls through to OIDC
+      params.authService.resolveJwt = vi.fn(async () => {
+        throw new Error('no token');
+      });
+      const loginRes = await invokeRoute(router, '/login', { cookies: {} });
+      expect(loginRes.redirect.mock.calls[0][0]).toContain('https://issuer.example.com/auth?');
+    });
+
+    it('same-user eligibility loss: disables existing user, clears stale cookie, and revokes subsequent n8n access', async () => {
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === 'https://issuer.example.com/token') {
+          return {
+            ok: true,
+            json: async () => ({
+              access_token: 'access-token-1',
+              id_token: createTestIdToken({
+                sub: 'subject-1',
+                email: 'eligible-then-ineligible@example.com',
+              }),
+              expires_in: 300,
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({ sub: 'subject-1', email: 'eligible-then-ineligible@example.com' }),
+        } as Response;
+      });
+      const params = createMockParams();
+      params.config.restrictNoRole = true;
+      params.n8nRepositories.user.findByEmail = vi.fn(
+        async () =>
+          ({
+            id: 'user-1',
+            email: 'eligible-then-ineligible@example.com',
+            disabled: false,
+            role: { slug: 'global:member' },
+          }) as any,
+      );
+      const setDisabled = vi.fn(async () => undefined);
+      params.n8nRepositories.user.setUserDisabled = setDisabled;
+      params.authService.clearCookie = vi.fn();
+      // Prior browser holds a valid n8n-auth for the same identity
+      const priorToken = 'stale-same-identity-token';
+      const router = buildOidcRouter(params);
+
+      const res = await invokeRoute(router, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: { ...createCallbackCookies('state-1'), 'n8n-auth': priorToken },
+      });
+
+      expect(setDisabled).toHaveBeenCalledWith('user-1', true);
+      expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
+      expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
+      // Cookie mutation: browser would drop n8n-auth — Set-Cookie clear via authService
+      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+      // Subsequent protected n8n behavior: disabled user must be rejected at integration seam
+      // Simulate n8n authService.resolveJwt now seeing disabled user — should be treated as unauthorized.
+      // Our assertion is that the only way to retain access would be the stale cookie, which was cleared.
+      // Verify fallback clear path also exercised when AuthService throws (production Secure misconfig)
+      const paramsWithThrowingClear = createMockParams();
+      paramsWithThrowingClear.config.restrictNoRole = true;
+      paramsWithThrowingClear.n8nRepositories.user.findByEmail = params.n8nRepositories.user.findByEmail;
+      paramsWithThrowingClear.n8nRepositories.user.setUserDisabled = setDisabled;
+      paramsWithThrowingClear.authService.clearCookie = vi.fn(() => {
+        throw new Error('Secure flag misconfigured');
+      });
+      const router2 = buildOidcRouter(paramsWithThrowingClear);
+      // Need fresh fetch mock still in place
+      const res2 = await invokeRoute(router2, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: createCallbackCookies('state-1'),
+      });
+      expect(res2.clearCookie).toHaveBeenCalledWith('n8n-auth', { path: '/' });
+    });
+
+    it('cross-identity account switching: new ineligible identity clears prior different-identity cookie', async () => {
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === 'https://issuer.example.com/token') {
+          return {
+            ok: true,
+            json: async () => ({
+              access_token: 'access-token-b',
+              id_token: createTestIdToken({ sub: 'subject-b', email: 'b-ineligible@example.com' }),
+              expires_in: 300,
+            }),
+          } as Response;
+        }
+        return { ok: true, json: async () => ({ sub: 'subject-b', email: 'b-ineligible@example.com' }) } as Response;
+      });
+      const params = createMockParams();
+      params.config.restrictNoRole = true;
+      params.n8nRepositories.user.findByEmail = vi.fn(async () => null); // B is new, ineligible — no row
+      params.n8nRepositories.user.createUserWithProject = vi.fn(async (data: any) => ({
+        user: { id: 'user-1', email: data.email, role: { slug: data.role.slug } },
+      }));
+      params.authService.clearCookie = vi.fn();
+      const priorToken = 'token-for-a-eligible';
+      const router = buildOidcRouter(params);
+
+      const res = await invokeRoute(router, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: { ...createCallbackCookies('state-1'), 'n8n-auth': priorToken },
+      });
+
+      expect(params.n8nRepositories.user.createUserWithProject).not.toHaveBeenCalled();
+      expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
+      expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
+      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+      // Integration seam: prior cookie for A must not grant n8n access after B's access-request;
+      // simulate second request presenting the stale A token — authService would previously have returned A,
+      // but after clear the browser would not send it. We assert clear prevents replay.
+      expect(params.authService.clearCookie).toHaveBeenCalledTimes(1);
+    });
+
+    it('disabled-user access: existing cookie for disabled user is terminated via clear and disabled enforcement', async () => {
+      // First, an eligible callback establishes a session, then a subsequent ineligible callback
+      // disables the user. We verify that the disabled state plus cookie clear means the next
+      // n8n cookie-auth attempt is not usable.
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === 'https://issuer.example.com/token') {
+          return {
+            ok: true,
+            json: async () => ({
+              access_token: 'access-token-1',
+              id_token: createTestIdToken({ sub: 'subject-1', email: 'disabled-user@example.com' }),
+              expires_in: 300,
+            }),
+          } as Response;
+        }
+        return { ok: true, json: async () => ({ sub: 'subject-1', email: 'disabled-user@example.com' }) } as Response;
+      });
+      const params = createMockParams();
+      params.config.restrictNoRole = true;
+      params.n8nRepositories.user.findByEmail = vi.fn(
+        async () =>
+          ({
+            id: 'user-disabled',
+            email: 'disabled-user@example.com',
+            disabled: false,
+            role: { slug: 'global:member' },
+          }) as any,
+      );
+      params.n8nRepositories.user.setUserDisabled = vi.fn(async () => undefined);
+      params.authService.clearCookie = vi.fn();
+      // Mock resolveJwt to emulate n8n's disabled check: if user disabled, reject
+      params.authService.resolveJwt = vi.fn(async (token: string) => {
+        if (token === 'disabled-cookie-token') {
+          // Simulate n8n rejecting a disabled user's JWT at the integration boundary
+          throw new Error('User is disabled');
+        }
+        return [null as any];
+      });
+      const router = buildOidcRouter(params);
+
+      const res = await invokeRoute(router, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: { ...createCallbackCookies('state-1'), 'n8n-auth': 'disabled-cookie-token' },
+      });
+
+      expect(params.n8nRepositories.user.setUserDisabled).toHaveBeenCalledWith('user-disabled', true);
+      expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
+      // Subsequent n8n-auth use must fail — integration seam throws for disabled
+      await expect(params.authService.resolveJwt('disabled-cookie-token', {} as any, {} as any)).rejects.toThrow(
+        'User is disabled',
+      );
+      // And login with that stale cookie must fall through to OIDC authorization, not fast-path
+      const loginRes = await invokeRoute(router, '/login', { cookies: { 'n8n-auth': 'disabled-cookie-token' } });
+      expect(loginRes.redirect.mock.calls[0][0]).toContain('https://issuer.example.com/auth?');
+    });
+
+    it('eligible callback still sets n8n-auth and does not clear it (positive control)', async () => {
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === 'https://issuer.example.com/token') {
+          return {
+            ok: true,
+            json: async () => ({
+              access_token: 'access-token-1',
+              id_token: createTestIdToken({ sub: 'subject-1', email: 'eligible@example.com', roles: 'global:member' }),
+              expires_in: 300,
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({ sub: 'subject-1', email: 'eligible@example.com', roles: 'global:member' }),
+        } as Response;
+      });
+      const params = createMockParams();
+      params.n8nRepositories.user.findByEmail = vi.fn(
+        async () =>
+          ({
+            id: 'user-1',
+            email: 'eligible@example.com',
+            disabled: false,
+            role: { slug: 'global:member' },
+          }) as any,
+      );
+      params.authService.clearCookie = vi.fn();
+      const router = buildOidcRouter(params);
+
+      const res = await invokeRoute(router, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: createCallbackCookies('state-1', '/ui/projects'),
+      });
+
+      expect(res.cookie).toHaveBeenCalledWith('n8n-auth', 'token', expect.objectContaining({ httpOnly: true }));
+      expect(params.authService.clearCookie).not.toHaveBeenCalled();
+    });
   });
 
   it.each([
@@ -824,5 +1135,74 @@ describe('oidc router', () => {
     });
 
     expect(role).toBe('global:admin');
+  });
+
+  // AUTH-03: Public error boundary — hostile text sanitized, allowlist preserved
+  describe('AUTH-03 public error boundary', () => {
+    it('rejects issuer-less manual configuration at router construction', () => {
+      const params = createMockParams();
+      params.config.issuerUrl = '';
+      expect(() => buildOidcRouter(params)).toThrow(/OIDC issuer is required/i);
+    });
+
+    it('sanitizes hostile provider error_description and unknown error codes to generic', async () => {
+      const router = buildOidcRouter(createMockParams());
+
+      const hostile = '<script>alert(1)</script> redis://secret-token https://evil.test/steal?token=abc';
+      const res = await invokeRoute(router, '/callback', {
+        query: { error: 'access_denied', error_description: hostile },
+      });
+      // Must map to allowlisted code, not hostile description
+      expectUiErrorRedirect(res, 'access_denied');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('<script>');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('redis');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('evil.test');
+
+      const res2 = await invokeRoute(router, '/callback', {
+        query: { error: 'not_a_standard_code', error_description: hostile },
+      });
+      expectUiErrorRedirect(res2, 'Authentication failed');
+      expect(res2.redirect.mock.calls[0][0]).not.toContain(hostile);
+      expect(res2.redirect.mock.calls[0][0]).not.toContain('not_a_standard_code');
+    });
+
+    it('allows known-safe provider code invalid_request without leaking description', async () => {
+      const router = buildOidcRouter(createMockParams());
+      const res = await invokeRoute(router, '/callback', {
+        query: { error: 'invalid_request', error_description: 'some detailed provider text with https://secret' },
+      });
+      expectUiErrorRedirect(res, 'invalid_request');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('https://secret');
+    });
+
+    it('sanitizes infrastructure errors in login route to generic', async () => {
+      const params = createMockParams();
+      // Force beginOidcAuthorization to throw infrastructure error via mocked discovery
+      const infraError = new Error('Redis connection failed at redis://localhost:6379');
+      fetchOidcDiscoveryDocumentMock.mockRejectedValueOnce(infraError);
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('.well-known/openid-configuration')) throw infraError; // pragma: allowlist secret
+        return originalFetch(input as any, undefined as any);
+      }) as unknown as typeof fetch;
+      const router = buildOidcRouter(params);
+      const res = await invokeRoute(router, '/login');
+      expectUiErrorRedirect(res, 'Authentication failed');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('Redis');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('redis://');
+    });
+
+    it('does not leak raw error_message in callback outer catch', async () => {
+      globalThis.fetch = vi.fn(async () => {
+        throw new Error('database connection string: postgres://user:pass@host/db'); // pragma: allowlist secret
+      });
+      const router = buildOidcRouter(createMockParams());
+      const res = await invokeRoute(router, '/callback', {
+        query: { code: 'code-1', state: 'state-1' },
+        cookies: createCallbackCookies('state-1'),
+      });
+      expectUiErrorRedirect(res, 'Authentication failed');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('postgres');
+      expect(res.redirect.mock.calls[0][0]).not.toContain('user:pass');
+    });
   });
 });

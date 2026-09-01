@@ -44,9 +44,9 @@ Validates `state` and `nonce` cookies before token exchange, exchanges `code` fo
 
 On success, the coordinator resolves eligibility and issues sessions (see § Authentication flow). On failure, redirects to `/ui?error=<stable public message>` with no cookies or handles.
 
-### 3. Exchange — `GET /ui-api/auth/exchange?session=<handle>`
+### 3. Exchange — `POST /ui-api/auth/exchange`
 
-Consumes a one-time UI exchange handle (see § Exchange handles) and returns the bearer token (`access_token` or app-issued JWT) to the SPA. The SPA stores it as `Authorization: Bearer` for `ui-api` calls and clears `session`/`continue` markers from history.
+Consumes a one-time UI exchange handle (see § Exchange handles) via JSON body `{"session": "<handle>"}` (`authExchangeSchema`) and returns the bearer token (`access_token` or app-issued JWT) to the SPA (`{token}` via `authExchangeResponseSchema`). The SPA stores it as `Authorization: Bearer` for `ui-api` calls and clears `session`/`continue` markers from history. Single-use via `getDel` (`consumeUiSessionExchange`); replay → `401`.
 
 ### 4. Logout — `GET /rest/auth/oidc/logout`
 
@@ -61,7 +61,7 @@ Aliases are redirect-only, never establish sessions or trust caller-supplied ide
 
 ### 5. Prepare UI logout — `POST /ui-api/auth/logout-prepare`
 
-Authenticated preparation endpoint. Requires a verified bearer session (401 otherwise), validates `returnTo` via `logout` policy, creates an opaque `logout` handle (24 random bytes, 60 s TTL) bound to the canonical email + validated `returnTo`, and returns `{ logoutUrl: "/rest/auth/oidc/logout?logout=<handle>" }`.
+Authenticated preparation endpoint. Requires a verified bearer session (`getUiSession` 401 otherwise), validates `returnTo` via `logout` policy (`resolveReturnTarget` `logout` → `/ui/*`), creates an opaque `logout` handle (`chwf:ui-oidc:logout:<handle>` 24 random bytes, 60 s TTL, email normalized `normalizeUiIdentityEmail`) bound to the canonical email + validated `returnTo`, and returns `{ logoutUrl: "/rest/auth/oidc/logout?logout=<handle>" }` (`authLogoutPrepareSchema` `returnTo` ≤2048).
 
 ### 6. Frontend helper — `GET /assets/oidc-frontend-hook.js`
 
@@ -75,23 +75,20 @@ Redirect-only. Initial loads and SPA navigation (`pushState`/`replaceState`/`pop
 
 - `OIDC_CLIENT_ID`
 - `OIDC_CLIENT_SECRET`
+- `OIDC_ISSUER` — **required in every mode** (`validateN8nOidcConfig` + `fetchOidcDiscoveryDocument` — missing issuer throws `OIDC issuer is required` / `OIDC issuer is required in manual endpoint mode`; `buildOidcRouter` fails fast before serving login; `verifyOidcIdToken` always sets `issuer` in `jwtVerify` so a correctly signed token with an unexpected `iss` is rejected). Configured `issuerUrl` must exactly equal the discovered `issuer` (`OIDC discovery issuer mismatch`).
 - `N8N_BASE_URL` — canonical deployment URL (e.g. `https://n8n.example.com`). Determines cookie `Secure` and the sole `OIDC_REDIRECT_URI` (`${N8N_BASE_URL}/rest/auth/oidc/callback`).
 - `N8N_PROTOCOL` — must be `https` when `N8N_BASE_URL` is `https` in production. See § Cookie.
 
-### Discovery mode
+### Discovery vs manual endpoints
 
-- `OIDC_ISSUER`
+- `OIDC_ISSUER` is always required. Provider metadata is resolved from `/.well-known/openid-configuration` (`fetchOidcDiscoveryDocument`); `jwks_uri`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, and `end_session_endpoint` are taken from discovery when present.
+- If any endpoint is not present in discovery, a manual fallback must be provided: `OIDC_AUTHORIZATION_ENDPOINT`, `OIDC_TOKEN_ENDPOINT`, `OIDC_USERINFO_ENDPOINT`, `OIDC_JWKS_URI`. Manual mode without `OIDC_ISSUER` is not supported (AUTH-03 — issuer-less manual was removed).
 
-If set, provider metadata is resolved from `/.well-known/openid-configuration`; `jwks_uri`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, and `end_session_endpoint` are taken from discovery (fallback to manual values).
+### Required secrets and TTLs
 
-### Manual endpoint mode
-
-When `OIDC_ISSUER` is empty, all of the following must be provided:
-
-- `OIDC_AUTHORIZATION_ENDPOINT`
-- `OIDC_TOKEN_ENDPOINT`
-- `OIDC_USERINFO_ENDPOINT`
-- `OIDC_JWKS_URI`
+- `UI_AUTH_USE_SEPARATE_TOKEN=false` → bearer is the upstream `access_token`; `upstreamAccessToken` is stored server-side and used for CSTAR (`session.upstreamAccessToken` / `getUiOidcAccessTokenByEmail`), never the app JWT (AUTH-02).
+- `UI_AUTH_USE_SEPARATE_TOKEN=true` → bearer is an app JWT `HS256` (`createUiAuthToken`/`issueUiSessionToken`). Requires `UI_AUTH_JWT_SECRET` or `N8N_USER_MANAGEMENT_JWT_SECRET`; payload `sid` is required and checked against `sessionIssueId` (single slot per email, 30d). TTL `min(8h, upstream expires_in)` (`UI_AUTH_JWT_TTL_MS` 8h); separate tokens fully expired (`isSeparateTokenExpired`) are rejected without refresh, within 5 min window (`shouldRefreshSeparateToken`/`UI_AUTH_REFRESH_WINDOW_MS` 5m) they attempt `refreshOidcTokens`.
+- TTLs: `n8n-auth` cookie 24h sliding (`getAuthCookieOptions`), JWT inside 7d; `n8n-oidc-state/nonce` 15m; `session`/`logout` handles 60s each; `refresh_token` cap 30d (`REFRESH_TOKEN_MAX_TTL_MS`); `id_token` `exp-now` or 24h; `acctoken` reverse `max(exp-now+5m,5m)`; `tenantRoles/Groups` 1h; discovery 1h.
 
 ### Optional
 
@@ -101,6 +98,9 @@ When `OIDC_ISSUER` is empty, all of the following must be provided:
 - `SSO_RESTRICT_NO_ROLE` — see § Role mapping.
 - `UI_AUTH_USE_SEPARATE_TOKEN` — `true` issues an app-signed JWT for UI bearer auth; `false` returns the upstream `access_token` directly.
 - `UI_AUTH_JWT_SECRET` / `N8N_USER_MANAGEMENT_JWT_SECRET` — secret for app-issued UI JWTs.
+- `OIDC_PROVIDER_TIMEOUT_MS` — default `10000` ms; all provider fetches (`fetchOidcDiscoveryDocument`, `exchangeAuthorizationCode`, `refreshOidcTokens`, `fetchOidcUserInfo`) use `fetchWithTimeout` with `AbortController` (`OIDC provider request timed out`), tested with bounded timeout.
+- `UI_APP_BASE_URL` — default `${N8N_BASE_URL}/ui`; first absolute base determines `trustedBase` for `returnTo` policy.
+- `CSTAR_BASE_URL`, `FEATURES_ENABLED`, `UI_OIDC_REDIS_URL/PASSWORD/PREFIX` — see canonical summary `docs/platform/user-authn-authz-summary.md:3`.
 
 ---
 
@@ -110,15 +110,17 @@ There is one browser authorization flow: `GET /rest/auth/oidc/login` → provide
 
 Callback outcomes:
 
-| Outcome                                                                                                                                                                    | n8n artifact                                                                             | UI artifact                                                                                                | Redirect                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **Eligible** — `nextRole` is `global:owner`/`admin`/`member`                                                                                                               | `n8n-auth` cookie (`HttpOnly`, `Secure` when `https`, `SameSite=Lax`, `Path=/`, 24 h)    | One-time exchange handle appended as `?session=<handle>` to validated `returnTo` (fallback `/?continue=/`) | Validated `returnTo` with exactly one `session` param, preserving query/fragment |
-| **Access-request** — `nextRole` empty (ineligible)                                                                                                                         | None (no user created if new; existing ineligible user disabled, preserving stored role) | One-time exchange handle → `GET /ui-api/auth/exchange` yields UI bearer                                    | `/ui/access-request?session=<handle>`                                            |
-| **Failure** — missing `id_token`/`jwks_uri`, signature/issuer/audience/nonce/expiry/userinfo `sub` mismatch, CSTAR verification error, Redis failure, provisioning failure | None                                                                                     | None (any handle already created is deleted)                                                               | `/ui?error=<stable public message>` (no handle, no cookie)                       |
+| Outcome                                                                                                                                                                    | n8n artifact                                                                                                                                                                                                                                                                                           | UI artifact                                                                                                                                                                                                   | Redirect                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Eligible** — `nextRole` is `global:owner`/`admin`/`member`                                                                                                               | `n8n-auth` cookie (`HttpOnly`, `Secure` when `https`, `SameSite=Lax`, `Path=/`, 24 h sliding / JWT 7d) set **after** `prepareUiSessionExchange` (see Atomic issuance)                                                                                                                                  | One-time exchange handle (`chwf:ui-oidc:session:<handle>` 60s, `getDel` single-use) appended as `?session=<handle>` to validated `returnTo` (fallback `/?continue=/`), traded at `POST /ui-api/auth/exchange` | Validated `returnTo` with exactly one `session` param, preserving query/fragment                                                                     |
+| **Access-request** — `nextRole` empty (ineligible) — AUTH-01                                                                                                               | None (no user created if new; existing ineligible user disabled, preserving stored role) **plus `Set-Cookie: clear n8n-auth` on the callback response** (`authService.clearCookie`, fallback `res.clearCookie`) so any prior `n8n-auth` (same or cross-identity) is terminated at this shared boundary | One-time exchange handle → `POST /ui-api/auth/exchange` yields UI bearer (`canRequestAccess` only)                                                                                                            | `/ui/access-request?session=<handle>` with `Set-Cookie: clear n8n-auth`                                                                              |
+| **Failure** — missing `id_token`/`jwks_uri`, signature/issuer/audience/nonce/expiry/userinfo `sub` mismatch, CSTAR verification error, Redis failure, provisioning failure | None                                                                                                                                                                                                                                                                                                   | None (any handle already created is deleted via `consumeUiSessionExchange`/`deleteUiSessionExchange` idempotent; `sid` restored or deleted per prior existence — AUTH-04)                                     | `/ui?error=<stable public message>` (no handle, no cookie; allowlist generic `Authentication failed`, issuer→`Invalid issuer`; see § Security notes) |
 
 Valid OIDC identities always receive an external UI session; only eligible identities receive `n8n-auth` and n8n-derived UI capabilities (`global:*` and `project:*` via `computePermissions`). Ineligible/disabled identities receive `canRequestAccess` only.
 
-UI exchange handles are separate from the `n8n-auth` cookie. The SPA trades the handle once for a bearer token; bearer tokens are either the upstream `access_token` or an app-issued JWT (`sid` bound, 8 h max, refresh window 5 min before expiry; fully expired tokens are rejected without refresh).
+UI exchange handles are separate from the `n8n-auth` cookie. The SPA trades the handle once for a bearer token; bearer tokens are either the upstream `access_token` or an app-issued JWT (`sid` bound to `sessionIssueId`, 8 h max, refresh window 5 min before expiry; fully expired `isSeparateTokenExpired` tokens are rejected without refresh; raw mode uses `shouldRefreshAccessToken` at/after `expiresAt`).
+
+**Atomic issuance guarantee (AUTH-04, `oidc-login-coordinator.test.ts`):** No failed login leaves a consumable `session` handle or a new usable bearer; partial `reftoken/idtoken/acctoken` writes are best-effort cleaned via `deleteUiOidcTokenRecords` (idempotent, original error preserved) and cannot create a session without a valid `sid` (separate) or `tokenemail`+handle (raw), nor defeat logout (`deleteUiOidcTokens` deletes all).
 
 ---
 
@@ -218,11 +220,13 @@ Every browser return target (`returnTo` on login/callback/logout, `continue` in 
 
 ## Callback verification
 
-- `state`/`nonce` signed cookies validated before token exchange (`Missing or invalid nonce - session expired` on failure).
+- `state`/`nonce` signed cookies validated before token exchange (`Missing or invalid nonce - session expired` on failure via `verifySignedCookie`/`validateCallbackRequest`).
 - Missing `id_token` or `jwks_uri` → `Missing ID token` / `OIDC JWKS URI is not configured`.
-- `jose.jwtVerify` with `issuer`, `audience`, `exp`, `nonce`; discovered `issuer` must equal configured `issuerUrl` exactly.
+- `OIDC_ISSUER` is mandatory; `fetchOidcDiscoveryDocument` throws `OIDC issuer is required in manual endpoint mode` if empty; `buildOidcRouter` throws before serving login if not configured.
+- `jose.jwtVerify` with `issuer` (always set), `audience`, `exp`, `nonce` via a reused `createRemoteJWKSet(jwks_uri)` per URI (`jwksCache`, AUTH-06, `clearJwksCacheForTests`); discovered `issuer` must equal configured `issuerUrl` exactly (`OIDC discovery issuer mismatch`).
 - `userinfo.sub` must exist and equal verified `id_token` `sub`; otherwise `userinfo sub mismatch`.
 - Signed-cookie HMAC uses `crypto.timingSafeEqual` after equal-length check.
+- Provider fetches are bounded via `fetchWithTimeout` (`AbortController` + `OIDC_PROVIDER_TIMEOUT_MS` default 10s, `OIDC provider request timed out`).
 
 ---
 
@@ -234,6 +238,7 @@ Every browser return target (`returnTo` on login/callback/logout, `continue` in 
 - In production (`NODE_ENV=production`), an `https` base with `N8N_PROTOCOL` not `https`, or an `http` base with `N8N_PROTOCOL=https`, or a missing/invalid base without `N8N_PROTOCOL=https`, throws at startup (no silent non-Secure production cookie).
 - In non-production, base protocol wins when parseable, otherwise `N8N_PROTOCOL === 'https'`.
 - Helm (`helm/main/values.yaml`) and `Dockerfile` set `N8N_PROTOCOL=https` matching `N8N_BASE_URL` `https`; `docker-compose` uses `http` for both.
+- `n8n-auth` is linked to the OIDC refresh lifecycle: `GET /ui-api/session` and `requireUiRequestContext` (`routes/ui-api.ts:38`) via `createUiRequestContextMiddleware` (`100`) — when `getUiSession` succeeds with `refreshedToken` and `n8n-auth` is present, the cookie is re-issued (`res.cookie('n8n-auth', sameToken, getAuthCookieOptions(isSecure))` sliding 24 h `helpers/cookie.ts:66`); when `getUiSession` returns `null` with a bearer present (OIDC expired, `isRefreshTokenExpired` `helpers/ui-auth-token.ts:30` or revoked `sid`/`acctoken` missing), `n8n-auth` is cleared (`res.clearCookie('n8n-auth', {httpOnly,secure,sameSite:lax,path:'/'})` `48`) so both sessions end together. Anonymous without a bearer never clears n8n-only session.
 
 State cookie also carries `returnTo`, `codeVerifier`, and `redirectUri`; nonce cookie carries `nonce`.
 
@@ -256,17 +261,22 @@ The frontend hook keeps `/ui` as the browser login landing page by replacing ini
 ## Security notes
 
 - `state`/`nonce` in signed cookies mitigate CSRF/replay; signatures compared with `timingSafeEqual`.
-- ID token is cryptographically verified (signature, issuer, audience, expiry, nonce) via JWKS; `userinfo` is bound to the same subject.
+- ID token is cryptographically verified (signature, issuer — always required — audience, expiry, nonce) via a reused JWKS resolver per `jwks_uri`; `userinfo` is bound to the same subject.
 - Cookie signing key derived from `N8N_ENCRYPTION_KEY` (or `OIDC_CLIENT_SECRET` fallback) via SHA-256 with `-oidc-state` suffix.
 - Valid email required before provisioning.
-- Internal exceptions mapped to stable public messages; structured server logs retain details.
-- Token refresh TTLs: refresh token capped to `min(provider remaining, 30d)`; `UI` bearer 8 h max with 5-min refresh window; expired tokens rejected.
+- Public error boundaries (AUTH-03, `oidc.test.ts`/`oidc-provider.test.ts`): `ALLOWED_OIDC_PROVIDER_ERROR_CODES` allowlist (19 codes) and `STABLE_PUBLIC_ROUTE_MESSAGES` allowlist map provider/route errors to stable public codes/messages; unknown or hostile texts (e.g. `<script>`, `redis://`, raw infrastructure) are mapped to generic `Authentication failed` (or issuer mismatch → `Invalid issuer`) and detailed causes are logged server-side via `logError`; no raw provider text is placed in `?error=` redirects.
+- Token refresh TTLs: refresh token capped to `min(provider remaining, 30d)` (`setUiOidcRefreshTokenWithExpiry`); `UI` bearer 8 h max with 5-min refresh window (`UI_AUTH_REFRESH_WINDOW_MS`); fully expired separate tokens (`isSeparateTokenExpired`) rejected without refresh, raw `shouldRefreshAccessToken` at/after `expiresAt`; `n8n-auth` 24 h cookie slides on UI refresh (`extendN8nAuthCookie` when `X-UI-Auth-Token` present) and is cleared when OIDC session expires/revoked **and a bearer was presented** (`clearN8nAuthCookie` / `shouldClearN8nCookieOnExpiry`; anonymous without bearer never clears n8n-only session) linked via `createUiRequestContextMiddleware`.
+- `n8n-auth` and UI bearer are not interchangeable: UI bearer never authenticates `GET /rest/auth/oidc/*` (those use cookie or handle), `n8n-auth` never authenticates `/ui-api/*` (those use `Authorization: Bearer` via `requireUiRequestContextMiddleware`).
+- Upstream CSTAR calls use the server-side upstream token (`session.upstreamAccessToken` resolved via `getUiOidcAccessTokenByEmail` or `refreshAccessToken` closure), never the presented UI bearer in separate-token mode (AUTH-02, `ui-api.test.ts` separate-token regression).
+- Race safety (AUTH-05, `ui-oidc-store-refresh.test.ts`): `setUiOidcAccessTokenRecord` uses Lua CAS (`SET_ACCESS_TOKEN_LUA`) and per-email in-process lock; `deleteUiOidcTokens` uses verify-after-DEL + orphan sweep; `refreshSessionByEmail` uses single-flight per normalized email (`REFRESH_SINGLE_FLIGHT_TIMEOUT_MS` 10s).
 
 ---
 
 ## Operational notes
 
-- Required env missing → routes not registered, warning logged.
-- Discovery cached in memory for 1 h.
-- OIDC failures surfaced via `/ui?error=...` (browser) and `logError` (server); `?email=` on logout is untrusted.
-- Logging via `external-hooks/src/api/utils/logger.ts`.
+- Required env missing or `OIDC_ISSUER` absent → routes not registered, warning logged; `buildOidcRouter` throws `OIDC issuer is required` so an invalid security configuration fails before serving login (AUTH-03).
+- Discovery cached in memory for 1 h (`fetchOidcDiscoveryDocument`); JWKS resolvers reused per `jwks_uri` while preserving `jose` key rotation on `kid` miss.
+- Provider fetches bounded by `OIDC_PROVIDER_TIMEOUT_MS` (default 10s) via `fetchWithTimeout`.
+- `GET /ui-api/auth/login` and `GET /ui-api/auth/logout` aliases are redirect-only (302) until `2026-09-30`; they do not establish sessions or trust caller identity (canonical is `GET /rest/auth/oidc/*`).
+- OIDC failures surfaced via `/ui?error=...` with allowlisted stable public messages (browser) and `logError` (server); `?email=` on logout is untrusted.
+- Logging via `external-hooks/src/api/utils/logger.ts`; `Open n8n` affordance is hidden for anonymous/loading/disabled/role-less users (defense-in-depth, server-side `n8n-auth` remains authoritative — AUTH-08).

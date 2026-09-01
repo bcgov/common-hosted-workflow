@@ -65,6 +65,11 @@ export function getN8nOidcConfigFromEnv(): N8nOidcConfig {
 
 export function validateN8nOidcConfig(config: N8nOidcConfig) {
   const missing = [] as string[];
+  // OIDC_ISSUER is mandatory in every supported configuration mode.
+  // Manual endpoint mode without an issuer would allow ID-token verification
+  // without an issuer constraint — default to requiring issuer unless a
+  // documented provider compatibility need is reviewed.
+  if (!config.issuerUrl) missing.push('OIDC_ISSUER');
   if (!config.issuerUrl) {
     if (!config.authorizationEndpoint) missing.push('OIDC_AUTHORIZATION_ENDPOINT');
     if (!config.tokenEndpoint) missing.push('OIDC_TOKEN_ENDPOINT');

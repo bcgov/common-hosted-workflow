@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { OidcDiscoveryDocument, UiOidcConfig } from './ui-oidc';
+import { OIDC_PROVIDER_TIMEOUT_MS } from '@config';
 
 export type OidcProviderConfig = Pick<
   UiOidcConfig,
@@ -59,8 +60,81 @@ type OidcDiscoveryCacheEntry = {
 const discoveryCache = new Map<string, OidcDiscoveryCacheEntry>();
 const OIDC_DISCOVERY_CACHE_TTL_MS = 60 * 60 * 1000;
 
+// AUTH-06: Remote JWKS resolver reuse — one instance per trusted JWKS URI.
+// `jose`'s RemoteJWKSet internally respects Cache-Control / key rotation
+// (re-fetches when `kid` not found / on expiry), so reusing the instance
+// preserves rotation while avoiding per-verification construction and
+// redundant network work.
+// Exported helpers for tests: `clearJwksCacheForTests`, `getJwksCacheSizeForTests`.
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+function getRemoteJWKSet(jwksUri: string) {
+  let entry = jwksCache.get(jwksUri);
+  if (!entry) {
+    entry = createRemoteJWKSet(new URL(jwksUri));
+    jwksCache.set(jwksUri, entry);
+  }
+  return entry;
+}
+export function clearJwksCacheForTests() {
+  jwksCache.clear();
+}
+export function getJwksCacheSizeForTests() {
+  return jwksCache.size;
+}
+export function getJwksCacheKeysForTests() {
+  return [...jwksCache.keys()];
+}
+
 export function clearOidcDiscoveryCache() {
   discoveryCache.clear();
+}
+
+// AUTH-06: Bounded provider fetch with stable timeout handling.
+// All OIDC provider network calls (discovery, token, refresh, userinfo)
+// go through this helper. It aborts after `timeoutMs` and throws the
+// stable message `OIDC provider request timed out` so callers and
+// tests can assert upper time bounds without depending on fetch
+// implementation details or raw AbortError text.
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = OIDC_PROVIDER_TIMEOUT_MS,
+): Promise<Response> {
+  // Allow tests to disable timeout with 0 or negative
+  if (!timeoutMs || timeoutMs <= 0) {
+    return fetch(input, init);
+  }
+  const controller = new AbortController();
+  // Merge caller signal with timeout signal when possible (Node 20+ has AbortSignal.any)
+  let signal: AbortSignal = controller.signal;
+  if (init.signal) {
+    const anyFn = (AbortSignal as unknown as { any?: (s: AbortSignal[]) => AbortSignal }).any;
+    if (typeof anyFn === 'function') {
+      signal = anyFn([init.signal as AbortSignal, controller.signal]);
+    } else {
+      // Fallback: honour caller abort separately, timeout still aborts its own controller
+      // Caller aborts will not be merged, but no caller currently passes a signal.
+      signal = controller.signal;
+      if ((init.signal as AbortSignal).aborted) controller.abort();
+      else (init.signal as AbortSignal).addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(input, { ...init, signal });
+    return response;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('OIDC provider request timed out', { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function getOidcProviderTimeoutMsForTests() {
+  return OIDC_PROVIDER_TIMEOUT_MS;
 }
 
 function getDiscoveryCacheKey(config: OidcProviderConfig) {
@@ -77,14 +151,7 @@ function getDiscoveryCacheKey(config: OidcProviderConfig) {
 
 export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
   if (!config.issuerUrl) {
-    return {
-      issuer: config.issuerUrl,
-      authorization_endpoint: config.authorizationEndpoint,
-      token_endpoint: config.tokenEndpoint,
-      userinfo_endpoint: config.userinfoEndpoint,
-      jwks_uri: config.jwksUri || undefined,
-      end_session_endpoint: config.endSessionEndpoint || undefined,
-    } satisfies OidcDiscoveryDocument;
+    throw new Error('OIDC issuer is required in manual endpoint mode');
   }
 
   const cacheKey = getDiscoveryCacheKey(config);
@@ -95,7 +162,7 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
   }
 
   const issuerUrl = config.issuerUrl.endsWith('/') ? config.issuerUrl.slice(0, -1) : config.issuerUrl;
-  const response = await fetch(`${issuerUrl}/.well-known/openid-configuration`);
+  const response = await fetchWithTimeout(`${issuerUrl}/.well-known/openid-configuration`);
   if (!response.ok) {
     throw new Error(`Failed to fetch OIDC discovery document: ${response.status}`);
   }
@@ -205,7 +272,7 @@ export async function exchangeAuthorizationCode(params: {
     body.set('code_verifier', params.codeVerifier);
   }
 
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetchWithTimeout(tokenEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -243,7 +310,7 @@ export async function refreshOidcTokens(params: {
     client_secret: params.config.clientSecret,
   });
 
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetchWithTimeout(tokenEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -285,12 +352,15 @@ async function verifyOidcIdToken(params: {
   }
 
   const issuer = resolveOidcIssuer(params.config, params.discovery);
+  if (!issuer) {
+    throw new Error('OIDC issuer is not configured');
+  }
 
-  const jwks = createRemoteJWKSet(new URL(jwksUri));
-  const verifyOpts: { issuer?: string; audience: string } = {
+  const jwks = getRemoteJWKSet(jwksUri);
+  const verifyOpts: { issuer: string; audience: string } = {
+    issuer,
     audience: params.config.clientId,
   };
-  if (issuer) verifyOpts.issuer = issuer;
   const verification = await jwtVerify(params.idToken, jwks, verifyOpts);
 
   const claims = verification.payload as Record<string, unknown>;
@@ -311,7 +381,7 @@ export async function fetchOidcUserInfo(params: {
     return null;
   }
 
-  const response = await fetch(userinfoEndpoint, {
+  const response = await fetchWithTimeout(userinfoEndpoint, {
     headers: { Authorization: `Bearer ${params.accessToken}` },
   });
 

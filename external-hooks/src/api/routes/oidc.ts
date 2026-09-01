@@ -12,7 +12,6 @@ import {
 } from '../helpers/n8n-oidc';
 import { appendQueryParam } from '../helpers/url';
 import { createReturnTargetPolicy, resolveReturnTarget } from '../helpers/return-target';
-import { isManagedProjectRole } from '../constants/project-roles';
 import { createLogger, logError } from '../utils/logger';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
@@ -22,9 +21,65 @@ import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
 import type { TenantService } from '../services/tenant.service';
 import type { UserService } from '../services/user';
-import { createOidcLoginCoordinator } from '../services/oidc-login-coordinator';
+import { createOidcLoginCoordinator, resolveNextRoleInternal } from '../services/oidc-login-coordinator';
 
 const log = createLogger('OIDCHook');
+
+// AUTH-03: Public error boundary — allowlist of stable public codes/messages.
+// Detailed causes are logged server-side; redirects never carry provider
+// descriptions, token details, URLs with secrets, or raw infrastructure text.
+const ALLOWED_OIDC_PROVIDER_ERROR_CODES = new Set([
+  'invalid_request',
+  'unauthorized_client',
+  'access_denied',
+  'unsupported_response_type',
+  'invalid_scope',
+  'server_error',
+  'temporarily_unavailable',
+  'interaction_required',
+  'login_required',
+  'account_selection_required',
+  'consent_required',
+  'invalid_request_uri',
+  'invalid_request_object',
+  'request_not_supported',
+  'request_uri_not_supported',
+  'registration_not_supported',
+]);
+
+const STABLE_PUBLIC_ROUTE_MESSAGES = new Set([
+  'Missing authorization code or state',
+  'Missing state cookies - session expired',
+  'Invalid state - possible CSRF attack',
+  'Missing or invalid nonce - session expired',
+  'OIDC authorization endpoint is not configured',
+  'OIDC issuer is required in manual endpoint mode',
+  'OIDC issuer is not configured',
+  'Authentication failed',
+]);
+
+function toPublicRouteMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (STABLE_PUBLIC_ROUTE_MESSAGES.has(raw)) return raw;
+  for (const allowed of STABLE_PUBLIC_ROUTE_MESSAGES) {
+    if (raw.includes(allowed)) return allowed;
+  }
+  // Map issuer-related failures to generic invalid-issuer public code
+  if (
+    /OIDC issuer is required/i.test(raw) ||
+    /OIDC issuer is not configured/i.test(raw) ||
+    /discovery issuer mismatch/i.test(raw)
+  ) {
+    return 'Authentication failed';
+  }
+  return 'Authentication failed';
+}
+
+function toPublicProviderErrorCode(errorParam: unknown): string {
+  const raw = String(errorParam);
+  if (ALLOWED_OIDC_PROVIDER_ERROR_CODES.has(raw)) return raw;
+  return 'Authentication failed';
+}
 
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
@@ -53,6 +108,10 @@ export function buildOidcRouter({
   cstarService,
   config,
 }: BuildOidcRouterParams) {
+  // AUTH-03: Fail fast on invalid security configuration before serving login.
+  if (!config.issuerUrl) {
+    throw new Error('OIDC issuer is required: set OIDC_ISSUER (manual endpoint mode requires explicit issuer)');
+  }
   const router = Router();
   const cookieSecret = getCookieSecret();
   const returnTargetPolicy = createReturnTargetPolicy();
@@ -118,8 +177,7 @@ export function buildOidcRouter({
       res.redirect(authRequest.authorizationUrl);
     } catch (error) {
       logError(log, error, { context: 'OIDC login' });
-      const message = error instanceof Error ? error.message : String(error);
-      res.redirect(buildExternalUiErrorRedirect(message));
+      res.redirect(buildExternalUiErrorRedirect(toPublicRouteMessage(error)));
     }
   });
 
@@ -143,14 +201,28 @@ export function buildOidcRouter({
       }
 
       if (outcome.kind === 'access-request') {
+        // P0 AUTH-01: access-request must never leave a stale n8n-auth in the
+        // browser (same-identity eligibility loss or cross-identity switch).
+        // The route is the single shared enforcement boundary — coordinator
+        // returns the outcome, route terminates any prior n8n session.
+        try {
+          authService.clearCookie(res);
+        } catch {
+          // Fall back to direct clear if AuthService derivation throws in
+          // misconfigured production (getSecureCookieFlag) — still terminate.
+          try {
+            res.clearCookie('n8n-auth', { path: '/' });
+          } catch {
+            // ignore
+          }
+        }
         return res.redirect(outcome.redirectUrl);
       }
 
       return res.redirect(buildExternalUiErrorRedirect(outcome.publicMessage));
     } catch (error) {
       logError(log, error, { context: 'OIDC callback' });
-      const message = error instanceof Error ? error.message : String(error);
-      res.redirect(buildExternalUiErrorRedirect('Authentication failed: ' + message));
+      res.redirect(buildExternalUiErrorRedirect('Authentication failed'));
     }
   });
 
@@ -251,74 +323,13 @@ type ResolveNextRoleParams = {
   accessToken?: string;
 };
 
+/**
+ * AUTH-07: Coordinator owns eligibility/role resolution. This export is a
+ * backwards-compatible delegate — one implementation (`resolveNextRoleInternal`)
+ * owns the decision. Kept for existing tests/routes that import from this module.
+ */
 export async function resolveNextRole(params: ResolveNextRoleParams): Promise<string> {
-  const { jwtRole, restrictNoRole, cstarService, ssoUserId, accessToken } = params;
-
-  if (!restrictNoRole) {
-    return jwtRole || 'global:member';
-  }
-
-  if (jwtRole) {
-    return jwtRole;
-  }
-
-  if (!accessToken || !cstarService.isConfigured()) {
-    return '';
-  }
-
-  const hasManagedProjectRole = await hasCstarManagedProjectRoleInAnyTenant({ cstarService, ssoUserId, accessToken });
-  if (hasManagedProjectRole) {
-    log.info('Granting global:member based on CSTAR managed tenant project role', { ssoUserId });
-    return 'global:member';
-  }
-
-  return '';
-}
-
-type HasCstarProjectRoleInAnyTenantParams = {
-  cstarService: CstarService;
-  ssoUserId: string;
-  accessToken: string;
-};
-
-async function hasCstarManagedProjectRoleInAnyTenant(params: HasCstarProjectRoleInAnyTenantParams): Promise<boolean> {
-  const { cstarService, ssoUserId, accessToken } = params;
-  let tenants;
-
-  try {
-    tenants = await cstarService.getUserTenantsStrict({ ssoUserId, accessToken });
-  } catch (error) {
-    log.error('Failed to verify CSTAR tenant memberships during OIDC login', {
-      ssoUserId,
-      error: String(error),
-    });
-    throw new Error('Unable to verify CSTAR tenant roles during sign-in', { cause: error });
-  }
-
-  for (const tenant of tenants) {
-    let roles;
-
-    try {
-      roles = await cstarService.getUserSharedServiceRolesStrict({
-        tenantId: tenant.id,
-        ssoUserId,
-        accessToken,
-      });
-    } catch (error) {
-      log.error('Failed to verify CSTAR tenant shared-service roles during OIDC login', {
-        ssoUserId,
-        tenantId: tenant.id,
-        error: String(error),
-      });
-      throw new Error('Unable to verify CSTAR tenant roles during sign-in', { cause: error });
-    }
-
-    if (roles.some((role) => isManagedProjectRole(role.name))) {
-      return true;
-    }
-  }
-
-  return false;
+  return resolveNextRoleInternal(params);
 }
 
 // --- Extracted helpers to reduce callback cognitive complexity ---
@@ -336,9 +347,11 @@ function validateCallbackRequest(req: Request, cookieSecret: string): CallbackVa
   const { code, state, error, error_description } = req.query;
 
   if (error) {
+    // Log detailed provider error server-side; never reflect error_description verbatim (may contain hostile text/secrets).
     log.error('OIDC error from provider', { error, errorDescription: error_description });
+    const publicCode = toPublicProviderErrorCode(error);
     return {
-      redirect: buildExternalUiErrorRedirect(String(error_description || error)),
+      redirect: buildExternalUiErrorRedirect(publicCode),
       code: null,
       statePayload: null,
       noncePayload: null,

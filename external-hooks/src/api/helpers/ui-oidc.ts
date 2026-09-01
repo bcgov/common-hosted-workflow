@@ -60,6 +60,13 @@ export type UiResolvedSession = UiSession & {
   permissions: Permissions;
   tenantRoles: TenantRole[];
   tenantGroups: TenantGroup[];
+  /**
+   * Upstream OIDC access token for CSTAR/provider calls.
+   * Distinct from the UI bearer (which may be an app JWT in separate-token mode).
+   * Never exposed via public session types (buildSessionSummary/buildWhoamiResponse)
+   * or API responses; internal use only.
+   */
+  upstreamAccessToken?: string;
 };
 
 // UiOidcConfig is now an alias to the single-source N8nOidcConfig / OidcProviderConfig.

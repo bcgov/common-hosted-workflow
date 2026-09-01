@@ -62,6 +62,12 @@ export const OIDC_SCOPES = process.env.OIDC_SCOPES || 'openid email profile';
 export const OIDC_ROLES_CLAIM = process.env.OIDC_ROLES_CLAIM || 'roles';
 export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 
+// AUTH-06: Bounded provider request timeout (ms). All OIDC discovery, token,
+// refresh, and userinfo fetches abort after this deadline and surface a
+// stable timeout error (`OIDC provider request timed out`) instead of
+// hanging indefinitely. Default 10s, override via OIDC_PROVIDER_TIMEOUT_MS.
+export const OIDC_PROVIDER_TIMEOUT_MS = Number.parseInt(process.env.OIDC_PROVIDER_TIMEOUT_MS ?? '10000', 10);
+
 // CSTAR – Tenant & user management
 export const CSTAR_BASE_URL = process.env.CSTAR_BASE_URL || '';
 export const CSTAR_API_BASE_URL = CSTAR_BASE_URL ? `${CSTAR_BASE_URL}/api/v1` : '';

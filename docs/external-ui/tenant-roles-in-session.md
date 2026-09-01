@@ -195,22 +195,29 @@ This runs **non-blocking** (fire-and-forget). If it fails, the first `/session` 
 
 ### 2. Session Resolution (Cache-Aside)
 
-On every `/ui-api/session` or authenticated request:
+On every `/ui-api/session` or authenticated request (`createUiRequestContextMiddleware` / `resolveUiRequestContext` via `getUiSession` → `loadUserContext` → `computePermissions`):
 
 ```
 resolveUiRequestContext()
-  ├── services.tenant.getTenantRolesForSession({ email, ssoUserId })
+  ├── getUiSession(req) // separate: jwtVerify+sid check; raw: tokenemail lookup + fetchOidcUserInfo
+  │     └── refreshSessionByEmail if window/expired (bounded, single-flight per email)
+  ├── services.tenant.getTenantRolesForSession({ email, ssoUserId, refreshAccessToken })
   │     └── Check Redis (getUiTenantRoles)
   │           ├── Cache hit  → return cached roles
-  │           └── Cache miss → fetch from CSTAR, store in Redis, return roles
+  │           └── Cache miss → fetch from CSTAR with server-side upstreamAccessToken, store in Redis, return roles
   │
-  └── services.tenant.getTenantGroupsForSession({ email, ssoUserId })
+  └── services.tenant.getTenantGroupsForSession({ email, ssoUserId, refreshAccessToken })
         └── Check Redis (getUiTenantGroups)
               ├── Cache hit  → return cached groups
-              └── Cache miss → fetch from CSTAR, store in Redis, return groups
+              └── Cache miss → fetch from CSTAR with server-side upstreamAccessToken, store in Redis, return groups
+        └── sets X-UI-Auth-Token + extendN8nAuthCookie on refresh; clears n8n-auth iff !resolved && bearer presented
 ```
 
-> **Note:** On a cold cache (e.g. first request after token refresh), each resolver independently calls CSTAR. When pre-warm runs at login it populates both caches in a single combined fetch, avoiding this double call on the first authenticated request.
+Upstream CSTAR calls use `session.upstreamAccessToken` (from `getUiOidcAccessTokenByEmail` or `refreshAccessToken` closure) — never the presented UI bearer in separate-token mode (AUTH-02, `ui-api.ts` / `wil.ts`).
+
+> **Note:** On a cold cache (e.g. first request after token refresh), each resolver independently calls CSTAR. When pre-warm runs at login it populates both caches in a single combined fetch, avoiding this double call on the first authenticated request. A combined `getTenantRolesAndGroupsForSession` exists for a single parallel read (`tenant.service.ts`).
+
+> **Note:** Combined op `getTenantRolesAndGroupsForSession` can serve both in one parallel Redis/CSTAR pass; `ui-api.ts` still calls the two wrappers sequentially (second hits cache populated by first after a cold miss — extra cost is 1 parallel Redis GET).
 
 ### 3. Token Refresh (Invalidation)
 
@@ -235,16 +242,17 @@ deleteUiOidcTokens(email)
 
 ## Caching Details
 
-| Property    | Roles                                   | Groups                                  |
-| ----------- | --------------------------------------- | --------------------------------------- |
-| Storage     | Redis (same instance as OIDC store)     | Redis (same instance as OIDC store)     |
-| Key format  | `{prefix}tenantroles:{email}`           | `{prefix}tenantgroups:{email}`          |
-| Default TTL | 1 hour                                  | 1 hour                                  |
-| Invalidated | On token refresh, on logout             | On token refresh, on logout             |
-| Pre-warmed  | At login (non-blocking, combined fetch) | At login (non-blocking, combined fetch) |
-| Cache miss  | Fetches from CSTAR on-demand            | Fetches from CSTAR on-demand            |
+| Property    | Roles                                                                                                                                                             | Groups                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Storage     | Redis (same instance as OIDC store, `ui-oidc-store.ts`)                                                                                                           | Redis (same instance as OIDC store, `ui-oidc-store.ts`) |
+| Key format  | `{prefix}tenantroles:{email}` (`tenantroles:<email>`)                                                                                                             | `{prefix}tenantgroups:{email}` (`tenantgroups:<email>`) |
+| Default TTL | 1 hour (`TENANT_ROLES_DEFAULT_TTL_MS` 1h)                                                                                                                         | 1 hour (`TENANT_ROLES_DEFAULT_TTL_MS` 1h)               |
+| Invalidated | On token refresh (`refreshSessionByEmail` `invalidateTenantRoles/Groups` + on `refreshAccessToken` path), on logout (`deleteUiOidcTokens`), expiry                | Same                                                    |
+| Pre-warmed  | At login eligible-only non-blocking (`prewarmTenantRolesAndGroups` + `syncTenantsForUser` via `post-login-tenant.ts`, single `getUserGroupsWithRoles` per tenant) | Same                                                    |
+| Cache miss  | Fetches from CSTAR on-demand with `upstreamAccessToken`                                                                                                           | Same                                                    |
+| Validation  | Malformed `TenantRole[]` / `TenantGroup[]` JSON fails closed → `null` via `storeLog.warn` (AUTH-07)                                                               | Same                                                    |
 
-Both caches share the same 1-hour TTL. If a user's CSTAR group memberships or role assignments change, the change will be reflected within 1 hour (or immediately after the next token refresh or re-login).
+Both caches share the same 1-hour TTL. If a user's CSTAR group memberships or role assignments change, the change will be reflected within 1 hour (or immediately after the next token refresh or re-login). `Open n8n` visibility is independent of CSTAR roles — it is gated only by `session.n8nUser` existence, not `canViewWorkflows` (AUTH-08, `app-layout.tsx`).
 
 ## WIL Actor Matching
 

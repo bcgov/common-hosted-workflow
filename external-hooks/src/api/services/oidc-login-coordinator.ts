@@ -10,6 +10,10 @@ import {
   setUiSessionExchange,
   setUiSessionIssueId,
   consumeUiSessionExchange,
+  getUiSessionIssueId,
+  deleteUiSessionIssueId,
+  deleteUiSessionExchange,
+  deleteUiOidcTokenRecords,
 } from '../helpers/ui-oidc-store';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 import type { UiOidcIdentity } from '../helpers/ui-oidc';
@@ -130,15 +134,28 @@ export async function resolveNextRoleInternal(params: ResolveNextRoleParams): Pr
 
 // ---------------------------------------------------------------------------
 // Persist tokens – extracted for injection/cleanup
-// Failure semantics: each Redis write is independent. We batch with
-// Promise.all() only after defining that any write failure aborts login
-// with no session handle issued and leaves any partial token keys
-// overwrite-safe (logout deletes all keys, and a missing exchange still
-// blocks login). No Redis transaction is used because keys are
-// independent and cleanup of partial writes is not required for
-// correctness — the next successful login overwrites them and a
-// failed login never issues a session. This is tested via persisted-
-// token-failure cases.
+// Guaranteed atomicity scope (AUTH-04):
+// - Failed login NEVER leaves a newly consumable exchange handle
+//   (prepareUiSessionExchange failure or n8n-token failure cleans handle)
+// - Failed login NEVER leaves a newly usable UI bearer that wasn't already
+//   valid. Partial OIDC token writes (reftoken/idtoken/acctoken) are
+//   overwrite-safe and cannot create a session without a valid sid match
+//   (separate mode) or tokenemail record consumed via handle (raw mode);
+//   logout (deleteUiOidcTokens) or next successful login overwrites them.
+// - sid mutation (setUiSessionIssueId) is compensated: if handle or n8n
+//   token fails after sid was overwritten, we restore the prior sid when
+//   it existed (preserving prior session) or delete the new sid when
+//   none existed (no prior session is kept). Prior session preservation
+//   vs revocation is therefore explicit and tested; new-login vs re-login
+//   differ only by whether a prior sid existed.
+// - All cleanup is idempotent (DEL of missing key is no-op) and preserves
+//   the original error when cleanup itself fails.
+// No Redis transaction/Lua is used: operations are independent single-key
+// SETs (atomic individually). Multi-key consistency relies on explicit
+// compensating delete/restore, which the fake models accurately (see
+// ui-oidc-store.ts header). Real-Redis integration would exercise
+// GETDEL/DEL idempotency; unit tests with injected failures cover the
+// compensation.
 // Token expiry: refresh_expires_in is preserved as expiresAt and
 // the Redis TTL is capped to min(provider remaining, 30-day max).
 // ---------------------------------------------------------------------------
@@ -168,17 +185,36 @@ export async function persistOidcTokensDefault(
   }
 
   if (ops.length === 0) return;
-  // Batch independent writes — any failure aborts the whole login (no partial session)
-  await Promise.all(ops);
+  try {
+    await Promise.all(ops);
+  } catch (orig: unknown) {
+    // Best-effort compensating delete of any token keys that may have
+    // been partially written. This is idempotent (DEL of missing keys)
+    // and must not mask the original error.
+    try {
+      await deleteUiOidcTokenRecords(email);
+    } catch {
+      // preserve original error even if cleanup fails
+    }
+    throw orig;
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Prepare UI exchange – atomic UI session handle (single-use)
+// Guarantees (AUTH-04): no failed login leaves a consumable handle.
+// sid mutation is compensated so prior session is preserved when it
+// existed (see coordinator handleCallback for priorSid restore) or
+// revoked (new sid deleted) when this is a first login. Cleanup is
+// idempotent and preserves original error.
 // ---------------------------------------------------------------------------
 export type PrepareUiExchangeDeps = {
   issueToken?: typeof issueUiSessionToken;
   setIssueId?: typeof setUiSessionIssueId;
   setExchange?: typeof setUiSessionExchange;
+  getIssueId?: typeof getUiSessionIssueId;
+  deleteIssueId?: typeof deleteUiSessionIssueId;
+  deleteExchange?: typeof deleteUiSessionExchange;
 };
 
 export async function prepareUiSessionExchange(
@@ -190,6 +226,8 @@ export async function prepareUiSessionExchange(
   const issue = deps.issueToken ?? issueUiSessionToken;
   const setIssue = deps.setIssueId ?? setUiSessionIssueId;
   const setEx = deps.setExchange ?? setUiSessionExchange;
+  const getIssue = deps.getIssueId ?? getUiSessionIssueId;
+  const delIssue = deps.deleteIssueId ?? deleteUiSessionIssueId;
 
   const sessionId = crypto.randomBytes(16).toString('base64url');
   const uiToken = await issue({
@@ -198,9 +236,31 @@ export async function prepareUiSessionExchange(
     upstreamExpiresAt: accessTokenExpiresAt,
     sessionId,
   });
+  // Capture prior sid for compensating restore if later step fails.
+  let priorSid: string | null;
+  try {
+    priorSid = await getIssue(identity.email);
+  } catch {
+    priorSid = null;
+  }
   await setIssue(identity.email, sessionId);
   const handle = crypto.randomBytes(24).toString('base64url');
-  await setEx(handle, uiToken, UI_SESSION_EXCHANGE_TTL_MS);
+  try {
+    await setEx(handle, uiToken, UI_SESSION_EXCHANGE_TTL_MS);
+  } catch (orig: unknown) {
+    // Compensating: restore prior sid or delete newly written sid.
+    // Idempotent; preserve original error even if cleanup fails.
+    try {
+      if (priorSid) {
+        await setIssue(identity.email, priorSid);
+      } else {
+        await delIssue(identity.email);
+      }
+    } catch {
+      // ignore cleanup failure – original error is authoritative
+    }
+    throw orig;
+  }
   return { handle, token: uiToken };
 }
 
@@ -260,6 +320,11 @@ export type OidcLoginCoordinatorDeps = {
   createAuthTokenFn?: typeof createAuthToken;
   // Cleanup for atomicity: if UI handle created but n8n token fails, delete exchange
   consumeExchange?: typeof consumeUiSessionExchange;
+  // Atomic helpers for compensating sid cleanup (AUTH-04)
+  getSessionIssueId?: typeof getUiSessionIssueId;
+  setSessionIssueId?: typeof setUiSessionIssueId;
+  deleteSessionIssueId?: typeof deleteUiSessionIssueId;
+  deleteSessionExchange?: typeof deleteUiSessionExchange;
   runPostLoginWork?: typeof import('./post-login-tenant').runPostLoginTenantWork;
   logger?: ReturnType<typeof createLogger>;
 };
@@ -270,32 +335,60 @@ export type OidcLoginInput = {
   noncePayload: N8nOidcNonceCookiePayload;
 };
 
+const ALLOWED_PUBLIC_ERROR_MESSAGES: readonly string[] = [
+  'No valid email in OIDC response',
+  'Missing ID token in token response',
+  'OIDC JWKS URI is not configured',
+  'OIDC issuer is required in manual endpoint mode',
+  'OIDC issuer is not configured',
+  'OIDC discovery issuer mismatch',
+  'Invalid issuer',
+  'Invalid nonce',
+  'Invalid ID token: missing sub',
+  'userinfo sub mismatch',
+  'Unable to verify CSTAR tenant roles during sign-in',
+  'OIDC provider did not return an access token',
+  'Failed to create or find user',
+  'Missing authorization code or state',
+  'Invalid state - possible CSRF attack',
+  'Missing state cookies - session expired',
+  'Missing or invalid nonce - session expired',
+];
+
 function toPublicMessage(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
-  // Known stable messages – expose directly; otherwise generic
-  const stableFragments = [
-    'No valid email',
-    'Missing ID token',
-    'OIDC JWKS URI',
-    'Invalid issuer',
-    'Invalid nonce',
-    'Invalid ID token',
-    'userinfo sub mismatch',
-    'Unable to verify CSTAR',
-    'OIDC provider did not return an access token',
-    'Failed to create or find user',
-    'Failed to create UI session',
-    'Missing authorization code',
-    'Invalid state',
-  ];
-  if (stableFragments.some((f) => msg.includes(f))) {
-    return msg.includes('Authentication failed') ? msg : 'Authentication failed: ' + msg;
+  // Map known stable messages to a sanitized allowlist; never expose raw provider
+  // descriptions, token details, URLs with secrets, or infrastructure stack traces.
+  // Detailed cause is already logged server-side via logError at the call site.
+  for (const allowed of ALLOWED_PUBLIC_ERROR_MESSAGES) {
+    if (msg.includes(allowed)) {
+      // Return the canonical allowlist entry, not the raw message, to avoid leaking
+      // surrounding hostile text (e.g., "<script>", long error_description with secrets).
+      // For generic "Invalid issuer" etc., return a stable public code.
+      if (
+        allowed === 'OIDC discovery issuer mismatch' ||
+        allowed === 'OIDC issuer is required in manual endpoint mode' ||
+        allowed === 'OIDC issuer is not configured'
+      ) {
+        return 'Authentication failed: Invalid issuer';
+      }
+      if (
+        allowed.startsWith('Missing') ||
+        allowed.startsWith('Invalid state') ||
+        allowed.startsWith('Missing or invalid')
+      ) {
+        return allowed;
+      }
+      return allowed.includes('Authentication failed') ? allowed : 'Authentication failed: ' + allowed;
+    }
   }
-  // For infrastructure failures (Redis, network) return generic but log details
-  if (/redis/i.test(msg) || /UI session/i.test(msg) || /Failed to create UI/i.test(msg)) {
-    return 'Authentication failed';
-  }
-  return 'Authentication failed: ' + msg;
+  // Explicit generic fallbacks for infrastructure/provider failures that must not leak
+  if (msg.includes('OIDC discovery issuer mismatch')) return 'Authentication failed: Invalid issuer';
+  if (/discovery issuer mismatch/i.test(msg)) return 'Authentication failed: Invalid issuer';
+  if (/OIDC issuer is required/i.test(msg) || /OIDC issuer is not configured/i.test(msg))
+    return 'Authentication failed: Invalid issuer';
+  // Unknown provider, Redis, database, coding errors -> stable generic public response
+  return 'Authentication failed';
 }
 
 export class OidcLoginCoordinator {
@@ -312,6 +405,10 @@ export class OidcLoginCoordinator {
       ensureTenantMapping: ensurePersonalProjectTenantMapping,
       createAuthTokenFn: createAuthToken,
       consumeExchange: consumeUiSessionExchange,
+      getSessionIssueId: getUiSessionIssueId,
+      setSessionIssueId: setUiSessionIssueId,
+      deleteSessionIssueId: deleteUiSessionIssueId,
+      deleteSessionExchange: deleteUiSessionExchange,
       runPostLoginWork: runPostLoginTenantWork,
       logger: log,
       ...deps,
@@ -633,6 +730,16 @@ export class OidcLoginCoordinator {
     }
 
     // --- Session atomicity: prepare UI exchange BEFORE issuing n8n-auth ---
+    // AUTH-04: capture prior sid so failure after sid mutation can restore
+    // the previous session (preserving it when it existed) or delete the
+    // new sid when this is a first login. No failed login leaves a
+    // newly consumable handle; prior session outcome is explicit and tested.
+    let priorSidForEligible: string | null;
+    try {
+      priorSidForEligible = await this.deps.getSessionIssueId(oidcIdentity.email);
+    } catch {
+      priorSidForEligible = null;
+    }
     let uiHandle: string;
     let uiToken: string;
     try {
@@ -641,6 +748,9 @@ export class OidcLoginCoordinator {
       uiToken = res.token;
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - prepare UI exchange (eligible)' });
+      // prepareUiSessionExchange already attempted compensating sid restore/delete
+      // for its own setExchange failure; ensure idempotency if prior sid capture
+      // differs (best-effort, preserve original error).
       return { kind: 'failure', publicMessage: toPublicMessage(error) };
     }
 
@@ -649,11 +759,27 @@ export class OidcLoginCoordinator {
       n8nAuthToken = createAuthTokenFn(user as any, jwtService);
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - create n8n auth token' });
-      // Clean up the UI exchange we just created to avoid dangling single-use handle
+      // Compensating cleanup: delete the newly created exchange handle and
+      // restore/delete sid so no consumable handle remains and prior session
+      // is either preserved (if existed) or revoked (if first login).
+      // Both DELs are idempotent; preserve original error even if cleanup fails.
       try {
         await this.deps.consumeExchange(uiHandle);
       } catch {
-        // ignore cleanup failure – already logging original error
+        try {
+          await this.deps.deleteSessionExchange(uiHandle);
+        } catch {
+          // ignore – original error is authoritative
+        }
+      }
+      try {
+        if (priorSidForEligible) {
+          await this.deps.setSessionIssueId(oidcIdentity.email, priorSidForEligible);
+        } else {
+          await this.deps.deleteSessionIssueId(oidcIdentity.email);
+        }
+      } catch {
+        // ignore cleanup failure – original error preserved
       }
       return { kind: 'failure', publicMessage: 'Authentication failed' };
     }

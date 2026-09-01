@@ -7,6 +7,7 @@ const {
   setUiLogoutHandleMock,
   fetchOidcDiscoveryDocumentMock,
   getOidcConfigFromEnvMock,
+  getUiOidcAccessTokenByEmailMock,
 } = vi.hoisted(() => ({
   getUiSessionMock: vi.fn(),
   getUiOidcIdTokenMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   setUiLogoutHandleMock: vi.fn(),
   fetchOidcDiscoveryDocumentMock: vi.fn(),
   getOidcConfigFromEnvMock: vi.fn(),
+  getUiOidcAccessTokenByEmailMock: vi.fn(),
 }));
 
 vi.mock('../../../src/api/helpers/ui-oidc', async () => {
@@ -48,6 +50,7 @@ vi.mock('../../../src/api/helpers/ui-oidc-store', async () => {
     getUiOidcIdToken: getUiOidcIdTokenMock,
     deleteUiOidcTokens: deleteUiOidcTokensMock,
     setUiLogoutHandle: setUiLogoutHandleMock,
+    getUiOidcAccessTokenByEmail: getUiOidcAccessTokenByEmailMock,
   };
 });
 
@@ -142,6 +145,8 @@ beforeEach(() => {
     },
   });
   deleteUiOidcTokensMock.mockResolvedValue(undefined);
+  getUiOidcAccessTokenByEmailMock.mockReset();
+  getUiOidcAccessTokenByEmailMock.mockResolvedValue('stored-upstream-access-token');
 });
 
 describe('GET /ui-api/session', () => {
@@ -192,6 +197,120 @@ describe('GET /ui-api/session', () => {
         },
       }),
     );
+  });
+});
+
+describe('OIDC session expiry clears n8n-auth and refresh extends it', () => {
+  function createMockResWithCookies() {
+    const res = createMockResponse() as any;
+    res.setHeader = vi.fn();
+    res.clearCookie = vi.fn();
+    res.cookie = vi.fn();
+    return res;
+  }
+
+  it('clears n8n-auth on GET /session when OIDC session expired but n8n cookie is still live', async () => {
+    getUiSessionMock.mockResolvedValue(null);
+    const uiApi = {
+      loadUserContext: vi.fn(),
+    };
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer expired-token' },
+      cookies: { 'n8n-auth': 'live-n8n-token' } as any,
+    } as any);
+    // ensure getBearerToken sees header
+    (req as any).header = vi.fn((name: string) => {
+      if (name.toLowerCase() === 'authorization') return 'Bearer expired-token';
+      return undefined;
+    });
+    (req as any).cookies = { 'n8n-auth': 'live-n8n-token' };
+    const res = createMockResWithCookies();
+
+    await runProtectedRoute({ uiApi }, 'get', '/session', req as any, res as any);
+
+    expect(res.clearCookie).toHaveBeenCalledWith('n8n-auth', expect.objectContaining({ path: '/', httpOnly: true }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ authenticated: false }));
+  });
+
+  it('does not clear n8n-auth when no bearer was presented (anonymous n8n-only)', async () => {
+    getUiSessionMock.mockResolvedValue(null);
+    const uiApi = { loadUserContext: vi.fn() };
+    const req = createMockRequest({
+      cookies: { 'n8n-auth': 'live-n8n-token' } as any,
+    } as any);
+    (req as any).header = vi.fn(() => undefined);
+    (req as any).cookies = { 'n8n-auth': 'live-n8n-token' };
+    const res = createMockResWithCookies();
+
+    await runProtectedRoute({ uiApi }, 'get', '/session', req as any, res as any);
+
+    expect(res.clearCookie).not.toHaveBeenCalled();
+  });
+
+  it('extends n8n-auth cookie when UI JWT is refreshed', async () => {
+    getUiSessionMock.mockResolvedValue({
+      session: {
+        subject: 'sub-1',
+        email: 'person@example.com',
+        issuer: 'https://issuer.example.com',
+        audience: ['app'],
+        claims: {},
+      },
+      refreshedToken: 'refreshed-token',
+    });
+    const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          disabled: false,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        accessibleProjectIds: [],
+        projects: [],
+        workflows: [],
+      }),
+    };
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer near-expiry-jwt' },
+      cookies: { 'n8n-auth': 'live-n8n-token' } as any,
+    } as any);
+    (req as any).header = vi.fn((name: string) => {
+      if (name.toLowerCase() === 'authorization') return 'Bearer near-expiry-jwt';
+      return undefined;
+    });
+    (req as any).cookies = { 'n8n-auth': 'live-n8n-token' };
+    const res = createMockResWithCookies();
+
+    await runProtectedRoute({ uiApi }, 'get', '/session', req as any, res as any);
+
+    expect(res.cookie).toHaveBeenCalledWith(
+      'n8n-auth',
+      'live-n8n-token',
+      expect.objectContaining({ httpOnly: true, path: '/', maxAge: 24 * 60 * 60 * 1000 }),
+    );
+    expect(res.setHeader).toHaveBeenCalledWith('X-UI-Auth-Token', 'refreshed-token');
+  });
+
+  it('clears n8n-auth on protected route when bearer expired', async () => {
+    getUiSessionMock.mockResolvedValue(null);
+    const uiApi = { loadUserContext: vi.fn() };
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer expired-token' },
+      cookies: { 'n8n-auth': 'live-n8n-token' } as any,
+    } as any);
+    (req as any).header = vi.fn((name: string) => {
+      if (name.toLowerCase() === 'authorization') return 'Bearer expired-token';
+      return undefined;
+    });
+    (req as any).cookies = { 'n8n-auth': 'live-n8n-token' };
+    (req as any).get = vi.fn(() => undefined);
+    const res = createMockResWithCookies();
+
+    await runProtectedRoute({ uiApi }, 'get', '/whoami', req as any, res as any);
+
+    expect(res.clearCookie).toHaveBeenCalledWith('n8n-auth', expect.anything());
+    expect(res.status).toHaveBeenCalledWith(401);
   });
 });
 
@@ -790,7 +909,8 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
 });
 
 describe('GET /ui-api/projects', () => {
-  it('returns user project tenants from projectTenant service', async () => {
+  it('returns user project tenants from projectTenant service using upstream token (raw mode)', async () => {
+    getUiOidcAccessTokenByEmailMock.mockResolvedValue('stored-upstream-access-token');
     const uiApi = {
       loadUserContext: vi.fn().mockResolvedValue({
         n8nUser: {
@@ -824,7 +944,7 @@ describe('GET /ui-api/projects', () => {
     expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith({
       ssoUserId: 'sub-1',
       n8nUserId: 'user-123',
-      accessToken: 'test-access-token', // pragma: allowlist secret
+      upstreamAccessToken: 'stored-upstream-access-token',
     });
     expect(res.json).toHaveBeenCalledWith({
       data: [
@@ -832,6 +952,112 @@ describe('GET /ui-api/projects', () => {
         { tenantId: '660e8400-e29b-41d4-a716-446655440000', tenantName: 'My Personal Project', projectId: 'def-456' },
       ],
     });
+  });
+
+  it('never forwards the app JWT upstream in separate-token mode (regression)', async () => {
+    // In separate-token mode the bearer is an app JWT (HS256, sid-checked), not the OIDC access token.
+    // The route must resolve the upstream token from the server-side store/session, not the bearer.
+    const appJwt = 'app.jwt.token'; // pragma: allowlist secret
+    const upstreamToken = 'upstream-oidc-access-token'; // pragma: allowlist secret
+    getUiSessionMock.mockResolvedValue({
+      session: {
+        subject: 'sub-1',
+        email: 'person@example.com',
+        issuer: 'https://issuer.example.com',
+        audience: ['app'],
+        claims: {},
+      },
+      upstreamAccessToken: upstreamToken,
+    });
+    getUiOidcAccessTokenByEmailMock.mockResolvedValue(upstreamToken);
+    const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          disabled: false,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        accessibleProjectIds: [],
+        projects: [],
+        workflows: [],
+      }),
+    };
+    const projectTenant = {
+      listUserProjectTenants: vi.fn().mockResolvedValue([]),
+    };
+    const req = createMockRequest({
+      headers: { authorization: `Bearer ${appJwt}` },
+      get: vi.fn((name: string) => {
+        if (name.toLowerCase() === 'authorization') return `Bearer ${appJwt}`;
+        return undefined;
+      }) as any,
+    });
+    const res = createMockResponse();
+
+    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+
+    expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith(
+      expect.objectContaining({ upstreamAccessToken: upstreamToken }),
+    );
+    expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalledWith(
+      expect.objectContaining({ upstreamAccessToken: appJwt }),
+    );
+    expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: appJwt }),
+    );
+  });
+
+  it('uses refreshed upstream token in the same request that triggered refresh', async () => {
+    const refreshedUpstream = 'refreshed-upstream-token'; // pragma: allowlist secret
+    const staleStoreToken = 'stale-upstream-token'; // pragma: allowlist secret
+    // getUiSession already refreshed and provided fresh upstream token (separate-token window refresh)
+    getUiSessionMock.mockResolvedValue({
+      session: {
+        subject: 'sub-1',
+        email: 'person@example.com',
+        issuer: 'https://issuer.example.com',
+        audience: ['app'],
+        claims: {},
+      },
+      refreshedToken: 'new-app-jwt',
+      upstreamAccessToken: refreshedUpstream,
+    });
+    // Even if store still returns stale, the request should use the refreshed value from session result
+    getUiOidcAccessTokenByEmailMock.mockResolvedValue(staleStoreToken);
+    const uiApi = {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser: {
+          id: 'user-123',
+          email: 'person@example.com',
+          disabled: false,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        accessibleProjectIds: [],
+        projects: [],
+        workflows: [],
+      }),
+    };
+    const projectTenant = {
+      listUserProjectTenants: vi.fn().mockResolvedValue([]),
+    };
+    const req = createMockRequest({
+      headers: { authorization: 'Bearer app-near-expiry-jwt' },
+      get: vi.fn((name: string) => {
+        if (name.toLowerCase() === 'authorization') return 'Bearer app-near-expiry-jwt';
+        return undefined;
+      }) as any,
+    });
+    const res = createMockResponse() as any;
+    res.setHeader = vi.fn();
+    res.clearCookie = vi.fn();
+    res.cookie = vi.fn();
+
+    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+
+    expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith(
+      expect.objectContaining({ upstreamAccessToken: refreshedUpstream }),
+    );
   });
 
   it('returns 401 when unauthenticated', async () => {

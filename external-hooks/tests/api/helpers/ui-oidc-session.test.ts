@@ -22,18 +22,22 @@ const {
   getUiSessionIssueIdMock: vi.fn(),
 }));
 
-vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
-  getUiOidcRefreshTokenRecord: getUiOidcRefreshTokenRecordMock,
-  getUiOidcIdToken: getUiOidcIdTokenMock,
-  getUiOidcAccessTokenRecord: getUiOidcAccessTokenRecordMock,
-  setUiOidcRefreshTokenWithExpiry: setUiOidcRefreshTokenWithExpiryMock,
-  setUiOidcIdToken: setUiOidcIdTokenMock,
-  setUiOidcAccessTokenRecord: setUiOidcAccessTokenRecordMock,
-  deleteUiTenantRoles: deleteUiTenantRolesMock,
-  deleteUiTenantGroups: deleteUiTenantGroupsMock,
-  getUiSessionIssueId: getUiSessionIssueIdMock,
-  setUiSessionIssueId: vi.fn(),
-}));
+vi.mock('../../../src/api/helpers/ui-oidc-store', async () => {
+  const actual = (await vi.importActual('../../../src/api/helpers/ui-oidc-store')) as Record<string, unknown>;
+  return {
+    ...(actual as object),
+    getUiOidcRefreshTokenRecord: getUiOidcRefreshTokenRecordMock,
+    getUiOidcIdToken: getUiOidcIdTokenMock,
+    getUiOidcAccessTokenRecord: getUiOidcAccessTokenRecordMock,
+    setUiOidcRefreshTokenWithExpiry: setUiOidcRefreshTokenWithExpiryMock,
+    setUiOidcIdToken: setUiOidcIdTokenMock,
+    setUiOidcAccessTokenRecord: setUiOidcAccessTokenRecordMock,
+    deleteUiTenantRoles: deleteUiTenantRolesMock,
+    deleteUiTenantGroups: deleteUiTenantGroupsMock,
+    getUiSessionIssueId: getUiSessionIssueIdMock,
+    setUiSessionIssueId: vi.fn(),
+  };
+});
 
 const { refreshOidcTokensMock, fetchOidcDiscoveryDocumentMock, fetchOidcUserInfoMock, extractOidcIdentityMock } =
   vi.hoisted(() => ({
