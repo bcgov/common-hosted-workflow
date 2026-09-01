@@ -3,7 +3,7 @@ import { StrictMode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { resolveContinuationUrl, SessionBootstrap } from '../src/auth/session-bootstrap';
+import { SessionBootstrap } from '../src/auth/session-bootstrap';
 import { APP_AUTH_TOKEN_STORAGE_KEY } from '../src/services/backend/axios';
 import { sessionState } from '../src/state/session';
 
@@ -194,7 +194,7 @@ describe('SessionBootstrap', () => {
     expect(url.hash).toBe('#h');
   });
 
-  it('valid continuation occurs only after successful exchange and navigates to local target', async () => {
+  it('cleans a continuation marker after successful exchange without navigating', async () => {
     exchangeSessionMock.mockResolvedValue({ token: 'tok-2' });
     getSessionMock.mockResolvedValue({
       authenticated: true,
@@ -242,12 +242,9 @@ describe('SessionBootstrap', () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => {
-      expect(exchangeSessionMock).toHaveBeenCalledWith('handle-1');
-    });
-    await waitFor(() => {
-      expect(replaceSpy).toHaveBeenCalledWith('/ui/projects?filter=active#top');
-    });
+    await waitFor(() => expect(exchangeSessionMock).toHaveBeenCalledWith('handle-1'));
+    expect(replaceSpy).not.toHaveBeenCalled();
+    expect(new URL(locationStub.href).searchParams.get('continue')).toBeNull();
   });
 
   it('does not navigate to rejected continuation target and cleans it', async () => {
@@ -322,28 +319,5 @@ describe('SessionBootstrap', () => {
       expect(url.hash).toBe('#hash');
     });
     expect(exchangeSessionMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('resolveContinuationUrl', () => {
-  const origin = 'https://ui.example.com';
-
-  it.each([
-    ['missing value', null],
-    ['authority-relative path', '//evil.test'],
-    ['backslash network path', '/\\evil.test/path'],
-    ['foreign origin', 'https://evil.test/ui'],
-    ['same-origin absolute URL', 'https://ui.example.com/ui/settings'],
-    ['non-http scheme', 'javascript:alert(1)'],
-    ['unparseable URL', 'https://'],
-  ])('rejects a %s', (_label, value) => {
-    expect(resolveContinuationUrl(value, origin)).toBeNull();
-  });
-
-  it.each([
-    ['local path', '/ui/projects', '/ui/projects'],
-    ['local path with query and fragment', '/ui/projects?filter=active#top', '/ui/projects?filter=active#top'],
-  ])('allows a %s', (_label, value, expected) => {
-    expect(resolveContinuationUrl(value, origin)).toBe(expected);
   });
 });

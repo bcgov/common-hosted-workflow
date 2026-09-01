@@ -134,7 +134,7 @@ export async function resolveNextRoleInternal(params: ResolveNextRoleParams): Pr
 
 // ---------------------------------------------------------------------------
 // Persist tokens – extracted for injection/cleanup
-// Guaranteed atomicity scope (AUTH-04):
+// Guaranteed atomicity scope ():
 // - Failed login NEVER leaves a newly consumable exchange handle
 //   (prepareUiSessionExchange failure or n8n-token failure cleans handle)
 // - Failed login NEVER leaves a newly usable UI bearer that wasn't already
@@ -202,7 +202,7 @@ export async function persistOidcTokensDefault(
 
 // ---------------------------------------------------------------------------
 // Prepare UI exchange – atomic UI session handle (single-use)
-// Guarantees (AUTH-04): no failed login leaves a consumable handle.
+// Guarantees (): no failed login leaves a consumable handle.
 // sid mutation is compensated so prior session is preserved when it
 // existed (see coordinator handleCallback for priorSid restore) or
 // revoked (new sid deleted) when this is a first login. Cleanup is
@@ -291,8 +291,26 @@ export type OidcLoginFailureOutcome = {
 
 export type OidcLoginOutcome = OidcLoginEligibleOutcome | OidcLoginAccessRequestOutcome | OidcLoginFailureOutcome;
 
-export function isFailureOutcome(o: OidcLoginOutcome): o is OidcLoginFailureOutcome {
-  return o.kind === 'failure';
+type OidcAuthorizationCompletion = Awaited<ReturnType<typeof completeOidcAuthorization>>;
+
+type AuthenticatedOidcIdentity = ReturnType<typeof extractOidcIdentity> & { email: string };
+
+type AuthenticatedLogin = {
+  completion: OidcAuthorizationCompletion;
+  identity: AuthenticatedOidcIdentity;
+  oidcIdentity: UiOidcIdentity;
+  accessTokenExpiresAt: number | undefined;
+};
+
+type RoleResolution = {
+  jwtRole: string | null;
+  cstarSsoUserId: string;
+  nextRole: string;
+  eligibilityTenants: import('../types/cstar').CstarTenant[] | undefined;
+};
+
+export function isFailureOutcome<T>(result: T | OidcLoginFailureOutcome): result is OidcLoginFailureOutcome {
+  return typeof result === 'object' && result !== null && 'kind' in result && result.kind === 'failure';
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +338,7 @@ export type OidcLoginCoordinatorDeps = {
   createAuthTokenFn?: typeof createAuthToken;
   // Cleanup for atomicity: if UI handle created but n8n token fails, delete exchange
   consumeExchange?: typeof consumeUiSessionExchange;
-  // Atomic helpers for compensating sid cleanup (AUTH-04)
+  // Atomic helpers for compensating sid cleanup ()
   getSessionIssueId?: typeof getUiSessionIssueId;
   setSessionIssueId?: typeof setUiSessionIssueId;
   deleteSessionIssueId?: typeof deleteUiSessionIssueId;
@@ -355,38 +373,40 @@ const ALLOWED_PUBLIC_ERROR_MESSAGES: readonly string[] = [
   'Missing or invalid nonce - session expired',
 ];
 
+const INVALID_ISSUER_MESSAGES = new Set([
+  'OIDC discovery issuer mismatch',
+  'OIDC issuer is required in manual endpoint mode',
+  'OIDC issuer is not configured',
+]);
+
+function formatAllowedPublicMessage(message: string): string {
+  if (INVALID_ISSUER_MESSAGES.has(message)) return 'Authentication failed: Invalid issuer';
+
+  if (message.startsWith('Missing') || message.startsWith('Invalid state')) return message;
+
+  return message.includes('Authentication failed') ? message : 'Authentication failed: ' + message;
+}
+
+function isIssuerConfigurationError(message: string): boolean {
+  return (
+    message.includes('OIDC discovery issuer mismatch') ||
+    /discovery issuer mismatch/i.test(message) ||
+    /OIDC issuer is required/i.test(message) ||
+    /OIDC issuer is not configured/i.test(message)
+  );
+}
+
 function toPublicMessage(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
   // Map known stable messages to a sanitized allowlist; never expose raw provider
   // descriptions, token details, URLs with secrets, or infrastructure stack traces.
   // Detailed cause is already logged server-side via logError at the call site.
-  for (const allowed of ALLOWED_PUBLIC_ERROR_MESSAGES) {
-    if (msg.includes(allowed)) {
-      // Return the canonical allowlist entry, not the raw message, to avoid leaking
-      // surrounding hostile text (e.g., "<script>", long error_description with secrets).
-      // For generic "Invalid issuer" etc., return a stable public code.
-      if (
-        allowed === 'OIDC discovery issuer mismatch' ||
-        allowed === 'OIDC issuer is required in manual endpoint mode' ||
-        allowed === 'OIDC issuer is not configured'
-      ) {
-        return 'Authentication failed: Invalid issuer';
-      }
-      if (
-        allowed.startsWith('Missing') ||
-        allowed.startsWith('Invalid state') ||
-        allowed.startsWith('Missing or invalid')
-      ) {
-        return allowed;
-      }
-      return allowed.includes('Authentication failed') ? allowed : 'Authentication failed: ' + allowed;
-    }
-  }
+  const allowed = ALLOWED_PUBLIC_ERROR_MESSAGES.find((message) => msg.includes(message));
+  if (allowed) return formatAllowedPublicMessage(allowed);
+
   // Explicit generic fallbacks for infrastructure/provider failures that must not leak
-  if (msg.includes('OIDC discovery issuer mismatch')) return 'Authentication failed: Invalid issuer';
-  if (/discovery issuer mismatch/i.test(msg)) return 'Authentication failed: Invalid issuer';
-  if (/OIDC issuer is required/i.test(msg) || /OIDC issuer is not configured/i.test(msg))
-    return 'Authentication failed: Invalid issuer';
+  if (isIssuerConfigurationError(msg)) return 'Authentication failed: Invalid issuer';
+
   // Unknown provider, Redis, database, coding errors -> stable generic public response
   return 'Authentication failed';
 }
@@ -416,37 +436,45 @@ export class OidcLoginCoordinator {
   }
 
   async handleCallback(input: OidcLoginInput): Promise<OidcLoginOutcome> {
-    const {
-      config,
-      returnTargetPolicy,
-      userRepository,
-      projectRepository,
-      tenantProjectRelationRepository,
-      jwtService,
-      userService,
-      tenantProjectSyncService,
-      cstarService,
-      completeAuthorization,
-      extractIdentity,
-      resolveCstarSsoUserId: resolveSso,
-      resolveNextRole: resolveRole,
-      persistTokens,
-      prepareExchange,
-      ensureTenantMapping,
-      createAuthTokenFn,
-      logger,
-    } = this.deps;
+    const authenticated = await this.authenticate(input);
+    if (isFailureOutcome(authenticated)) return authenticated;
 
-    const { code, statePayload, noncePayload } = input;
+    const role = await this.resolveRole(authenticated);
+    if (isFailureOutcome(role)) return role;
 
-    let completion: Awaited<ReturnType<typeof completeOidcAuthorization>>;
+    let user = await this.findUser(authenticated.identity.email);
+    if (isFailureOutcome(user)) return user;
+
+    if (!user && !role.nextRole) {
+      this.deps.logger.info('No OIDC role for new user, redirecting to access request page without creating n8n user', {
+        email: authenticated.identity.email,
+      });
+      return this.createAccessRequest(authenticated, 'new ineligible');
+    }
+
+    if (!user) {
+      user = await this.provisionUser(authenticated, role.nextRole);
+      if (isFailureOutcome(user)) return user;
+    }
+
+    const userUpdate = await this.syncAndUpdateUser(user, role.nextRole, authenticated.identity.email);
+    if (isFailureOutcome(userUpdate)) return userUpdate;
+    if (!role.nextRole) return this.createAccessRequest(authenticated, 'existing ineligible');
+
+    await this.runPostLoginWork(authenticated, role, user);
+    return this.createEligibleSession(authenticated, user, input.statePayload);
+  }
+
+  private async authenticate(input: OidcLoginInput): Promise<AuthenticatedLogin | OidcLoginFailureOutcome> {
+    const { config, completeAuthorization, extractIdentity, persistTokens, logger } = this.deps;
+    let completion: OidcAuthorizationCompletion;
     try {
       completion = await completeAuthorization({
-        code,
+        code: input.code,
         storedState: {
-          nonce: noncePayload.nonce!,
-          codeVerifier: statePayload?.codeVerifier,
-          redirectUri: statePayload?.redirectUri || config.redirectUri,
+          nonce: input.noncePayload.nonce!,
+          codeVerifier: input.statePayload?.codeVerifier,
+          redirectUri: input.statePayload?.redirectUri || config.redirectUri,
         },
         config,
       });
@@ -457,220 +485,199 @@ export class OidcLoginCoordinator {
 
     let identity: ReturnType<typeof extractIdentity>;
     try {
-      identity = extractIdentity({
-        claims: completion.mergedClaims,
-        discovery: completion.discovery,
-        config,
-      });
+      identity = extractIdentity({ claims: completion.mergedClaims, discovery: completion.discovery, config });
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - extract identity' });
       return { kind: 'failure', publicMessage: toPublicMessage(error) };
     }
-
-    if (!identity.email || !isValidEmail(identity.email)) {
+    if (!identity.email || !isValidEmail(identity.email))
       return { kind: 'failure', publicMessage: 'No valid email in OIDC response' };
-    }
-
-    const oidcIdentity: UiOidcIdentity = {
-      subject: identity.subject || identity.email,
-      email: identity.email,
-      preferredUsername: identity.preferredUsername,
-      name: identity.name,
-      issuer: completion.discovery.issuer || config.issuerUrl,
-      audience: [config.clientId],
-      claims: identity.claims,
-    };
 
     const accessTokenExpiresAt = resolveAccessTokenExpiresAt(completion.tokens.expires_in);
-
     try {
       await persistTokens(identity.email, completion.tokens, accessTokenExpiresAt);
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - persist tokens' });
       return { kind: 'failure', publicMessage: 'Authentication failed' };
     }
+    return {
+      completion,
+      identity: identity as AuthenticatedOidcIdentity,
+      accessTokenExpiresAt,
+      oidcIdentity: {
+        subject: identity.subject || identity.email,
+        email: identity.email,
+        preferredUsername: identity.preferredUsername,
+        name: identity.name,
+        issuer: completion.discovery.issuer || config.issuerUrl,
+        audience: [config.clientId],
+        claims: identity.claims,
+      },
+    };
+  }
 
-    const jwtRole = parseN8nOidcRole(identity.claims[config.rolesClaim]);
-    const cstarSsoUserId = resolveSso(identity.claims, identity.subject, identity.email);
-    let nextRole: string;
-    let eligibilityTenants: import('../types/cstar').CstarTenant[] | undefined;
+  private async resolveRole(login: AuthenticatedLogin): Promise<RoleResolution | OidcLoginFailureOutcome> {
+    const { config, cstarService, resolveCstarSsoUserId, resolveNextRole, logger } = this.deps;
+    const jwtRole = parseN8nOidcRole(login.identity.claims[config.rolesClaim]);
+    const cstarSsoUserId = resolveCstarSsoUserId(login.identity.claims, login.identity.subject, login.identity.email);
+    const eligibilityTenants = await this.fetchEligibilityTenants(login, jwtRole, cstarSsoUserId);
+    if (isFailureOutcome(eligibilityTenants)) return eligibilityTenants;
     try {
-      // Reuse CSTAR tenants fetch between eligibility check and post-login work
-      // to avoid repeated getUserTenants calls in the same login (see post-login-tenant.ts).
-      // When restrictNoRole + missing jwtRole requires CSTAR, pre-fetch strictly once and
-      // pass through to resolver; otherwise resolver handles its own early returns without CSTAR.
-      const needsCstarForEligibility =
-        config.restrictNoRole && !jwtRole && !!completion.tokens.access_token && cstarService.isConfigured();
-      if (needsCstarForEligibility) {
-        try {
-          eligibilityTenants = await cstarService.getUserTenantsStrict({
-            ssoUserId: cstarSsoUserId,
-            accessToken: completion.tokens.access_token!,
-          });
-        } catch (error) {
-          logError(logger, error, { context: 'OIDC callback - resolve role (tenants fetch)' });
-          const msg = error instanceof Error ? error.message : String(error);
-          // Strict variant already throws stable message; preserve it
-          const stable = msg.includes('Unable to verify CSTAR')
-            ? msg
-            : 'Unable to verify CSTAR tenant roles during sign-in';
-          return { kind: 'failure', publicMessage: stable };
-        }
-        nextRole = await resolveRole({
-          jwtRole,
-          restrictNoRole: config.restrictNoRole,
-          cstarService,
-          ssoUserId: cstarSsoUserId,
-          accessToken: completion.tokens.access_token,
-          tenants: eligibilityTenants,
-        });
-      } else {
-        nextRole = await resolveRole({
-          jwtRole,
-          restrictNoRole: config.restrictNoRole,
-          cstarService,
-          ssoUserId: cstarSsoUserId,
-          accessToken: completion.tokens.access_token,
-        });
-      }
+      const nextRole = await resolveNextRole({
+        jwtRole,
+        restrictNoRole: config.restrictNoRole,
+        cstarService,
+        ssoUserId: cstarSsoUserId,
+        accessToken: login.completion.tokens.access_token,
+        tenants: eligibilityTenants,
+      });
+      return { jwtRole, cstarSsoUserId, nextRole, eligibilityTenants };
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - resolve role' });
-      const msg = error instanceof Error ? error.message : String(error);
-      // Preserve known stable message for CSTAR verification failure
-      if (msg.includes('Unable to verify CSTAR')) {
-        return { kind: 'failure', publicMessage: msg };
-      }
-      return { kind: 'failure', publicMessage: toPublicMessage(error) };
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        kind: 'failure',
+        publicMessage: message.includes('Unable to verify CSTAR') ? message : toPublicMessage(error),
+      };
     }
+  }
 
-    // --- New user path (authoritative eligibility check) ---
-    // eslint-disable-next-line
-    let user: N8nUser | null = null;
+  private async fetchEligibilityTenants(
+    login: AuthenticatedLogin,
+    jwtRole: string | null,
+    cstarSsoUserId: string,
+  ): Promise<import('../types/cstar').CstarTenant[] | undefined | OidcLoginFailureOutcome> {
+    const { config, cstarService, logger } = this.deps;
+    const accessToken = login.completion.tokens.access_token;
+    if (!config.restrictNoRole || jwtRole || !accessToken || !cstarService.isConfigured()) return undefined;
     try {
-      user = (await userRepository.findByEmail(identity.email, ['role'])) as N8nUser | null;
+      return await cstarService.getUserTenantsStrict({ ssoUserId: cstarSsoUserId, accessToken });
     } catch (error) {
-      logError(logger, error, { context: 'OIDC callback - find user' });
+      logError(logger, error, { context: 'OIDC callback - resolve role (tenants fetch)' });
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        kind: 'failure',
+        publicMessage: message.includes('Unable to verify CSTAR')
+          ? message
+          : 'Unable to verify CSTAR tenant roles during sign-in',
+      };
+    }
+  }
+
+  private async findUser(email: string): Promise<N8nUser | null | OidcLoginFailureOutcome> {
+    try {
+      return (await this.deps.userRepository.findByEmail(email, ['role'])) as N8nUser | null;
+    } catch (error) {
+      logError(this.deps.logger, error, { context: 'OIDC callback - find user' });
       return { kind: 'failure', publicMessage: 'Authentication failed' };
     }
+  }
 
-    if (!user) {
-      if (!nextRole) {
-        // Ineligible new user – UI-only session (access-request)
-        logger.info('No OIDC role for new user, redirecting to access request page without creating n8n user', {
-          email: identity.email,
-        });
-        try {
-          const { handle, token } = await prepareExchange(
-            oidcIdentity,
-            completion.tokens.access_token,
-            accessTokenExpiresAt,
-          );
-          const redirectUrl = appendSessionToReturnTo(buildUiAppUrl('/access-request'), handle);
-          return { kind: 'access-request', uiHandle: handle, uiToken: token, redirectUrl };
-        } catch (error) {
-          logError(logger, error, { context: 'OIDC callback - prepare UI exchange (new ineligible)' });
-          return { kind: 'failure', publicMessage: toPublicMessage(error) };
-        }
-      }
+  private async provisionUser(login: AuthenticatedLogin, nextRole: string): Promise<N8nUser | OidcLoginFailureOutcome> {
+    const { userRepository, logger } = this.deps;
+    let resolvedRole: string;
+    try {
+      resolvedRole = (await userRepository.count()) === 0 ? 'global:owner' : nextRole;
+    } catch (error) {
+      logError(logger, error, { context: 'OIDC callback - count users' });
+      return { kind: 'failure', publicMessage: 'Authentication failed' };
+    }
+    if (!resolvedRole) return { kind: 'failure', publicMessage: 'Failed to create or find user' };
 
-      // Eligible new user – provisioning
-      let resolvedRole: string;
-      try {
-        const userCount = await userRepository.count();
-        resolvedRole = userCount === 0 ? 'global:owner' : nextRole;
-      } catch (error) {
-        logError(logger, error, { context: 'OIDC callback - count users' });
-        return { kind: 'failure', publicMessage: 'Authentication failed' };
-      }
-
-      if (!resolvedRole) {
-        return { kind: 'failure', publicMessage: 'Failed to create or find user' };
-      }
-
-      const givenName = typeof identity.claims.given_name === 'string' ? identity.claims.given_name : undefined;
-      const familyName = typeof identity.claims.family_name === 'string' ? identity.claims.family_name : undefined;
-
-      const userData = {
+    const { identity } = login;
+    const givenName = typeof identity.claims.given_name === 'string' ? identity.claims.given_name : undefined;
+    const familyName = typeof identity.claims.family_name === 'string' ? identity.claims.family_name : undefined;
+    try {
+      const result = await userRepository.createUserWithProject({
         email: identity.email,
         firstName: givenName || identity.name?.split(' ')[0] || 'User',
         lastName: familyName || identity.name?.split(' ').slice(1).join(' ') || '',
         password: crypto.randomBytes(32).toString('hex'),
         disabled: !nextRole,
         role: { slug: resolvedRole },
+      } as any);
+      const user = result.user as N8nUser;
+      logger.info('Created user with personal project', {
+        role: resolvedRole,
+        disabled: !nextRole,
+        email: identity.email,
+      });
+      return user || { kind: 'failure', publicMessage: 'Failed to create or find user' };
+    } catch (error) {
+      logError(logger, error, { context: 'OIDC callback - create user' });
+      return { kind: 'failure', publicMessage: 'Authentication failed' };
+    }
+  }
+
+  private async syncAndUpdateUser(
+    user: N8nUser,
+    nextRole: string,
+    email: string,
+  ): Promise<void | OidcLoginFailureOutcome> {
+    const { userRepository, userService, logger } = this.deps;
+    try {
+      await syncN8nUserRole({ user, nextRole, userRepository, userService });
+    } catch (error) {
+      logError(logger, error, { context: 'OIDC callback - sync role' });
+      return { kind: 'failure', publicMessage: 'Authentication failed' };
+    }
+    if (!nextRole) return this.setUserDisabled(user, true, email);
+    if ((user as any).disabled) return this.setUserDisabled(user, false, email);
+  }
+
+  private async setUserDisabled(
+    user: N8nUser,
+    disabled: boolean,
+    email: string,
+  ): Promise<void | OidcLoginFailureOutcome> {
+    try {
+      await this.deps.userRepository.setUserDisabled(user.id, disabled);
+      user.disabled = disabled;
+      this.deps.logger.info(
+        disabled
+          ? 'User disabled, redirecting to access request page'
+          : 'User re-enabled after receiving a valid OIDC role',
+        { email },
+      );
+    } catch (error) {
+      logError(this.deps.logger, error, {
+        context: disabled ? 'OIDC callback - disable user' : 'OIDC callback - re-enable user',
+      });
+      return { kind: 'failure', publicMessage: 'Authentication failed' };
+    }
+  }
+
+  private async createAccessRequest(
+    login: AuthenticatedLogin,
+    userKind: 'new ineligible' | 'existing ineligible',
+  ): Promise<OidcLoginAccessRequestOutcome | OidcLoginFailureOutcome> {
+    try {
+      const { handle, token } = await this.deps.prepareExchange(
+        login.oidcIdentity,
+        login.completion.tokens.access_token,
+        login.accessTokenExpiresAt,
+      );
+      return {
+        kind: 'access-request',
+        uiHandle: handle,
+        uiToken: token,
+        redirectUrl: appendSessionToReturnTo(buildUiAppUrl('/access-request'), handle),
       };
-
-      try {
-        const result = await userRepository.createUserWithProject(userData as any);
-        user = result.user as N8nUser;
-        logger.info('Created user with personal project', {
-          role: resolvedRole,
-          disabled: !nextRole,
-          email: identity.email,
-        });
-      } catch (error) {
-        logError(logger, error, { context: 'OIDC callback - create user' });
-        return { kind: 'failure', publicMessage: 'Authentication failed' };
-      }
-
-      if (!user) {
-        return { kind: 'failure', publicMessage: 'Failed to create or find user' };
-      }
+    } catch (error) {
+      logError(this.deps.logger, error, { context: `OIDC callback - prepare UI exchange (${userKind})` });
+      return { kind: 'failure', publicMessage: toPublicMessage(error) };
     }
+  }
 
-    // --- Existing user: role sync with last-owner protection ---
-    if (user) {
-      try {
-        await syncN8nUserRole({ user, nextRole, userRepository, userService });
-        // Refresh currentRole after sync? sync may have changed DB but user object still holds old role.
-        // For decision below we use nextRole directly, not currentRole.
-      } catch (error) {
-        logError(logger, error, { context: 'OIDC callback - sync role' });
-        return { kind: 'failure', publicMessage: 'Authentication failed' };
-      }
-    }
-
-    if (!user) {
-      return { kind: 'failure', publicMessage: 'Failed to create or find user' };
-    }
-
-    // --- Ineligible existing user – disable and UI-only ---
-    if (!nextRole) {
-      try {
-        await userRepository.setUserDisabled(user.id, true);
-      } catch (error) {
-        logError(logger, error, { context: 'OIDC callback - disable user' });
-        return { kind: 'failure', publicMessage: 'Authentication failed' };
-      }
-      user.disabled = true;
-      logger.info('User disabled, redirecting to access request page', { email: identity.email });
-
-      try {
-        const { handle, token } = await prepareExchange(
-          oidcIdentity,
-          completion.tokens.access_token,
-          accessTokenExpiresAt,
-        );
-        const redirectUrl = appendSessionToReturnTo(buildUiAppUrl('/access-request'), handle);
-        return { kind: 'access-request', uiHandle: handle, uiToken: token, redirectUrl };
-      } catch (error) {
-        logError(logger, error, { context: 'OIDC callback - prepare UI exchange (existing ineligible)' });
-        return { kind: 'failure', publicMessage: toPublicMessage(error) };
-      }
-    }
-
-    // --- Re-enable if previously disabled ---
-    if ((user as any).disabled) {
-      try {
-        await userRepository.setUserDisabled(user.id, false);
-      } catch (error) {
-        logError(logger, error, { context: 'OIDC callback - re-enable user' });
-        return { kind: 'failure', publicMessage: 'Authentication failed' };
-      }
-      (user as any).disabled = false;
-      logger.info('User re-enabled after receiving a valid OIDC role', { email: identity.email });
-    }
-
-    // --- Post-login: ensure tenant mapping (non-fatal) ---
+  private async runPostLoginWork(login: AuthenticatedLogin, role: RoleResolution, user: N8nUser): Promise<void> {
+    const {
+      ensureTenantMapping,
+      projectRepository,
+      tenantProjectRelationRepository,
+      tenantProjectSyncService,
+      cstarService,
+      logger,
+    } = this.deps;
     try {
       await ensureTenantMapping({
         userId: user.id,
@@ -679,118 +686,101 @@ export class OidcLoginCoordinator {
         reason: 'oidc-login',
       });
     } catch (error) {
-      // Logged inside ensurePersonalProjectTenantMapping, but keep warning here
       logError(logger, error, { context: 'OIDC callback - ensure tenant mapping' });
     }
 
-    // --- Post-login: unified tenant pre-warm + tenant-project sync ---
-    // Single operation for eligible users only. Access-request-only users
-    // intentionally do NOT pre-warm tenant caches (they have no n8n project
-    // membership; first UI session will fetch on demand if needed). This
-    // boundary is tested in coordinator tests.
-    // Missing access_token is a no-op (logged, not failed) — login still
-    // succeeds but tenant work is skipped.
-    // Failures are non-blocking: logged with consistent shape, never
-    // throw, preserving the documented login-success contract.
-    // CSTAR tenants are fetched once and reused for both pre-warm and sync
-    // to avoid repeated requests during the same login (see post-login-tenant.ts).
-    const postLoginAccessToken = completion.tokens.access_token;
-    const depsAny = this.deps as unknown as { tenantService?: import('./tenant.service').TenantService };
-    if (depsAny.tenantService && this.deps.runPostLoginWork && postLoginAccessToken) {
-      // Fire-and-forget with consistent error logging inside helper (allSettled)
-      // Reuse eligibility tenants when available to avoid a duplicate CSTAR fetch
+    const accessToken = login.completion.tokens.access_token;
+    const tenantService = this.deps.tenantService;
+    if (!accessToken) {
+      logger.debug('Post-login tenant work skipped: no access token', { email: login.identity.email });
+      return;
+    }
+    if (tenantService) {
       void this.deps
         .runPostLoginWork({
-          email: identity.email,
-          ssoUserId: cstarSsoUserId,
-          accessToken: postLoginAccessToken,
+          email: login.identity.email,
+          ssoUserId: role.cstarSsoUserId,
+          accessToken,
           n8nUserId: user.id,
-          tenantService: depsAny.tenantService,
+          tenantService,
           tenantProjectSyncService,
           cstarService,
-          tenants: eligibilityTenants,
+          tenants: role.eligibilityTenants,
         })
-        .catch((err: unknown) => {
-          // Defensive: runPostLoginWork already logs via allSettled, but keep outer catch for unexpected throw
-          logger.error('Tenant post-login work failed', { email: identity.email, error: String(err) });
-        });
-    } else if (postLoginAccessToken) {
-      // Fallback when tenantService not injected (e.g., legacy tests) — preserve old sync-only behavior
-      tenantProjectSyncService
-        .syncTenantsForUser({
-          ssoUserId: cstarSsoUserId,
-          n8nUserId: user.id,
-          accessToken: postLoginAccessToken,
-        })
-        .catch((err: unknown) => {
-          logger.error('Tenant project sync failed', { email: identity.email, error: String(err) });
-        });
-    } else {
-      logger.debug('Post-login tenant work skipped: no access token', { email: identity.email });
+        .catch((error: unknown) =>
+          logger.error('Tenant post-login work failed', { email: login.identity.email, error: String(error) }),
+        );
+      return;
     }
+    void tenantProjectSyncService
+      .syncTenantsForUser({ ssoUserId: role.cstarSsoUserId, n8nUserId: user.id, accessToken })
+      .catch((error: unknown) =>
+        logger.error('Tenant project sync failed', { email: login.identity.email, error: String(error) }),
+      );
+  }
 
-    // --- Session atomicity: prepare UI exchange BEFORE issuing n8n-auth ---
-    // AUTH-04: capture prior sid so failure after sid mutation can restore
-    // the previous session (preserving it when it existed) or delete the
-    // new sid when this is a first login. No failed login leaves a
-    // newly consumable handle; prior session outcome is explicit and tested.
-    let priorSidForEligible: string | null;
+  private async createEligibleSession(
+    login: AuthenticatedLogin,
+    user: N8nUser,
+    statePayload: N8nOidcStateCookiePayload,
+  ): Promise<OidcLoginEligibleOutcome | OidcLoginFailureOutcome> {
+    const { prepareExchange, createAuthTokenFn, jwtService, returnTargetPolicy, logger } = this.deps;
+    const priorSid = await this.getPriorSessionIssueId(login.oidcIdentity.email);
+    let exchange: { handle: string; token: string };
     try {
-      priorSidForEligible = await this.deps.getSessionIssueId(oidcIdentity.email);
-    } catch {
-      priorSidForEligible = null;
-    }
-    let uiHandle: string;
-    let uiToken: string;
-    try {
-      const res = await prepareExchange(oidcIdentity, completion.tokens.access_token, accessTokenExpiresAt);
-      uiHandle = res.handle;
-      uiToken = res.token;
+      exchange = await prepareExchange(
+        login.oidcIdentity,
+        login.completion.tokens.access_token,
+        login.accessTokenExpiresAt,
+      );
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - prepare UI exchange (eligible)' });
-      // prepareUiSessionExchange already attempted compensating sid restore/delete
-      // for its own setExchange failure; ensure idempotency if prior sid capture
-      // differs (best-effort, preserve original error).
       return { kind: 'failure', publicMessage: toPublicMessage(error) };
     }
-
-    let n8nAuthToken: string;
     try {
-      n8nAuthToken = createAuthTokenFn(user as any, jwtService);
+      const n8nAuthToken = createAuthTokenFn(user as any, jwtService);
+      const returnTo =
+        resolveReturnTarget(statePayload?.returnTo, 'login', returnTargetPolicy) ||
+        appendQueryParam(buildUiAppUrl('/'), 'continue', '/');
+      return {
+        kind: 'eligible',
+        user,
+        n8nAuthToken,
+        uiHandle: exchange.handle,
+        uiToken: exchange.token,
+        redirectUrl: appendSessionToReturnTo(returnTo, exchange.handle),
+      };
     } catch (error) {
       logError(logger, error, { context: 'OIDC callback - create n8n auth token' });
-      // Compensating cleanup: delete the newly created exchange handle and
-      // restore/delete sid so no consumable handle remains and prior session
-      // is either preserved (if existed) or revoked (if first login).
-      // Both DELs are idempotent; preserve original error even if cleanup fails.
-      try {
-        await this.deps.consumeExchange(uiHandle);
-      } catch {
-        try {
-          await this.deps.deleteSessionExchange(uiHandle);
-        } catch {
-          // ignore – original error is authoritative
-        }
-      }
-      try {
-        if (priorSidForEligible) {
-          await this.deps.setSessionIssueId(oidcIdentity.email, priorSidForEligible);
-        } else {
-          await this.deps.deleteSessionIssueId(oidcIdentity.email);
-        }
-      } catch {
-        // ignore cleanup failure – original error preserved
-      }
+      await this.cleanupFailedEligibleSession(exchange.handle, login.oidcIdentity.email, priorSid);
       return { kind: 'failure', publicMessage: 'Authentication failed' };
     }
+  }
 
-    const returnTo =
-      resolveReturnTarget(statePayload?.returnTo, 'login', returnTargetPolicy) ||
-      appendQueryParam(buildUiAppUrl('/'), 'continue', '/');
+  private async getPriorSessionIssueId(email: string): Promise<string | null> {
+    try {
+      return await this.deps.getSessionIssueId(email);
+    } catch {
+      return null;
+    }
+  }
 
-    const redirectUrl = appendSessionToReturnTo(returnTo, uiHandle);
-
-    return { kind: 'eligible', user, n8nAuthToken, uiHandle, uiToken, redirectUrl };
+  private async cleanupFailedEligibleSession(handle: string, email: string, priorSid: string | null): Promise<void> {
+    try {
+      await this.deps.consumeExchange(handle);
+    } catch {
+      try {
+        await this.deps.deleteSessionExchange(handle);
+      } catch {
+        // Preserve the original token-creation failure.
+      }
+    }
+    try {
+      if (priorSid) await this.deps.setSessionIssueId(email, priorSid);
+      else await this.deps.deleteSessionIssueId(email);
+    } catch {
+      // Preserve the original token-creation failure.
+    }
   }
 }
 

@@ -598,7 +598,7 @@ describe('prepareUiSessionExchange', () => {
   });
 });
 
-describe('AUTH-04 atomic issuance and revocation semantics', () => {
+describe('atomic issuance and revocation semantics', () => {
   it('no failed eligible login leaves a consumable exchange handle (createAuthToken failure cleans handle and sid)', async () => {
     const priorSid = 'prior-sid-123';
     const getSessionIssueId = vi.fn(async () => priorSid);
@@ -835,7 +835,7 @@ describe('AUTH-04 atomic issuance and revocation semantics', () => {
   });
 
   it('delete helpers are idempotent (DEL of missing key is no-op in fake and real Redis)', async () => {
-    // Contract note (AUTH-04): DEL is idempotent in real Redis (deleting a missing
+    // Contract note: DEL is idempotent in real Redis (deleting a missing
     // key returns 0, not an error) and the store's compensating cleanup relies on
     // this. The fake's Map-based DEL models this accurately; this test verifies
     // the coordinator's cleanup path treats DEL as no-op via injected mocks

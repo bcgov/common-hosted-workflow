@@ -59,27 +59,6 @@ function consumeSignedOutMarker() {
   return true;
 }
 
-export function resolveContinuationUrl(continueTo: string | null, origin: string): string | null {
-  if (!continueTo) return null;
-
-  // Continuations are application-relative paths only, never URLs supplied by
-  // a caller. This keeps the redirect target within this UI application.
-  if (!continueTo.startsWith('/') || continueTo.startsWith('//') || continueTo.includes('\\')) return null;
-
-  try {
-    const resolved = new URL(continueTo, origin);
-    if (resolved.origin !== origin) return null;
-    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
-  } catch {
-    return null;
-  }
-}
-
-function getContinueUrl() {
-  const url = new URL(globalThis.location.href);
-  return resolveContinuationUrl(url.searchParams.get('continue'), url.origin);
-}
-
 export function clearSessionHandleFromUrl() {
   // Backwards-compatible helper: delegate to full security cleanup so
   // session, continue, signedOut and logout are removed together while
@@ -102,6 +81,21 @@ function exchangeSessionOnce(sessionHandle: string) {
   return request;
 }
 
+async function exchangeAndStoreSession(sessionHandle: string, isCancelled: () => boolean) {
+  try {
+    const result = await exchangeSessionOnce(sessionHandle);
+    if (!isCancelled()) {
+      setStoredAppToken(result.token);
+      clearSecurityParamsFromUrl();
+    }
+  } catch {
+    if (!isCancelled()) {
+      clearStoredAppToken();
+      clearSecurityParamsFromUrl();
+    }
+  }
+}
+
 export function SessionBootstrap({ children }: { children: ReactNode }) {
   const [isTokenReady, setIsTokenReady] = useState(false);
 
@@ -115,40 +109,9 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
 
       const sessionHandle = getSessionHandleFromUrl();
       if (sessionHandle) {
-        // Capture continuation before cleaning, so valid navigation can still occur.
-        const continueTo = getContinueUrl();
-        try {
-          const result = await exchangeSessionOnce(sessionHandle);
-          if (!cancelled) {
-            setStoredAppToken(result.token);
-            clearSecurityParamsFromUrl();
-            if (continueTo) {
-              globalThis.location.replace(continueTo);
-              return;
-            }
-          }
-        } catch {
-          if (!cancelled) {
-            clearStoredAppToken();
-            clearSecurityParamsFromUrl();
-          }
-        }
+        await exchangeAndStoreSession(sessionHandle, () => cancelled);
       } else {
-        // No session handle — still remove any stale security params (continue,
-        // logout, or leftover signedOut/session) so they do not persist in history.
-        // Valid continuation occurs only after a successful exchange, so we do
-        // not navigate here.
-        const url = new URL(globalThis.location.href);
-        if (
-          url.searchParams.has('continue') ||
-          url.searchParams.has('logout') ||
-          url.searchParams.has('session') ||
-          url.searchParams.has('signedOut')
-        ) {
-          // consumeSignedOutMarker already handled signedOut=1 case above;
-          // for remaining markers, clean them without navigating.
-          clearSecurityParamsFromUrl();
-        }
+        clearSecurityParamsFromUrl();
       }
 
       if (!cancelled) {

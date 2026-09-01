@@ -109,7 +109,7 @@ describe('TenantService – first session load uses pre-warmed data (OIDC-07)', 
   });
 });
 
-describe('AUTH-06 bound and measured tenant/network work', () => {
+describe('bound and measured tenant/network work', () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it('combined roles+groups: cache miss does single CSTAR tenants+groups fetch; hit does zero', async () => {

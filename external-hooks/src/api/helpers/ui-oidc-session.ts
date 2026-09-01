@@ -14,7 +14,7 @@ import {
   setUiOidcRefreshTokenWithExpiry as defaultSetUiOidcRefreshTokenWithExpiry,
 } from './ui-oidc-store';
 
-// AUTH-07: Minimal injectable boundary for deterministic unit/contract tests.
+// Minimal injectable boundary for deterministic unit/contract tests.
 // Default implementations are the real store helpers; tests can pass fakes via
 // the `deps` param to `getUiSession` / `refreshSessionByEmail` without mocking
 // the `redis` module or env.
@@ -59,7 +59,7 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('UiSession');
 
 /**
- * AUTH-05: Email-scoped single-flight for provider refresh.
+ * Email-scoped single-flight for provider refresh.
  *
  * - Scope: per normalized email (one active UI session per email).
  * - At most one `refreshOidcTokens` provider call runs for the same email

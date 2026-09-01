@@ -546,8 +546,8 @@ describe('oidc router', () => {
     expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
   });
 
-  // AUTH-01: stale and cross-identity n8n sessions must be terminated on access-request
-  describe('AUTH-01 access-request clears stale n8n-auth', () => {
+  // stale and cross-identity n8n sessions must be terminated on access-request
+  describe('access-request clears stale n8n-auth', () => {
     it('clears n8n-auth even when no prior cookie was present (no-cookie case)', async () => {
       globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
         if (String(input) === 'https://issuer.example.com/token') {
@@ -1137,8 +1137,8 @@ describe('oidc router', () => {
     expect(role).toBe('global:admin');
   });
 
-  // AUTH-03: Public error boundary — hostile text sanitized, allowlist preserved
-  describe('AUTH-03 public error boundary', () => {
+  // Public error boundary — hostile text sanitized, allowlist preserved
+  describe('public error boundary', () => {
     it('rejects issuer-less manual configuration at router construction', () => {
       const params = createMockParams();
       params.config.issuerUrl = '';

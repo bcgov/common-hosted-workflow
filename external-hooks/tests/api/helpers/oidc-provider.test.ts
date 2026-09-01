@@ -418,13 +418,13 @@ describe('oidc-provider', () => {
     });
   });
 
-  // AUTH-03: issuer verification and startup validation — also-in describe block
+  // issuer verification and startup validation — also-in describe block
   // These tests reuse outer verification scope helpers; moved to top-level describe for coverage
 });
 
-// AUTH-03: issuer verification and startup validation (outside verification describe to avoid scope issues,
+// issuer verification and startup validation (outside verification describe to avoid scope issues,
 // but reusing same helpers via shared setup)
-describe('oidc-provider AUTH-03 issuer and manual mode hardening', () => {
+describe('oidc-provider issuer and manual mode hardening', () => {
   let keyPair2: Awaited<ReturnType<typeof generateKeyPair>>;
   let publicJwk2: Record<string, unknown>;
   const originalFetch2 = globalThis.fetch;
@@ -609,7 +609,7 @@ describe('oidc-provider AUTH-03 issuer and manual mode hardening', () => {
   });
 });
 
-describe('oidc-provider AUTH-06 bounded network and JWKS reuse', () => {
+describe('oidc-provider bounded network and JWKS reuse', () => {
   let keyPair3: Awaited<ReturnType<typeof generateKeyPair>>;
   let publicJwk3: Record<string, unknown>;
   const originalFetch3 = globalThis.fetch;

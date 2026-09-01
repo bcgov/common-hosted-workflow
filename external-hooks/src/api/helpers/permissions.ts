@@ -14,7 +14,7 @@ export type Permissions = {
   canManageProject: boolean;
 };
 
-// AUTH-07: Pure permission computation — single owner for permission + role checks.
+// Pure permission computation — single owner for permission + role checks.
 // Disabled/role-less identities have no n8n capabilities; `checkRole` in ui-api.ts
 // reuses the same disabled/role predicate so guards cannot drift.
 export function computePermissions(

@@ -99,7 +99,7 @@ function shouldClearN8nCookieOnExpiry(req: Request, resolved: unknown) {
   return !resolved && !!getBearerToken(req);
 }
 
-// AUTH-07: Authenticated context — explicit UI credential (bearer via getUiSession),
+// Authenticated context — explicit UI credential (bearer via getUiSession),
 // upstream credential (server-side, never bearer in separate-token mode),
 // identity (session.email/subject/claims), and authorization (permissions/n8nUser).
 // Routes consume capabilities (checkPermission/checkRole) rather than inferring

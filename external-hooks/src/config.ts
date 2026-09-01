@@ -62,7 +62,7 @@ export const OIDC_SCOPES = process.env.OIDC_SCOPES || 'openid email profile';
 export const OIDC_ROLES_CLAIM = process.env.OIDC_ROLES_CLAIM || 'roles';
 export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 
-// AUTH-06: Bounded provider request timeout (ms). All OIDC discovery, token,
+// Bounded provider request timeout (ms). All OIDC discovery, token,
 // refresh, and userinfo fetches abort after this deadline and surface a
 // stable timeout error (`OIDC provider request timed out`) instead of
 // hanging indefinitely. Default 10s, override via OIDC_PROVIDER_TIMEOUT_MS.

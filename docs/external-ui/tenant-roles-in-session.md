@@ -18,8 +18,8 @@ The frontend uses lightweight hooks to conditionally show/hide components based 
 ```
 ┌──────────────────────┐      ┌──────────────────────┐      ┌──────────────────────────┐
 │   External UI        │      │    Backend (session)  │      │          Redis           │
-│   useTenantRoles()   │◀────▶│  /ui-api/session      │◀────▶│  tenantroles:{email}     │
-│   useHasRole()       │      │  /ui-api/whoami       │      │  tenantgroups:{email}    │
+│   useTenantRoles   │◀────▶│  /ui-api/session      │◀────▶│  tenantroles:{email}     │
+│   useHasRole       │      │  /ui-api/whoami       │      │  tenantgroups:{email}    │
 └──────────────────────┘      └──────────┬───────────┘      │  (1h TTL each)           │
                                          │ (cache miss)      └──────────────────────────┘
                               ┌──────────▼───────────┐
@@ -117,20 +117,18 @@ All hooks are exported from `src/state/session.ts`:
 import { useTenantRoles, useHasRole, useHasTenantRole } from '../state/session';
 ```
 
-### `useTenantRoles()`
+### `useTenantRoles`
 
 Returns the full list of tenant roles for the current user. Use this for custom logic that needs to iterate over tenants.
 
 ```tsx
-const tenantRoles = useTenantRoles();
+const tenantRoles = useTenantRoles;
 
-return (
-  <ul>
-    {tenantRoles.map((t) => (
-      <li key={t.tenantId}>
+return   <ul>
+    {tenantRoles.map((t) =>       <li key={t.tenantId}>
         {t.tenantName}: {t.roles.join(', ')}
       </li>
-    ))}
+)}
   </ul>
 );
 ```
@@ -154,8 +152,7 @@ Returns `true` if the user holds the specified role in a **specific** tenant.
 ```tsx
 const isAdmin = useHasTenantRole(selectedTenantId, 'project:admin');
 
-return (
-  <>
+return   <>
     <WorkflowList tenantId={selectedTenantId} />
     {isAdmin && <AdminPanel tenantId={selectedTenantId} />}
   </>
@@ -164,10 +161,10 @@ return (
 
 ### Combining with Existing Permissions
 
-Tenant roles are complementary to the existing `usePermissions()` hook. Use permissions for n8n-level access control and tenant roles for tenant-scoped visibility:
+Tenant roles are complementary to the existing `usePermissions` hook. Use permissions for n8n-level access control and tenant roles for tenant-scoped visibility:
 
 ```tsx
-const permissions = usePermissions();
+const permissions = usePermissions;
 const canEditInTenant = useHasTenantRole(tenantId, 'project:editor');
 
 const canShare = permissions?.canShareWorkflows ?? false;
@@ -198,7 +195,7 @@ This runs **non-blocking** (fire-and-forget). If it fails, the first `/session` 
 On every `/ui-api/session` or authenticated request (`createUiRequestContextMiddleware` / `resolveUiRequestContext` via `getUiSession` → `loadUserContext` → `computePermissions`):
 
 ```
-resolveUiRequestContext()
+resolveUiRequestContext
   ├── getUiSession(req) // separate: jwtVerify+sid check; raw: tokenemail lookup + fetchOidcUserInfo
   │     └── refreshSessionByEmail if window/expired (bounded, single-flight per email)
   ├── services.tenant.getTenantRolesForSession({ email, ssoUserId, refreshAccessToken })
@@ -213,7 +210,7 @@ resolveUiRequestContext()
         └── sets X-UI-Auth-Token + extendN8nAuthCookie on refresh; clears n8n-auth iff !resolved && bearer presented
 ```
 
-Upstream CSTAR calls use `session.upstreamAccessToken` (from `getUiOidcAccessTokenByEmail` or `refreshAccessToken` closure) — never the presented UI bearer in separate-token mode (AUTH-02, `ui-api.ts` / `wil.ts`).
+Upstream CSTAR calls use `session.upstreamAccessToken` (from `getUiOidcAccessTokenByEmail` or `refreshAccessToken` closure) — never the presented UI bearer in separate-token mode (, `ui-api.ts` / `wil.ts`).
 
 > **Note:** On a cold cache (e.g. first request after token refresh), each resolver independently calls CSTAR. When pre-warm runs at login it populates both caches in a single combined fetch, avoiding this double call on the first authenticated request. A combined `getTenantRolesAndGroupsForSession` exists for a single parallel read (`tenant.service.ts`).
 
@@ -224,7 +221,7 @@ Upstream CSTAR calls use `session.upstreamAccessToken` (from `getUiOidcAccessTok
 When the upstream OIDC access token is refreshed:
 
 ```
-refreshSessionByEmail()
+refreshSessionByEmail
   ├── invalidateTenantRoles(email)   → Delete tenantroles:{email}
   └── invalidateTenantGroups(email)  → Delete tenantgroups:{email}
 ```
@@ -250,9 +247,9 @@ deleteUiOidcTokens(email)
 | Invalidated | On token refresh (`refreshSessionByEmail` `invalidateTenantRoles/Groups` + on `refreshAccessToken` path), on logout (`deleteUiOidcTokens`), expiry                | Same                                                    |
 | Pre-warmed  | At login eligible-only non-blocking (`prewarmTenantRolesAndGroups` + `syncTenantsForUser` via `post-login-tenant.ts`, single `getUserGroupsWithRoles` per tenant) | Same                                                    |
 | Cache miss  | Fetches from CSTAR on-demand with `upstreamAccessToken`                                                                                                           | Same                                                    |
-| Validation  | Malformed `TenantRole[]` / `TenantGroup[]` JSON fails closed → `null` via `storeLog.warn` (AUTH-07)                                                               | Same                                                    |
+| Validation  | Malformed `TenantRole[]` / `TenantGroup[]` JSON fails closed → `null` via `storeLog.warn`                                                                         | Same                                                    |
 
-Both caches share the same 1-hour TTL. If a user's CSTAR group memberships or role assignments change, the change will be reflected within 1 hour (or immediately after the next token refresh or re-login). `Open n8n` visibility is independent of CSTAR roles — it is gated only by `session.n8nUser` existence, not `canViewWorkflows` (AUTH-08, `app-layout.tsx`).
+Both caches share the same 1-hour TTL. If a user's CSTAR group memberships or role assignments change, the change will be reflected within 1 hour (or immediately after the next token refresh or re-login). `Open n8n` visibility is independent of CSTAR roles — it is gated only by `session.n8nUser` existence, not `canViewWorkflows` (, `app-layout.tsx`).
 
 ## WIL Actor Matching
 

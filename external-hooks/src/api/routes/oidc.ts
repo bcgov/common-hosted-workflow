@@ -25,7 +25,7 @@ import { createOidcLoginCoordinator, resolveNextRoleInternal } from '../services
 
 const log = createLogger('OIDCHook');
 
-// AUTH-03: Public error boundary — allowlist of stable public codes/messages.
+// Public error boundary — allowlist of stable public codes/messages.
 // Detailed causes are logged server-side; redirects never carry provider
 // descriptions, token details, URLs with secrets, or raw infrastructure text.
 const ALLOWED_OIDC_PROVIDER_ERROR_CODES = new Set([
@@ -108,7 +108,7 @@ export function buildOidcRouter({
   cstarService,
   config,
 }: BuildOidcRouterParams) {
-  // AUTH-03: Fail fast on invalid security configuration before serving login.
+  // Fail fast on invalid security configuration before serving login.
   if (!config.issuerUrl) {
     throw new Error('OIDC issuer is required: set OIDC_ISSUER (manual endpoint mode requires explicit issuer)');
   }
@@ -201,7 +201,7 @@ export function buildOidcRouter({
       }
 
       if (outcome.kind === 'access-request') {
-        // P0 AUTH-01: access-request must never leave a stale n8n-auth in the
+        // P0: access-request must never leave a stale n8n-auth in the
         // browser (same-identity eligibility loss or cross-identity switch).
         // The route is the single shared enforcement boundary — coordinator
         // returns the outcome, route terminates any prior n8n session.
@@ -324,7 +324,7 @@ type ResolveNextRoleParams = {
 };
 
 /**
- * AUTH-07: Coordinator owns eligibility/role resolution. This export is a
+ * Coordinator owns eligibility/role resolution. This export is a
  * backwards-compatible delegate — one implementation (`resolveNextRoleInternal`)
  * owns the decision. Kept for existing tests/routes that import from this module.
  */

@@ -102,7 +102,7 @@ export class TenantService {
   }
 
   /**
-   * AUTH-06: Combined tenant roles+groups operation (single cache-aside, single CSTAR batch).
+   * Combined tenant roles+groups operation (single cache-aside, single CSTAR batch).
    * On cache hit for both, zero CSTAR calls. On either miss, one fetchAndCache call
    * populates both caches. This avoids duplicated orchestration when ui-api previously
    * called getTenantRolesForSession + getTenantGroupsForSession sequentially (2 Redis

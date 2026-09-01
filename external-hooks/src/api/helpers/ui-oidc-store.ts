@@ -6,7 +6,7 @@ import { createLogger } from '../utils/logger';
 const storeLog = createLogger('UiOidcStore');
 
 /**
- * Atomicity & test-fake fidelity (AUTH-04, AUTH-05):
+ * Atomicity & test-fake fidelity (, ):
  * All single-key ops (SET with PX, GET, DEL, GETDEL) are atomic in real Redis.
  * The in-memory fake used in unit tests models each as a single synchronous
  * Map operation, which is faithful because real Redis also executes each
@@ -20,7 +20,7 @@ const storeLog = createLogger('UiOidcStore');
  * behavior for those commands is documented as accurate for the tested
  * atomicity scope.
  *
- * AUTH-05 adds Lua-backed atomic replacement for forward/reverse
+ *  adds Lua-backed atomic replacement for forward/reverse
  * access-token records. Real Redis executes the Lua script atomically
  * (single-threaded). The fake's `eval` polyfill executes the same logical
  * steps synchronously on its Map, preserving the invariant that an older
@@ -80,7 +80,7 @@ function extractJwtExpiryMs(token: string): number | undefined {
 }
 
 let redisClientPromise: Promise<RedisClient> | null = null;
-// AUTH-07: Smallest injectable store boundary — tests can inject a fake client
+// Smallest injectable store boundary — tests can inject a fake client
 // without mocking the `redis` module. Real code never calls this; contract
 // tests use the fake, security-relevant ops are exercised against both fake
 // and real Redis when UI_OIDC_REDIS_URL points at a real instance.
@@ -96,7 +96,7 @@ export function setRedisClientPromiseForTests(promise: Promise<RedisClient>): vo
   redisClientOverride = promise;
 }
 
-// AUTH-07: Runtime validation for persisted JSON — fail closed on malformed.
+// Runtime validation for persisted JSON — fail closed on malformed.
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0;
 }
@@ -148,7 +148,7 @@ function isValidTenantGroupArray(v: unknown): v is TenantGroup[] {
 }
 
 /**
- * AUTH-05: Per-email in-process mutex for store mutations.
+ * Per-email in-process mutex for store mutations.
  * Serializes concurrent `setUiOidcAccessTokenRecord` and
  * `deleteUiOidcTokens` for the same email within a single Node process.
  * Prevents JS-yield interleaving from orphaning reverse records.
@@ -414,7 +414,7 @@ export async function getUiOidcIdToken(email: string) {
 }
 
 /**
- * AUTH-05: Atomic forward/reverse replacement.
+ * Atomic forward/reverse replacement.
  * Real Redis uses a Lua script that runs atomically:
  *   - If an expected previous token was observed before the call, the
  *     script fails closed when forward != expectedPrev, preventing a stale
@@ -537,7 +537,7 @@ export async function getUiOidcAccessTokenRecord(accessToken: string) {
 }
 
 /**
- * AUTH-05: Race-safe logout delete.
+ * Race-safe logout delete.
  * Must not return while a usable reverse record for that identity remains.
  * A concurrent refresh may recreate the forward record after we snapshot
  * it. We loop verify-after-DEL: after deleting the snapshot's forward +

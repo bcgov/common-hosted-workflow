@@ -60,7 +60,7 @@ type OidcDiscoveryCacheEntry = {
 const discoveryCache = new Map<string, OidcDiscoveryCacheEntry>();
 const OIDC_DISCOVERY_CACHE_TTL_MS = 60 * 60 * 1000;
 
-// AUTH-06: Remote JWKS resolver reuse — one instance per trusted JWKS URI.
+// Remote JWKS resolver reuse — one instance per trusted JWKS URI.
 // `jose`'s RemoteJWKSet internally respects Cache-Control / key rotation
 // (re-fetches when `kid` not found / on expiry), so reusing the instance
 // preserves rotation while avoiding per-verification construction and
@@ -89,7 +89,7 @@ export function clearOidcDiscoveryCache() {
   discoveryCache.clear();
 }
 
-// AUTH-06: Bounded provider fetch with stable timeout handling.
+// Bounded provider fetch with stable timeout handling.
 // All OIDC provider network calls (discovery, token, refresh, userinfo)
 // go through this helper. It aborts after `timeoutMs` and throws the
 // stable message `OIDC provider request timed out` so callers and

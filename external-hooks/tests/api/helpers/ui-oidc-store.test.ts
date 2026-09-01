@@ -128,12 +128,12 @@ describe('ui-oidc-store', () => {
     });
   });
 
-  // AUTH-07: Malformed Redis records fail closed (never throw) and are treated as revoked.
+  // Malformed Redis records fail closed (never throw) and are treated as revoked.
   // Contract: exercises both the fake (deterministic unit) and, when a real Redis is available,
   // the same validation path (client-side JSON parsing). Real Redis integration would use the same
   // `setRedisClientForTests` override with a live client; the validation is identical because
   // it is pure-JS after the GET. Tests here run on the fake but document fidelity.
-  describe('AUTH-07 malformed record handling (fail closed)', () => {
+  describe('malformed record handling (fail closed)', () => {
     it('consumeUiSessionExchange returns null on invalid JSON', async () => {
       vi.stubEnv('UI_OIDC_REDIS_URL', 'redis://redis:6379');
       const redisClient = { ...createMockRedisClient(), getDel: vi.fn().mockResolvedValue('not-json{') };

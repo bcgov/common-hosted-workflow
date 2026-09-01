@@ -122,7 +122,7 @@ describe('ui-oidc-store refresh token TTL capping (OIDC-07)', () => {
 });
 
 /**
- * AUTH-05: Deterministic concurrency tests for forward/reverse atomic replacement,
+ * Deterministic concurrency tests for forward/reverse atomic replacement,
  * refresh vs logout, and old-token resurrection prevention. Also covers
  * single-flight lock behavior.
  *
@@ -194,7 +194,7 @@ function createDeterministicRedis(prefix = 'chwf:ui-oidc:') {
   return { store, client };
 }
 
-describe('AUTH-05 race-safe store (deterministic interleavings)', () => {
+describe('race-safe store (deterministic interleavings)', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
@@ -394,7 +394,7 @@ describe('AUTH-05 race-safe store (deterministic interleavings)', () => {
   });
 });
 
-describe('AUTH-05 refresh single-flight lock', () => {
+describe('refresh single-flight lock', () => {
   const getUiOidcRefreshTokenRecordMock = vi.fn();
   const setUiOidcRefreshTokenWithExpiryMock = vi.fn();
   const setUiOidcIdTokenMock = vi.fn();
