@@ -26,7 +26,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   // role. Must not use canViewWorkflows or any custom-UI feature flag as proxy.
   const canOpenN8n = !isLoading && !!session?.n8nUser && !session.n8nUser.disabled && !!session.n8nUser.role?.slug;
   const navItems: AppNavItem[] = [
-    // { to: '/', label: 'Home', end: true },
     ...(canViewWorkflows ? [{ to: '/workflows', label: 'Workflows' }] : []),
     ...(canManageWil ? [{ to: '/workflow-interaction', label: 'Workflow Interaction' }] : []),
     ...(canManageProject ? [{ to: '/projects', label: 'Projects' }] : []),

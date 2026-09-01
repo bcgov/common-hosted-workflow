@@ -466,27 +466,24 @@ describe('Session-driven navigation/gating', () => {
       expect(screen.queryByText('Workflows')).not.toBeInTheDocument();
     });
 
-    it('marks the current page and exposes its active visual treatment', () => {
+    it('does not show Home in the top navigation', () => {
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      const homeLink = screen.getByRole('link', { name: 'Home' });
-      expect(homeLink).toHaveAttribute('aria-current', 'page');
-      expect(homeLink).toHaveClass('bg-white/15', 'font-bold', 'after:left-0', 'after:right-0');
-      expect(homeLink).not.toHaveClass('hover:underline');
+      expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument();
     });
 
-    it('left-aligns a single desktop item', () => {
+    it('centers an empty desktop menu', () => {
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('xl:ml-20', 'xl:justify-start');
+      expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('xl:justify-center');
     });
 
     it('adds the hover underline treatment only to inactive links', () => {
