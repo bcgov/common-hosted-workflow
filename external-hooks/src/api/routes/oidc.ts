@@ -1,50 +1,85 @@
-import crypto from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
-import { N8N_PROTOCOL } from '@config';
+import { beginOidcAuthorization, fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
+import { getSecureCookieFlag, getCookieOptions, getAuthCookieOptions } from '../helpers/cookie';
+import { consumeUiLogoutHandle, getUiOidcIdToken, deleteUiOidcTokens } from '../helpers/ui-oidc-store';
 import {
-  beginOidcAuthorization,
-  completeOidcAuthorization,
-  extractOidcIdentity,
-  fetchOidcDiscoveryDocument,
-} from '../helpers/oidc-provider';
-import {
-  getUiOidcIdToken,
-  setUiOidcAccessTokenRecord,
-  setUiOidcIdToken,
-  setUiOidcRefreshToken,
-  setUiSessionExchange,
-} from '../helpers/ui-oidc-store';
-import {
-  createAuthToken,
   createSignedCookie,
   getCookieSecret,
-  isValidEmail,
   type N8nOidcConfig,
   type N8nOidcNonceCookiePayload,
   type N8nOidcStateCookiePayload,
-  type N8nOidcUser,
-  parseN8nOidcRole,
   verifySignedCookie,
 } from '../helpers/n8n-oidc';
-import { issueUiSessionToken, resolveAccessTokenExpiresAt } from '../helpers/ui-auth-token';
-import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
-import type { UiOidcIdentity } from '../helpers/ui-oidc';
-import { getOidcConfigFromEnv } from '../helpers/ui-oidc';
-import { appendSessionToReturnTo, buildUiAppUrl } from '../helpers/url';
-import { isManagedProjectRole } from '../constants/project-roles';
+import { appendQueryParam } from '../helpers/url';
+import { createReturnTargetPolicy, resolveReturnTarget } from '../helpers/return-target';
 import { createLogger, logError } from '../utils/logger';
-import type { N8nUser } from '../types/user';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { AuthService } from '../services/auth';
 import type { CstarService } from '../services/cstar.service';
 import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
+import type { TenantService } from '../services/tenant.service';
 import type { UserService } from '../services/user';
-import { ensurePersonalProjectTenantMapping } from '../services/personal-project-tenant';
+import { createOidcLoginCoordinator, resolveNextRoleInternal } from '../services/oidc-login-coordinator';
 
 const log = createLogger('OIDCHook');
-const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
+
+// Public error boundary — allowlist of stable public codes/messages.
+// Detailed causes are logged server-side; redirects never carry provider
+// descriptions, token details, URLs with secrets, or raw infrastructure text.
+const ALLOWED_OIDC_PROVIDER_ERROR_CODES = new Set([
+  'invalid_request',
+  'unauthorized_client',
+  'access_denied',
+  'unsupported_response_type',
+  'invalid_scope',
+  'server_error',
+  'temporarily_unavailable',
+  'interaction_required',
+  'login_required',
+  'account_selection_required',
+  'consent_required',
+  'invalid_request_uri',
+  'invalid_request_object',
+  'request_not_supported',
+  'request_uri_not_supported',
+  'registration_not_supported',
+]);
+
+const STABLE_PUBLIC_ROUTE_MESSAGES = new Set([
+  'Missing authorization code or state',
+  'Missing state cookies - session expired',
+  'Invalid state - possible CSRF attack',
+  'Missing or invalid nonce - session expired',
+  'OIDC authorization endpoint is not configured',
+  'OIDC issuer is required in manual endpoint mode',
+  'OIDC issuer is not configured',
+  'Authentication failed',
+]);
+
+function toPublicRouteMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (STABLE_PUBLIC_ROUTE_MESSAGES.has(raw)) return raw;
+  for (const allowed of STABLE_PUBLIC_ROUTE_MESSAGES) {
+    if (raw.includes(allowed)) return allowed;
+  }
+  // Map issuer-related failures to generic invalid-issuer public code
+  if (
+    /OIDC issuer is required/i.test(raw) ||
+    /OIDC issuer is not configured/i.test(raw) ||
+    /discovery issuer mismatch/i.test(raw)
+  ) {
+    return 'Authentication failed';
+  }
+  return 'Authentication failed';
+}
+
+function toPublicProviderErrorCode(errorParam: unknown): string {
+  const raw = String(errorParam);
+  if (ALLOWED_OIDC_PROVIDER_ERROR_CODES.has(raw)) return raw;
+  return 'Authentication failed';
+}
 
 export type BuildOidcRouterParams = {
   n8nRepositories: N8nRepositories;
@@ -53,50 +88,13 @@ export type BuildOidcRouterParams = {
   jwtService: JwtService;
   userService: UserService;
   tenantProjectSyncService: TenantProjectSyncService;
+  tenantService?: TenantService;
   cstarService: CstarService;
   config: N8nOidcConfig;
 };
 
-function getCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: N8N_PROTOCOL === 'https',
-    sameSite: 'lax' as const,
-    maxAge: 15 * 60 * 1000,
-  };
-}
-
-function getAuthCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: N8N_PROTOCOL === 'https',
-    sameSite: 'lax' as const,
-    maxAge: 24 * 60 * 60 * 1000,
-  };
-}
-
-function buildExternalUiErrorRedirect(message: string) {
+export function buildExternalUiErrorRedirect(message: string) {
   return '/ui?error=' + encodeURIComponent(message);
-}
-
-async function redirectToAccessRequest(
-  params: {
-    user: N8nOidcUser | null;
-    identity: UiOidcIdentity;
-    accessToken?: string;
-    accessTokenExpiresAt?: number;
-  },
-  res: Response,
-) {
-  const uiToken = await issueUiSessionToken({
-    oidc: params.identity,
-    upstreamAccessToken: params.accessToken,
-    upstreamExpiresAt: params.accessTokenExpiresAt,
-  });
-
-  const sessionHandle = crypto.randomBytes(24).toString('base64url');
-  await setUiSessionExchange(sessionHandle, uiToken, UI_SESSION_EXCHANGE_TTL_MS);
-  return res.redirect(appendSessionToReturnTo(buildUiAppUrl('/access-request'), sessionHandle));
 }
 
 export function buildOidcRouter({
@@ -106,16 +104,39 @@ export function buildOidcRouter({
   jwtService,
   userService,
   tenantProjectSyncService,
+  tenantService,
   cstarService,
   config,
 }: BuildOidcRouterParams) {
-  const { user: userRepository } = n8nRepositories;
+  // Fail fast on invalid security configuration before serving login.
+  if (!config.issuerUrl) {
+    throw new Error('OIDC issuer is required: set OIDC_ISSUER (manual endpoint mode requires explicit issuer)');
+  }
   const router = Router();
   const cookieSecret = getCookieSecret();
+  const returnTargetPolicy = createReturnTargetPolicy();
+  // Capture deployment-derived cookie security once per router (injected config, not per-request env read).
+  // Fails closed in production when base URL and protocol disagree.
+  const isSecureCookie = getSecureCookieFlag();
+  // Coordinator owns provider completion, token persistence, eligibility, provisioning,
+  // role sync, tenant mapping/sync, and session issuance. Route is thin adapter.
+  const loginCoordinator = createOidcLoginCoordinator({
+    config,
+    returnTargetPolicy,
+    userRepository: n8nRepositories.user,
+    projectRepository: n8nRepositories.project,
+    tenantProjectRelationRepository: customRepositories.tenantProjectRelation,
+    jwtService,
+    userService,
+    tenantProjectSyncService,
+    tenantService,
+    cstarService,
+  });
 
   router.get('/login', async (req: Request, res: Response) => {
+    const returnTo = resolveReturnTarget(req.query.returnTo, 'login', returnTargetPolicy);
     const existingToken = req.cookies['n8n-auth'];
-    if (existingToken) {
+    if (existingToken && !returnTo) {
       try {
         const [user] = await authService.resolveJwt(existingToken, req, res);
         if (user) {
@@ -141,18 +162,22 @@ export function buildOidcRouter({
             state: authRequest.state,
             codeVerifier: authRequest.codeVerifier,
             redirectUri: authRequest.redirectUri,
+            returnTo,
           },
           cookieSecret,
         ),
-        getCookieOptions(),
+        getCookieOptions(isSecureCookie),
       );
-      res.cookie('n8n-oidc-nonce', createSignedCookie({ nonce: authRequest.nonce }, cookieSecret), getCookieOptions());
+      res.cookie(
+        'n8n-oidc-nonce',
+        createSignedCookie({ nonce: authRequest.nonce }, cookieSecret),
+        getCookieOptions(isSecureCookie),
+      );
 
       res.redirect(authRequest.authorizationUrl);
     } catch (error) {
       logError(log, error, { context: 'OIDC login' });
-      const message = error instanceof Error ? error.message : String(error);
-      res.redirect(buildExternalUiErrorRedirect(message));
+      res.redirect(buildExternalUiErrorRedirect(toPublicRouteMessage(error)));
     }
   });
 
@@ -167,152 +192,106 @@ export function buildOidcRouter({
       res.clearCookie('n8n-oidc-state');
       res.clearCookie('n8n-oidc-nonce');
 
-      const completion = await completeOidcAuthorization({
-        code: code as string,
-        storedState: {
-          nonce: noncePayload?.nonce || '',
-          codeVerifier: statePayload?.codeVerifier,
-          redirectUri: statePayload?.redirectUri || config.redirectUri,
-        },
-        config,
-      });
+      const outcome = await loginCoordinator.handleCallback({ code: code as string, statePayload, noncePayload });
 
-      const identity = extractOidcIdentity({
-        claims: completion.mergedClaims,
-        discovery: completion.discovery,
-        config,
-      });
-
-      if (!identity.email || !isValidEmail(identity.email)) {
-        return res.redirect(buildExternalUiErrorRedirect('No valid email in OIDC response'));
+      if (outcome.kind === 'eligible') {
+        // Atomicity: UI exchange already prepared before n8n token; set n8n-auth only on success.
+        res.cookie('n8n-auth', outcome.n8nAuthToken, getAuthCookieOptions(isSecureCookie));
+        return res.redirect(outcome.redirectUrl);
       }
 
-      const oidcIdentity: UiOidcIdentity = {
-        subject: identity.subject || identity.email,
-        email: identity.email,
-        preferredUsername: identity.preferredUsername,
-        name: identity.name,
-        issuer: completion.discovery.issuer || config.issuerUrl,
-        audience: [config.clientId],
-        claims: identity.claims,
-      };
-      const accessTokenExpiresAt = resolveAccessTokenExpiresAt(completion.tokens.expires_in);
-
-      await persistOidcTokens(identity.email, completion.tokens, accessTokenExpiresAt);
-
-      const jwtRole = parseN8nOidcRole(identity.claims[config.rolesClaim]);
-      const cstarSsoUserId = resolveCstarSsoUserId(identity.claims, identity.subject, identity.email);
-      const nextRole = await resolveNextRole({
-        jwtRole,
-        restrictNoRole: config.restrictNoRole,
-        cstarService,
-        ssoUserId: cstarSsoUserId,
-        accessToken: completion.tokens.access_token,
-      });
-
-      let user = await userRepository.findByEmail(identity.email, ['role']);
-
-      if (!user) {
-        const newUserResult = await handleNewUser({
-          nextRole,
-          identity,
-          oidcIdentity,
-          accessToken: completion.tokens.access_token,
-          accessTokenExpiresAt,
-          userRepository,
-          res,
-        });
-        if (newUserResult.redirected) return;
-        user = newUserResult.user;
+      if (outcome.kind === 'access-request') {
+        // P0: access-request must never leave a stale n8n-auth in the
+        // browser (same-identity eligibility loss or cross-identity switch).
+        // The route is the single shared enforcement boundary — coordinator
+        // returns the outcome, route terminates any prior n8n session.
+        try {
+          authService.clearCookie(res);
+        } catch {
+          // Fall back to direct clear if AuthService derivation throws in
+          // misconfigured production (getSecureCookieFlag) — still terminate.
+          try {
+            res.clearCookie('n8n-auth', { path: '/' });
+          } catch {
+            // ignore
+          }
+        }
+        return res.redirect(outcome.redirectUrl);
       }
 
-      if (!user) {
-        return res.redirect(buildExternalUiErrorRedirect('Failed to create or find user'));
-      }
-
-      await syncUserRole(user, nextRole, userRepository, userService, identity.email);
-
-      if (!nextRole) {
-        await userRepository.setUserDisabled(user.id, true);
-        user.disabled = true;
-        log.info('User disabled, redirecting to access request page', { email: identity.email });
-
-        return await redirectToAccessRequest(
-          { user, identity: oidcIdentity, accessToken: completion.tokens.access_token, accessTokenExpiresAt },
-          res,
-        );
-      }
-
-      if (user.disabled) {
-        await userRepository.setUserDisabled(user.id, false);
-        user.disabled = false;
-        log.info('User re-enabled after receiving a valid OIDC role', { email: identity.email });
-      }
-
-      await ensurePersonalProjectTenantMapping({
-        userId: user.id,
-        projectRepo: n8nRepositories.project,
-        tenantProjectRelationRepository: customRepositories.tenantProjectRelation,
-        reason: 'oidc-login',
-      });
-
-      // Sync tenant projects (non-blocking — errors are logged but don't fail login)
-      if (completion.tokens.access_token) {
-        tenantProjectSyncService
-          .syncTenantsForUser({
-            ssoUserId: cstarSsoUserId,
-            n8nUserId: user.id,
-            accessToken: completion.tokens.access_token,
-          })
-          .catch((err) => {
-            log.error('Tenant project sync failed', { email: identity.email, error: String(err) });
-          });
-      }
-
-      const authToken = createAuthToken(user, jwtService);
-      res.cookie('n8n-auth', authToken, getAuthCookieOptions());
-      res.redirect('/');
+      return res.redirect(buildExternalUiErrorRedirect(outcome.publicMessage));
     } catch (error) {
       logError(log, error, { context: 'OIDC callback' });
-      const message = error instanceof Error ? error.message : String(error);
-      res.redirect(buildExternalUiErrorRedirect('Authentication failed: ' + message));
+      res.redirect(buildExternalUiErrorRedirect('Authentication failed'));
     }
   });
 
   router.get('/logout', async (req: Request, res: Response) => {
+    const requestedReturnTo = resolveReturnTarget(req.query.returnTo, 'logout', returnTargetPolicy) || '/';
+
+    // UI-originated logout carries a short-lived, single-use opaque handle that
+    // binds the verified bearer identity to a validated return target. A
+    // consumed (or unknown/expired) handle never authorizes anything.
+    const logoutHandle = typeof req.query.logout === 'string' ? req.query.logout : '';
+    let handleRecord: { email: string; returnTo: string } | null = null;
+    if (logoutHandle) {
+      try {
+        handleRecord = await consumeUiLogoutHandle(logoutHandle);
+        if (!handleRecord) {
+          log.warn('OIDC logout: logout handle is unknown or already used');
+        }
+      } catch (error) {
+        logError(log, error, { context: 'OIDC logout handle consumption' });
+      }
+    }
+
+    // Identity is only ever trusted from the authenticated logout handle or a
+    // valid n8n cookie — never from caller-supplied query parameters.
+    const boundReturnTo = handleRecord
+      ? resolveReturnTarget(handleRecord.returnTo, 'logout', returnTargetPolicy) || requestedReturnTo
+      : requestedReturnTo;
+    const returnTo = appendQueryParam(boundReturnTo, 'signedOut', '1');
+
     try {
-      const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
-
+      let email = handleRecord?.email ?? '';
       const token = req.cookies['n8n-auth'];
-      if (!token) {
-        log.debug('OIDC logout: no user session cookie provided, redirecting directly', { returnTo });
-        res.redirect(returnTo);
-        return;
+
+      if (token) {
+        try {
+          const [user] = await authService.resolveJwt(token, req, res);
+          if (!email) {
+            email = typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+          }
+          await authService.invalidateToken(req as any);
+        } catch (error) {
+          // An invalid cookie must not fall back to caller-controlled identity.
+          log.debug('OIDC logout: failed to resolve or invalidate n8n session', { error: String(error) });
+        }
       }
 
-      const [user] = await authService.resolveJwt(token, req, res);
-      if (!user?.email) {
-        log.debug('OIDC logout: no user or email provided, redirecting directly', { returnTo });
-        res.redirect(returnTo);
-        return;
-      }
-
-      const email = user.email.trim();
-
-      await authService.invalidateToken(req as any);
       authService.clearCookie(res);
 
-      const idToken = await getUiOidcIdToken(user.email);
+      if (!email) {
+        log.debug('OIDC logout: no authenticated identity, redirecting without touching token records', {
+          returnTo,
+        });
+        res.redirect(returnTo);
+        return;
+      }
+
+      // Local session cleanup happens before any upstream work so provider
+      // discovery or network failure cannot prevent revocation.
+      const idToken = await getUiOidcIdToken(email);
+      await deleteUiOidcTokens(email);
       if (!idToken) {
         log.debug('OIDC logout: no ID token stored, redirecting directly', { email, returnTo });
         res.redirect(returnTo);
         return;
       }
 
-      const oidcConfig = getOidcConfigFromEnv();
-      const discovery = await fetchOidcDiscoveryDocument(oidcConfig);
+      const discovery = await fetchOidcDiscoveryDocument(config);
 
-      const endSessionEndpoint = discovery.end_session_endpoint || oidcConfig.endSessionEndpoint;
+      const endSessionEndpoint = discovery.end_session_endpoint || config.endSessionEndpoint;
       if (!endSessionEndpoint) {
         log.debug('OIDC logout: no end_session_endpoint in discovery or config, redirecting directly', {
           email,
@@ -329,7 +308,6 @@ export function buildOidcRouter({
       res.redirect(logoutUrl.toString());
     } catch (error) {
       logError(log, error, { context: 'OIDC logout' });
-      const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
       res.redirect(returnTo);
     }
   });
@@ -345,74 +323,13 @@ type ResolveNextRoleParams = {
   accessToken?: string;
 };
 
+/**
+ * Coordinator owns eligibility/role resolution. This export is a
+ * backwards-compatible delegate — one implementation (`resolveNextRoleInternal`)
+ * owns the decision. Kept for existing tests/routes that import from this module.
+ */
 export async function resolveNextRole(params: ResolveNextRoleParams): Promise<string> {
-  const { jwtRole, restrictNoRole, cstarService, ssoUserId, accessToken } = params;
-
-  if (!restrictNoRole) {
-    return jwtRole || 'global:member';
-  }
-
-  if (jwtRole) {
-    return jwtRole;
-  }
-
-  if (!accessToken || !cstarService.isConfigured()) {
-    return '';
-  }
-
-  const hasManagedProjectRole = await hasCstarManagedProjectRoleInAnyTenant({ cstarService, ssoUserId, accessToken });
-  if (hasManagedProjectRole) {
-    log.info('Granting global:member based on CSTAR managed tenant project role', { ssoUserId });
-    return 'global:member';
-  }
-
-  return '';
-}
-
-type HasCstarProjectRoleInAnyTenantParams = {
-  cstarService: CstarService;
-  ssoUserId: string;
-  accessToken: string;
-};
-
-async function hasCstarManagedProjectRoleInAnyTenant(params: HasCstarProjectRoleInAnyTenantParams): Promise<boolean> {
-  const { cstarService, ssoUserId, accessToken } = params;
-  let tenants;
-
-  try {
-    tenants = await cstarService.getUserTenantsStrict({ ssoUserId, accessToken });
-  } catch (error) {
-    log.error('Failed to verify CSTAR tenant memberships during OIDC login', {
-      ssoUserId,
-      error: String(error),
-    });
-    throw new Error('Unable to verify CSTAR tenant roles during sign-in', { cause: error });
-  }
-
-  for (const tenant of tenants) {
-    let roles;
-
-    try {
-      roles = await cstarService.getUserSharedServiceRolesStrict({
-        tenantId: tenant.id,
-        ssoUserId,
-        accessToken,
-      });
-    } catch (error) {
-      log.error('Failed to verify CSTAR tenant shared-service roles during OIDC login', {
-        ssoUserId,
-        tenantId: tenant.id,
-        error: String(error),
-      });
-      throw new Error('Unable to verify CSTAR tenant roles during sign-in', { cause: error });
-    }
-
-    if (roles.some((role) => isManagedProjectRole(role.name))) {
-      return true;
-    }
-  }
-
-  return false;
+  return resolveNextRoleInternal(params);
 }
 
 // --- Extracted helpers to reduce callback cognitive complexity ---
@@ -423,16 +340,18 @@ type CallbackValidationResult =
       redirect: null;
       code: string;
       statePayload: N8nOidcStateCookiePayload;
-      noncePayload: N8nOidcNonceCookiePayload | null;
+      noncePayload: N8nOidcNonceCookiePayload;
     };
 
 function validateCallbackRequest(req: Request, cookieSecret: string): CallbackValidationResult {
   const { code, state, error, error_description } = req.query;
 
   if (error) {
+    // Log detailed provider error server-side; never reflect error_description verbatim (may contain hostile text/secrets).
     log.error('OIDC error from provider', { error, errorDescription: error_description });
+    const publicCode = toPublicProviderErrorCode(error);
     return {
-      redirect: buildExternalUiErrorRedirect(String(error_description || error)),
+      redirect: buildExternalUiErrorRedirect(publicCode),
       code: null,
       statePayload: null,
       noncePayload: null,
@@ -472,107 +391,14 @@ function validateCallbackRequest(req: Request, cookieSecret: string): CallbackVa
     };
   }
 
+  if (!noncePayload || typeof noncePayload.nonce !== 'string' || !noncePayload.nonce) {
+    return {
+      redirect: buildExternalUiErrorRedirect('Missing or invalid nonce - session expired'),
+      code: null,
+      statePayload: null,
+      noncePayload: null,
+    };
+  }
+
   return { redirect: null, code: code as string, statePayload, noncePayload };
-}
-
-async function persistOidcTokens(
-  email: string,
-  tokens: { refresh_token?: string; id_token?: string; access_token?: string },
-  accessTokenExpiresAt: number | undefined,
-): Promise<void> {
-  if (tokens.refresh_token) {
-    await setUiOidcRefreshToken(email, tokens.refresh_token);
-  }
-  if (tokens.id_token) {
-    await setUiOidcIdToken(email, tokens.id_token);
-  }
-  if (tokens.access_token) {
-    await setUiOidcAccessTokenRecord(email, tokens.access_token, accessTokenExpiresAt);
-  }
-}
-
-type HandleNewUserParams = {
-  nextRole: string;
-  identity: { email: string; subject?: string; name?: string; claims: Record<string, unknown> };
-  oidcIdentity: UiOidcIdentity;
-  accessToken?: string;
-  accessTokenExpiresAt?: number;
-  userRepository: BuildOidcRouterParams['n8nRepositories']['user'];
-  res: Response;
-};
-
-type HandleNewUserResult = { redirected: true; user: null } | { redirected: false; user: N8nUser | null };
-
-async function handleNewUser(params: HandleNewUserParams): Promise<HandleNewUserResult> {
-  const { nextRole, identity, oidcIdentity, accessToken, accessTokenExpiresAt, userRepository, res } = params;
-
-  if (!nextRole) {
-    log.info('No OIDC role for new user, redirecting to access request page without creating n8n user', {
-      email: identity.email,
-    });
-    await redirectToAccessRequest({ user: null, identity: oidcIdentity, accessToken, accessTokenExpiresAt }, res);
-    return { redirected: true, user: null };
-  }
-
-  const userCount = await userRepository.count();
-  const resolvedRole = userCount === 0 ? 'global:owner' : nextRole;
-
-  if (!resolvedRole) {
-    return { redirected: false, user: null };
-  }
-
-  const givenName = typeof identity.claims.given_name === 'string' ? identity.claims.given_name : undefined;
-  const familyName = typeof identity.claims.family_name === 'string' ? identity.claims.family_name : undefined;
-
-  const userData = {
-    email: identity.email,
-    firstName: givenName || identity.name?.split(' ')[0] || 'User',
-    lastName: familyName || identity.name?.split(' ').slice(1).join(' ') || '',
-    password: crypto.randomBytes(32).toString('hex'),
-    disabled: !nextRole,
-    role: { slug: resolvedRole },
-  };
-
-  const result = await userRepository.createUserWithProject(userData);
-
-  log.info('Created user with personal project', {
-    role: resolvedRole,
-    disabled: !nextRole,
-    email: identity.email,
-  });
-
-  return { redirected: false, user: result.user };
-}
-
-async function syncUserRole(
-  user: N8nUser,
-  nextRole: string,
-  userRepository: BuildOidcRouterParams['n8nRepositories']['user'],
-  userSvc: UserService,
-  email: string,
-): Promise<void> {
-  const currentRole = user.role?.slug || '';
-
-  if (currentRole === nextRole) {
-    return;
-  }
-
-  if (currentRole === 'global:owner' && nextRole !== 'global:owner') {
-    const otherOwnerCount = await userRepository
-      .createQueryBuilder('user')
-      .innerJoin('user.role', 'role')
-      .where('role.slug = :ownerRole', { ownerRole: 'global:owner' })
-      .andWhere('user.id != :userId', { userId: user.id })
-      .getCount();
-
-    if (otherOwnerCount === 0) {
-      log.warn('Not downgrading user role to avoid leaving system without an owner', { email });
-      return;
-    }
-  }
-
-  if (nextRole) {
-    await userSvc.changeUserRole(user, { newRoleName: nextRole });
-    log.info('User role updated', { previousRole: currentRole, newRole: nextRole, email });
-  }
 }

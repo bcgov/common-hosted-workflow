@@ -49,6 +49,12 @@ export class UiWorkflowQueryService {
       return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
     }
 
+    // Disabled users keep their identity (so sessions can report access-request state)
+    // but must never receive n8n-derived data, including administrator-wide workflow lists.
+    if (n8nUser.disabled) {
+      return { n8nUser, accessibleProjectIds: [], projects: [], workflows: [] };
+    }
+
     const [personalProject, accessibleProjectIds] = await Promise.all([
       this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
       listProjectIdsAccessibleToUser(this.n8nRepositories.project, this.n8nRepositories.projectRelation, n8nUser.id),

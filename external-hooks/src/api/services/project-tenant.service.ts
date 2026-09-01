@@ -111,14 +111,18 @@ export class ProjectTenantService {
   async listUserProjectTenants(params: {
     ssoUserId: string;
     n8nUserId: string;
-    accessToken: string;
+    /** Upstream OIDC access token — never the UI app JWT */
+    upstreamAccessToken: string;
+    /** @deprecated Use upstreamAccessToken */
+    accessToken?: string;
   }): Promise<UserProjectTenantItem[]> {
-    const { ssoUserId, n8nUserId, accessToken } = params;
+    const { ssoUserId, n8nUserId } = params;
+    const upstreamAccessToken = params.upstreamAccessToken ?? params.accessToken ?? '';
     const results: UserProjectTenantItem[] = [];
 
     // Fetch CSTAR tenants for the user
     if (this.cstarService.isConfigured()) {
-      const cstarTenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken });
+      const cstarTenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken: upstreamAccessToken });
       const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
 
       // Build a reverse map: tenantId → projectId

@@ -234,29 +234,25 @@ describe('Session-driven navigation/gating', () => {
 
       const signInButtons = screen.getAllByRole('button', { name: /sign in/i });
       expect(signInButtons.length).toBeGreaterThanOrEqual(1);
-      const openN8nButton = screen.getByRole('button', { name: 'Open n8n' });
-      expect(openN8nButton).toBeInTheDocument();
-      expect(openN8nButton).toHaveClass('w-[4.5rem]', 'sm:w-20');
+      expect(screen.queryByRole('button', { name: 'Open n8n' })).not.toBeInTheDocument();
       expect(signInButtons[0]).toHaveClass('w-[4.5rem]', 'sm:w-20');
       expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main-content');
       expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
       expect(screen.getByRole('navigation', { name: 'Legal' })).toBeInTheDocument();
     });
 
-    it('opens n8n from the header when not authenticated', async () => {
-      const user = userEvent.setup();
+    it('hides open n8n when not authenticated', () => {
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      await user.click(screen.getByRole('button', { name: 'Open n8n' }));
-
-      expect(openN8n).toHaveBeenCalledOnce();
+      expect(screen.queryByRole('button', { name: 'Open n8n' })).not.toBeInTheDocument();
+      expect(openN8n).not.toHaveBeenCalled();
     });
 
-    it('shows open n8n while the session is loading', () => {
+    it('hides open n8n while the session is loading', () => {
       sessionState.isLoading = true;
 
       renderWithProviders(
@@ -265,7 +261,7 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByRole('button', { name: 'Open n8n' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Open n8n' })).not.toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent('Loading session');
       const header = screen.getAllByRole('banner')[0];
       expect(within(header).queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
@@ -336,27 +332,158 @@ describe('Session-driven navigation/gating', () => {
       expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
     });
 
-    it('marks the current page and exposes its active visual treatment', () => {
+    it('hides open n8n for a disabled n8n user', () => {
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: true,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        permissions: {
+          isAdmin: false,
+          canRequestAccess: false,
+          canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
+        },
+      };
+
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      const homeLink = screen.getByRole('link', { name: 'Home' });
-      expect(homeLink).toHaveAttribute('aria-current', 'page');
-      expect(homeLink).toHaveClass('bg-white/15', 'font-bold', 'after:left-0', 'after:right-0');
-      expect(homeLink).not.toHaveClass('hover:underline');
+      expect(screen.queryByRole('button', { name: 'Open n8n' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
     });
 
-    it('left-aligns a single desktop item', () => {
+    it('hides open n8n for a role-less access-request user', () => {
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: false,
+          role: null,
+        },
+        permissions: {
+          isAdmin: false,
+          canRequestAccess: true,
+          canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
+        },
+      };
+
       renderWithProviders(
         <MemoryRouter initialEntries={['/']}>
           <App />
         </MemoryRouter>,
       );
 
-      expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('xl:ml-20', 'xl:justify-start');
+      expect(screen.queryByRole('button', { name: 'Open n8n' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+    });
+
+    it.each([
+      ['global:owner' as const, 'Owner'],
+      ['global:admin' as const, 'Admin'],
+      ['global:member' as const, 'Member'],
+    ])('shows open n8n for enabled user with %s role and invokes openN8n', async (slug, displayName) => {
+      const user = userEvent.setup();
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: false,
+          role: { slug, displayName },
+        },
+        permissions: {
+          isAdmin: slug !== 'global:member',
+          canRequestAccess: false,
+          canReviewAccessRequests: false,
+          canShareWorkflows: true,
+          canUnshareWorkflows: false,
+        },
+      };
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      const button = screen.getByRole('button', { name: 'Open n8n' });
+      expect(button).toBeInTheDocument();
+      expect(button).toHaveClass('w-[4.5rem]', 'sm:w-20');
+      await user.click(button);
+      expect(openN8n).toHaveBeenCalledOnce();
+      vi.mocked(openN8n).mockClear();
+    });
+
+    it('shows open n8n for enabled user even when custom UI feature flags are disabled', async () => {
+      const user = userEvent.setup();
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: {
+          id: 'user-1',
+          email: 'user@example.com',
+          disabled: false,
+          role: { slug: 'global:member', displayName: 'Member' },
+        },
+        permissions: {
+          isAdmin: false,
+          canRequestAccess: false,
+          canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
+          canViewWorkflows: false,
+          isCstarTenantProjectSyncEnabled: false,
+          canManageWil: false,
+          canManageProject: false,
+        },
+      };
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      const button = screen.getByRole('button', { name: 'Open n8n' });
+      expect(button).toBeInTheDocument();
+      await user.click(button);
+      expect(openN8n).toHaveBeenCalledOnce();
+      // Verify visibility is independent of feature flags: workflows nav is hidden but n8n remains
+      expect(screen.queryByText('Workflows')).not.toBeInTheDocument();
+    });
+
+    it('does not show Home in the top navigation', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument();
+    });
+
+    it('centers an empty desktop menu', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('xl:justify-center');
     });
 
     it('adds the hover underline treatment only to inactive links', () => {

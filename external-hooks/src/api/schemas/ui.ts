@@ -46,3 +46,17 @@ export const authExchangeSchema = z.object({
 export const authExchangeResponseSchema = z.object({
   token: z.string(),
 });
+
+export const authLogoutPrepareSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+  body: z
+    .object({
+      returnTo: z.string().trim().max(2048).optional(),
+    })
+    .optional(),
+});
+
+export const authLogoutPrepareResponseSchema = z.object({
+  logoutUrl: z.string(),
+});

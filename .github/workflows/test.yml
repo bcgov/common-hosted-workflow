@@ -45,7 +45,10 @@ jobs:
       working-directory: ./external-hooks
       shell: bash
 
-    - name: Run external-ui lint
-      run: pnpm lint
+    - name: Run external-ui lint, test & build
+      run: |
+        pnpm lint
+        pnpm test
+        pnpm build
       working-directory: ./external-ui
       shell: bash

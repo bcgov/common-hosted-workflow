@@ -15,6 +15,7 @@ interface AppHeaderProps {
   navItems: AppNavItem[];
   userEmail?: string;
   isLoading: boolean;
+  canOpenN8n: boolean;
   onLogin: () => void;
   onLogout: () => void;
   onOpenN8n: () => void;
@@ -32,7 +33,15 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
 const shellActionClassName =
   'h-[2.125rem] min-h-0 w-[4.5rem] border-white/30 bg-white/10 px-0 py-0 text-[0.8125rem] leading-none font-normal text-white shadow-none hover:bg-white/15 hover:text-white active:bg-white/20 focus-visible:outline-accent sm:w-20';
 
-function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout, onOpenN8n }: Readonly<AppHeaderProps>) {
+function AppHeader({
+  navItems,
+  userEmail,
+  isLoading,
+  canOpenN8n,
+  onLogin,
+  onLogout,
+  onOpenN8n,
+}: Readonly<AppHeaderProps>) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const hasSingleNavItem = navItems.length === 1;
@@ -171,16 +180,18 @@ function AppHeader({ navItems, userEmail, isLoading, onLogin, onLogout, onOpenN8
               Sign in
             </Button>
           )}
-          <Button
-            type="button"
-            onClick={onOpenN8n}
-            variant="ghost"
-            size="sm"
-            aria-label="Open n8n"
-            className={shellActionClassName}
-          >
-            Open n8n
-          </Button>
+          {canOpenN8n ? (
+            <Button
+              type="button"
+              onClick={onOpenN8n}
+              variant="ghost"
+              size="sm"
+              aria-label="Open n8n"
+              className={shellActionClassName}
+            >
+              Open n8n
+            </Button>
+          ) : null}
         </div>
       </div>
     </header>

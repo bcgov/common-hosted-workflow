@@ -50,6 +50,8 @@ export type SyncTenantsForUserParams = {
   ssoUserId: string;
   n8nUserId: string;
   accessToken: string;
+  /** Optional pre-fetched tenants to avoid a duplicate CSTAR tenants call when caller already holds them */
+  tenants?: import('../types/cstar').CstarTenant[];
 };
 
 export class TenantProjectSyncService {
@@ -89,10 +91,10 @@ export class TenantProjectSyncService {
       return;
     }
 
-    const { ssoUserId, n8nUserId, accessToken } = params;
+    const { ssoUserId, n8nUserId, accessToken, tenants: preFetchedTenants } = params;
     log.debug('Starting tenant project sync', { ssoUserId, n8nUserId });
 
-    const tenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken });
+    const tenants = preFetchedTenants ?? (await this.cstarService.getUserTenants({ ssoUserId, accessToken }));
 
     if (tenants.length > 0) {
       log.debug('Found CSTAR tenants for user', {

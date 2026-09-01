@@ -6,6 +6,7 @@ import {
   OIDC_USERINFO_ENDPOINT,
   OIDC_JWKS_URI,
   OIDC_END_SESSION_ENDPOINT,
+  OIDC_USE_MANUAL_ENDPOINTS,
   OIDC_CLIENT_ID,
   OIDC_CLIENT_SECRET,
   OIDC_REDIRECT_URI,
@@ -37,6 +38,7 @@ export type N8nOidcStateCookiePayload = {
   state?: string;
   codeVerifier?: string;
   redirectUri?: string;
+  returnTo?: string;
   exp?: number;
 };
 
@@ -53,6 +55,7 @@ export function getN8nOidcConfigFromEnv(): N8nOidcConfig {
     userinfoEndpoint: OIDC_USERINFO_ENDPOINT,
     jwksUri: OIDC_JWKS_URI,
     endSessionEndpoint: OIDC_END_SESSION_ENDPOINT,
+    useManualEndpoints: OIDC_USE_MANUAL_ENDPOINTS,
     clientId: OIDC_CLIENT_ID,
     clientSecret: OIDC_CLIENT_SECRET,
     redirectUri: OIDC_REDIRECT_URI,
@@ -64,10 +67,16 @@ export function getN8nOidcConfigFromEnv(): N8nOidcConfig {
 
 export function validateN8nOidcConfig(config: N8nOidcConfig) {
   const missing = [] as string[];
+  // OIDC_ISSUER is mandatory in every supported configuration mode.
+  // Manual endpoint mode without an issuer would allow ID-token verification
+  // without an issuer constraint — default to requiring issuer unless a
+  // documented provider compatibility need is reviewed.
+  if (!config.issuerUrl) missing.push('OIDC_ISSUER');
   if (!config.issuerUrl) {
-    if (!config.authorizationEndpoint && !config.tokenEndpoint && !config.userinfoEndpoint) {
-      missing.push('OIDC_ISSUER');
-    }
+    if (!config.authorizationEndpoint) missing.push('OIDC_AUTHORIZATION_ENDPOINT');
+    if (!config.tokenEndpoint) missing.push('OIDC_TOKEN_ENDPOINT');
+    if (!config.userinfoEndpoint) missing.push('OIDC_USERINFO_ENDPOINT');
+    if (!config.jwksUri) missing.push('OIDC_JWKS_URI');
   }
   if (!config.clientId) missing.push('OIDC_CLIENT_ID');
   if (!config.clientSecret) missing.push('OIDC_CLIENT_SECRET');
@@ -99,14 +108,23 @@ export function createSignedCookie(payload: object, secret: string, expiresInSec
 
 export function verifySignedCookie(cookie: string, secret: string) {
   try {
-    const [dataB64, signature] = cookie.split('.');
+    const dotIndex = cookie.lastIndexOf('.');
+    if (dotIndex === -1) return null;
+    const dataB64 = cookie.slice(0, dotIndex);
+    const signature = cookie.slice(dotIndex + 1);
+    if (!dataB64 || !signature) return null;
     const data = base64UrlDecode(dataB64).toString('utf8');
 
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(data);
     const expectedSignature = hmac.digest('hex');
 
-    if (signature !== expectedSignature) {
+    if (signature.length !== expectedSignature.length) {
+      return null;
+    }
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) {
       return null;
     }
 
@@ -169,8 +187,11 @@ export function parseN8nOidcRole(value: unknown): N8nOidcRoleSlug | '' {
     .map((role) => role.trim())
     .filter(Boolean);
 
-  if (roles.length > 0 && ['global:owner', 'global:admin', 'global:member'].includes(roles[0])) {
-    return roles[0] as N8nOidcRoleSlug;
+  const allowed: readonly string[] = ['global:owner', 'global:admin', 'global:member'];
+  for (const role of roles) {
+    if ((allowed as readonly string[]).includes(role)) {
+      return role as N8nOidcRoleSlug;
+    }
   }
 
   return '';

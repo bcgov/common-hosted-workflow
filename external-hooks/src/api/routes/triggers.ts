@@ -41,6 +41,7 @@ async function canManageTriggers(
   const tenantRow = await customRepositories.tenantProjectRelation.getRowByTenantId(tenantId);
   if (!tenantRow) return false;
   if (tenantRow.projectType === 'personal') {
+    if (!session.n8nUser) return false;
     const personalProject = await n8nRepositories.project.getPersonalProjectForUser(session.n8nUser.id);
     return personalProject?.id === tenantRow.projectId;
   }

@@ -144,6 +144,91 @@ describe('UiApiService', () => {
     ]);
   });
 
+  it('returns no workflows or projects for a disabled admin and never queries administrator-wide', async () => {
+    const n8nRepos = createMockN8nRepositories();
+    n8nRepos.user.findOne.mockResolvedValue({
+      id: 'user-123',
+      email: 'owner@example.com',
+      disabled: true,
+      role: { slug: 'global:admin', displayName: 'Admin' },
+    });
+
+    const service = new UiApiService(createMockN8nRepositoryObject(n8nRepos));
+    const result = await service.getWorkflows('owner@example.com');
+
+    expect(result.n8nUser).toEqual({
+      id: 'user-123',
+      email: 'owner@example.com',
+      disabled: true,
+      role: { slug: 'global:admin', displayName: 'Admin' },
+    });
+    expect(result.accessibleProjectIds).toEqual([]);
+    expect(result.projects).toEqual([]);
+    expect(result.workflows).toEqual([]);
+    expect(n8nRepos.sharedWorkflow.manager.query).not.toHaveBeenCalled();
+    expect(n8nRepos.project.getPersonalProjectForUser).not.toHaveBeenCalled();
+    expect(n8nRepos.projectRelation.findAllByUser).not.toHaveBeenCalled();
+  });
+
+  it('returns context identity but no data for a disabled member', async () => {
+    const n8nRepos = createMockN8nRepositories();
+    n8nRepos.user.findOne.mockResolvedValue({
+      id: 'user-123',
+      email: 'member@example.com',
+      disabled: true,
+      role: { slug: 'global:member', displayName: 'Member' },
+    });
+
+    const service = new UiApiService(createMockN8nRepositoryObject(n8nRepos));
+    const result = await service.loadUserContext('member@example.com');
+
+    expect(result.n8nUser?.disabled).toBe(true);
+    expect(result.workflows).toEqual([]);
+    expect(n8nRepos.sharedWorkflow.manager.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects sharing for a disabled admin retaining a stale role', async () => {
+    const n8nRepos = createMockN8nRepositories();
+    n8nRepos.user.findOne.mockResolvedValue({
+      id: 'user-123',
+      email: 'owner@example.com',
+      disabled: true,
+      role: { slug: 'global:admin', displayName: 'Admin' },
+    });
+
+    const service = new UiApiService(createMockN8nRepositoryObject(n8nRepos));
+    await expect(service.shareWorkflow('owner@example.com', 'wf-1', 'new@example.com')).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(n8nRepos.sharedWorkflow.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsharing for a disabled admin retaining a stale role', async () => {
+    const n8nRepos = createMockN8nRepositories();
+    n8nRepos.user.findOne.mockResolvedValue({
+      id: 'user-123',
+      email: 'owner@example.com',
+      disabled: true,
+      role: { slug: 'global:admin', displayName: 'Admin' },
+    });
+
+    const service = new UiApiService(createMockN8nRepositoryObject(n8nRepos));
+    await expect(service.unshareWorkflow('owner@example.com', 'wf-1', 'team-proj')).rejects.toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it('returns an empty context for an unprovisioned identity', async () => {
+    const n8nRepos = createMockN8nRepositories();
+    n8nRepos.user.findOne.mockResolvedValue(null);
+
+    const service = new UiApiService(createMockN8nRepositoryObject(n8nRepos));
+    const result = await service.loadUserContext('nobody@example.com');
+
+    expect(result).toEqual({ n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] });
+    expect(n8nRepos.sharedWorkflow.manager.query).not.toHaveBeenCalled();
+  });
+
   it('shares a workflow with a new email', async () => {
     const n8nRepos = createMockN8nRepositories();
     n8nRepos.user.findOne.mockImplementation(async ({ where: { email } }) => {

@@ -35,15 +35,38 @@ function getSessionHandleFromUrl() {
   return session;
 }
 
-function clearSessionHandleFromUrl() {
+function clearSecurityParamsFromUrl() {
   const url = new URL(globalThis.location.href);
-  if (!url.searchParams.has('session')) {
-    return;
+  const keys = ['session', 'continue', 'signedOut', 'logout'];
+  let changed = false;
+  for (const key of keys) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
   }
-
-  url.searchParams.delete('session');
-  globalThis.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  if (changed) {
+    globalThis.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }
 }
+
+function consumeSignedOutMarker() {
+  const url = new URL(globalThis.location.href);
+  if (url.searchParams.get('signedOut') !== '1') return false;
+
+  url.searchParams.delete('signedOut');
+  globalThis.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  return true;
+}
+
+export function clearSessionHandleFromUrl() {
+  // Backwards-compatible helper: delegate to full security cleanup so
+  // session, continue, signedOut and logout are removed together while
+  // preserving unrelated query/hash values.
+  clearSecurityParamsFromUrl();
+}
+
+export { clearSecurityParamsFromUrl };
 
 function exchangeSessionOnce(sessionHandle: string) {
   const existing = sessionExchangeRequests.get(sessionHandle);
@@ -58,6 +81,21 @@ function exchangeSessionOnce(sessionHandle: string) {
   return request;
 }
 
+async function exchangeAndStoreSession(sessionHandle: string, isCancelled: () => boolean) {
+  try {
+    const result = await exchangeSessionOnce(sessionHandle);
+    if (!isCancelled()) {
+      setStoredAppToken(result.token);
+      clearSecurityParamsFromUrl();
+    }
+  } catch {
+    if (!isCancelled()) {
+      clearStoredAppToken();
+      clearSecurityParamsFromUrl();
+    }
+  }
+}
+
 export function SessionBootstrap({ children }: { children: ReactNode }) {
   const [isTokenReady, setIsTokenReady] = useState(false);
 
@@ -65,20 +103,15 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function bootstrapToken() {
+      if (consumeSignedOutMarker()) {
+        clearStoredAppToken();
+      }
+
       const sessionHandle = getSessionHandleFromUrl();
       if (sessionHandle) {
-        try {
-          const result = await exchangeSessionOnce(sessionHandle);
-          if (!cancelled) {
-            setStoredAppToken(result.token);
-            clearSessionHandleFromUrl();
-          }
-        } catch {
-          if (!cancelled) {
-            clearStoredAppToken();
-            clearSessionHandleFromUrl();
-          }
-        }
+        await exchangeAndStoreSession(sessionHandle, () => cancelled);
+      } else {
+        clearSecurityParamsFromUrl();
       }
 
       if (!cancelled) {

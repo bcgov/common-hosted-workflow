@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { OidcDiscoveryDocument, UiOidcConfig } from './ui-oidc';
+import { OIDC_PROVIDER_TIMEOUT_MS } from '@config';
 
 export type OidcProviderConfig = Pick<
   UiOidcConfig,
@@ -14,7 +15,9 @@ export type OidcProviderConfig = Pick<
   | 'clientSecret'
   | 'redirectUri'
   | 'scopes'
->;
+> & {
+  useManualEndpoints?: boolean;
+};
 
 export type OidcAuthorizationState = {
   nonce: string;
@@ -59,12 +62,90 @@ type OidcDiscoveryCacheEntry = {
 const discoveryCache = new Map<string, OidcDiscoveryCacheEntry>();
 const OIDC_DISCOVERY_CACHE_TTL_MS = 60 * 60 * 1000;
 
+// Remote JWKS resolver reuse — one instance per trusted JWKS URI.
+// `jose`'s RemoteJWKSet internally respects Cache-Control / key rotation
+// (re-fetches when `kid` not found / on expiry), so reusing the instance
+// preserves rotation while avoiding per-verification construction and
+// redundant network work.
+// Exported helpers for tests: `clearJwksCacheForTests`, `getJwksCacheSizeForTests`.
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+function getRemoteJWKSet(jwksUri: string) {
+  let entry = jwksCache.get(jwksUri);
+  if (!entry) {
+    entry = createRemoteJWKSet(new URL(jwksUri));
+    jwksCache.set(jwksUri, entry);
+  }
+  return entry;
+}
+export function clearJwksCacheForTests() {
+  jwksCache.clear();
+}
+export function getJwksCacheSizeForTests() {
+  return jwksCache.size;
+}
+export function getJwksCacheKeysForTests() {
+  return [...jwksCache.keys()];
+}
+
+export function clearOidcDiscoveryCache() {
+  discoveryCache.clear();
+}
+
+// Bounded provider fetch with stable timeout handling.
+// All OIDC provider network calls (discovery, token, refresh, userinfo)
+// go through this helper. It aborts after `timeoutMs` and throws the
+// stable message `OIDC provider request timed out` so callers and
+// tests can assert upper time bounds without depending on fetch
+// implementation details or raw AbortError text.
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = OIDC_PROVIDER_TIMEOUT_MS,
+): Promise<Response> {
+  // Allow tests to disable timeout with 0 or negative
+  if (!timeoutMs || timeoutMs <= 0) {
+    return fetch(input, init);
+  }
+  const controller = new AbortController();
+  // Merge caller signal with timeout signal when possible (Node 20+ has AbortSignal.any)
+  let signal: AbortSignal = controller.signal;
+  if (init.signal) {
+    const anyFn = (AbortSignal as unknown as { any?: (s: AbortSignal[]) => AbortSignal }).any;
+    if (typeof anyFn === 'function') {
+      signal = anyFn([init.signal as AbortSignal, controller.signal]);
+    } else {
+      // Fallback: honour caller abort separately, timeout still aborts its own controller
+      // Caller aborts will not be merged, but no caller currently passes a signal.
+      signal = controller.signal;
+      if ((init.signal as AbortSignal).aborted) controller.abort();
+      else (init.signal as AbortSignal).addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(input, { ...init, signal });
+    return response;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('OIDC provider request timed out', { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function getOidcProviderTimeoutMsForTests() {
+  return OIDC_PROVIDER_TIMEOUT_MS;
+}
+
 function getDiscoveryCacheKey(config: OidcProviderConfig) {
   return [
     config.issuerUrl,
     config.authorizationEndpoint,
     config.tokenEndpoint,
     config.userinfoEndpoint,
+    config.jwksUri,
     config.clientId,
     config.redirectUri,
   ].join('|');
@@ -72,13 +153,27 @@ function getDiscoveryCacheKey(config: OidcProviderConfig) {
 
 export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
   if (!config.issuerUrl) {
+    throw new Error('OIDC issuer is required in manual endpoint mode');
+  }
+
+  // A container may need internal provider endpoints while the issuer remains
+  // browser-facing. When every endpoint is explicitly configured, discovery
+  // would incorrectly try to reach that browser address from the container.
+  if (
+    config.useManualEndpoints &&
+    config.authorizationEndpoint &&
+    config.tokenEndpoint &&
+    config.userinfoEndpoint &&
+    config.jwksUri
+  ) {
     return {
       issuer: config.issuerUrl,
       authorization_endpoint: config.authorizationEndpoint,
       token_endpoint: config.tokenEndpoint,
       userinfo_endpoint: config.userinfoEndpoint,
+      jwks_uri: config.jwksUri,
       end_session_endpoint: config.endSessionEndpoint || undefined,
-    } satisfies OidcDiscoveryDocument;
+    };
   }
 
   const cacheKey = getDiscoveryCacheKey(config);
@@ -89,7 +184,7 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
   }
 
   const issuerUrl = config.issuerUrl.endsWith('/') ? config.issuerUrl.slice(0, -1) : config.issuerUrl;
-  const response = await fetch(`${issuerUrl}/.well-known/openid-configuration`);
+  const response = await fetchWithTimeout(`${issuerUrl}/.well-known/openid-configuration`);
   if (!response.ok) {
     throw new Error(`Failed to fetch OIDC discovery document: ${response.status}`);
   }
@@ -199,7 +294,7 @@ export async function exchangeAuthorizationCode(params: {
     body.set('code_verifier', params.codeVerifier);
   }
 
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetchWithTimeout(tokenEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -237,7 +332,7 @@ export async function refreshOidcTokens(params: {
     client_secret: params.config.clientSecret,
   });
 
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetchWithTimeout(tokenEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -258,6 +353,15 @@ export async function refreshOidcTokens(params: {
   };
 }
 
+function resolveOidcIssuer(config: OidcProviderConfig, discovery: OidcDiscoveryDocument): string | undefined {
+  const configured = config.issuerUrl?.trim() || undefined;
+  const discovered = discovery.issuer?.trim() || undefined;
+  if (configured && discovered && configured !== discovered) {
+    throw new Error(`OIDC discovery issuer mismatch: expected ${configured} got ${discovered}`);
+  }
+  return discovered || configured || undefined;
+}
+
 async function verifyOidcIdToken(params: {
   idToken: string;
   discovery: OidcDiscoveryDocument;
@@ -266,19 +370,20 @@ async function verifyOidcIdToken(params: {
 }) {
   const jwksUri = params.discovery.jwks_uri || params.config.jwksUri;
   if (!jwksUri) {
-    const claims = decodeOidcJwt(params.idToken);
-    if (typeof claims.nonce !== 'string' || claims.nonce !== params.expectedNonce) {
-      throw new Error('Invalid nonce');
-    }
-    return claims;
+    throw new Error('OIDC JWKS URI is not configured');
   }
 
-  const issuer = params.discovery.issuer || params.config.issuerUrl;
-  const jwks = createRemoteJWKSet(new URL(jwksUri));
-  const verification = await jwtVerify(params.idToken, jwks, {
+  const issuer = resolveOidcIssuer(params.config, params.discovery);
+  if (!issuer) {
+    throw new Error('OIDC issuer is not configured');
+  }
+
+  const jwks = getRemoteJWKSet(jwksUri);
+  const verifyOpts: { issuer: string; audience: string } = {
     issuer,
     audience: params.config.clientId,
-  });
+  };
+  const verification = await jwtVerify(params.idToken, jwks, verifyOpts);
 
   const claims = verification.payload as Record<string, unknown>;
   if (typeof claims.nonce !== 'string' || claims.nonce !== params.expectedNonce) {
@@ -298,7 +403,7 @@ export async function fetchOidcUserInfo(params: {
     return null;
   }
 
-  const response = await fetch(userinfoEndpoint, {
+  const response = await fetchWithTimeout(userinfoEndpoint, {
     headers: { Authorization: `Bearer ${params.accessToken}` },
   });
 
@@ -315,6 +420,9 @@ export async function completeOidcAuthorization(params: {
   config: OidcProviderConfig;
 }) {
   const discovery = await fetchOidcDiscoveryDocument(params.config);
+  // Validate discovered issuer exactly against configured issuer before any token handling.
+  resolveOidcIssuer(params.config, discovery);
+
   const tokens = await exchangeAuthorizationCode({
     code: params.code,
     discovery,
@@ -323,14 +431,20 @@ export async function completeOidcAuthorization(params: {
     codeVerifier: params.storedState.codeVerifier,
   });
 
-  const idTokenClaims = tokens.id_token
-    ? await verifyOidcIdToken({
-        idToken: tokens.id_token,
-        discovery,
-        config: params.config,
-        expectedNonce: params.storedState.nonce,
-      })
-    : null;
+  if (!tokens.id_token) {
+    throw new Error('Missing ID token in token response');
+  }
+
+  const idTokenClaims = await verifyOidcIdToken({
+    idToken: tokens.id_token,
+    discovery,
+    config: params.config,
+    expectedNonce: params.storedState.nonce,
+  });
+
+  if (typeof idTokenClaims.sub !== 'string' || !idTokenClaims.sub) {
+    throw new Error('Invalid ID token: missing sub');
+  }
 
   const userInfo = tokens.access_token
     ? await fetchOidcUserInfo({
@@ -340,12 +454,64 @@ export async function completeOidcAuthorization(params: {
       })
     : null;
 
+  if (userInfo) {
+    if (typeof userInfo.sub !== 'string' || !userInfo.sub) {
+      throw new Error('Invalid userinfo: missing sub');
+    }
+    if (userInfo.sub !== idTokenClaims.sub) {
+      throw new Error('userinfo sub mismatch');
+    }
+  }
+
+  // Authoritative claim sources (explicit merging — no silent spread overwrite):
+  // - sub: verified ID token only
+  // - email: verified ID token if present, otherwise verified userinfo (same subject)
+  // - roles / authorization claim: verified ID token if present, otherwise userinfo
+  // - iss/aud/nonce/exp/iat/nbf/jti: verified ID token only
+  // - other profile claims: ID token preferred, userinfo supplements without overwriting
+  const mergedClaims: Record<string, unknown> = { ...idTokenClaims };
+  if (userInfo) {
+    const protectedKeys = new Set([
+      'sub',
+      'iss',
+      'aud',
+      'nonce',
+      'exp',
+      'iat',
+      'nbf',
+      'jti',
+      'at_hash',
+      'c_hash',
+      'azp',
+    ]);
+    for (const [key, value] of Object.entries(userInfo)) {
+      if (protectedKeys.has(key)) continue;
+      // Email and roles are authoritative from ID token if already present.
+      if (
+        (key === 'email' || key === 'preferred_username') &&
+        typeof mergedClaims[key] === 'string' &&
+        mergedClaims[key]
+      ) {
+        continue;
+      }
+      if (key in mergedClaims) continue;
+      mergedClaims[key] = value;
+    }
+    // Ensure email from userinfo is used if ID token lacks it (subject already verified equal).
+    if (!mergedClaims.email && typeof userInfo.email === 'string' && userInfo.email) {
+      mergedClaims.email = userInfo.email;
+    }
+    if (!mergedClaims.preferred_username && typeof userInfo.preferred_username === 'string') {
+      mergedClaims.preferred_username = userInfo.preferred_username;
+    }
+  }
+
   return {
     discovery,
     tokens,
     idTokenClaims,
     userInfo,
-    mergedClaims: { ...(idTokenClaims ?? {}), ...(userInfo ?? {}) },
+    mergedClaims,
   } satisfies OidcAuthorizationResult;
 }
 

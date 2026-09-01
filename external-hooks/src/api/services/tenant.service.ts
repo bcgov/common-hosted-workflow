@@ -102,9 +102,42 @@ export class TenantService {
   }
 
   /**
+   * Combined tenant roles+groups operation (single cache-aside, single CSTAR batch).
+   * On cache hit for both, zero CSTAR calls. On either miss, one fetchAndCache call
+   * populates both caches. This avoids duplicated orchestration when ui-api previously
+   * called getTenantRolesForSession + getTenantGroupsForSession sequentially (2 Redis
+   * GETs each + conditional extra CSTAR if second still missed).
+   * Callers that need only one slice can still use the convenience wrappers below,
+   * which delegate to this combined operation.
+   */
+  async getTenantRolesAndGroupsForSession(params: {
+    email: string;
+    ssoUserId: string;
+    accessToken?: string;
+    refreshAccessToken?: () => Promise<{ accessToken: string; refreshedToken?: string } | null>;
+  }): Promise<{ roles: TenantRole[]; groups: TenantGroup[]; refreshedToken?: string }> {
+    if (!this.cstarService.isConfigured()) {
+      return { roles: [], groups: [] };
+    }
+
+    const [cachedRoles, cachedGroups] = await Promise.all([
+      getUiTenantRoles(params.email),
+      getUiTenantGroups(params.email),
+    ]);
+    if (cachedRoles && cachedGroups) {
+      return { roles: cachedRoles, groups: cachedGroups };
+    }
+
+    const { roles, groups, refreshedToken } = await this.fetchAndCacheRolesAndGroups(params);
+    return { roles, groups, refreshedToken };
+  }
+
+  /**
    * Resolves tenant roles for a user session (cache-aside pattern).
    * Returns cached value from Redis if available, otherwise fetches from CSTAR.
    * On cache miss, fetches both roles and groups in a single CSTAR call and populates both caches.
+   * Preserves single-cache read for single-slice callers; combined callers should use
+   * getTenantRolesAndGroupsForSession to avoid sequential GETs.
    */
   async getTenantRolesForSession(params: {
     email: string;
@@ -121,7 +154,6 @@ export class TenantService {
       return { roles: cached };
     }
 
-    // Cache miss — fetch both and populate both caches
     const { roles, refreshedToken } = await this.fetchAndCacheRolesAndGroups(params);
     return { roles, refreshedToken };
   }
@@ -130,6 +162,8 @@ export class TenantService {
    * Resolves tenant groups for a user session (cache-aside pattern).
    * Returns cached value from Redis if available, otherwise fetches from CSTAR.
    * On cache miss, fetches both roles and groups in a single CSTAR call and populates both caches.
+   * Preserves single-cache read for single-slice callers; combined callers should use
+   * getTenantRolesAndGroupsForSession to avoid sequential GETs.
    */
   async getTenantGroupsForSession(params: {
     email: string;
@@ -146,7 +180,6 @@ export class TenantService {
       return { groups: cached };
     }
 
-    // Cache miss — fetch both and populate both caches
     const { groups, refreshedToken } = await this.fetchAndCacheRolesAndGroups(params);
     return { groups, refreshedToken };
   }
@@ -192,17 +225,25 @@ export class TenantService {
    * Pre-warms both tenant roles and tenant groups cache at login time.
    * Uses a single CSTAR call (getUserGroupsWithRoles) per tenant to derive both.
    * Throws on failure — caller is responsible for error handling.
+   * Accepts optional pre-fetched tenants to avoid a duplicate CSTAR tenants call
+   * when the caller already holds the tenant list (e.g., post-login work reuses
+   * the same tenants for sync and pre-warm).
    */
   async prewarmTenantRolesAndGroups(params: {
     email: string;
     ssoUserId: string;
     accessToken: string;
+    tenants?: import('../types/cstar').CstarTenant[];
   }): Promise<{ refreshedToken?: string }> {
     if (!this.cstarService.isConfigured()) {
       return {};
     }
 
-    const { roles, groups } = await this.fetchTenantRolesAndGroupsFromCstar(params.ssoUserId, params.accessToken);
+    const { roles, groups } = await this.fetchTenantRolesAndGroupsFromCstar(
+      params.ssoUserId,
+      params.accessToken,
+      params.tenants,
+    );
     await Promise.all([setUiTenantRoles(params.email, roles), setUiTenantGroups(params.email, groups)]);
     return {};
   }
@@ -235,8 +276,9 @@ export class TenantService {
   private async fetchTenantRolesAndGroupsFromCstar(
     ssoUserId: string,
     accessToken: string,
+    preFetchedTenants?: import('../types/cstar').CstarTenant[],
   ): Promise<{ roles: TenantRole[]; groups: TenantGroup[] }> {
-    const tenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken });
+    const tenants = preFetchedTenants ?? (await this.cstarService.getUserTenants({ ssoUserId, accessToken }));
     if (tenants.length === 0) {
       return { roles: [], groups: [] };
     }

@@ -1,12 +1,15 @@
 import { randomBytes } from 'crypto';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { type infer as zInfer } from 'zod';
+import { N8N_BASE_URL } from '@config';
 import { OkResponse, CreatedResponse, ForbiddenResponse, UnauthorizedResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestParser } from '../utils/validation';
 import {
   authExchangeResponseSchema,
   authExchangeSchema,
+  authLogoutPrepareResponseSchema,
+  authLogoutPrepareSchema,
   shareWorkflowResponseSchema,
   shareWorkflowSchema,
   unshareWorkflowResponseSchema,
@@ -21,42 +24,29 @@ import {
   accessRequestListResponseSchema,
   reviewAccessRequestResponseSchema,
 } from '../schemas/access-request';
-import { issueUiSessionToken } from '../helpers/ui-auth-token';
-import { completeUiLogin, buildUiLoginRedirect } from '../helpers/ui-oidc-auth';
+import { consumeUiSessionExchange, setUiLogoutHandle } from '../helpers/ui-oidc-store';
 import {
-  consumeUiSessionExchange,
-  deleteUiOidcTokens,
-  getUiOidcIdToken,
-  setUiOidcAccessTokenRecord,
-  setUiOidcIdToken,
-  setUiOidcRefreshToken,
-  setUiOidcRefreshTokenWithExpiry,
-  setUiSessionExchange,
-} from '../helpers/ui-oidc-store';
-import { fetchOidcDiscoveryDocument } from '../helpers/oidc-provider';
-import { getBearerToken, getUiSession, serializeN8nUser, refreshSessionByEmail } from '../helpers/ui-oidc-session';
+  getBearerToken,
+  getUiSession,
+  serializeN8nUser,
+  refreshSessionByEmail,
+  type UiOidcSessionStoreDeps,
+} from '../helpers/ui-oidc-session';
+import { getUiOidcAccessTokenByEmail } from '../helpers/ui-oidc-store';
+import { getAuthCookieOptions, getSecureCookieFlag } from '../helpers/cookie';
 import { computePermissions, type Permissions } from '../helpers/permissions';
-import {
-  getOidcConfigFromEnv,
-  buildSessionSummary,
-  buildWhoamiResponse,
-  type UiSerializedN8nUser,
-} from '../helpers/ui-oidc';
-import { appendQueryParam, appendSessionToReturnTo } from '../helpers/url';
+import { buildSessionSummary, buildWhoamiResponse, type UiSerializedN8nUser } from '../helpers/ui-oidc';
+import { appendQueryParam } from '../helpers/url';
+import { createReturnTargetPolicy, resolveReturnTarget } from '../helpers/return-target';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { buildWilRouter } from './wil';
 import { buildAdminProjectRouter } from './admin-projects';
-import { createLogger } from '../utils/logger';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
-
-const log = createLogger('UiApi');
 
 type UiApiMutableRequest = Request & {
   session?: UiApiRequest['session'];
   context?: UiApiRequest['context'];
 };
-
-const UI_SESSION_EXCHANGE_TTL_MS = 60 * 1000;
 
 function setRefreshedUiTokenHeader(res: Response, token?: string) {
   if (token) {
@@ -64,8 +54,75 @@ function setRefreshedUiTokenHeader(res: Response, token?: string) {
   }
 }
 
-async function resolveUiRequestContext(req: Request, services: ApiRouteContext['services']) {
-  const rawSessionResult = await getUiSession(req);
+function clearN8nAuthCookie(res: Response) {
+  const clearCookie = (res as unknown as { clearCookie?: (name: string, opts?: unknown) => void }).clearCookie;
+  if (typeof clearCookie !== 'function') return;
+  try {
+    const isSecure = getSecureCookieFlag();
+    clearCookie.call(res as unknown as Record<string, unknown>, 'n8n-auth', {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax' as const,
+      path: '/' as const,
+    });
+  } catch {
+    // getSecureCookieFlag throws in production on misconfigured
+    // N8N_BASE_URL/N8N_PROTOCOL — fall back to path-only clear so
+    // an expired OIDC session still removes the browser cookie.
+    try {
+      clearCookie.call(res as unknown as Record<string, unknown>, 'n8n-auth', { path: '/' });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function extendN8nAuthCookie(req: Request, res: Response) {
+  const cookies = (req as unknown as { cookies?: Record<string, string | undefined> }).cookies;
+  const token = cookies?.['n8n-auth'];
+  if (!token) return;
+  const cookieFn = (res as unknown as { cookie?: (name: string, val: string, opts?: unknown) => void }).cookie;
+  if (typeof cookieFn !== 'function') return;
+  try {
+    const isSecure = getSecureCookieFlag();
+    cookieFn.call(res as unknown as Record<string, unknown>, 'n8n-auth', token, getAuthCookieOptions(isSecure));
+  } catch {
+    // misconfigured Secure derivation must not break refresh
+  }
+}
+
+function shouldClearN8nCookieOnExpiry(req: Request, resolved: unknown) {
+  // OIDC session expired/revoked but the browser still presents
+  // n8n-auth — remove it so both sessions end together.
+  // Only when a UI bearer was presented; anonymous without a bearer
+  // must not clear a valid n8n-only session.
+  return !resolved && !!getBearerToken(req);
+}
+
+// Authenticated context — explicit UI credential (bearer via getUiSession),
+// upstream credential (server-side, never bearer in separate-token mode),
+// identity (session.email/subject/claims), and authorization (permissions/n8nUser).
+// Routes consume capabilities (checkPermission/checkRole) rather than inferring
+// from token shape. Smallest injectable boundary for tests: optional sessionDeps
+// allows faking the store without module-global Redis/env mutation.
+export type UiRequestContextDeps = {
+  sessionStoreDeps?: UiOidcSessionStoreDeps;
+  getUiSessionFn?: typeof getUiSession;
+  getAccessTokenByEmailFn?: typeof getUiOidcAccessTokenByEmail;
+};
+async function resolveUiRequestContext(
+  req: Request,
+  services: ApiRouteContext['services'],
+  injected?: UiRequestContextDeps,
+) {
+  const getSession = injected?.getUiSessionFn ?? getUiSession;
+  const getAccessByEmail = injected?.getAccessTokenByEmailFn ?? getUiOidcAccessTokenByEmail;
+  const rawSessionResult = injected?.sessionStoreDeps
+    ? await (getSession as unknown as (r: Request, d: unknown) => Promise<unknown>)(
+        req,
+        injected.sessionStoreDeps as unknown,
+      )
+    : await (getSession as unknown as (r: Request) => Promise<unknown>)(req);
   if (!rawSessionResult) {
     return null;
   }
@@ -74,20 +131,28 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
     typeof rawSessionResult === 'object' && rawSessionResult !== null && 'session' in rawSessionResult;
   const session = hasWrappedSession ? rawSessionResult.session : rawSessionResult;
   const sessionRefreshedToken = hasWrappedSession ? rawSessionResult.refreshedToken : undefined;
+  // Upstream credential is distinct from the UI bearer. In separate-token mode the bearer
+  // is an app JWT (HS256, sid-checked) while the upstream OIDC access token lives server-side.
+  // Track the authoritative upstream token (refreshed within this request if needed).
+  let upstreamAccessToken: string | undefined = hasWrappedSession ? rawSessionResult.upstreamAccessToken : undefined;
 
   const context = await services.uiApi.loadUserContext(session.email);
   const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
-  const resolvedN8nUser = serializeN8nUser(context.n8nUser) ?? {
-    id: ssoUserId,
-    email: session.email,
-    disabled: false,
-    role: null,
-  };
+  // Unauthenticated-by-n8n identities keep `n8nUser: null`; they hold a UI session
+  // with access-request capabilities only, never a synthetic enabled n8n user.
+  const resolvedN8nUser = serializeN8nUser(context.n8nUser);
 
   const refreshAccessToken = async () => {
-    const result = await refreshSessionByEmail(session.email);
+    const result = injected?.sessionStoreDeps
+      ? ((await (refreshSessionByEmail as unknown as (e: string, t: unknown, d: unknown) => Promise<unknown>)(
+          session.email,
+          undefined,
+          injected.sessionStoreDeps as unknown,
+        )) as unknown as Awaited<ReturnType<typeof refreshSessionByEmail>>)
+      : await refreshSessionByEmail(session.email);
     if (!result) return null;
     if (!result.upstreamAccessToken) return null;
+    upstreamAccessToken = result.upstreamAccessToken;
     return { accessToken: result.upstreamAccessToken, refreshedToken: result.refreshedToken };
   };
 
@@ -105,6 +170,13 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
 
   const refreshedToken = tenantRolesResult.refreshedToken ?? tenantGroupsResult.refreshedToken ?? sessionRefreshedToken;
 
+  // Fallback to server-side store for the authoritative upstream credential (never the UI bearer).
+  // If refresh occurred via getUiSession or tenant refreshAccessToken, upstreamAccessToken already holds the fresh value.
+  if (!upstreamAccessToken) {
+    const access = await getAccessByEmail(session.email);
+    upstreamAccessToken = (access as string | null) ?? undefined;
+  }
+
   return {
     session: {
       ...session,
@@ -112,20 +184,28 @@ async function resolveUiRequestContext(req: Request, services: ApiRouteContext['
       permissions: computePermissions(resolvedN8nUser, services.featureFlag),
       tenantRoles: tenantRolesResult.roles,
       tenantGroups: tenantGroupsResult.groups,
+      // Internal use only — excluded from buildSessionSummary/buildWhoamiResponse public types
+      upstreamAccessToken,
     },
     context,
     refreshedToken,
+    upstreamAccessToken,
   };
 }
 
-function createUiRequestContextMiddleware(services: ApiRouteContext['services']) {
+function createUiRequestContextMiddleware(services: ApiRouteContext['services'], injected?: UiRequestContextDeps) {
   return async (req: UiApiMutableRequest, _res: Response, next: NextFunction) => {
     try {
-      const resolved = await resolveUiRequestContext(req, services);
+      const resolved = await resolveUiRequestContext(req, services, injected);
       if (resolved) {
         req.session = resolved.session;
         req.context = resolved.context;
         setRefreshedUiTokenHeader(_res, resolved.refreshedToken);
+        if (resolved.refreshedToken) {
+          extendN8nAuthCookie(req, _res);
+        }
+      } else if (shouldClearN8nCookieOnExpiry(req, resolved)) {
+        clearN8nAuthCookie(_res);
       }
 
       next();
@@ -135,8 +215,8 @@ function createUiRequestContextMiddleware(services: ApiRouteContext['services'])
   };
 }
 
-function requireUiRequestContextMiddleware(services: ApiRouteContext['services']) {
-  const loadUiRequestContext = createUiRequestContextMiddleware(services);
+function requireUiRequestContextMiddleware(services: ApiRouteContext['services'], injected?: UiRequestContextDeps) {
+  const loadUiRequestContext = createUiRequestContextMiddleware(services, injected);
 
   return async (req: UiApiMutableRequest, res: Response, next: NextFunction) => {
     await loadUiRequestContext(req, res, (error?: unknown) => {
@@ -154,7 +234,7 @@ function requireUiRequestContextMiddleware(services: ApiRouteContext['services']
   };
 }
 
-export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware };
+export { createUiRequestContextMiddleware, requireUiRequestContextMiddleware, resolveUiRequestContext };
 
 function checkPermission(permissionKey: keyof Permissions) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -169,8 +249,9 @@ function checkPermission(permissionKey: keyof Permissions) {
 
 function checkRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const roleSlug = (req as UiApiRequest).session?.n8nUser?.role?.slug;
-    if (!roleSlug || !allowedRoles.includes(roleSlug)) {
+    const n8nUser = (req as UiApiRequest).session?.n8nUser;
+    // Disabled users must not pass role guards even when a stale role remains in the database.
+    if (!n8nUser || n8nUser.disabled || !n8nUser.role || !allowedRoles.includes(n8nUser.role.slug)) {
       ForbiddenResponse(res);
       return;
     }
@@ -179,20 +260,30 @@ function checkRole(...allowedRoles: string[]) {
 }
 
 export function buildUiApiRouter(routeContext: ApiRouteContext) {
-  const { services, n8nRepositories } = routeContext;
+  const { services } = routeContext;
   const router = Router();
   const requireUiRequestContext = requireUiRequestContextMiddleware(services);
+  const returnTargetPolicy = createReturnTargetPolicy();
 
   router.get('/session', async (req, res) => {
     const resolved = await resolveUiRequestContext(req, services);
+    if (resolved?.refreshedToken) {
+      extendN8nAuthCookie(req, res);
+    } else if (shouldClearN8nCookieOnExpiry(req, resolved)) {
+      clearN8nAuthCookie(res);
+    }
     setRefreshedUiTokenHeader(res, resolved?.refreshedToken);
 
     res.json(buildSessionSummary(resolved?.session ?? null));
   });
 
+  // Deprecated compatibility alias — redirects only, never establishes a session
+  // or trusts identity. The sole authorization flow is GET /rest/auth/oidc/callback.
+  // Retained as a redirect alias for deployed callers; removal target: next minor
+  // after provider docs confirm only the unified callback is registered (expected 2026-09-30).
   router.get('/auth/login', async (req, res) => {
-    const redirectUrl = await buildUiLoginRedirect(req);
-    res.redirect(redirectUrl);
+    const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/ui/';
+    res.redirect(appendQueryParam(`${N8N_BASE_URL}/rest/auth/oidc/login`, 'returnTo', returnTo));
   });
 
   router.post(
@@ -209,118 +300,44 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     },
   );
 
-  router.get('/auth/callback', async (req, res) => {
-    const result = await completeUiLogin(req);
-    if (!result.ok) {
-      res.redirect(appendQueryParam(result.returnTo, 'error', result.errorMessage));
-      return;
-    }
+  const UI_LOGOUT_HANDLE_TTL_MS = 60 * 1000;
 
-    let token: string;
-
-    try {
-      if (result.refreshToken) {
-        if (result.refreshTokenExpiresAt) {
-          await setUiOidcRefreshTokenWithExpiry(result.email, result.refreshToken, result.refreshTokenExpiresAt);
-        } else {
-          await setUiOidcRefreshToken(result.email, result.refreshToken);
-        }
-      }
-      if (result.idToken) {
-        await setUiOidcIdToken(result.email, result.idToken);
-      }
-      if (result.accessToken) {
-        await setUiOidcAccessTokenRecord(result.email, result.accessToken, result.accessTokenExpiresAt);
+  // Authenticated logout preparation: derive identity from the verified bearer
+  // session and return a short-lived, single-use opaque logout handle bound to
+  // the validated return target. The canonical OIDC logout endpoint consumes
+  // the handle and never trusts caller-supplied identity or destinations.
+  router.post(
+    '/auth/logout-prepare',
+    createRequestParser(authLogoutPrepareSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof authLogoutPrepareSchema>>, res) => {
+      const sessionResult = await getUiSession(req);
+      const session = sessionResult && 'session' in sessionResult ? sessionResult.session : null;
+      if (!session?.email) {
+        UnauthorizedResponse(res);
+        return;
       }
 
-      token = await issueUiSessionToken({
-        oidc: {
-          subject: result.subject,
-          email: result.email,
-          preferredUsername: result.preferredUsername,
-          name: result.name,
-          issuer: result.issuer,
-          audience: result.audience,
-          claims: result.claims,
-        },
-        upstreamAccessToken: result.accessToken,
-        upstreamExpiresAt: result.accessTokenExpiresAt,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to establish UI session';
-      res.redirect(appendQueryParam(result.returnTo, 'error', message));
-      return;
-    }
+      const returnTo =
+        resolveReturnTarget(req.parsed.body?.returnTo, 'logout', returnTargetPolicy) ?? returnTargetPolicy.fallback;
+      const handle = randomBytes(24).toString('base64url');
+      await setUiLogoutHandle(handle, { email: session.email, returnTo }, UI_LOGOUT_HANDLE_TTL_MS);
 
-    // Sync tenant projects (non-blocking — errors are logged but don't fail login)
-    if (result.accessToken) {
-      const cstarSsoUserId = resolveCstarSsoUserId(result.claims, result.subject, result.email);
+      OkResponse(
+        res,
+        { logoutUrl: appendQueryParam(`${N8N_BASE_URL}/rest/auth/oidc/logout`, 'logout', handle) },
+        authLogoutPrepareResponseSchema,
+      );
+    },
+  );
 
-      // Pre-warm tenant roles and groups cache (non-blocking)
-      services.tenant
-        .prewarmTenantRolesAndGroups({
-          email: result.email,
-          ssoUserId: cstarSsoUserId,
-          accessToken: result.accessToken,
-        })
-        .catch((err) => {
-          log.error('Tenant roles pre-warm failed', { email: result.email, error: String(err) });
-        });
-
-      // Look up n8n user by email to get the n8n user ID
-      const n8nUser = result.email ? await n8nRepositories.user.findByEmail(result.email) : null;
-      if (n8nUser) {
-        services.tenantProjectSync
-          .syncTenantsForUser({
-            ssoUserId: cstarSsoUserId,
-            n8nUserId: n8nUser.id,
-            accessToken: result.accessToken,
-          })
-          .catch((err) => {
-            log.error('Tenant project sync failed', { email: result.email, error: String(err) });
-          });
-      }
-    }
-
-    const sessionHandle = randomBytes(24).toString('base64url');
-    await setUiSessionExchange(sessionHandle, token, UI_SESSION_EXCHANGE_TTL_MS);
-    res.redirect(appendSessionToReturnTo(result.returnTo, sessionHandle));
-  });
-
+  // Deprecated compatibility alias — redirect only, never establishes a session
+  // or trusts identity. Canonical logout is GET /rest/auth/oidc/logout which
+  // derives identity from the n8n cookie or a bearer-authenticated logout handle.
+  // This alias forwards only the return target and is retained for compatibility;
+  // removal target: next minor after callers migrate (expected 2026-09-30).
   router.get('/auth/logout', async (req, res) => {
     const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/ui/';
-    const email = typeof req.query.email === 'string' ? req.query.email : '';
-
-    if (!email) {
-      log.debug('Logout requested without email, redirecting directly', { returnTo });
-      res.redirect(returnTo);
-      return;
-    }
-
-    const idToken = await getUiOidcIdToken(email);
-    await deleteUiOidcTokens(email);
-
-    if (!idToken) {
-      log.debug('Logout: no ID token stored, redirecting directly', { email, returnTo });
-      res.redirect(returnTo);
-      return;
-    }
-
-    const config = getOidcConfigFromEnv();
-    const discovery = await fetchOidcDiscoveryDocument(config);
-
-    const endSessionEndpoint = discovery.end_session_endpoint || config.endSessionEndpoint;
-    if (!endSessionEndpoint) {
-      log.debug('Logout: no end_session_endpoint in discovery or config, redirecting directly', { email, returnTo });
-      res.redirect(returnTo);
-      return;
-    }
-
-    log.info('Logout: redirecting to upstream IDP end_session_endpoint', { email, returnTo });
-    const logoutUrl = new URL(endSessionEndpoint);
-    logoutUrl.searchParams.set('post_logout_redirect_uri', returnTo);
-    logoutUrl.searchParams.set('id_token_hint', idToken);
-    res.redirect(logoutUrl.toString());
+    res.redirect(appendQueryParam(`${N8N_BASE_URL}/rest/auth/oidc/logout`, 'returnTo', returnTo));
   });
 
   router.get('/whoami', requireUiRequestContext, async (req, res) => {
@@ -329,7 +346,7 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     OkResponse(res, buildWhoamiResponse(session, req.get('user-agent')));
   });
 
-  router.get('/workflows', requireUiRequestContext, async (req, res) => {
+  router.get('/workflows', requireUiRequestContext, checkPermission('canViewWorkflows'), async (req, res) => {
     const { context } = req as UiApiRequest;
 
     OkResponse(res, context.workflows);
@@ -460,16 +477,18 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
   );
 
   // List user personal project and their tenant projects (non-admin API)
+  // Upstream credential is resolved from the authenticated session context (server-side store / refresh),
+  // never by rereading the UI bearer (which is an app JWT in separate-token mode).
   router.get('/projects', requireUiRequestContext, checkPermission('canManageProject'), async (req, res) => {
     const session = (req as UiApiRequest).session;
-    const accessToken = getBearerToken(req) ?? '';
+    const upstreamAccessToken = session.upstreamAccessToken ?? '';
     const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
     const n8nUserId = session.n8nUser?.id ?? '';
 
     const data = await services.projectTenant.listUserProjectTenants({
       ssoUserId,
       n8nUserId,
-      accessToken,
+      upstreamAccessToken,
     });
 
     OkResponse(res, { data });

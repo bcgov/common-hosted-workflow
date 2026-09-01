@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { login, logout, openN8n } from '../auth/session-actions';
-import { useAuthUser, usePermissions, useSessionLoading } from '../state/session';
+import { useAuthUser, usePermissions, useSession, useSessionLoading } from '../state/session';
 import { ToastContainer } from '../components/toast-container';
 import { AppHeader, type AppNavItem } from '@/components/layout/app-header';
 import { AppFooter } from '@/components/layout/app-footer';
@@ -10,6 +10,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const session = useSession();
   const user = useAuthUser();
   const permissions = usePermissions();
   const isLoading = useSessionLoading();
@@ -18,8 +19,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   const canViewWorkflows = permissions?.canViewWorkflows ?? false;
   const canManageWil = permissions?.canManageWil ?? false;
   const canManageProject = permissions?.canManageProject ?? false;
+  // Defense in depth only: button affordance is not the security boundary.
+  // Direct n8n access remains protected by server-side n8n-auth cookie / session
+  // authorization. Visibility is derived from the authoritative session contract
+  // for an eligible n8n identity: n8nUser exists, is not disabled, and has a
+  // role. Must not use canViewWorkflows or any custom-UI feature flag as proxy.
+  const canOpenN8n = !isLoading && !!session?.n8nUser && !session.n8nUser.disabled && !!session.n8nUser.role?.slug;
   const navItems: AppNavItem[] = [
-    { to: '/', label: 'Home', end: true },
     ...(canViewWorkflows ? [{ to: '/workflows', label: 'Workflows' }] : []),
     ...(canManageWil ? [{ to: '/workflow-interaction', label: 'Workflow Interaction' }] : []),
     ...(canManageProject ? [{ to: '/projects', label: 'Projects' }] : []),
@@ -34,6 +40,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         navItems={navItems}
         userEmail={user?.email}
         isLoading={isLoading}
+        canOpenN8n={canOpenN8n}
         onLogin={login}
         onLogout={logout}
         onOpenN8n={openN8n}

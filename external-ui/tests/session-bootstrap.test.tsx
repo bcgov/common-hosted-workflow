@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { StrictMode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
@@ -33,6 +34,8 @@ describe('SessionBootstrap', () => {
     sessionState.isLoading = false;
     exchangeSessionMock.mockReset();
     getSessionMock.mockReset();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     globalThis.history.replaceState({}, '', '/ui?session=session-123');
   });
 
@@ -82,5 +85,239 @@ describe('SessionBootstrap', () => {
     });
 
     expect(new URL(globalThis.location.href).searchParams.get('session')).toBeNull();
+  });
+
+  it('clears the browser token after coordinated logout', async () => {
+    globalThis.localStorage.setItem(APP_AUTH_TOKEN_STORAGE_KEY, 'stale-token');
+    globalThis.history.replaceState({}, '', '/ui?signedOut=1');
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionBootstrap>
+          <div>child</div>
+        </SessionBootstrap>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY)).toBeNull();
+    });
+    expect(new URL(globalThis.location.href).searchParams.get('signedOut')).toBeNull();
+    expect(getSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('removes session, continue, signedOut and logout markers while preserving unrelated query and hash', async () => {
+    exchangeSessionMock.mockResolvedValue({ token: 'tok-abc' });
+    getSessionMock.mockResolvedValue({
+      authenticated: true,
+      user: { subject: 'sub-1', email: 'a@example.com' },
+      oidc: { issuer: 'https://issuer', subject: 'sub-1', audience: ['ui'], email: 'a@example.com', claims: {} },
+      n8nUser: { id: '1', email: 'a@example.com', disabled: false, role: null },
+      permissions: {
+        isAdmin: false,
+        canRequestAccess: true,
+        canReviewAccessRequests: false,
+        canShareWorkflows: false,
+        canUnshareWorkflows: false,
+      },
+    } as any);
+    globalThis.history.replaceState(
+      {},
+      '',
+      '/ui?session=sess-123&continue=%2Fui%2Fprojects%3Fx%3D1&signedOut=1&logout=handle-xyz&keep=yes&foo=bar#section',
+    );
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionBootstrap>
+          <div>child</div>
+        </SessionBootstrap>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY)).toBe('tok-abc');
+    });
+    const url = new URL(globalThis.location.href);
+    // Security params must be gone
+    expect(url.searchParams.get('session')).toBeNull();
+    expect(url.searchParams.get('continue')).toBeNull();
+    expect(url.searchParams.get('signedOut')).toBeNull();
+    expect(url.searchParams.get('logout')).toBeNull();
+    // Unrelated params and hash preserved
+    expect(url.searchParams.get('keep')).toBe('yes');
+    expect(url.searchParams.get('foo')).toBe('bar');
+    expect(url.hash).toBe('#section');
+  });
+
+  it('cleans up URL and token even when exchange fails, and never navigates to continue', async () => {
+    exchangeSessionMock.mockRejectedValue(new Error('exchange failed'));
+    globalThis.localStorage.setItem(APP_AUTH_TOKEN_STORAGE_KEY, 'stale');
+    const replaceSpy = vi.fn();
+    const origin = globalThis.location.origin;
+    const initialUrl = new URL('/ui?session=bad&continue=%2Fui%2Fprojects&keep=1#h', origin).toString();
+    const locationStub: any = {
+      href: initialUrl,
+      origin,
+      pathname: new URL(initialUrl).pathname,
+      search: new URL(initialUrl).search,
+      hash: new URL(initialUrl).hash,
+      replace: replaceSpy,
+      assign: vi.fn(),
+    };
+    vi.stubGlobal('location', locationStub);
+    vi.spyOn(globalThis.history, 'replaceState').mockImplementation((...args: any[]) => {
+      const urlStr = args[2] as string;
+      const parsed = new URL(urlStr, origin);
+      locationStub.href = parsed.toString();
+      locationStub.pathname = parsed.pathname;
+      locationStub.search = parsed.search;
+      locationStub.hash = parsed.hash;
+    });
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionBootstrap>
+          <div>child</div>
+        </SessionBootstrap>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY)).toBeNull();
+    });
+    expect(replaceSpy).not.toHaveBeenCalled();
+    const url = new URL(locationStub.href);
+    expect(url.searchParams.get('session')).toBeNull();
+    expect(url.searchParams.get('continue')).toBeNull();
+    expect(url.searchParams.get('keep')).toBe('1');
+    expect(url.hash).toBe('#h');
+  });
+
+  it('cleans a continuation marker after successful exchange without navigating', async () => {
+    exchangeSessionMock.mockResolvedValue({ token: 'tok-2' });
+    getSessionMock.mockResolvedValue({
+      authenticated: true,
+      user: { subject: 'sub-1', email: 'a@example.com' },
+      oidc: { issuer: 'https://issuer', subject: 'sub-1', audience: ['ui'], email: 'a@example.com', claims: {} },
+      n8nUser: { id: '1', email: 'a@example.com', disabled: false, role: null },
+      permissions: {
+        isAdmin: false,
+        canRequestAccess: true,
+        canReviewAccessRequests: false,
+        canShareWorkflows: false,
+        canUnshareWorkflows: false,
+      },
+    } as any);
+    const replaceSpy = vi.fn();
+    const origin = globalThis.location.origin;
+    const initialUrl = new URL(
+      '/ui?session=handle-1&continue=%2Fui%2Fprojects%3Ffilter%3Dactive%23top',
+      origin,
+    ).toString();
+    const locationStub: any = {
+      href: initialUrl,
+      origin,
+      pathname: new URL(initialUrl).pathname,
+      search: new URL(initialUrl).search,
+      hash: new URL(initialUrl).hash,
+      replace: replaceSpy,
+      assign: vi.fn(),
+    };
+    vi.stubGlobal('location', locationStub);
+    vi.spyOn(globalThis.history, 'replaceState').mockImplementation((...args: any[]) => {
+      const urlStr = args[2] as string;
+      const parsed = new URL(urlStr, origin);
+      locationStub.href = parsed.toString();
+      locationStub.pathname = parsed.pathname;
+      locationStub.search = parsed.search;
+      locationStub.hash = parsed.hash;
+    });
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionBootstrap>
+          <div>child</div>
+        </SessionBootstrap>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(exchangeSessionMock).toHaveBeenCalledWith('handle-1'));
+    expect(replaceSpy).not.toHaveBeenCalled();
+    expect(new URL(locationStub.href).searchParams.get('continue')).toBeNull();
+  });
+
+  it('does not navigate to rejected continuation target and cleans it', async () => {
+    exchangeSessionMock.mockResolvedValue({ token: 'tok-3' });
+    getSessionMock.mockResolvedValue({
+      authenticated: true,
+      user: { subject: 'sub-1', email: 'a@example.com' },
+      oidc: { issuer: 'https://issuer', subject: 'sub-1', audience: ['ui'], email: 'a@example.com', claims: {} },
+      n8nUser: { id: '1', email: 'a@example.com', disabled: false, role: null },
+      permissions: {
+        isAdmin: false,
+        canRequestAccess: true,
+        canReviewAccessRequests: false,
+        canShareWorkflows: false,
+        canUnshareWorkflows: false,
+      },
+    } as any);
+    const replaceSpy = vi.fn();
+    const origin = globalThis.location.origin;
+    const initialUrl = new URL('/ui?session=handle-2&continue=https%3A%2F%2Fevil.test%2Fphish', origin).toString();
+    const locationStub: any = {
+      href: initialUrl,
+      origin,
+      pathname: new URL(initialUrl).pathname,
+      search: new URL(initialUrl).search,
+      hash: new URL(initialUrl).hash,
+      replace: replaceSpy,
+      assign: vi.fn(),
+    };
+    vi.stubGlobal('location', locationStub);
+    vi.spyOn(globalThis.history, 'replaceState').mockImplementation((...args: any[]) => {
+      const urlStr = args[2] as string;
+      const parsed = new URL(urlStr, origin);
+      locationStub.href = parsed.toString();
+      locationStub.pathname = parsed.pathname;
+      locationStub.search = parsed.search;
+      locationStub.hash = parsed.hash;
+    });
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionBootstrap>
+          <div>child</div>
+        </SessionBootstrap>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY)).toBe('tok-3');
+    });
+    expect(replaceSpy).not.toHaveBeenCalled();
+    const url = new URL(locationStub.href);
+    expect(url.searchParams.get('continue')).toBeNull();
+    expect(url.searchParams.get('session')).toBeNull();
+  });
+
+  it('clears logout and continue markers even without a session handle', async () => {
+    globalThis.history.replaceState({}, '', '/ui?continue=%2Fui%2Fprojects&logout=handle-123&keep=1#hash');
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionBootstrap>
+          <div>child</div>
+        </SessionBootstrap>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      const url = new URL(globalThis.location.href);
+      expect(url.searchParams.get('continue')).toBeNull();
+      expect(url.searchParams.get('logout')).toBeNull();
+      expect(url.searchParams.get('keep')).toBe('1');
+      expect(url.hash).toBe('#hash');
+    });
+    expect(exchangeSessionMock).not.toHaveBeenCalled();
   });
 });

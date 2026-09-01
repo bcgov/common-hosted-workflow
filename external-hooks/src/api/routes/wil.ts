@@ -10,7 +10,6 @@ import { createRequestParser } from '../utils/validation';
 import { wilListQuerySchema, wilCallbackSchema, wilChefsTokenSchema, type WilListQuery } from '../schemas/wil';
 import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
-import { getBearerToken } from '../helpers/ui-oidc-session';
 import { buildTriggerRouter } from './triggers';
 import { callWebhook } from './helpers/webhook-fire';
 import { CALLBACK_TIMEOUT_MS } from './constants/constants';
@@ -29,7 +28,8 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
    */
   router.get('/tenants', async (req, res) => {
     const session = (req as unknown as { session: UiResolvedSession }).session;
-    const accessToken = getBearerToken(req) ?? undefined;
+    // Use server-side upstream credential from authenticated session, never the UI bearer
+    const upstreamAccessToken = (session as UiResolvedSession & { upstreamAccessToken?: string }).upstreamAccessToken;
 
     // CSTAR expects the IDP user GUID (e.g. idir_user_guid), not the Keycloak sub
     const ssoUserId =
@@ -37,7 +37,7 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
 
     const tenants = await services.tenant.listTenantsForUser({
       ssoUserId,
-      accessToken,
+      accessToken: upstreamAccessToken,
       n8nUserId: session.n8nUser?.id,
     });
     OkResponse(res, { tenants });

@@ -42,13 +42,20 @@ export const UI_AUTH_JWT_AUDIENCE = process.env.UI_AUTH_JWT_AUDIENCE || 'chwf-ui
 export const UI_AUTH_USE_SEPARATE_TOKEN = process.env.UI_AUTH_USE_SEPARATE_TOKEN === 'true';
 export const N8N_USER_MANAGEMENT_JWT_SECRET = process.env.N8N_USER_MANAGEMENT_JWT_SECRET ?? '';
 
-// n8n OIDC – base provider config
+// n8n OIDC – base provider config (single source; no separate UI redirect)
+// Provider configuration is consolidated via N8nOidcConfig / OidcProviderConfig.
+// The sole browser callback is `${N8N_BASE_URL}/rest/auth/oidc/callback`.
+// Deployment owners confirmed no active provider registration targets the legacy
+// `/ui-api/auth/callback` URI (checked docs/external-hooks/oidc.md and
+// docs/external-ui/tenant-roles-in-session.md on 2026-08-31); legacy URI
+// removal is intentional and provider docs now list only the single callback.
 export const OIDC_ISSUER = process.env.OIDC_ISSUER || '';
 export const OIDC_AUTHORIZATION_ENDPOINT = process.env.OIDC_AUTHORIZATION_ENDPOINT || '';
 export const OIDC_TOKEN_ENDPOINT = process.env.OIDC_TOKEN_ENDPOINT || '';
 export const OIDC_USERINFO_ENDPOINT = process.env.OIDC_USERINFO_ENDPOINT || '';
 export const OIDC_JWKS_URI = process.env.OIDC_JWKS_URI || '';
 export const OIDC_END_SESSION_ENDPOINT = process.env.OIDC_END_SESSION_ENDPOINT || '';
+export const OIDC_USE_MANUAL_ENDPOINTS = process.env.OIDC_USE_MANUAL_ENDPOINTS === 'true';
 export const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || '';
 export const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || '';
 export const OIDC_REDIRECT_URI = `${N8N_BASE_URL}/rest/auth/oidc/callback`;
@@ -56,16 +63,11 @@ export const OIDC_SCOPES = process.env.OIDC_SCOPES || 'openid email profile';
 export const OIDC_ROLES_CLAIM = process.env.OIDC_ROLES_CLAIM || 'roles';
 export const SSO_RESTRICT_NO_ROLE = process.env.SSO_RESTRICT_NO_ROLE === 'true';
 
-// OIDC frontend hook – controls which browser logic is served at /assets/oidc-frontend-hook.js
-// 'redirect' (default): /login and /signin are replaced with /ui; logout returns to /ui
-// 'legacy': legacy SSO button injection on /login and /signin; logout returns to /
-export const OIDC_FRONTEND_HOOK_MODE = (() => {
-  const raw = (process.env.OIDC_FRONTEND_HOOK_MODE ?? 'redirect').trim().toLowerCase();
-  return raw === 'legacy' ? 'legacy' : 'redirect';
-})();
-
-// UI OIDC – only redirect remains UI-specific; shared provider/client config comes from OIDC_*
-export const UI_OIDC_REDIRECT_URI = `${UI_API_BASE_URL}/auth/callback`;
+// Bounded provider request timeout (ms). All OIDC discovery, token,
+// refresh, and userinfo fetches abort after this deadline and surface a
+// stable timeout error (`OIDC provider request timed out`) instead of
+// hanging indefinitely. Default 10s, override via OIDC_PROVIDER_TIMEOUT_MS.
+export const OIDC_PROVIDER_TIMEOUT_MS = Number.parseInt(process.env.OIDC_PROVIDER_TIMEOUT_MS ?? '10000', 10);
 
 // CSTAR – Tenant & user management
 export const CSTAR_BASE_URL = process.env.CSTAR_BASE_URL || '';
