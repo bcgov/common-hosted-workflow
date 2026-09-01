@@ -192,17 +192,25 @@ export class TenantService {
    * Pre-warms both tenant roles and tenant groups cache at login time.
    * Uses a single CSTAR call (getUserGroupsWithRoles) per tenant to derive both.
    * Throws on failure — caller is responsible for error handling.
+   * Accepts optional pre-fetched tenants to avoid a duplicate CSTAR tenants call
+   * when the caller already holds the tenant list (e.g., post-login work reuses
+   * the same tenants for sync and pre-warm).
    */
   async prewarmTenantRolesAndGroups(params: {
     email: string;
     ssoUserId: string;
     accessToken: string;
+    tenants?: import('../types/cstar').CstarTenant[];
   }): Promise<{ refreshedToken?: string }> {
     if (!this.cstarService.isConfigured()) {
       return {};
     }
 
-    const { roles, groups } = await this.fetchTenantRolesAndGroupsFromCstar(params.ssoUserId, params.accessToken);
+    const { roles, groups } = await this.fetchTenantRolesAndGroupsFromCstar(
+      params.ssoUserId,
+      params.accessToken,
+      params.tenants,
+    );
     await Promise.all([setUiTenantRoles(params.email, roles), setUiTenantGroups(params.email, groups)]);
     return {};
   }
@@ -235,8 +243,9 @@ export class TenantService {
   private async fetchTenantRolesAndGroupsFromCstar(
     ssoUserId: string,
     accessToken: string,
+    preFetchedTenants?: import('../types/cstar').CstarTenant[],
   ): Promise<{ roles: TenantRole[]; groups: TenantGroup[] }> {
-    const tenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken });
+    const tenants = preFetchedTenants ?? (await this.cstarService.getUserTenants({ ssoUserId, accessToken }));
     if (tenants.length === 0) {
       return { roles: [], groups: [] };
     }

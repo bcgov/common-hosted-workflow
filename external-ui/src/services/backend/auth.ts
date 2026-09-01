@@ -92,6 +92,10 @@ export type AuthExchangeResponse = {
   token: string;
 };
 
+export type AuthLogoutPrepareResponse = {
+  logoutUrl: string;
+};
+
 export function getWhoami(params?: { signal?: AbortSignal }) {
   return instance.get<WhoamiResponse>('/ui-api/whoami', { signal: params?.signal }).then((res) => res.data);
 }
@@ -103,5 +107,11 @@ export function getSession(params?: { signal?: AbortSignal }) {
 export function exchangeSession(session: string, params?: { signal?: AbortSignal }) {
   return instance
     .post<AuthExchangeResponse>('/ui-api/auth/exchange', { session }, { signal: params?.signal })
+    .then((res) => res.data);
+}
+
+export function prepareLogout(returnTo: string, params?: { signal?: AbortSignal }) {
+  return instance
+    .post<AuthLogoutPrepareResponse>('/ui-api/auth/logout-prepare', { returnTo }, { signal: params?.signal })
     .then((res) => res.data);
 }

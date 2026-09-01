@@ -1,6 +1,6 @@
 # Tenant Roles and Groups in Session
 
-Exposes the user's CSTAR shared-service roles **and group memberships** per tenant in the session API, enabling role- and group-based UI visibility in the external UI and actor matching in the Workflow Interaction Layer.
+Exposes the user's CSTAR shared-service roles **and group memberships** per tenant in the session API, enabling role- and group-based UI visibility in the external UI and actor matching in the Workflow Interaction Layer. Every valid OIDC identity receives an external UI session; the tenant role/group caches are pre-warmed only for **eligible** logins (users with `global:owner`/`admin`/`member`), while ineligible (access-request) sessions fetch on first `/ui-api/session`.
 
 ## Overview
 
@@ -178,7 +178,7 @@ const showEditControls = canShare && canEditInTenant;
 
 ### 1. Login (Pre-warm)
 
-At OIDC callback (`/ui-api/auth/callback`), after a successful login:
+At the unified OIDC callback (`GET /rest/auth/oidc/callback`), after a successful login for an eligible user:
 
 ```
 Login success
@@ -277,16 +277,17 @@ Additional roles and groups may be added in CSTAR without requiring code changes
 
 ### Backend (`external-hooks`)
 
-| File                                 | Purpose                                                                                                                      |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `src/api/services/tenant.service.ts` | `getTenantRolesForSession`, `getTenantGroupsForSession`, `prewarmTenantRolesAndGroups`, `fetchTenantRolesAndGroupsFromCstar` |
-| `src/api/helpers/tenant-roles.ts`    | Cache-aside helper for roles (Redis get/set/delete)                                                                          |
-| `src/api/helpers/tenant-groups.ts`   | Cache-aside helper for groups (Redis get/set/delete)                                                                         |
-| `src/api/helpers/ui-oidc-store.ts`   | Redis functions for both roles and groups; `TenantRole` and `TenantGroup` types                                              |
-| `src/api/helpers/ui-oidc.ts`         | `UiResolvedSession`, `UiSessionSummary`, `WhoamiResponse` — include both `tenantRoles` and `tenantGroups`                    |
-| `src/api/helpers/ui-oidc-session.ts` | Calls `invalidateTenantRoles` and `invalidateTenantGroups` on token refresh                                                  |
-| `src/api/routes/ui-api.ts`           | Session resolution + login pre-warm                                                                                          |
-| `src/api/types/actor-matchers.ts`    | `ActorMatchers` type used by WIL routes                                                                                      |
+| File                                                                                                              | Purpose                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `src/api/services/tenant.service.ts`                                                                              | `getTenantRolesForSession`, `getTenantGroupsForSession`, `prewarmTenantRolesAndGroups`, `fetchTenantRolesAndGroupsFromCstar` |
+| `src/api/helpers/tenant-roles.ts`                                                                                 | Cache-aside helper for roles (Redis get/set/delete)                                                                          |
+| `src/api/helpers/tenant-groups.ts`                                                                                | Cache-aside helper for groups (Redis get/set/delete)                                                                         |
+| `src/api/helpers/ui-oidc-store.ts`                                                                                | Redis functions for both roles and groups; `TenantRole` and `TenantGroup` types                                              |
+| `src/api/helpers/ui-oidc.ts`                                                                                      | `UiResolvedSession`, `UiSessionSummary`, `WhoamiResponse` — include both `tenantRoles` and `tenantGroups`                    |
+| `src/api/helpers/ui-oidc-session.ts`                                                                              | Calls `invalidateTenantRoles` and `invalidateTenantGroups` on token refresh                                                  |
+| `src/api/routes/oidc.ts` + `src/api/services/oidc-login-coordinator.ts` + `src/api/services/post-login-tenant.ts` | Unified OIDC callback and post-login pre-warm/sync (eligible users only)                                                     |
+| `src/api/routes/ui-api.ts`                                                                                        | Session resolution (no login flow)                                                                                           |
+| `src/api/types/actor-matchers.ts`                                                                                 | `ActorMatchers` type used by WIL routes                                                                                      |
 
 ### Frontend (`external-ui`)
 

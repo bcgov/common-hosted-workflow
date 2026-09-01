@@ -5,7 +5,7 @@ import { extractCredentialIds, getWorkflowNodes } from '../helpers/workflow';
 import { UiWorkflowQueryService } from './ui-workflow-query';
 
 type SharingContext = {
-  n8nUser: { id: string; role?: { slug: string } | null };
+  n8nUser: { id: string; disabled?: boolean; role?: { slug: string } | null };
   accessibleProjectIds: string[];
 };
 
@@ -109,6 +109,9 @@ export class UiWorkflowSharingService {
   private async requireManagingContext(email?: string): Promise<SharingContext> {
     const context = await this.queryService.loadUserContext(email);
     if (!context.n8nUser) throw new AppError(401, 'Not authenticated.');
+    // Disabled users must not share/unshare even when a stale role remains in the database.
+    if (context.n8nUser.disabled)
+      throw new AppError(403, 'Sharing workflows is restricted to active users with a role.');
     if (!canShareWorkflows(context.n8nUser.role?.slug)) {
       throw new AppError(403, 'Sharing workflows is restricted to active users with a role.');
     }

@@ -5,6 +5,7 @@ import type { AuthService } from '../services/auth';
 import type { CstarService } from '../services/cstar.service';
 import type { JwtService } from '../services/jwt';
 import type { TenantProjectSyncService } from '../services/tenant-project-sync.service';
+import type { TenantService } from '../services/tenant.service';
 import type { UserService } from '../services/user';
 import { createLogger } from '../utils/logger';
 import type { N8nRepositories } from './n8n-repositories';
@@ -20,6 +21,7 @@ type MountOidcParams = {
   jwtService: JwtService;
   userService: UserService;
   tenantProjectSyncService: TenantProjectSyncService;
+  tenantService?: TenantService;
   cstarService: CstarService;
 };
 
@@ -31,6 +33,7 @@ export function mountOidc({
   jwtService,
   userService,
   tenantProjectSyncService,
+  tenantService,
   cstarService,
 }: MountOidcParams) {
   const config = getN8nOidcConfigFromEnv();
@@ -50,6 +53,7 @@ export function mountOidc({
       jwtService,
       userService,
       tenantProjectSyncService,
+      tenantService,
       cstarService,
       config,
     }),

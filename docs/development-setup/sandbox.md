@@ -62,7 +62,7 @@ The sandbox uses a "Dependency Chain" to ensure services configure themselves in
 
 ## UI Backend Auth Config
 
-The external UI no longer bootstraps OIDC settings from `GET /ui-api/runtime-config`. In the sandbox, the backend reads `UI_OIDC_*` variables from `docker-compose/.env` via `docker-compose/docker-compose.yml`, manages the OIDC callback itself, then returns a signed UI JWT to the browser.
+The sandbox uses the single OIDC flow. The external UI does not bootstrap settings from `GET /ui-api/runtime-config`; the backend reads `UI_OIDC_*` and `OIDC_*` variables from `docker-compose/.env` via `docker-compose/docker-compose.yml`, exposes the sole callback at `GET /rest/auth/oidc/callback`, verifies ID tokens (JWKS/issuer/audience/nonce, `userinfo.sub` bound to `id_token.sub`), and issues both artifacts on eligibility: `n8n-auth` cookie and a one-time `session` exchange handle that the SPA trades at `GET /ui-api/auth/exchange`. Ineligible identities receive a UI-only handle to `/ui/access-request`. There is no frontend-hook mode switch and no pre-warming via the old callback — eligible logins pre-warm tenant roles/groups and sync tenant projects non-blocking together.
 
 ## 💾 Persistence & Volumes
 

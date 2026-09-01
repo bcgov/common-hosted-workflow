@@ -50,55 +50,29 @@ export type UiAuthTokenPayload = {
   email: string;
   preferredUsername?: string;
   name?: string;
+  /** Per-session issue identifier checked against server state for revocation. */
+  sid?: string;
   oidc: UiOidcIdentity;
 };
 
 export type UiResolvedSession = UiSession & {
-  n8nUser: UiSerializedN8nUser;
+  n8nUser: UiSerializedN8nUser | null;
   permissions: Permissions;
   tenantRoles: TenantRole[];
   tenantGroups: TenantGroup[];
 };
 
-export type UiOidcConfig = {
-  issuerUrl: string;
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-  userinfoEndpoint: string;
-  jwksUri: string;
-  endSessionEndpoint: string;
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-  scopes: string;
-};
+// UiOidcConfig is now an alias to the single-source N8nOidcConfig / OidcProviderConfig.
+// The sole redirect URI is OIDC_REDIRECT_URI = `${N8N_BASE_URL}/rest/auth/oidc/callback`.
+// Deployment verification on 2026-08-31 confirmed no active provider registration
+// targets the legacy `/ui-api/auth/callback`; that URI is intentionally removed.
+import { getN8nOidcConfigFromEnv, type N8nOidcConfig } from './n8n-oidc';
 
-import {
-  OIDC_ISSUER,
-  OIDC_AUTHORIZATION_ENDPOINT,
-  OIDC_TOKEN_ENDPOINT,
-  OIDC_USERINFO_ENDPOINT,
-  OIDC_JWKS_URI,
-  OIDC_END_SESSION_ENDPOINT,
-  OIDC_CLIENT_ID,
-  OIDC_CLIENT_SECRET,
-  UI_OIDC_REDIRECT_URI,
-  OIDC_SCOPES,
-} from '@config';
+export type UiOidcConfig = N8nOidcConfig;
 
+/** @deprecated Use getN8nOidcConfigFromEnv() – single injected OIDC config. Kept for transition. */
 export function getOidcConfigFromEnv(): UiOidcConfig {
-  return {
-    issuerUrl: OIDC_ISSUER,
-    authorizationEndpoint: OIDC_AUTHORIZATION_ENDPOINT,
-    tokenEndpoint: OIDC_TOKEN_ENDPOINT,
-    userinfoEndpoint: OIDC_USERINFO_ENDPOINT,
-    jwksUri: OIDC_JWKS_URI,
-    endSessionEndpoint: OIDC_END_SESSION_ENDPOINT,
-    clientId: OIDC_CLIENT_ID,
-    clientSecret: OIDC_CLIENT_SECRET,
-    redirectUri: UI_OIDC_REDIRECT_URI,
-    scopes: OIDC_SCOPES,
-  };
+  return getN8nOidcConfigFromEnv();
 }
 
 export type UiSessionSummary = {

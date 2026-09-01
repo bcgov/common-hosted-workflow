@@ -59,12 +59,17 @@ type OidcDiscoveryCacheEntry = {
 const discoveryCache = new Map<string, OidcDiscoveryCacheEntry>();
 const OIDC_DISCOVERY_CACHE_TTL_MS = 60 * 60 * 1000;
 
+export function clearOidcDiscoveryCache() {
+  discoveryCache.clear();
+}
+
 function getDiscoveryCacheKey(config: OidcProviderConfig) {
   return [
     config.issuerUrl,
     config.authorizationEndpoint,
     config.tokenEndpoint,
     config.userinfoEndpoint,
+    config.jwksUri,
     config.clientId,
     config.redirectUri,
   ].join('|');
@@ -77,6 +82,7 @@ export async function fetchOidcDiscoveryDocument(config: OidcProviderConfig) {
       authorization_endpoint: config.authorizationEndpoint,
       token_endpoint: config.tokenEndpoint,
       userinfo_endpoint: config.userinfoEndpoint,
+      jwks_uri: config.jwksUri || undefined,
       end_session_endpoint: config.endSessionEndpoint || undefined,
     } satisfies OidcDiscoveryDocument;
   }
@@ -258,6 +264,15 @@ export async function refreshOidcTokens(params: {
   };
 }
 
+function resolveOidcIssuer(config: OidcProviderConfig, discovery: OidcDiscoveryDocument): string | undefined {
+  const configured = config.issuerUrl?.trim() || undefined;
+  const discovered = discovery.issuer?.trim() || undefined;
+  if (configured && discovered && configured !== discovered) {
+    throw new Error(`OIDC discovery issuer mismatch: expected ${configured} got ${discovered}`);
+  }
+  return discovered || configured || undefined;
+}
+
 async function verifyOidcIdToken(params: {
   idToken: string;
   discovery: OidcDiscoveryDocument;
@@ -266,19 +281,17 @@ async function verifyOidcIdToken(params: {
 }) {
   const jwksUri = params.discovery.jwks_uri || params.config.jwksUri;
   if (!jwksUri) {
-    const claims = decodeOidcJwt(params.idToken);
-    if (typeof claims.nonce !== 'string' || claims.nonce !== params.expectedNonce) {
-      throw new Error('Invalid nonce');
-    }
-    return claims;
+    throw new Error('OIDC JWKS URI is not configured');
   }
 
-  const issuer = params.discovery.issuer || params.config.issuerUrl;
+  const issuer = resolveOidcIssuer(params.config, params.discovery);
+
   const jwks = createRemoteJWKSet(new URL(jwksUri));
-  const verification = await jwtVerify(params.idToken, jwks, {
-    issuer,
+  const verifyOpts: { issuer?: string; audience: string } = {
     audience: params.config.clientId,
-  });
+  };
+  if (issuer) verifyOpts.issuer = issuer;
+  const verification = await jwtVerify(params.idToken, jwks, verifyOpts);
 
   const claims = verification.payload as Record<string, unknown>;
   if (typeof claims.nonce !== 'string' || claims.nonce !== params.expectedNonce) {
@@ -315,6 +328,9 @@ export async function completeOidcAuthorization(params: {
   config: OidcProviderConfig;
 }) {
   const discovery = await fetchOidcDiscoveryDocument(params.config);
+  // Validate discovered issuer exactly against configured issuer before any token handling.
+  resolveOidcIssuer(params.config, discovery);
+
   const tokens = await exchangeAuthorizationCode({
     code: params.code,
     discovery,
@@ -323,14 +339,20 @@ export async function completeOidcAuthorization(params: {
     codeVerifier: params.storedState.codeVerifier,
   });
 
-  const idTokenClaims = tokens.id_token
-    ? await verifyOidcIdToken({
-        idToken: tokens.id_token,
-        discovery,
-        config: params.config,
-        expectedNonce: params.storedState.nonce,
-      })
-    : null;
+  if (!tokens.id_token) {
+    throw new Error('Missing ID token in token response');
+  }
+
+  const idTokenClaims = await verifyOidcIdToken({
+    idToken: tokens.id_token,
+    discovery,
+    config: params.config,
+    expectedNonce: params.storedState.nonce,
+  });
+
+  if (typeof idTokenClaims.sub !== 'string' || !idTokenClaims.sub) {
+    throw new Error('Invalid ID token: missing sub');
+  }
 
   const userInfo = tokens.access_token
     ? await fetchOidcUserInfo({
@@ -340,12 +362,64 @@ export async function completeOidcAuthorization(params: {
       })
     : null;
 
+  if (userInfo) {
+    if (typeof userInfo.sub !== 'string' || !userInfo.sub) {
+      throw new Error('Invalid userinfo: missing sub');
+    }
+    if (userInfo.sub !== idTokenClaims.sub) {
+      throw new Error('userinfo sub mismatch');
+    }
+  }
+
+  // Authoritative claim sources (explicit merging — no silent spread overwrite):
+  // - sub: verified ID token only
+  // - email: verified ID token if present, otherwise verified userinfo (same subject)
+  // - roles / authorization claim: verified ID token if present, otherwise userinfo
+  // - iss/aud/nonce/exp/iat/nbf/jti: verified ID token only
+  // - other profile claims: ID token preferred, userinfo supplements without overwriting
+  const mergedClaims: Record<string, unknown> = { ...idTokenClaims };
+  if (userInfo) {
+    const protectedKeys = new Set([
+      'sub',
+      'iss',
+      'aud',
+      'nonce',
+      'exp',
+      'iat',
+      'nbf',
+      'jti',
+      'at_hash',
+      'c_hash',
+      'azp',
+    ]);
+    for (const [key, value] of Object.entries(userInfo)) {
+      if (protectedKeys.has(key)) continue;
+      // Email and roles are authoritative from ID token if already present.
+      if (
+        (key === 'email' || key === 'preferred_username') &&
+        typeof mergedClaims[key] === 'string' &&
+        mergedClaims[key]
+      ) {
+        continue;
+      }
+      if (key in mergedClaims) continue;
+      mergedClaims[key] = value;
+    }
+    // Ensure email from userinfo is used if ID token lacks it (subject already verified equal).
+    if (!mergedClaims.email && typeof userInfo.email === 'string' && userInfo.email) {
+      mergedClaims.email = userInfo.email;
+    }
+    if (!mergedClaims.preferred_username && typeof userInfo.preferred_username === 'string') {
+      mergedClaims.preferred_username = userInfo.preferred_username;
+    }
+  }
+
   return {
     discovery,
     tokens,
     idTokenClaims,
     userInfo,
-    mergedClaims: { ...(idTokenClaims ?? {}), ...(userInfo ?? {}) },
+    mergedClaims,
   } satisfies OidcAuthorizationResult;
 }
 

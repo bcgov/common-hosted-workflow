@@ -2,15 +2,13 @@ import { createHash } from 'crypto';
 import { createClient } from 'redis';
 import { UI_OIDC_REDIS_URL, UI_OIDC_REDIS_PASSWORD, UI_OIDC_REDIS_PREFIX } from '@config';
 
-type UiOidcStateRecord = {
-  nonce: string;
-  codeVerifier: string;
-  returnTo: string;
-  redirectUri: string;
-};
-
 type UiSessionExchangeRecord = {
   token: string;
+};
+
+export type UiLogoutHandleRecord = {
+  email: string;
+  returnTo: string;
 };
 
 type RedisClient = Awaited<ReturnType<typeof createClient>>;
@@ -53,24 +51,29 @@ function extractJwtExpiryMs(token: string): number | undefined {
 
 let redisClientPromise: Promise<RedisClient> | null = null;
 
-function getStateKey(state: string) {
-  return `${UI_OIDC_REDIS_PREFIX}state:${state}`;
-}
-
 function getSessionExchangeKey(sessionHandle: string) {
   return `${UI_OIDC_REDIS_PREFIX}session:${sessionHandle}`;
 }
 
+/**
+ * Normalize an identity email before it is used as (part of) a Redis key so
+ * every caller reads and deletes the same records regardless of case or
+ * surrounding whitespace.
+ */
+export function normalizeUiIdentityEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 function getRefreshTokenKey(email: string) {
-  return `${UI_OIDC_REDIS_PREFIX}reftoken:${email}`;
+  return `${UI_OIDC_REDIS_PREFIX}reftoken:${normalizeUiIdentityEmail(email)}`;
 }
 
 function getIdTokenKey(email: string) {
-  return `${UI_OIDC_REDIS_PREFIX}idtoken:${email}`;
+  return `${UI_OIDC_REDIS_PREFIX}idtoken:${normalizeUiIdentityEmail(email)}`;
 }
 
 function getAccessTokenByEmailKey(email: string) {
-  return `${UI_OIDC_REDIS_PREFIX}acctoken:${email}`;
+  return `${UI_OIDC_REDIS_PREFIX}acctoken:${normalizeUiIdentityEmail(email)}`;
 }
 
 function getAccessTokenRecordKey(token: string) {
@@ -79,11 +82,19 @@ function getAccessTokenRecordKey(token: string) {
 }
 
 function getTenantRolesKey(email: string) {
-  return `${UI_OIDC_REDIS_PREFIX}tenantroles:${email}`;
+  return `${UI_OIDC_REDIS_PREFIX}tenantroles:${normalizeUiIdentityEmail(email)}`;
 }
 
 function getTenantGroupsKey(email: string) {
-  return `${UI_OIDC_REDIS_PREFIX}tenantgroups:${email}`;
+  return `${UI_OIDC_REDIS_PREFIX}tenantgroups:${normalizeUiIdentityEmail(email)}`;
+}
+
+function getSessionIssueIdKey(email: string) {
+  return `${UI_OIDC_REDIS_PREFIX}sessionissue:${normalizeUiIdentityEmail(email)}`;
+}
+
+function getLogoutHandleKey(handle: string) {
+  return `${UI_OIDC_REDIS_PREFIX}logout:${handle}`;
 }
 
 async function getRedisClient(): Promise<RedisClient> {
@@ -97,24 +108,6 @@ async function getRedisClient(): Promise<RedisClient> {
   }
 
   return redisClientPromise;
-}
-
-export async function setUiOidcState(state: string, value: UiOidcStateRecord, ttlMs: number) {
-  const client = await getRedisClient();
-  await client.set(getStateKey(state), JSON.stringify(value), { PX: ttlMs });
-}
-
-export async function getUiOidcState(state: string) {
-  const client = await getRedisClient();
-  const raw = await client.get(getStateKey(state));
-  if (!raw) return null;
-
-  return JSON.parse(raw) as UiOidcStateRecord;
-}
-
-export async function deleteUiOidcState(state: string) {
-  const client = await getRedisClient();
-  await client.del(getStateKey(state));
 }
 
 export async function setUiSessionExchange(sessionHandle: string, token: string, ttlMs: number) {
@@ -131,9 +124,41 @@ export async function consumeUiSessionExchange(sessionHandle: string) {
   return JSON.parse(raw) as UiSessionExchangeRecord;
 }
 
-export async function setUiOidcRefreshToken(email: string, refreshToken: string, ttlMs?: number) {
+export async function setUiLogoutHandle(handle: string, record: UiLogoutHandleRecord, ttlMs: number) {
+  const client = await getRedisClient();
+  const normalized: UiLogoutHandleRecord = { ...record, email: normalizeUiIdentityEmail(record.email) };
+  await client.set(getLogoutHandleKey(handle), JSON.stringify(normalized), { PX: ttlMs });
+}
+
+/** Atomically read-and-delete a logout handle so it can only be used once. */
+export async function consumeUiLogoutHandle(handle: string): Promise<UiLogoutHandleRecord | null> {
+  const client = await getRedisClient();
+  const raw = await client.getDel(getLogoutHandleKey(handle));
+  if (!raw) return null;
+  return JSON.parse(raw) as UiLogoutHandleRecord;
+}
+
+/**
+ * Store the per-session issue identifier for an email. In separate-JWT mode
+ * the identifier is embedded in the issued UI token and `getUiSession()`
+ * rejects tokens whose identifier no longer matches the stored value, which
+ * makes UI sessions server-revocable at logout.
+ */
+export async function setUiSessionIssueId(email: string, sessionId: string, ttlMs?: number) {
   const client = await getRedisClient();
   const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  await client.set(getSessionIssueIdKey(email), sessionId, { PX: effectiveTtl });
+}
+
+export async function getUiSessionIssueId(email: string): Promise<string | null> {
+  const client = await getRedisClient();
+  return await client.get(getSessionIssueIdKey(email));
+}
+
+export async function setUiOidcRefreshToken(email: string, refreshToken: string, ttlMs?: number) {
+  const client = await getRedisClient();
+  const requestedTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  const effectiveTtl = Math.min(Math.max(requestedTtl, 1), REFRESH_TOKEN_MAX_TTL_MS);
   await client.set(getRefreshTokenKey(email), refreshToken, { PX: effectiveTtl });
 }
 
@@ -144,7 +169,18 @@ export async function setUiOidcRefreshTokenWithExpiry(
   ttlMs?: number,
 ) {
   const client = await getRedisClient();
-  const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  let effectiveTtl: number;
+  if (typeof expiresAt === 'number') {
+    const remainingMs = expiresAt - Date.now();
+    const cappedRemaining = Math.min(remainingMs, REFRESH_TOKEN_MAX_TTL_MS);
+    // Remaining validity may be negative if already expired — expire quickly
+    const safeRemaining = Math.max(cappedRemaining, 1);
+    const requested = ttlMs ?? safeRemaining;
+    effectiveTtl = Math.min(requested, safeRemaining, REFRESH_TOKEN_MAX_TTL_MS);
+  } else {
+    const requested = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+    effectiveTtl = Math.min(Math.max(requested, 1), REFRESH_TOKEN_MAX_TTL_MS);
+  }
   const record: RefreshTokenRecord = { token: refreshToken, expiresAt };
   await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
 }
@@ -223,6 +259,7 @@ export async function deleteUiOidcTokens(email: string) {
     getRefreshTokenKey(email),
     getIdTokenKey(email),
     getAccessTokenByEmailKey(email),
+    getSessionIssueIdKey(email),
     getTenantRolesKey(email),
     getTenantGroupsKey(email),
   ];

@@ -13,12 +13,30 @@ export function shouldRefreshAccessToken(expiresAt?: number) {
   return typeof expiresAt === 'number' && Date.now() >= expiresAt;
 }
 
+export const UI_AUTH_REFRESH_WINDOW_MS = 5 * 60 * 1000;
+
+export function shouldRefreshSeparateToken(expiresAt?: number) {
+  if (typeof expiresAt !== 'number') return false;
+  const now = Date.now();
+  if (expiresAt <= now) return false;
+  return expiresAt - now <= UI_AUTH_REFRESH_WINDOW_MS;
+}
+
+export function isSeparateTokenExpired(expiresAt?: number): boolean {
+  if (typeof expiresAt !== 'number') return false;
+  return Date.now() >= expiresAt;
+}
+
 export function isRefreshTokenExpired(expiresAt?: number): boolean {
   if (typeof expiresAt !== 'number') return false;
   return Date.now() > expiresAt;
 }
 
-export async function createUiAuthToken(params: { oidc: UiOidcIdentity; upstreamExpiresAt?: number }) {
+export async function createUiAuthToken(params: {
+  oidc: UiOidcIdentity;
+  upstreamExpiresAt?: number;
+  sessionId?: string;
+}) {
   if (!UI_AUTH_JWT_SECRET) {
     throw new Error('UI auth JWT secret is not configured');
   }
@@ -36,6 +54,7 @@ export async function createUiAuthToken(params: { oidc: UiOidcIdentity; upstream
     email: params.oidc.email,
     preferredUsername: params.oidc.preferredUsername,
     name: params.oidc.name,
+    ...(params.sessionId ? { sid: params.sessionId } : {}),
     oidc: {
       ...params.oidc,
       claims: params.oidc.claims,
@@ -54,11 +73,18 @@ export async function issueUiSessionToken(params: {
   oidc: UiOidcIdentity;
   upstreamAccessToken?: string;
   upstreamExpiresAt?: number;
+  sessionId?: string;
 }) {
   if (UI_AUTH_USE_SEPARATE_TOKEN) {
+    if (!params.sessionId) {
+      // Separate JWTs must carry the per-session identifier so logout can
+      // revoke them server-side.
+      throw new Error('UI session id is required for separate-token sessions');
+    }
     return await createUiAuthToken({
       oidc: params.oidc,
       upstreamExpiresAt: params.upstreamExpiresAt,
+      sessionId: params.sessionId,
     });
   }
 

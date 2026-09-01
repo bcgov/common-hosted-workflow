@@ -30,18 +30,9 @@ describe('ui-oidc-store', () => {
     const redisClient = createMockRedisClient();
     createClientMock.mockReturnValue(redisClient);
 
-    const { setUiOidcState } = await import('../../../src/api/helpers/ui-oidc-store');
+    const { setUiSessionExchange } = await import('../../../src/api/helpers/ui-oidc-store');
 
-    await setUiOidcState(
-      'state-1',
-      {
-        nonce: 'nonce-1',
-        codeVerifier: 'verifier-1',
-        returnTo: '/ui',
-        redirectUri: 'http://localhost:5173/ui-api/auth/callback',
-      },
-      60_000,
-    );
+    await setUiSessionExchange('handle-1', 'token-1', 60_000);
 
     expect(createClientMock).toHaveBeenCalledWith({
       url: 'redis://redis:6379',

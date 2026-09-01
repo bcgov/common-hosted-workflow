@@ -9,6 +9,7 @@ const {
   setUiOidcAccessTokenRecordMock,
   deleteUiTenantRolesMock,
   deleteUiTenantGroupsMock,
+  getUiSessionIssueIdMock,
 } = vi.hoisted(() => ({
   getUiOidcRefreshTokenRecordMock: vi.fn(),
   getUiOidcIdTokenMock: vi.fn(),
@@ -18,6 +19,7 @@ const {
   setUiOidcAccessTokenRecordMock: vi.fn(),
   deleteUiTenantRolesMock: vi.fn(),
   deleteUiTenantGroupsMock: vi.fn(),
+  getUiSessionIssueIdMock: vi.fn(),
 }));
 
 vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
@@ -29,6 +31,8 @@ vi.mock('../../../src/api/helpers/ui-oidc-store', () => ({
   setUiOidcAccessTokenRecord: setUiOidcAccessTokenRecordMock,
   deleteUiTenantRoles: deleteUiTenantRolesMock,
   deleteUiTenantGroups: deleteUiTenantGroupsMock,
+  getUiSessionIssueId: getUiSessionIssueIdMock,
+  setUiSessionIssueId: vi.fn(),
 }));
 
 const { refreshOidcTokensMock, fetchOidcDiscoveryDocumentMock, fetchOidcUserInfoMock, extractOidcIdentityMock } =
@@ -53,6 +57,15 @@ vi.mock('../../../src/api/helpers/ui-auth-token', async (importOriginal) => {
     ...actual,
     issueUiSessionToken: issueUiSessionTokenMock,
   };
+});
+
+const { jwtVerifyMock } = vi.hoisted(() => ({
+  jwtVerifyMock: vi.fn(),
+}));
+
+vi.mock('jose', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...(actual as object), jwtVerify: jwtVerifyMock };
 });
 
 function createMockRequest(headers: Record<string, string> = {}) {
@@ -95,6 +108,7 @@ describe('ui-oidc-session refresh/logout behavior', () => {
       audience: ['test-client'],
       claims: {},
     });
+    getUiSessionIssueIdMock.mockResolvedValue('test-session-id');
   });
 
   describe('refresh token storage on callback', () => {
@@ -260,6 +274,307 @@ describe('ui-oidc-session refresh/logout behavior', () => {
       const result = await getUiSession(req);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('server-side revocation: raw-token mode (UI_AUTH_USE_SEPARATE_TOKEN=false)', () => {
+    it('rejects an unknown or revoked raw token (no server record)', async () => {
+      getUiOidcAccessTokenRecordMock.mockResolvedValue(null);
+
+      const req = createMockRequest({ authorization: 'Bearer revoked-raw-token' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+      expect(fetchOidcUserInfoMock).not.toHaveBeenCalled();
+    });
+
+    it('accepts a known raw token with a server record and future expiry', async () => {
+      const farFuture = Date.now() + 3600_000;
+      getUiOidcAccessTokenRecordMock.mockResolvedValue({
+        email: 'user@example.com',
+        expiresAt: farFuture,
+      });
+
+      const req = createMockRequest({ authorization: 'Bearer valid-raw-token' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).not.toBeNull();
+      expect(result?.session.email).toBe('user@example.com');
+      expect(fetchOidcUserInfoMock).toHaveBeenCalled();
+    });
+  });
+
+  describe('server-side revocation: separate-JWT mode (UI_AUTH_USE_SEPARATE_TOKEN=true)', () => {
+    beforeEach(() => {
+      vi.stubEnv('UI_AUTH_USE_SEPARATE_TOKEN', 'true');
+      vi.stubEnv('UI_AUTH_JWT_SECRET', 'test-secret-32-bytes-long-for-hs256!!');
+    });
+
+    it('rejects a separate JWT whose sid does not match the stored session issue id', async () => {
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          sid: 'sid-old',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-with-old-sid' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+    });
+
+    it('rejects a separate JWT when the stored session issue id is missing (revoked via logout)', async () => {
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          sid: 'sid-current',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue(null);
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-after-logout' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+    });
+
+    it('rejects a separate JWT without a sid', async () => {
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-no-sid' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+    });
+
+    it('accepts a separate JWT whose sid matches the stored session issue id', async () => {
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          sid: 'sid-current',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-valid' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).not.toBeNull();
+      expect(result?.session.email).toBe('user@example.com');
+    });
+
+    it('does not refresh when separate JWT has plenty of time left', async () => {
+      const farFutureExp = Math.floor(Date.now() / 1000) + 3600;
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: farFutureExp,
+          sid: 'sid-current',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-far-future' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).not.toBeNull();
+      expect(result?.refreshedToken).toBeUndefined();
+      expect(refreshOidcTokensMock).not.toHaveBeenCalled();
+    });
+
+    it('refreshes within bounded pre-expiry window and returns replacement token', async () => {
+      const soonExp = Math.floor(Date.now() / 1000) + 120; // 2 minutes from now, within 5min window
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: soonExp,
+          sid: 'sid-current',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+      getUiOidcRefreshTokenRecordMock.mockResolvedValue({ token: 'stored-refresh-token' });
+      refreshOidcTokensMock.mockResolvedValue({
+        access_token: 'new-access-token-window',
+        refresh_token: 'new-refresh-token',
+        id_token: 'new-id-token',
+        expires_in: 3600,
+      });
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-near-expiry' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(refreshOidcTokensMock).toHaveBeenCalled();
+      expect(result?.refreshedToken).toBe('refreshed-jwt-token');
+      expect(result?.session.email).toBe('user@example.com');
+    });
+
+    it('rejects fully expired separate JWT without attempting refresh, and does not propagate token', async () => {
+      const expiredExp = Math.floor(Date.now() / 1000) - 60;
+      jwtVerifyMock.mockRejectedValue(new Error('JWTExpired: "exp" claim timestamp check failed'));
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-expired' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+      expect(refreshOidcTokensMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects separate JWT that is already past expiry even if jwtVerify would succeed (defensive)', async () => {
+      const expiredExp = Math.floor(Date.now() / 1000) - 10;
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: expiredExp,
+          sid: 'sid-current',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-just-expired' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+      expect(refreshOidcTokensMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects within-window token when refresh fails', async () => {
+      const soonExp = Math.floor(Date.now() / 1000) + 60;
+      jwtVerifyMock.mockResolvedValue({
+        payload: {
+          sub: 'user-sub-123',
+          email: 'user@example.com',
+          exp: soonExp,
+          sid: 'sid-current',
+          oidc: {
+            subject: 'user-sub-123',
+            email: 'user@example.com',
+            issuer: 'https://idir.example.com',
+            audience: ['test-client'],
+            claims: {},
+          },
+        },
+        protectedHeader: {},
+      });
+      getUiSessionIssueIdMock.mockResolvedValue('sid-current');
+      getUiOidcRefreshTokenRecordMock.mockResolvedValue(null);
+
+      const req = createMockRequest({ authorization: 'Bearer jwt-window-no-refresh' });
+
+      const { getUiSession } = await import('../../../src/api/helpers/ui-oidc-session');
+      const result = await getUiSession(req);
+
+      expect(result).toBeNull();
+      expect(refreshOidcTokensMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('shouldRefreshSeparateToken window logic', () => {
+    it('does not refresh far-future tokens, refreshes within 5min, rejects expired', async () => {
+      const { shouldRefreshSeparateToken, isSeparateTokenExpired } =
+        await import('../../../src/api/helpers/ui-auth-token');
+      const now = Date.now();
+      expect(shouldRefreshSeparateToken(now + 3600 * 1000)).toBe(false);
+      expect(shouldRefreshSeparateToken(now + 4 * 60 * 1000)).toBe(true);
+      expect(shouldRefreshSeparateToken(now + 60 * 1000)).toBe(true);
+      expect(shouldRefreshSeparateToken(now - 1000)).toBe(false);
+      expect(isSeparateTokenExpired(now - 1000)).toBe(true);
+      expect(isSeparateTokenExpired(now + 1000)).toBe(false);
+      expect(shouldRefreshSeparateToken(undefined)).toBe(false);
     });
   });
 });

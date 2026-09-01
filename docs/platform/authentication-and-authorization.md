@@ -29,29 +29,36 @@ It is a consolidation document. It does not replace the more detailed docs for O
 
 ## 1. Authentication
 
-### 1.1 `n8n` sign-in
+### 1.1 Unified OIDC sign-in (single authorization flow)
 
-`n8n` authenticates users through the custom OIDC hook.
+`n8n` and the external UI share one backend-managed OIDC authorization flow. Every valid OIDC identity receives an external UI session; an `n8n` session (`n8n-auth` cookie) is issued only after n8n eligibility succeeds.
 
 High-level flow:
 
-1. User opens `GET /rest/auth/oidc/login`.
-2. The app redirects the browser to the OIDC provider.
-3. The provider returns to `GET /rest/auth/oidc/callback`.
-4. The callback resolves the user's identity and role claim.
-5. The app creates or updates the `n8n` user.
-6. The app issues the `n8n-auth` cookie for the browser session.
+1. Browser opens `GET /rest/auth/oidc/login` (or `/ui` → `Open n8n` → that endpoint; `GET /ui-api/auth/login` is a deprecated redirect alias).
+2. The hook validates `returnTo` (`/ui/*`, fallback `/ui/`) via `return-target` policy and checks an existing `n8n-auth` cookie — valid without a `returnTo` redirects directly to `/`, otherwise a fresh authorization starts so the UI can obtain a new exchange handle.
+3. The hook creates signed `n8n-oidc-state` / `n8n-oidc-nonce` cookies (`HttpOnly` `Secure` when `N8N_BASE_URL` is `https` `SameSite=Lax` `Path=/` 15 min) and redirects to the provider `authorization_endpoint`.
+4. The provider returns to `GET /rest/auth/oidc/callback` with `code` + `state`.
+5. The callback validates `state`/`nonce` cookies before token exchange, exchanges `code` for tokens, cryptographically verifies the `id_token` (signature via JWKS, `iss`/`aud`/`exp`/`nonce`) and that discovered `issuer` equals the configured `issuerUrl`, and requires `userinfo.sub` to equal the verified `id_token` `sub`.
+6. The hook extracts `email`/`roles` (`roles` = first valid `global:owner`/`admin`/`member` in `claims[OIDC_ROLES_CLAIM]` comma-list) and validates email.
+7. The coordinator resolves `nextRole`: if `SSO_RESTRICT_NO_ROLE=false` missing roles fall back to `global:member`; if `true`, missing roles check CSTAR managed project roles (`project:editor`/`viewer`/`admin` in any tenant) for a `global:member` fallback, otherwise empty.
+8. **Eligible (`nextRole` present)** → creates or reuses the n8n user (first user → `global:owner`; existing user role synced with last-owner protection; previously disabled users re-enabled), ensures tenant mapping, schedules non-blocking pre-warm + tenant-project sync, then issues both artifacts: `n8n-auth` cookie (`HttpOnly` `Secure` when https `SameSite=Lax` `Path=/` 24 h) + one-time UI exchange handle (`session=...` 60 s single-use) appended to the validated `returnTo` (preserving query/fragment, exactly one `session` param). On `createAuthToken` failure the handle is deleted.
+9. **Access-request (`nextRole` empty)** → no n8n user created for new identities; existing ineligible users are disabled (`disabled=true`, role preserved, not synced to empty string) and lose n8n-derived capabilities; UI exchange handle only, redirect to `/ui/access-request?session=...`.
+10. **Failure** (missing `id_token`/`jwks_uri`, signature/issuer/audience/nonce/expiry/userinfo `sub` mismatch, CSTAR verification error, Redis/provisioning/role-sync failure) → no artifact, redirect to `/ui?error=<stable public message>` (details in server logs; no handle, no `n8n-auth`).
+
+This is the sole browser authentication path; `GET /ui-api/auth/callback` and UI OIDC state records were removed. Valid `returnTo`/`continue` targets are confined to allowed origins (`N8N_BASE_URL`/`UI_APP_BASE_URL`) and `/ui/*` (or `/` for continuation); hostile forms (`//`, `\`, `%5c`, foreign origins, non-http schemes, disallowed paths) fall back to `/ui/` (or `/`) and never receive a handle.
 
 Important details:
 
 - The first user ever created becomes `global:owner`.
-- Later users normally become the mapped OIDC role.
+- Later users normally become the mapped OIDC role (first valid `global:owner`/`admin`/`member` in the comma list).
 - If `SSO_RESTRICT_NO_ROLE=false`, a user with no valid upstream role falls back to `global:member`.
 - If `SSO_RESTRICT_NO_ROLE=true` and the user has any CSTAR managed project role in any tenant, the user also falls back to `global:member`.
-- If `SSO_RESTRICT_NO_ROLE=true` and the user has no valid upstream role and no CSTAR managed project role, the user is redirected into the access-request flow.
+- If `SSO_RESTRICT_NO_ROLE=true` and the user has no valid upstream role and no CSTAR managed project role, the user is not provisioned (new) or is disabled preserving role (existing) and is redirected into the access-request flow with a UI-only session.
 - If CSTAR verification fails during that fallback check, sign-in fails instead of silently routing the user to access request.
+- Browser `n8n` login entry points `/login` and `/signin` are unconditionally replaced with `/ui` by the redirect-only frontend hook (`/assets/oidc-frontend-hook.js`, no mode switch); n8n logout is intercepted to `GET /rest/auth/oidc/logout`.
 
-This is the authentication path for the `n8n` web app itself.
+Session and logout details are in the extended flow: the SPA trades the `session` handle once at `GET /ui-api/auth/exchange`, bearer tokens are revokable server-side, and logout ownership/revocation is described below.
 
 ### 1.2 Custom API endpoint authentication
 
@@ -87,13 +94,15 @@ Global roles are platform-wide `n8n` roles:
 
 These are not tenant-scoped.
 
-These roles come from the upstream OIDC role claim, from the CSTAR managed project-role fallback in the login callback, or from the access-request approval flow.
+These roles come from the upstream OIDC role claim (first valid `global:owner`/`admin`/`member` in `claims[OIDC_ROLES_CLAIM]`), from the CSTAR managed project-role fallback in the single login callback, or from the access-request approval flow.
 
 What they are used for:
 
 - `global:owner` and `global:admin` can use admin-only APIs and review access requests.
 - `global:member` is the normal baseline platform user role.
-- A user with no valid upstream global role may still become `global:member` if CSTAR shows any managed tenant project role; otherwise the user may be disabled or routed to access request, depending on configuration.
+- A user with no valid upstream global role may still become `global:member` if CSTAR shows any managed tenant project role; otherwise the user is not provisioned (new) or is disabled preserving their stored role (existing) and routed to the access-request flow with a UI-only session. The legacy claim that such users are "synced to an empty role" is obsolete — the role is preserved and the account is disabled.
+
+Every authenticated identity receives an external UI session; only eligible identities (`nextRole` present) receive `n8n-auth` and n8n-derived UI capabilities. Ineligible/disabled identities receive `canRequestAccess` only (see §3).
 
 ### 2.2 Project-level roles
 
@@ -134,16 +143,17 @@ Important distinction:
 
 ## 3. Initial access request for baseline platform access
 
-This is the path for a user who can authenticate with OIDC but does not receive a usable global `n8n` role from either the upstream OIDC role claim or the CSTAR managed project-role fallback.
+This is the path for a user who can authenticate with OIDC but is **ineligible** for `n8n` (no valid `global:owner`/`admin`/`member` from the OIDC role claim nor CSTAR fallback).
 
 Typical flow:
 
-1. The user signs in through OIDC.
-2. The callback cannot resolve a valid global role for the user from either the upstream role claim or CSTAR managed project roles.
-3. The user is redirected to the access-request page.
-4. The user submits a justification.
-5. A `global:owner` or `global:admin` reviews the request.
-6. On approval, the system assigns `global:member`.
+1. The user signs in through the single OIDC flow (`GET /rest/auth/oidc/login` → callback).
+2. The callback cannot resolve a valid `nextRole` from either the upstream role claim (first valid wins) or CSTAR managed project roles (or CSTAR check is not configured).
+3. No `n8n-auth` is issued. For a new identity, no n8n user is created; for an existing user, the account is disabled (`disabled=true`) preserving the stored role and n8n-derived permissions are denied. A one-time UI exchange handle is still issued.
+4. The browser is redirected to `/ui/access-request?session=<handle>` (validated `returnTo` policy), the SPA exchanges the handle for a bearer and shows the access-request page (capability `canRequestAccess` only).
+5. The user submits a justification.
+6. A `global:owner` or `global:admin` reviews the request.
+7. On approval, the system assigns `global:member`.
 
 Approval side effects:
 
@@ -180,22 +190,25 @@ Rules:
 - One project maps to at most one tenant.
 - The team project is created on demand when a qualifying tenant user logs in.
 
-### 4.2 Sync behavior at login
+### 4.2 Sync and pre-warm behavior at login
 
-After successful OIDC login, tenant-project sync runs in the background.
+After successful **eligible** OIDC login (ineligible users do not trigger it), two post-login operations run together non-blocking via `post-login-tenant.ts` (`runPostLoginTenantWork` → `prewarmTenantRolesAndGroups` + `syncTenantsForUser` with `Promise.allSettled`), sharing a single CSTAR tenants fetch:
 
-For each CSTAR tenant the user belongs to:
+For each CSTAR tenant the user belongs to (sync):
 
 1. Load the user's CSTAR shared-service roles for that tenant.
 2. Resolve the highest applicable `n8n` project role.
 3. Create the team project if needed.
 4. Add, update, or remove the user's `n8n` project relation.
 
+Pre-warm populates Redis `tenantroles:{email}` / `tenantgroups:{email}` (1 h TTL) via one `getUserGroupsWithRoles` per tenant, so the first `/ui-api/session` after login hits cache.
+
 After processing active tenants, the sync also removes stale managed project relations for tenant projects the user no longer belongs to.
 
 Important behavior:
 
-- Sync is non-blocking and does not fail login.
+- Both operations are non-blocking and never fail login; failures are logged (`Tenant roles pre-warm failed` / `Tenant project sync failed`) but the redirect and both session artifacts already succeeded.
+- Missing `access_token` or unconfigured CSTAR skips both.
 - Partial CSTAR failures do not block other tenant syncs.
 - Only managed roles are updated or removed.
 - Manually assigned non-managed project roles are preserved.

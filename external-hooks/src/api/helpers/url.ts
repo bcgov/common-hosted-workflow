@@ -1,14 +1,21 @@
 import { UI_APP_BASE_URL } from '@config';
 
+const RELATIVE_URL_BASE = 'http://relative.invalid';
+
+function isAbsoluteUrl(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value);
+}
+
+/**
+ * Set a query parameter on an absolute or relative URL using
+ * `URL.searchParams.set()` semantics: existing occurrences of the key are
+ * replaced (exactly one remains), existing query parameters and fragments
+ * are preserved.
+ */
 export function appendQueryParam(urlOrPath: string, key: string, value: string) {
-  try {
-    const url = new URL(urlOrPath);
-    url.searchParams.set(key, value);
-    return url.toString();
-  } catch {
-    const separator = urlOrPath.includes('?') ? '&' : '?';
-    return `${urlOrPath}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-  }
+  const url = isAbsoluteUrl(urlOrPath) ? new URL(urlOrPath) : new URL(urlOrPath, RELATIVE_URL_BASE);
+  url.searchParams.set(key, value);
+  return isAbsoluteUrl(urlOrPath) ? url.toString() : `${url.pathname}${url.search}${url.hash}`;
 }
 
 export function appendTokenToReturnTo(returnTo: string, token: string) {

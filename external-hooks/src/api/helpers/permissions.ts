@@ -18,21 +18,25 @@ export function computePermissions(
   n8nUser: { disabled: boolean; role: { slug: string } | null } | null,
   featureFlagService: FeatureFlagService,
 ): Permissions {
-  const isAdmin = n8nUser?.role != null && ADMIN_ROLE_SLUGS.has(n8nUser.role.slug);
-  const hasNoRole = n8nUser?.role == null;
   const isDisabled = n8nUser?.disabled ?? false;
-  const userIsValid = !!n8nUser && !isDisabled && !hasNoRole;
+  const hasNoRole = n8nUser?.role == null;
+  // An identity is only n8n-authorized when an enabled user with an n8n role exists.
+  // Disabled users and unprovisioned identities receive no n8n-derived capabilities.
+  const isEligibleEnabledUser = !!n8nUser && !isDisabled && !hasNoRole;
+  const isAdmin = !!n8nUser && !isDisabled && n8nUser.role != null && ADMIN_ROLE_SLUGS.has(n8nUser.role.slug);
 
-  const canShareWorkflows = userIsValid && featureFlagService.isFeatureEnabled(FEATURE.WORKFLOW_SHARE);
+  const canShareWorkflows = isEligibleEnabledUser && featureFlagService.isFeatureEnabled(FEATURE.WORKFLOW_SHARE);
 
   return {
     isAdmin,
     canViewWorkflows: canShareWorkflows,
+    // Access-request creation/status is the only default capability for
+    // disabled or ineligible (missing/role-less) identities.
     canRequestAccess: isDisabled || hasNoRole,
     canReviewAccessRequests: isAdmin,
     canShareWorkflows,
     canUnshareWorkflows: isAdmin,
-    canManageWil: !!n8nUser && featureFlagService.isFeatureEnabled(FEATURE.WIL),
-    canManageProject: !!n8nUser && featureFlagService.isFeatureEnabled(FEATURE.PROJECT),
+    canManageWil: isEligibleEnabledUser && featureFlagService.isFeatureEnabled(FEATURE.WIL),
+    canManageProject: isEligibleEnabledUser && featureFlagService.isFeatureEnabled(FEATURE.PROJECT),
   };
 }

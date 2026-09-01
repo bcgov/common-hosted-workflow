@@ -7,6 +7,7 @@ import { extractOidcIdentity, fetchOidcDiscoveryDocument, fetchOidcUserInfo, ref
 import {
   getUiOidcAccessTokenRecord,
   getUiOidcRefreshTokenRecord,
+  getUiSessionIssueId,
   setUiOidcAccessTokenRecord,
   setUiOidcIdToken,
   setUiOidcRefreshTokenWithExpiry,
@@ -15,9 +16,11 @@ import {
   issueUiSessionToken,
   resolveAccessTokenExpiresAt,
   shouldRefreshAccessToken,
+  shouldRefreshSeparateToken,
   isRefreshTokenExpired,
+  isSeparateTokenExpired,
 } from './ui-auth-token';
-import { getOidcConfigFromEnv } from './ui-oidc';
+import { getN8nOidcConfigFromEnv } from './n8n-oidc';
 import { invalidateTenantRoles } from './tenant-roles';
 import { invalidateTenantGroups } from './tenant-groups';
 import { createLogger } from '../utils/logger';
@@ -78,6 +81,14 @@ async function tryGetLocalUiSession(token: string): Promise<UiSession | null> {
   const payload = verification.payload as Partial<UiAuthTokenPayload>;
   if (!payload.sub || !payload.email || !payload.oidc) return null;
 
+  // Per-session revocation: the credential's issue id must match the value
+  // currently stored server-side. Logout (or another login overwriting the
+  // single-slot record) deletes it, which revokes the credential.
+  const currentSessionId = await getUiSessionIssueId(payload.email);
+  if (!payload.sid || !currentSessionId || payload.sid !== currentSessionId) {
+    return null;
+  }
+
   return {
     subject: payload.sub,
     email: payload.email,
@@ -91,7 +102,7 @@ async function tryGetLocalUiSession(token: string): Promise<UiSession | null> {
 }
 
 async function tryGetUpstreamUiSession(token: string): Promise<UiSession | null> {
-  const config = getOidcConfigFromEnv();
+  const config = getN8nOidcConfigFromEnv();
   if (!config.clientId) {
     return null;
   }
@@ -153,7 +164,7 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
   log.info('Refresh attempted', { email });
 
   try {
-    const config = getOidcConfigFromEnv();
+    const config = getN8nOidcConfigFromEnv();
     const discovery = await fetchOidcDiscoveryDocument(config);
     const refreshed = await refreshOidcTokens({ refreshToken: refreshTokenRecord.token, discovery, config });
     if (!refreshed.access_token) {
@@ -197,6 +208,7 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
       },
       upstreamAccessToken: refreshed.access_token,
       upstreamExpiresAt: refreshedExpiresAt,
+      sessionId: (await getUiSessionIssueId(email)) ?? undefined,
     });
 
     return { session, refreshedToken, upstreamAccessToken: refreshed.access_token };
@@ -210,12 +222,29 @@ async function refreshSessionByEmail(email: string, currentAccessToken?: string)
 }
 
 async function resolveLocalUiSession(token: string): Promise<UiSessionResult | null> {
-  const session = await tryGetLocalUiSession(token);
+  let session: UiSession | null;
+  try {
+    session = await tryGetLocalUiSession(token);
+  } catch (error) {
+    // jose.jwtVerify throws JWTExpired for fully expired tokens. Those must be
+    // rejected without attempting a refresh; the caller will see a null session
+    // and the X-UI-Auth-Token will not be set.
+    const message = error instanceof Error ? error.message : '';
+    if (message.toLowerCase().includes('jwt expired') || message.toLowerCase().includes('exp claim')) {
+      return null;
+    }
+    return null;
+  }
   if (!session) {
     return null;
   }
 
-  if (!shouldRefreshAccessToken(session.expiresAt)) {
+  // Fully expired separate JWTs are rejected outright — they cannot be refreshed.
+  if (isSeparateTokenExpired(session.expiresAt)) {
+    return null;
+  }
+
+  if (!shouldRefreshSeparateToken(session.expiresAt)) {
     return { session };
   }
 
@@ -225,14 +254,22 @@ async function resolveLocalUiSession(token: string): Promise<UiSessionResult | n
     return refreshed;
   }
 
+  // Within pre-expiry window but refresh failed — reject rather than fall back to
+  // a soon-to-expire credential so the caller can re-authenticate.
   return null;
 }
 
 async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult | null> {
   const record = await getUiOidcAccessTokenRecord(token);
-  const knownExpiresAt = record?.expiresAt;
 
-  if (record?.email && shouldRefreshAccessToken(knownExpiresAt)) {
+  // Raw access tokens must be server-known: logout deletes the record, so a
+  // token without one is unknown or revoked and is never trusted on its own.
+  if (!record?.email) {
+    return null;
+  }
+  const knownExpiresAt = record.expiresAt;
+
+  if (shouldRefreshAccessToken(knownExpiresAt)) {
     const session = await buildUpstreamSessionFromToken(token, knownExpiresAt);
     if (!session) {
       return await refreshSessionByEmail(record.email, token);
@@ -246,10 +283,6 @@ async function resolveUpstreamUiSession(token: string): Promise<UiSessionResult 
   const session = await buildUpstreamSessionFromToken(token, knownExpiresAt);
   if (session) {
     return { session };
-  }
-
-  if (!record?.email) {
-    return null;
   }
 
   return await refreshSessionByEmail(record.email, token);

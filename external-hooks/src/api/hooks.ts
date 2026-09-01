@@ -63,6 +63,7 @@ function createHookConfig() {
             jwtService: n8nServices.jwtService,
             userService: n8nServices.userService,
             tenantProjectSyncService: services.tenantProjectSync,
+            tenantService: services.tenant,
             cstarService: services.cstar,
           });
           mountAssets(app);
