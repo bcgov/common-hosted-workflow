@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">CI Checks | Common Hosted Workflow</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://bcgov.github.io/common-hosted-workflow/ci-cd/ci/checks"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="CI Checks | Common Hosted Workflow"><meta data-rh="true" name="description" content="This repository uses a layered CI model: fast hygiene checks for every contribution, followed by targeted package validation on pushes."><meta data-rh="true" property="og:description" content="This repository uses a layered CI model: fast hygiene checks for every contribution, followed by targeted package validation on pushes."><link data-rh="true" rel="icon" href="/common-hosted-workflow/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://bcgov.github.io/common-hosted-workflow/ci-cd/ci/checks"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/ci-cd/ci/checks" hreflang="en"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/ci-cd/ci/checks" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Checks","item":"https://bcgov.github.io/common-hosted-workflow/ci-cd/ci/checks"}]}</script><link rel="stylesheet" href="/common-hosted-workflow/assets/css/styles.dd79eb43.css">
-<script src="/common-hosted-workflow/assets/js/runtime~main.1316b676.js" defer="defer"></script>
-<script src="/common-hosted-workflow/assets/js/main.9efcf8b7.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/runtime~main.8fedac67.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/main.8a639cc4.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -18,8 +18,8 @@
 <p>The same policy runs in three places:</p>
 <ul>
 <li class=""><strong>Local development:</strong> hooks run before commit and catch issues early.</li>
-<li class=""><strong>Pull requests:</strong> <a href="/common-hosted-workflow/assets/files/pre-commit-pr-043a7d01f1eb41021ba265755329bb64.yml" target="_blank" class=""><code>pre-commit-pr.yml</code></a> validates PR commit history and repository checks.</li>
-<li class=""><strong>Pushes:</strong> <a href="/common-hosted-workflow/assets/files/pre-commit-f0579c4f2291836358ae5d6ce6b9ce33.yml" target="_blank" class=""><code>pre-commit.yml</code></a> validates pushed commits and can auto-commit generated fixes when configured by the action.</li>
+<li class=""><strong>Pull requests:</strong> <a href="/common-hosted-workflow/assets/files/pre-commit-pr-d90966810dc581dede00ff45faf98724.yml" target="_blank" class=""><code>pre-commit-pr.yml</code></a> validates PR commit history and repository checks.</li>
+<li class=""><strong>Pushes:</strong> <a href="/common-hosted-workflow/assets/files/pre-commit-bf7c338047c75517880206907aee5338.yml" target="_blank" class=""><code>pre-commit.yml</code></a> validates pushed commits and can auto-commit generated fixes when configured by the action.</li>
 </ul>
 <p>In practice, this lane covers the repository-level contract:</p>
 <ul>
@@ -29,7 +29,7 @@
 <li class="">secret detection and other security-oriented hooks</li>
 </ul>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="package-validation">Package Validation<a href="#package-validation" class="hash-link" aria-label="Direct link to Package Validation" title="Direct link to Package Validation" translate="no">​</a></h2>
-<p><a href="/common-hosted-workflow/assets/files/test-1be945e49ab8660af962df644dd9c056.yml" target="_blank" class=""><code>test.yml</code></a> runs push-based validation for actively maintained packages:</p>
+<p><a href="/common-hosted-workflow/assets/files/test-8a81795a8d46f5152c725fbb5317ae8d.yml" target="_blank" class=""><code>test.yml</code></a> runs push-based validation for actively maintained packages:</p>
 <ul>
 <li class=""><code>community-nodes</code>: build and unit tests</li>
 <li class=""><code>docker-compose/sdg-mock-app</code>: lint and build</li>

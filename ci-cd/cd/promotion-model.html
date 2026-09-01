@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Promotion Model | Common Hosted Workflow</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://bcgov.github.io/common-hosted-workflow/ci-cd/cd/promotion-model"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Promotion Model | Common Hosted Workflow"><meta data-rh="true" name="description" content="Application delivery follows a progressive promotion model driven by Git events and GitHub Releases."><meta data-rh="true" property="og:description" content="Application delivery follows a progressive promotion model driven by Git events and GitHub Releases."><link data-rh="true" rel="icon" href="/common-hosted-workflow/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://bcgov.github.io/common-hosted-workflow/ci-cd/cd/promotion-model"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/ci-cd/cd/promotion-model" hreflang="en"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/ci-cd/cd/promotion-model" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Promotion Model","item":"https://bcgov.github.io/common-hosted-workflow/ci-cd/cd/promotion-model"}]}</script><link rel="stylesheet" href="/common-hosted-workflow/assets/css/styles.dd79eb43.css">
-<script src="/common-hosted-workflow/assets/js/runtime~main.1316b676.js" defer="defer"></script>
-<script src="/common-hosted-workflow/assets/js/main.9efcf8b7.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/runtime~main.8fedac67.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/main.8a639cc4.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -22,7 +22,7 @@
 <li class="">GitHub Releases act as the approval boundary for prod.</li>
 </ul>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="image-tagging-strategy">Image Tagging Strategy<a href="#image-tagging-strategy" class="hash-link" aria-label="Direct link to Image Tagging Strategy" title="Direct link to Image Tagging Strategy" translate="no">​</a></h2>
-<p>The reusable build workflow, <a href="/common-hosted-workflow/assets/files/_build-and-push-3f07c3f8821cb238df114a7aa966a164.yml" target="_blank" class=""><code>_build-and-push.yml</code></a>, publishes images to <code>ghcr.io</code>.</p>
+<p>The reusable build workflow, <a href="/common-hosted-workflow/assets/files/_build-and-push-c39d8babbe76d40f2bbe0b851130bc77.yml" target="_blank" class=""><code>_build-and-push.yml</code></a>, publishes images to <code>ghcr.io</code>.</p>
 <p>By default it emits branch and long-SHA metadata tags. Test releases override that behavior and publish semver tags.</p>
 <p>Operationally, the important rule is simple: deployments promote <strong>image tags</strong>, not Helm chart versions.</p>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="deployment-streams">Deployment Streams<a href="#deployment-streams" class="hash-link" aria-label="Direct link to Deployment Streams" title="Direct link to Deployment Streams" translate="no">​</a></h2>

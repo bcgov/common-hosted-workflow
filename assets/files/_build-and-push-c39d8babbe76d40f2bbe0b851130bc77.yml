@@ -1,0 +1,49 @@
+name: Reusable Build and Push
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        required: true
+        type: string
+      docker-path:
+        required: true
+        type: string
+      metadata-tags:
+        required: false
+        type: string
+        default: |
+          type=ref,event=branch
+          type=sha,format=long,prefix=,suffix=
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+  security-events: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+    - name: Setup Tools
+      uses: ./.github/actions/setup-tools
+
+    - name: Build and Push
+      uses: egose/actions/docker-build-push@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
+      with:
+        registry-url: ${{ env.GITHUB_REGISTRY }}
+        registry-username: ${{ github.actor }}
+        registry-password: ${{ secrets.GITHUB_TOKEN }}
+        image-name: ${{ inputs.image-name }}
+        docker-context: ${{ inputs.docker-path }}
+        docker-file: ${{ inputs.docker-path }}/Dockerfile
+        docker-outputs: type=image,push=true,compression=gzip,force-compression=true
+        metadata-tags: ${{ inputs.metadata-tags }}
+        trivy: false
