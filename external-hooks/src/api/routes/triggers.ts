@@ -70,6 +70,11 @@ function isActorAllowed(
     return tenantRoles.some((r) => actorsLower.has(r.toLowerCase()));
   }
 
+  if (allowedActorsType === 'group') {
+    const tenantGroups = session.tenantGroups.find((tg) => tg.tenantId === tenantId)?.groups ?? [];
+    return tenantGroups.some((g) => actorsLower.has(g.toLowerCase()));
+  }
+
   return false;
 }
 

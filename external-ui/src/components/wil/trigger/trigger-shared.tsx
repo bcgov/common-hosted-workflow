@@ -77,7 +77,6 @@ export function AllowedActorsTypeField({
         <option value="role">Role</option>
         <option value="user">User</option>
         <option value="group">Group</option>
-        <option value="other">Other</option>
       </Select>
     </div>
   );
