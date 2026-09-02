@@ -39,29 +39,13 @@ async function canManageTriggers(
   n8nRepositories: ApiRouteContext['n8nRepositories'],
 ): Promise<boolean> {
   const tenantRow = await customRepositories.tenantProjectRelation.getRowByTenantId(tenantId);
-  if (!tenantRow) {
-    log.info('[DEBUG canManageTriggers] no tenant row → false', { tenantId: shortenIdForLog(tenantId) });
-    return false;
-  }
+  if (!tenantRow) return false;
   if (tenantRow.projectType === 'personal') {
     if (!session.n8nUser) return false;
     const personalProject = await n8nRepositories.project.getPersonalProjectForUser(session.n8nUser.id);
-    const isPersonalManager = personalProject?.id === tenantRow.projectId;
-    log.info('[DEBUG canManageTriggers] personal tenant', {
-      tenantId: shortenIdForLog(tenantId),
-      isPersonalManager,
-    });
-    return isPersonalManager;
+    return personalProject?.id === tenantRow.projectId;
   }
-  const isManager = session.tenantRoles.some(
-    (tr) => tr.tenantId === tenantId && tr.roles.includes(TRIGGER_MANAGE_ROLE),
-  );
-  log.info('[DEBUG canManageTriggers] team tenant', {
-    tenantId: shortenIdForLog(tenantId),
-    manageRole: TRIGGER_MANAGE_ROLE,
-    isManager,
-  });
-  return isManager;
+  return session.tenantRoles.some((tr) => tr.tenantId === tenantId && tr.roles.includes(TRIGGER_MANAGE_ROLE));
 }
 
 /**
@@ -75,52 +59,22 @@ function isActorAllowed(
 ): boolean {
   const { allowedActors, allowedActorsType } = trigger;
   const actorsLower = new Set(allowedActors.map((a) => a.toLowerCase()));
-
-  // [DEBUG] Trace inputs to actor-allow evaluation.
-  log.info('[DEBUG isActorAllowed] evaluating', {
-    tenantId: shortenIdForLog(tenantId),
-    allowedActorsType,
-    allowedActors,
-    actorsLower: [...actorsLower],
-    sessionEmail: session.email,
-    sessionTenantRoles: session.tenantRoles,
-    sessionTenantGroups: session.tenantGroups,
-  });
-
-  if (actorsLower.has('*') || allowedActorsType === 'all') {
-    log.info('[DEBUG isActorAllowed] matched wildcard/all', { allowedActorsType });
-    return true;
-  }
+  if (actorsLower.has('*') || allowedActorsType === 'all') return true;
 
   if (allowedActorsType === 'user') {
-    const matched = actorsLower.has(session.email.toLowerCase());
-    log.info('[DEBUG isActorAllowed] user branch', { sessionEmail: session.email, matched });
-    return matched;
+    return actorsLower.has(session.email.toLowerCase());
   }
 
   if (allowedActorsType === 'role') {
     const tenantRoles = session.tenantRoles.find((tr) => tr.tenantId === tenantId)?.roles ?? [];
-    const matched = tenantRoles.some((r) => actorsLower.has(r.toLowerCase()));
-    log.info('[DEBUG isActorAllowed] role branch', { tenantRoles, actorsLower: [...actorsLower], matched });
-    return matched;
+    return tenantRoles.some((r) => actorsLower.has(r.toLowerCase()));
   }
 
   if (allowedActorsType === 'group') {
-    const tenantGroupEntry = session.tenantGroups.find((tg) => tg.tenantId === tenantId);
-    const tenantGroups = tenantGroupEntry?.groups ?? [];
-    const matched = tenantGroups.some((g) => actorsLower.has(g.toLowerCase()));
-    log.info('[DEBUG isActorAllowed] group branch', {
-      tenantIdLookup: shortenIdForLog(tenantId),
-      foundTenantGroupEntry: Boolean(tenantGroupEntry),
-      tenantGroups,
-      tenantGroupsLower: tenantGroups.map((g) => g.toLowerCase()),
-      actorsLower: [...actorsLower],
-      matched,
-    });
-    return matched;
+    const tenantGroups = session.tenantGroups.find((tg) => tg.tenantId === tenantId)?.groups ?? [];
+    return tenantGroups.some((g) => actorsLower.has(g.toLowerCase()));
   }
 
-  log.info('[DEBUG isActorAllowed] no branch matched → denying', { allowedActorsType });
   return false;
 }
 
@@ -212,21 +166,6 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     const isManager = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
 
-    // [DEBUG] Trace list request context.
-    log.info('[DEBUG GET /triggers] context', {
-      tenantId: shortenIdForLog(tenantId),
-      allowedProjectIds: allowedProjectIds.map((id) => shortenIdForLog(id)),
-      isManager,
-      sessionEmail: session.email,
-      rowCount: rows.length,
-      rows: rows.map((r) => ({
-        id: shortenIdForLog(r.id),
-        triggerType: r.triggerType,
-        allowedActorsType: r.allowedActorsType,
-        allowedActors: r.allowedActors,
-      })),
-    });
-
     if (isManager) {
       const chefsFormIds = rows.filter((r) => r.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM).map((r) => r.id);
       const triggerIdsWithCreds =
@@ -241,13 +180,6 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       );
     } else {
       const visibleRows = rows.filter((r) => isActorAllowed(r, session, tenantId));
-      // [DEBUG] Trace which rows survived the viewer actor filter.
-      log.info('[DEBUG GET /triggers] viewer filter result', {
-        tenantId: shortenIdForLog(tenantId),
-        totalRows: rows.length,
-        visibleCount: visibleRows.length,
-        visibleIds: visibleRows.map((r) => shortenIdForLog(r.id)),
-      });
       OkResponse(
         res,
         { data: visibleRows.map((r) => mapTriggerRowToLimitedResponse(r)) },
