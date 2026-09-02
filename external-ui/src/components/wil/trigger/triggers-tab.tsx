@@ -1,6 +1,6 @@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TRIGGER_MANAGE_ROLE_VALUES } from '../../../lib/trigger-manage-roles';
-import { useHasTenantRoles, useTenantRolesById } from '../../../state/session';
+import { useHasTenantRoles, useTenantRolesById, useTenantGroupsById } from '../../../state/session';
 import { useTriggers } from './use-triggers';
 import { canUserSeeTrigger } from './trigger-utils';
 import { TRIGGER_TYPES } from '../../../constants/constants';
@@ -19,6 +19,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
   const hasManageRoles = useHasTenantRoles(tenantId, TRIGGER_MANAGE_ROLE_VALUES);
   const canManage = isPersonalTenant || hasManageRoles;
   const userTenantRoles = useTenantRolesById(tenantId);
+  const userTenantGroups = useTenantGroupsById(tenantId);
 
   const {
     triggers,
@@ -54,7 +55,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
 
   const visibleTriggers = canManage
     ? triggers
-    : triggers.filter((t) => canUserSeeTrigger(t, userTenantRoles, userEmail));
+    : triggers.filter((t) => canUserSeeTrigger(t, userTenantRoles, userTenantGroups, userEmail));
 
   const deleteTriggerLabel =
     pendingDeleteTrigger?.config.type === TRIGGER_TYPES.CHEFS_FORM
