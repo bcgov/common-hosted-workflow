@@ -15,10 +15,12 @@ export function ChefsFormViewer({
   readOnly = false,
   language = 'en',
   baseUrl = DEFAULT_BASE_URL,
+  submitMode,
   onFormReady,
   onSubmissionComplete,
   onSubmissionError,
   onBeforeSubmit,
+  onHostSubmit,
 }: Readonly<ChefsFormViewerProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptStatus = useChefsScript(baseUrl);
@@ -34,6 +36,7 @@ export function ChefsFormViewer({
   const onSubmissionCompleteRef = useRef(onSubmissionComplete);
   const onSubmissionErrorRef = useRef(onSubmissionError);
   const onBeforeSubmitRef = useRef(onBeforeSubmit);
+  const onHostSubmitRef = useRef(onHostSubmit);
   const prefillDataRef = useRef(prefillData);
 
   useEffect(() => {
@@ -48,6 +51,9 @@ export function ChefsFormViewer({
   useEffect(() => {
     onBeforeSubmitRef.current = onBeforeSubmit;
   }, [onBeforeSubmit]);
+  useEffect(() => {
+    onHostSubmitRef.current = onHostSubmit;
+  }, [onHostSubmit]);
   useEffect(() => {
     prefillDataRef.current = prefillData;
   }, [prefillData]);
@@ -66,6 +72,7 @@ export function ChefsFormViewer({
       headersJson ? `headers='${headersJson}'` : '',
       readOnly ? `read-only="true"` : '',
       language ? `language="${language}"` : '',
+      submitMode && submitMode !== 'chefs' ? `submit-mode="${submitMode}"` : '',
       'isolate-styles',
     ]
       .filter(Boolean)
@@ -118,10 +125,16 @@ export function ChefsFormViewer({
       );
     };
 
+    const handleHostSubmit = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      onHostSubmitRef.current?.(customEvent.detail);
+    };
+
     formViewer.addEventListener('formio:ready', handleFormReady);
     formViewer.addEventListener('formio:beforeSubmit', handleBeforeSubmit);
     formViewer.addEventListener('formio:submitDone', handleSubmit);
     formViewer.addEventListener('formio:submitError', handleSubmitError);
+    formViewer.addEventListener('formio:hostSubmit', handleHostSubmit);
 
     // Trigger load if the web component exposes a load method
     const viewer = formViewer as HTMLElement & { load?: () => Promise<void> };
@@ -134,6 +147,7 @@ export function ChefsFormViewer({
       formViewer.removeEventListener('formio:beforeSubmit', handleBeforeSubmit);
       formViewer.removeEventListener('formio:submitDone', handleSubmit);
       formViewer.removeEventListener('formio:submitError', handleSubmitError);
+      formViewer.removeEventListener('formio:hostSubmit', handleHostSubmit);
 
       // Explicitly destroy the web component to clear internal timers (e.g. auth token refresh)
       const viewerInstance = formViewer as HTMLElement & { destroy?: () => void };
@@ -143,7 +157,19 @@ export function ChefsFormViewer({
 
       setIsFormMounted(false);
     };
-  }, [scriptStatus, formId, authToken, submissionId, baseUrl, tokenJson, userJson, headersJson, readOnly, language]);
+  }, [
+    scriptStatus,
+    formId,
+    authToken,
+    submissionId,
+    baseUrl,
+    tokenJson,
+    userJson,
+    headersJson,
+    readOnly,
+    language,
+    submitMode,
+  ]);
 
   if (scriptStatus === 'error') {
     return (

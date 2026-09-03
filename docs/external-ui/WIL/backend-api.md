@@ -117,9 +117,12 @@ Exchanges a FormAPIKey (stored in the action record) for a short-lived CHEFS JWT
   "authToken": "eyJhbG...",
   "formId": "chefs-form-uuid",
   "formName": "My Form",
-  "baseUrl": "https://submit.digital.gov.bc.ca/app"
+  "baseUrl": "https://submit.digital.gov.bc.ca/app",
+  "skipChefsSubmission": true
 }
 ```
+
+`skipChefsSubmission` is only included (as `true`) when the action payload has it set — that is, when the workflow designer enabled **Send Form Data to Callback** on the `showform` action. When absent, the UI submits the form to CHEFS as normal.
 
 **Error Responses:**
 
@@ -142,6 +145,7 @@ Exchanges a FormAPIKey (stored in the action record) for a short-lived CHEFS JWT
 6. Calls `ChefsService.getFormToken({ formId, formApiKey })`
    - POSTs to `{CHEFS_GATEWAY_URL}/auth/token/forms/{formId}` with Basic Auth
    - Returns `{ authToken, formId, baseUrl }`
+7. If `payload.skipChefsSubmission === true`, includes `skipChefsSubmission: true` in the response so the UI can switch the form viewer to host-controlled submission (`submit-mode="none"`)
 
 ---
 
@@ -157,6 +161,15 @@ Proxies interaction responses to the upstream webhook URL stored in the action r
   "body": { "option": "Approve" }
 }
 ```
+
+The `body` object is opaque to this endpoint — it is forwarded to the upstream `callbackUrl` as-is. Its shape depends on the action type and, for `showform`, on the **Send Form Data to Callback** toggle:
+
+| Action                                  | `body` shape                                    |
+| --------------------------------------- | ----------------------------------------------- |
+| `getapproval`                           | `{ "option": "Approve" }`                       |
+| `waitonevent`                           | `{ "eventName": "clicked" }`                    |
+| `showform` (default)                    | `{ "formId": "...", "submission_id": "..." }`   |
+| `showform` (skip CHEFS submission)      | `{ "formId": "...", "formData": { ... } }`      |
 
 **Response (success):**
 

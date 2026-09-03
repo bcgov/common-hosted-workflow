@@ -6,6 +6,7 @@ import { getStoredAppToken } from '../../services/backend/axios';
 import { useSessionSnapshot, useTenantGroupsById, useTenantRolesById } from '../../state/session';
 import { ChefsFormPanel } from '../chefs/chefs-form-panel';
 import type { ChefsFormPanelInitData } from '../chefs/chefs-form-panel';
+import type { HostSubmitDetail } from '../chefs/types';
 import { buildTokenObject, buildUserObject, buildUserProfile } from '../chefs/user-claims-utils';
 import { extractSubmissionId } from '../chefs/submission-utils';
 import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
@@ -40,6 +41,7 @@ async function initializeForm(params: {
     token: buildTokenObject(params.claims),
     user: buildUserObject(params.claims, { roles: params.tenantRoles, groups: params.tenantGroups }),
     headers: userToken ? { Authorization: `Bearer ${userToken}` } : {},
+    skipChefsSubmission: tokenResponse.skipChefsSubmission === true,
   };
 }
 
@@ -89,6 +91,8 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
     onRefresh?.();
   }
 
+  const skipChefsSubmission = initMutation.data?.skipChefsSubmission === true;
+
   const handleSubmissionComplete = useCallback(
     (detail: unknown) => {
       if (callbackMutation.isPending || callbackMutation.isSuccess) return;
@@ -96,6 +100,22 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
         tenantId,
         actionId: action.id,
         body: { formId: initMutation.data?.formId ?? '', submission_id: extractSubmissionId(detail) },
+      });
+    },
+    [action.id, tenantId, callbackMutation, initMutation.data?.formId],
+  );
+
+  // When skipChefsSubmission is enabled, the form is not submitted to CHEFS.
+  // Instead the full validated form data is sent to the callback URL.
+  const handleHostSubmit = useCallback(
+    (detail: HostSubmitDetail) => {
+      // Ignore draft saves — only forward final submissions
+      if (detail.isDraft) return;
+      if (callbackMutation.isPending || callbackMutation.isSuccess) return;
+      callbackMutation.mutate({
+        tenantId,
+        actionId: action.id,
+        body: { formId: initMutation.data?.formId ?? '', formData: detail.data },
       });
     },
     [action.id, tenantId, callbackMutation, initMutation.data?.formId],
@@ -132,8 +152,10 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
       submitSuccess={callbackMutation.isSuccess}
       submitError={callbackMutation.isError ? callbackMutation.error : null}
       submitErrorFallback="Failed to submit form response. Please try again."
+      submitMode={skipChefsSubmission ? 'none' : 'chefs'}
       onSubmissionComplete={handleSubmissionComplete}
       onBeforeSubmit={handleBeforeSubmit}
+      onHostSubmit={skipChefsSubmission ? handleHostSubmit : undefined}
     />
   );
 }

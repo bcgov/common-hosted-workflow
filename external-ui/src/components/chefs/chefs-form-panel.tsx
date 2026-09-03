@@ -1,5 +1,6 @@
 import { IconLoader2 } from '@tabler/icons-react';
 import { ChefsFormViewer } from './chefs-form-viewer';
+import type { HostSubmitDetail } from './types';
 import { StatusPending, StatusSuccess, StatusError, ErrorAlert } from '../shared/status-views';
 
 export interface ChefsFormPanelInitData {
@@ -11,6 +12,8 @@ export interface ChefsFormPanelInitData {
   token: Record<string, unknown>;
   user: Record<string, unknown>;
   headers: Record<string, string>;
+  /** When true, the form data is sent to the callback URL instead of submitted to CHEFS. */
+  skipChefsSubmission?: boolean;
 }
 
 interface ChefsFormPanelProps {
@@ -40,6 +43,10 @@ interface ChefsFormPanelProps {
   onSubmissionComplete: (detail: unknown) => void;
   /** Called before submission. Return false or reject to block. */
   onBeforeSubmit?: () => Promise<boolean>;
+  /** Controls how form submission is handled. Default is 'chefs' (normal CHEFS submission). */
+  submitMode?: 'chefs' | 'host' | 'none';
+  /** Called when submitMode is 'host' or 'none' after validation passes. */
+  onHostSubmit?: (detail: HostSubmitDetail) => void;
 }
 
 /**
@@ -62,6 +69,8 @@ export function ChefsFormPanel({
   submitErrorFallback = 'Failed to submit form. Please try again.',
   onSubmissionComplete,
   onBeforeSubmit,
+  submitMode,
+  onHostSubmit,
 }: Readonly<ChefsFormPanelProps>) {
   if (initPending) return <StatusPending label="Loading form…" />;
 
@@ -99,8 +108,10 @@ export function ChefsFormPanel({
         token={initData.token}
         user={initData.user}
         headers={initData.headers}
+        submitMode={submitMode}
         onSubmissionComplete={onSubmissionComplete}
         onBeforeSubmit={onBeforeSubmit}
+        onHostSubmit={onHostSubmit}
       />
     </div>
   );
