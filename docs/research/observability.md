@@ -57,6 +57,19 @@ for capacity planning and alerting once the core pillars are stable.
 | **Grafana Loki**  | Log storage for n8n Log Streaming events (workflow lifecycle and audit events)                                                    |
 | **Grafana**       | Visualization layer — dashboards and alerting across logs and traces                                                              |
 
+### Alert delivery
+
+Grafana Alerting is provisioned from the Helm chart. Rules carry a `team` label that routes
+email notifications to either the platform/operations or workflow team contact point. Recipient
+addresses are injected through deployment secrets, not committed to the repository. System-log
+rules query Loki for errors and elevated warning volume, while workflow-failure rules route to
+the workflow team. Notification templates include alert context and a link to the relevant
+Grafana dashboard.
+
+To add another team, define its email contact point, provide the recipient address through the
+deployment secret, add a notification-policy route for the team's label, and apply that label to
+the applicable rules.
+
 ### Why this stack
 
 - All components are from the Grafana ecosystem — consistent versioning, shared support model
@@ -515,13 +528,13 @@ Log Streaming:     n8n → syslog tcp://chwf-alloy:5514 → Alloy → Loki
 
 ## Open Questions
 
-| Question                                                               | Notes                                                                                                                                   |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| What does n8n Enterprise Log Streaming actually send over syslog?      | Determines if `\| json` pipeline works or custom parsing is needed                                                                      |
-| What is the primary isolation boundary — environment or project?       | Determines tenancy model; affects Alloy config, Grafana datasources, S3 layout                                                          |
-| What alerting targets do teams use? (email, Slack, Teams, RocketChat?) | Needed to configure Grafana Alerting contact points                                                                                     |
-| Should execution pruning be enabled and at what retention period?      | Separate from trace retention — affects n8n PostgreSQL DB size                                                                          |
-| What is the SLA for the observability stack itself?                    | 99.9% uptime requires HA replicas for Alloy, Tempo distributor, Loki distributor, and Grafana — single-pod deployments are insufficient |
-| Are traces operational telemetry or records?                           | If a workflow trace contains a case ID or application reference, retention and security requirements may change significantly           |
+| Question                                                          | Notes                                                                                                                                   |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| What does n8n Enterprise Log Streaming actually send over syslog? | Determines if `\| json` pipeline works or custom parsing is needed                                                                      |
+| What is the primary isolation boundary — environment or project?  | Determines tenancy model; affects Alloy config, Grafana datasources, S3 layout                                                          |
+| Which additional teams or delivery channels need alert routes?    | Email routes exist for platform and workflow teams; additional contact points and policies must be provisioned explicitly.              |
+| Should execution pruning be enabled and at what retention period? | Separate from trace retention — affects n8n PostgreSQL DB size                                                                          |
+| What is the SLA for the observability stack itself?               | 99.9% uptime requires HA replicas for Alloy, Tempo distributor, Loki distributor, and Grafana — single-pod deployments are insufficient |
+| Are traces operational telemetry or records?                      | If a workflow trace contains a case ID or application reference, retention and security requirements may change significantly           |
 
 ---

@@ -314,6 +314,48 @@ Default time range: **last 1 hour** — widen the time picker for historical inv
 
 ---
 
+## Grafana Alerting
+
+Grafana evaluates provisioned alert rules and sends email notifications to the responsible
+team. Alert rules, contact points, notification policies, and email templates are managed in
+Git and provisioned by Helm; they are locked against editing in the Grafana UI.
+
+### Team routing
+
+Every alert rule includes a `team` label. Grafana routes notifications using that label:
+
+| Team label  | Recipient contact point | Alert scope                            |
+| ----------- | ----------------------- | -------------------------------------- |
+| `platform`  | `n8n-ops-email`         | n8n platform and infrastructure health |
+| `workflows` | `n8n-workflows-email`   | Workflow execution failures            |
+
+The recipient addresses are supplied to Grafana through the deployment secret rather than
+stored in Git. Notifications are grouped by Grafana folder and alert name, wait 30 seconds
+before the first notification, and repeat every four hours while an alert remains firing.
+
+### System-log alerts
+
+The following rules query the `n8n-system-logs` Loki stream and route to the `platform` team:
+
+| Alert                                | Condition                                                                                                            | Evaluation                           |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **System Error Detected**            | An unstructured log line contains `error`, `exception`, `fatal`, or `panic`; workflow execution events are excluded. | More than zero errors for one minute |
+| **System Structured Error Detected** | A non-workflow n8n component emits a structured error-level message.                                                 | More than zero errors for one minute |
+| **System Warnings Elevated**         | More than 10 non-execution warning lines are emitted.                                                                | Sustained for five minutes           |
+
+System-error emails include recent matching error messages and a link to the **n8n System
+Logs** dashboard around the alert time. Workflow alerts instead link to the **n8n Executions**
+dashboard and can include failed-workflow counts.
+
+### Adding a team route
+
+To send a class of alerts to another team, add an email contact point, supply its recipient
+address through the deployment secret, add a matching `team` route in the notification policy,
+and label the relevant alert rules with that team value. Keep the contact point, policy, and
+rule label in sync: an unmatched team label falls back to Grafana's default receiver.
+
+---
+
 ## How metrics, traces, and logs reach Grafana
 
 ```
