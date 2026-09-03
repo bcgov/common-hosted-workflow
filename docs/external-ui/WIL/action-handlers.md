@@ -115,6 +115,7 @@ An embedded CHEFS form with full authentication context, prefill data, and submi
   formName?: string;                           // Display name
   formPreFillData?: Record<string, unknown>;   // Workflow-defined prefill values
   submissionId?: string;                       // Existing submission (if editing)
+  skipChefsSubmission?: boolean;               // When true, send form data to callback instead of submitting to CHEFS
   // formApiKey is NEVER present — stripped server-side
 }
 ```
@@ -144,6 +145,10 @@ Action selected / tenantId changes
 
 ### Submission Callback Flow
 
+The handler chooses one of two submission paths based on `skipChefsSubmission` from the init data.
+
+**Default path (`skipChefsSubmission` absent/false)** — the form submits to CHEFS (`submit-mode="chefs"`), and `formio:submitDone` fires:
+
 ```
 formio:submitDone event fires
     │
@@ -157,6 +162,23 @@ formio:submitDone event fires
     ├── [Success] "Form submitted successfully" + onInteractionSuccess()
     └── [Error] Error alert above form (form still visible for context)
 ```
+
+**Skip-CHEFS path (`skipChefsSubmission === true`)** — the viewer runs in `submit-mode="none"`, so CHEFS validates but does not store a submission. Instead of `formio:submitDone`, the `formio:hostSubmit` event fires with the full form data:
+
+```
+formio:hostSubmit event fires  (detail: { data, isDraft, ... })
+    │
+    ├── Ignore draft saves (isDraft === true)
+    │
+    ├── callbackMutation.mutate({ tenantId, actionId, body: { formId, formData: detail.data } })
+    │       └── POST /ui-api/wil/callback
+    │
+    ├── [Pending] Overlay with "Submitting…" spinner, form blocked
+    ├── [Success] "Form submitted successfully" + onInteractionSuccess()   ← same confirmation as default path
+    └── [Error] Error alert above form (form still visible for context)
+```
+
+Both paths reuse the same `callbackMutation` and success UI — only the callback body differs (`submission_id` vs `formData`).
 
 ### State Management
 

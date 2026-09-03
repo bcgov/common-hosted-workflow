@@ -33,28 +33,28 @@ Both operations support actor, workflow instance, `since`, and `limit` filters a
 
 Creates a new action in the WIL API layer.
 
-| Parameter                | Type    | Required                           | Default       | Description                                                               |
-| ------------------------ | ------- | ---------------------------------- | ------------- | ------------------------------------------------------------------------- |
-| Actor ID                 | string  | Yes                                | -             | Target actor identifier                                                   |
-| Actor Type               | options | Yes                                | `user`        | `user`, `group`, `role`, `system`, `other`                                |
-| Action Type              | options | Yes                                | `getapproval` | `getapproval`, `showform`, `waitonevent`                                  |
-| Action Title             | string  | No                                 | -             | Optional title for the action                                             |
-| HTML                     | string  | Yes, for `getapproval`             | -             | HTML content shown before approval options                                |
-| Options                  | list    | Yes, for `getapproval`             | -             | Repeatable approval option labels. At least one option is required.       |
-| CHEFS Form Name          | string  | Yes, for `showform`                | -             | CHEFS form name shown for the form action                                 |
-| CHEFS Form ID            | string  | Yes, for `showform`                | -             | CHEFS form ID to render                                                   |
-| CHEFS Form API Key       | string  | Yes, for `showform`                | -             | CHEFS form API key used server-side                                       |
-| CHEFS Form Submission ID | string  | No                                 | -             | Existing CHEFS form submission ID to prefill from prior data              |
-| Form Pre-Fill Data       | JSON    | No                                 | `{}`          | Object of CHEFS field API names and values                                |
-| Send Form Data to Callback (Skip CHEFS Submission) | boolean | No                   | `false`       | For `showform`. When on, the form data is sent to the callback URL instead of submitted to CHEFS |
-| Payload                  | JSON    | Yes, for `waitonevent`             | `{}`          | Free-form wait-on-event payload, for example `{ "eventName": "clicked" }` |
-| Callback Method          | options | No                                 | `POST`        | `none`, `POST`, `PUT`, `PATCH`                                            |
-| Callback URL             | string  | Yes (when Callback Method != None) | -             | URL called when action completes                                          |
-| Callback Payload Spec    | JSON    | No                                 | `{}`          | Template for expected callback body                                       |
-| Due Date                 | string  | No                                 | -             | RFC 3339 timestamp                                                        |
-| Priority                 | options | No                                 | `normal`      | `normal` or `critical`                                                    |
-| Check In                 | string  | No                                 | -             | RFC 3339 reminder timestamp                                               |
-| Metadata                 | JSON    | No                                 | `{}`          | Arbitrary JSON metadata                                                   |
+| Parameter                                          | Type    | Required                           | Default       | Description                                                                                      |
+| -------------------------------------------------- | ------- | ---------------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| Actor ID                                           | string  | Yes                                | -             | Target actor identifier                                                                          |
+| Actor Type                                         | options | Yes                                | `user`        | `user`, `group`, `role`, `system`, `other`                                                       |
+| Action Type                                        | options | Yes                                | `getapproval` | `getapproval`, `showform`, `waitonevent`                                                         |
+| Action Title                                       | string  | No                                 | -             | Optional title for the action                                                                    |
+| HTML                                               | string  | Yes, for `getapproval`             | -             | HTML content shown before approval options                                                       |
+| Options                                            | list    | Yes, for `getapproval`             | -             | Repeatable approval option labels. At least one option is required.                              |
+| CHEFS Form Name                                    | string  | Yes, for `showform`                | -             | CHEFS form name shown for the form action                                                        |
+| CHEFS Form ID                                      | string  | Yes, for `showform`                | -             | CHEFS form ID to render                                                                          |
+| CHEFS Form API Key                                 | string  | Yes, for `showform`                | -             | CHEFS form API key used server-side                                                              |
+| CHEFS Form Submission ID                           | string  | No                                 | -             | Existing CHEFS form submission ID to prefill from prior data                                     |
+| Form Pre-Fill Data                                 | JSON    | No                                 | `{}`          | Object of CHEFS field API names and values                                                       |
+| Send Form Data to Callback (Skip CHEFS Submission) | boolean | No                                 | `false`       | For `showform`. When on, the form data is sent to the callback URL instead of submitted to CHEFS |
+| Payload                                            | JSON    | Yes, for `waitonevent`             | `{}`          | Free-form wait-on-event payload, for example `{ "eventName": "clicked" }`                        |
+| Callback Method                                    | options | No                                 | `POST`        | `none`, `POST`, `PUT`, `PATCH`                                                                   |
+| Callback URL                                       | string  | Yes (when Callback Method != None) | -             | URL called when action completes                                                                 |
+| Callback Payload Spec                              | JSON    | No                                 | `{}`          | Template for expected callback body                                                              |
+| Due Date                                           | string  | No                                 | -             | RFC 3339 timestamp                                                                               |
+| Priority                                           | options | No                                 | `normal`      | `normal` or `critical`                                                                           |
+| Check In                                           | string  | No                                 | -             | RFC 3339 reminder timestamp                                                                      |
+| Metadata                                           | JSON    | No                                 | `{}`          | Arbitrary JSON metadata                                                                          |
 
 `Action Title` is sent as top-level `actionTitle`; it is not nested inside `payload`.
 
@@ -212,14 +212,14 @@ Generated payload:
 
 #### showform Details
 
-| Field                  | Type    | Required | Description                                                                                    |
-| ---------------------- | ------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `formName`             | string  | Yes      | CHEFS form name shown for the form action                                                      |
-| `formId`               | string  | Yes      | CHEFS form ID to render                                                                        |
-| `formApiKey`           | string  | Yes      | CHEFS form API key used server-side. The backend strips it before returning actions to the UI. |
-| `submissionId`         | string  | No       | Existing CHEFS form submission ID used to prefill the form from prior submission data          |
-| `formPreFillData`      | object  | No       | Key-value pairs matching CHEFS form field API names                                            |
-| `skipChefsSubmission`  | boolean | No       | Set to `true` by the **Send Form Data to Callback** toggle. Only present in the payload when enabled. |
+| Field                 | Type    | Required | Description                                                                                           |
+| --------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `formName`            | string  | Yes      | CHEFS form name shown for the form action                                                             |
+| `formId`              | string  | Yes      | CHEFS form ID to render                                                                               |
+| `formApiKey`          | string  | Yes      | CHEFS form API key used server-side. The backend strips it before returning actions to the UI.        |
+| `submissionId`        | string  | No       | Existing CHEFS form submission ID used to prefill the form from prior submission data                 |
+| `formPreFillData`     | object  | No       | Key-value pairs matching CHEFS form field API names                                                   |
+| `skipChefsSubmission` | boolean | No       | Set to `true` by the **Send Form Data to Callback** toggle. Only present in the payload when enabled. |
 
 If `submissionId` is provided, it takes full priority: the form loads the existing submission data and `formPreFillData` is ignored.
 
@@ -229,10 +229,10 @@ By default a `showform` action submits the completed form to CHEFS, which stores
 
 Enable **Send Form Data to Callback** when you want the workflow to receive the raw form data directly, without CHEFS storing a submission. The form is still rendered and validated by CHEFS — only the final storage step is skipped.
 
-| Toggle           | CHEFS submission created? | Callback body sent to Callback URL                          |
-| ---------------- | ------------------------- | ----------------------------------------------------------- |
-| Off (default)    | Yes                       | `{ "formId": "...", "submission_id": "..." }`               |
-| On               | No                        | `{ "formId": "...", "formData": { ...all form fields } }`   |
+| Toggle        | CHEFS submission created? | Callback body sent to Callback URL                        |
+| ------------- | ------------------------- | --------------------------------------------------------- |
+| Off (default) | Yes                       | `{ "formId": "...", "submission_id": "..." }`             |
+| On            | No                        | `{ "formId": "...", "formData": { ...all form fields } }` |
 
 In both cases the user sees the same "Form submitted successfully" confirmation after completion.
 

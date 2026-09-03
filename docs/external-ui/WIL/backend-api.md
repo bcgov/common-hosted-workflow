@@ -164,12 +164,12 @@ Proxies interaction responses to the upstream webhook URL stored in the action r
 
 The `body` object is opaque to this endpoint — it is forwarded to the upstream `callbackUrl` as-is. Its shape depends on the action type and, for `showform`, on the **Send Form Data to Callback** toggle:
 
-| Action                                  | `body` shape                                    |
-| --------------------------------------- | ----------------------------------------------- |
-| `getapproval`                           | `{ "option": "Approve" }`                       |
-| `waitonevent`                           | `{ "eventName": "clicked" }`                    |
-| `showform` (default)                    | `{ "formId": "...", "submission_id": "..." }`   |
-| `showform` (skip CHEFS submission)      | `{ "formId": "...", "formData": { ... } }`      |
+| Action                             | `body` shape                                  |
+| ---------------------------------- | --------------------------------------------- |
+| `getapproval`                      | `{ "option": "Approve" }`                     |
+| `waitonevent`                      | `{ "eventName": "clicked" }`                  |
+| `showform` (default)               | `{ "formId": "...", "submission_id": "..." }` |
+| `showform` (skip CHEFS submission) | `{ "formId": "...", "formData": { ... } }`    |
 
 **Response (success):**
 
