@@ -203,6 +203,19 @@ After `formio:submitDone`:
 
 3. The upstream n8n webhook receives the form ID and submission ID, which it can use to fetch the full submission data from CHEFS if needed.
 
+### Submit Modes: CHEFS Submission vs Host-Controlled
+
+`ChefsFormViewer` accepts a `submitMode` prop that maps to the web component's `submit-mode` attribute. The WIL ShowForm handler selects the mode based on `skipChefsSubmission` from the `/chefs-token` response (which mirrors the `showform` action payload set by the WIL node).
+
+| `submitMode`        | Attribute rendered   | Event fired         | Callback body               | CHEFS submission stored? |
+| ------------------- | -------------------- | ------------------- | --------------------------- | ------------------------ |
+| `'chefs'` (default) | none (default)       | `formio:submitDone` | `{ formId, submission_id }` | Yes                      |
+| `'none'`            | `submit-mode="none"` | `formio:hostSubmit` | `{ formId, formData }`      | No                       |
+
+When `skipChefsSubmission === true`, the handler passes `submitMode="none"` and an `onHostSubmit` callback. CHEFS still renders and validates the form, but does not persist a submission; the full validated form data arrives in `detail.data` on the `formio:hostSubmit` event and is forwarded to the callback URL. Draft saves (`detail.isDraft === true`) are ignored. The user sees the same "Form submitted successfully" confirmation in both modes.
+
+`submit-mode="none"` is only emitted when the mode is not the default `'chefs'`, so the default flow is byte-for-byte unchanged.
+
 ### Limitation: No Submission Updates (Yet)
 
 The current implementation does not support editing existing submissions. The `submissionId` prop on `ChefsFormViewer` is wired but the WIL flow always treats interactions as new form fills. See [Future Work](./future-work.md) for planned submission update support.
@@ -237,7 +250,7 @@ return () => {
 The component uses several techniques to avoid unnecessary re-renders that would destroy and recreate the form:
 
 - **Memoized JSON serialization** — `token`, `user`, `headers` are stringified via `useMemo` and only trigger re-renders when their content actually changes.
-- **Ref-based callbacks** — `onFormReady`, `onSubmissionComplete`, `onSubmissionError` are stored in refs so the main effect's dependency array stays stable.
+- **Ref-based callbacks** — `onFormReady`, `onSubmissionComplete`, `onSubmissionError`, `onBeforeSubmit`, `onHostSubmit` are stored in refs so the main effect's dependency array stays stable.
 - **Ref-based prefillData** — stored in a ref and read at event time, not in the effect deps.
 
 ### Effect Dependencies
@@ -245,7 +258,19 @@ The component uses several techniques to avoid unnecessary re-renders that would
 The main effect re-runs (destroys and recreates the form) only when these change:
 
 ```typescript
-[scriptStatus, formId, authToken, submissionId, baseUrl, tokenJson, userJson, headersJson, readOnly, language];
+[
+  scriptStatus,
+  formId,
+  authToken,
+  submissionId,
+  baseUrl,
+  tokenJson,
+  userJson,
+  headersJson,
+  readOnly,
+  language,
+  submitMode,
+];
 ```
 
 This means changing the action (different `formId` or `authToken`) correctly re-renders a fresh form.

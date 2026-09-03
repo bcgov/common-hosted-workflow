@@ -57,6 +57,7 @@ export type WilChefsTokenResponse = {
   formId: string;
   formName: string;
   baseUrl: string;
+  skipChefsSubmission?: boolean;
 };
 
 export type WilActionCountsResponse = {

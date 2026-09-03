@@ -272,6 +272,15 @@ export const actionCreateProperties: INodeProperties[] = [
     displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
   },
   {
+    displayName: 'Send Form Data to Callback (Skip CHEFS Submission)',
+    name: 'skipChefsSubmission',
+    type: 'boolean',
+    default: false,
+    description:
+      'When enabled, the form data is NOT submitted to CHEFS. Instead, the complete form data is sent directly to the callback URL so the workflow can process it. The form is still rendered and validated by CHEFS, but no submission record is created in CHEFS.',
+    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+  },
+  {
     displayName: 'Payload',
     name: 'payload',
     type: 'json',

@@ -57,6 +57,9 @@ function buildActionPayload(ctx: IExecuteFunctions, i: number, actionType: strin
     const formPreFillData = safeParse(ctx.getNodeParameter('formPreFillData', i, '{}'));
     if (formPreFillData) payload.formPreFillData = formPreFillData as Record<string, unknown>;
 
+    const skipChefsSubmission = ctx.getNodeParameter('skipChefsSubmission', i, false) as boolean;
+    if (skipChefsSubmission) payload.skipChefsSubmission = true;
+
     return payload;
   }
 
