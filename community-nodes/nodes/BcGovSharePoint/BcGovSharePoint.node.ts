@@ -7,6 +7,7 @@ import {
   type IDataObject,
   type INodeType,
   type INodeTypeDescription,
+  type GenericValue,
 } from 'n8n-workflow';
 import {
   GRAPH_CREDENTIAL_TYPE,
@@ -14,7 +15,7 @@ import {
   type RetryOptions,
   type BinaryRequestContext,
 } from './transport/graphRequest';
-import { TtlCache } from './transport/cache';
+import { getCacheForCredential } from './transport/cache';
 import { createCachedResolvers, type SiteInput, type ListInput, type DriveInput } from './transport/resolve';
 import { createItem } from './actions/item/create';
 import { updateItem } from './actions/item/update';
@@ -51,27 +52,7 @@ interface BcGovSharePointCredentials {
   maxRetries: number;
 }
 
-/**
- * Cache lifetime is per-credential (tenantId:clientId), not a single
- * process-global instance — two different Graph tenants/app registrations
- * must never share cached metadata (spec section 9).
- */
-const cachesByCredentialId = new Map<string, TtlCache<unknown>>();
-
-/** @internal Test-only: clear all cached resolvers between tests. */
-export function _resetCachesForTesting(): void {
-  cachesByCredentialId.clear();
-}
-
-function getCacheForCredential(credentialId: string, ttlMinutes: number, refresh: boolean): TtlCache<unknown> {
-  let cache = cachesByCredentialId.get(credentialId);
-  if (!cache) {
-    cache = new TtlCache<unknown>(ttlMinutes * 60_000);
-    cachesByCredentialId.set(credentialId, cache);
-  }
-  if (refresh) cache.clear();
-  return cache;
-}
+export { _resetCachesForTesting } from './transport/cache';
 
 function parseSiteInput(raw: { mode: string; value?: string; hostname?: string; path?: string }): SiteInput {
   if (raw.mode === 'id') return { mode: 'id', value: String(raw.value) };
@@ -484,7 +465,8 @@ export class BcGovSharePoint implements INodeType {
                 name: 'value',
                 type: 'string',
                 default: '',
-                description: 'The value to write — person fields accept an email, dates accept ISO 8601',
+                description:
+                  'The value to write — person fields accept an email, dates accept ISO 8601, and multi-value columns (multi-choice, multi-person, multi-lookup) accept a comma-separated list such as A,B or an array such as {{ ["A","B"] }}',
               },
             ],
           },
@@ -1067,15 +1049,39 @@ async function executeItemOperation(
   throw new NodeOperationError(this.getNode(), `Unknown item operation "${operation}"`, { itemIndex });
 }
 
+/**
+ * Normalize a per-column "Fields" value. The value input is a `json`-typed
+ * fixedCollection field, so n8n may hand back either an already-parsed value
+ * (array/object/number/boolean from an expression) or a raw string. A string
+ * that parses as a JSON array or object is re-hydrated so multi-value columns
+ * (multi-choice/person/lookup) receive a real array; any other string is left
+ * untouched so scalar text/choice values pass through verbatim.
+ */
+function normalizeFieldValue(value: GenericValue): GenericValue {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!(trimmed.startsWith('[') || trimmed.startsWith('{'))) return value;
+  try {
+    return JSON.parse(trimmed) as GenericValue;
+  } catch {
+    return value;
+  }
+}
+
 function readFieldsFromInput(this: IExecuteFunctions, itemIndex: number): IDataObject {
   const fieldInputMode = this.getNodeParameter('fieldInputMode', itemIndex) as 'json' | 'fields';
   if (fieldInputMode === 'fields') {
     const entries =
-      (this.getNodeParameter('fieldEntries', itemIndex, {}) as { field?: Array<{ column: string; value: string }> })
-        .field ?? [];
+      (
+        this.getNodeParameter('fieldEntries', itemIndex, {}) as {
+          field?: Array<{ column: string; value: GenericValue }>;
+        }
+      ).field ?? [];
     const rawFields: IDataObject = {};
     for (const entry of entries) {
-      if (entry.column) rawFields[entry.column] = entry.value;
+      if (entry.column) {
+        rawFields[entry.column] = normalizeFieldValue(entry.value);
+      }
     }
     return rawFields;
   }

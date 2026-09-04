@@ -144,7 +144,7 @@ describe('coerceFieldValue', () => {
     expect(result).toEqual({ Field1: 'hello' });
   });
 
-  it('writes a multi-choice field with the @odata.type sibling key', async () => {
+  it('writes a multi-choice field with the Collection(Edm.String) @odata.type sibling key', async () => {
     const context = makeContext(vi.fn());
     const result = await coerceFieldValue(
       context,
@@ -157,6 +157,22 @@ describe('coerceFieldValue', () => {
     expect(result).toEqual({
       'Choice1@odata.type': 'Collection(Edm.String)',
       Choice1: ['A', 'B'],
+    });
+  });
+
+  it('splits a comma-joined string into an array for a multi-choice field (n8n Expression-mode flattening)', async () => {
+    const context = makeContext(vi.fn());
+    const result = await coerceFieldValue(
+      context,
+      'https://graph.microsoft.com/v1.0',
+      { maxRetries: 1 },
+      'site-1',
+      entry({ internalName: 'Choice1', type: 'choice', allowMultiple: true }),
+      'Angling, Hunting,Firearms',
+    );
+    expect(result).toEqual({
+      'Choice1@odata.type': 'Collection(Edm.String)',
+      Choice1: ['Angling', 'Hunting', 'Firearms'],
     });
   });
 

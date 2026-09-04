@@ -17,11 +17,12 @@ export async function createItem(
   rawFields: IDataObject,
 ): Promise<IDataObject> {
   const fields = await coerceFieldsForWrite(context, baseUrl, retry, siteId, columnMap, rawFields);
+  const url = `${baseUrl}/sites/${siteId}/lists/${listId}/items`;
   return graphRequest<IDataObject>(
     context,
     {
       method: 'POST',
-      url: `${baseUrl}/sites/${siteId}/lists/${listId}/items`,
+      url,
       body: { fields },
       json: true,
     },

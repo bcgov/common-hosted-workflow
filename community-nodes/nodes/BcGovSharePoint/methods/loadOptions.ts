@@ -5,12 +5,16 @@ import {
   type GraphContext,
   type RetryOptions,
 } from '../transport/graphRequest';
-import { resolveSiteId, resolveListId, getColumnMap, type SiteInput, type ListInput } from '../transport/resolve';
+import { createCachedResolvers, type SiteInput, type ListInput } from '../transport/resolve';
+import { getCacheForCredential } from '../transport/cache';
 
 interface LoadOptionsCredentials {
+  tenantId: string;
+  clientId: string;
   graphBaseUrl: string;
   defaultSiteUrl: string;
   maxRetries: number;
+  cacheTtlMinutes: number;
 }
 
 function buildGraphContext(self: ILoadOptionsFunctions): GraphContext {
@@ -34,15 +38,36 @@ function parseSiteParam(raw: { mode: string; value?: string }, defaultSiteUrl: s
   return { mode: 'url', value };
 }
 
-async function resolveCurrentSiteId(
+/**
+ * Site/list/column metadata is stable and expensive to fetch — without this,
+ * every open of the "add field" column picker re-issues the same site/list/
+ * columns Graph calls. Reuses the same per-credential TtlCache as the
+ * execute() path (spec section 9) so a warm cache serves both.
+ */
+function getResolvers(
   self: ILoadOptionsFunctions,
   context: GraphContext,
   credentials: LoadOptionsCredentials,
   retry: RetryOptions,
+) {
+  const credentialId = `${credentials.tenantId}:${credentials.clientId}`;
+  // Mirrors execute()'s "Refresh Metadata Cache" toggle — reading it here
+  // means checking it also busts the cache backing these loadOptions
+  // dropdowns (e.g. after adding a column in SharePoint), not just the
+  // next actual run.
+  const refreshCache = self.getNodeParameter('refreshCache', false) as boolean;
+  const cache = getCacheForCredential(credentialId, credentials.cacheTtlMinutes, refreshCache);
+  return createCachedResolvers(context, credentials.graphBaseUrl, retry, cache, credentialId);
+}
+
+async function resolveCurrentSiteId(
+  self: ILoadOptionsFunctions,
+  resolvers: ReturnType<typeof getResolvers>,
+  credentials: LoadOptionsCredentials,
 ): Promise<string> {
   const siteRaw = self.getNodeParameter('site', { mode: 'url', value: '' }) as { mode: string; value?: string };
   const siteInput = parseSiteParam(siteRaw, credentials.defaultSiteUrl);
-  const { siteId } = await resolveSiteId(context, credentials.graphBaseUrl, retry, siteInput);
+  const { siteId } = await resolvers.resolveSiteId(siteInput);
   return siteId;
 }
 
@@ -60,7 +85,8 @@ export async function searchLists(this: ILoadOptionsFunctions, filter?: string):
   const context = buildGraphContext(this);
   const retry: RetryOptions = { maxRetries: Math.min(credentials.maxRetries, 2) };
   const baseUrl = credentials.graphBaseUrl;
-  const siteId = await resolveCurrentSiteId(this, context, credentials, retry);
+  const resolvers = getResolvers(this, context, credentials, retry);
+  const siteId = await resolveCurrentSiteId(this, resolvers, credentials);
 
   const lists = await graphPagedRequest<GraphList>(
     context,
@@ -97,7 +123,8 @@ export async function searchDrives(this: ILoadOptionsFunctions, filter?: string)
   const context = buildGraphContext(this);
   const retry: RetryOptions = { maxRetries: Math.min(credentials.maxRetries, 2) };
   const baseUrl = credentials.graphBaseUrl;
-  const siteId = await resolveCurrentSiteId(this, context, credentials, retry);
+  const resolvers = getResolvers(this, context, credentials, retry);
+  const siteId = await resolveCurrentSiteId(this, resolvers, credentials);
 
   const drives = await graphPagedRequest<GraphDrive>(
     context,
@@ -132,13 +159,13 @@ export async function getColumnNames(this: ILoadOptionsFunctions): Promise<INode
   const credentials = await this.getCredentials<LoadOptionsCredentials>(GRAPH_CREDENTIAL_TYPE);
   const context = buildGraphContext(this);
   const retry: RetryOptions = { maxRetries: Math.min(credentials.maxRetries, 2) };
-  const baseUrl = credentials.graphBaseUrl;
-  const siteId = await resolveCurrentSiteId(this, context, credentials, retry);
+  const resolvers = getResolvers(this, context, credentials, retry);
+  const siteId = await resolveCurrentSiteId(this, resolvers, credentials);
 
   const listRaw = this.getNodeParameter('list', { mode: 'name', value: '' }) as { mode: string; value?: string };
   const listInput = parseListParam(listRaw);
-  const listId = await resolveListId(context, baseUrl, retry, siteId, listInput);
-  const columnMap = await getColumnMap(context, baseUrl, retry, siteId, listId);
+  const listId = await resolvers.resolveListId(siteId, listInput);
+  const columnMap = await resolvers.getColumnMap(siteId, listId);
 
   const options: INodePropertyOptions[] = [];
   for (const [, entry] of columnMap.byDisplayName.entries()) {

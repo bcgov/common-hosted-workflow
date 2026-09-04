@@ -6,11 +6,11 @@ This document describes every resource, operation, and parameter available in th
 
 These parameters are always visible regardless of the selected resource or operation:
 
-| Parameter              | Type             | Required | Default                   | Description                                                               |
-| ---------------------- | ---------------- | -------- | ------------------------- | ------------------------------------------------------------------------- |
-| Resource               | select           | Yes      | `Item`                    | The SharePoint resource to operate on (Item, File, List, User)            |
-| Site                   | resource locator | No       | Credential's Default Site | The target SharePoint site (by URL, Host & Path, or ID)                   |
-| Refresh Metadata Cache | boolean          | No       | `false`                   | Bypass and repopulate cached site/list/column metadata for this execution |
+| Parameter              | Type             | Required | Default                   | Description                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ---------------- | -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Resource               | select           | Yes      | `Item`                    | The SharePoint resource to operate on (Item, File, List, User)                                                                                                                                                                                                                                         |
+| Site                   | resource locator | No       | Credential's Default Site | The target SharePoint site (by URL, Host & Path, or ID)                                                                                                                                                                                                                                                |
+| Refresh Metadata Cache | boolean          | No       | `false`                   | Bypass and repopulate cached site/list/column metadata for this execution, and for the column dropdowns (Site/List/"Add Column" pickers) — check this after adding, renaming, or removing a SharePoint column so the pickers pick up the change immediately instead of waiting for the cache to expire |
 
 ### Site Parameter Modes
 
@@ -334,6 +334,8 @@ Use the n8n UI to select columns from a dropdown and fill values one by one. The
 - Exploring available columns
 - Non-technical users
 
+The **Value** input is a plain string field, not JSON — type or map a value directly (e.g. `Angling`). For multi-value columns (multi-choice, multi-person, multi-lookup), enter a **comma-separated list** (e.g. `Angling,Hunting,Firearms`); the node splits it and writes the correct multi-value payload. An array expression (`{{ ["Angling","Hunting"] }}`) also works if the upstream data is already an array.
+
 ### Use JSON Mode
 
 Provide a JSON object keyed by display name or internal name:
@@ -357,14 +359,18 @@ This mode is ideal for:
 
 The node automatically coerces values based on the column's SharePoint type:
 
-| Column type      | Input format              | Coercion                             |
-| ---------------- | ------------------------- | ------------------------------------ |
-| Person/Group     | Email string              | Resolved to `LookupId` integer       |
-| DateTime         | ISO 8601 string           | Passed as-is (Graph handles parsing) |
-| Number/Currency  | Numeric string or number  | Parsed to number                     |
-| Boolean (Yes/No) | `true`/`false` or `1`/`0` | Coerced to boolean                   |
-| Choice           | String value              | Validated against allowed choices    |
-| Lookup           | Integer or numeric string | Passed as LookupId                   |
+| Column type                                | Input format                                 | Coercion                                                                                                                         |
+| ------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Person/Group                               | Email string                                 | Resolved to `LookupId` integer                                                                                                   |
+| DateTime                                   | ISO 8601 string                              | Passed as-is (Graph handles parsing)                                                                                             |
+| Number/Currency                            | Numeric string or number                     | Parsed to number                                                                                                                 |
+| Boolean (Yes/No)                           | `true`/`false` or `1`/`0`                    | Coerced to boolean                                                                                                               |
+| Choice (single-select)                     | String value                                 | Passed through as-is                                                                                                             |
+| Choice (multi-select, "checkboxes" choice) | Comma-separated string (`A,B,C`) or an array | Split into an array and written with the `Collection(Edm.String)` `@odata.type` annotation Graph requires for multi-value writes |
+| Multi-value Person/Lookup                  | Comma-separated string or an array           | Split into an array of resolved `LookupId`s, written as `Collection(Edm.Int32)`                                                  |
+| Lookup (single-value)                      | Integer or numeric string                    | Passed as LookupId                                                                                                               |
+
+Multi-value detection for choice columns is based on Microsoft Graph's `choice.displayAs` facet (`"checkBoxes"` = multi-select); Graph does not expose a separate `allowMultipleSelection` flag for choice columns the way it does for Person/Group and Lookup columns.
 
 ---
 

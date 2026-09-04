@@ -30,6 +30,61 @@ function isRetryableStatus(status: number | undefined): boolean {
   return status === 429 || status === 503;
 }
 
+/**
+ * Truncate a serialized blob so a diagnostic message stays readable in the
+ * n8n UI even when a payload or response body is large.
+ */
+function truncate(text: string, max = 1500): string {
+  return text.length > max ? `${text.slice(0, max)}… (truncated)` : text;
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Extract the raw response body from a failed request. n8n/undici nest the
+ * upstream payload differently depending on the client, so probe the common
+ * shapes rather than assuming one.
+ */
+function getResponseBody(error: unknown): unknown {
+  const typed = error as {
+    response?: { body?: unknown; data?: unknown };
+    error?: unknown;
+    cause?: { response?: { body?: unknown; data?: unknown } };
+  };
+  return (
+    typed.response?.body ??
+    typed.response?.data ??
+    typed.cause?.response?.body ??
+    typed.cause?.response?.data ??
+    typed.error
+  );
+}
+
+/**
+ * Build a NodeApiError that carries the outgoing request and the raw upstream
+ * response body in its description. Graph frequently answers a rejected
+ * SharePoint write with an opaque 500 "generalException", which n8n surfaces
+ * with no indication of which field or value caused it — without the request
+ * body echoed back, such failures are undiagnosable from the UI alone.
+ */
+function buildApiError(context: GraphContext, error: unknown, options: IHttpRequestOptions): NodeApiError {
+  const parts = [`${options.method ?? 'GET'} ${options.url}`];
+  if (options.body !== undefined) {
+    parts.push(`Request body: ${truncate(safeStringify(options.body))}`);
+  }
+  const responseBody = getResponseBody(error);
+  if (responseBody !== undefined) {
+    parts.push(`Response body: ${truncate(safeStringify(responseBody))}`);
+  }
+  return new NodeApiError(context.getNode(), error as JsonObject, { description: parts.join('\n') });
+}
+
 function getRetryAfterMs(error: unknown): number | undefined {
   const headers = (error as { response?: { headers?: Record<string, string> } })?.response?.headers;
   const retryAfter = headers?.['retry-after'] ?? headers?.['Retry-After'];
@@ -55,16 +110,15 @@ export async function graphRequest<T = unknown>(
       return (await context.helpers.httpRequestWithAuthentication(GRAPH_CREDENTIAL_TYPE, options)) as T;
     } catch (error) {
       lastError = error;
-      const status = getStatusCode(error);
-      if (!isRetryableStatus(status) || attempt === retry.maxRetries) {
-        throw new NodeApiError(context.getNode(), error as JsonObject);
+      if (!isRetryableStatus(getStatusCode(error)) || attempt === retry.maxRetries) {
+        throw buildApiError(context, error, options);
       }
       const backoffMs = getRetryAfterMs(error) ?? (retry.baseDelayMs ?? DEFAULT_BASE_DELAY_MS) * 2 ** attempt;
       await delay(backoffMs + Math.random() * 100); // NOSONAR — non-cryptographic jitter for retry backoff
     }
   }
 
-  throw new NodeApiError(context.getNode(), lastError as JsonObject);
+  throw buildApiError(context, lastError, options);
 }
 
 export interface PagingOptions {
@@ -165,8 +219,7 @@ export async function graphBinaryRequest(
       return await context.helpers.requestOAuth2(GRAPH_CREDENTIAL_TYPE, requestOptions, { tokenType: 'Bearer' });
     } catch (error) {
       lastError = error;
-      const status = getStatusCode(error);
-      if (!isRetryableStatus(status) || attempt === retry.maxRetries) {
+      if (!isRetryableStatus(getStatusCode(error)) || attempt === retry.maxRetries) {
         throw new NodeApiError(context.getNode(), error as JsonObject);
       }
       const backoffMs = getRetryAfterMs(error) ?? (retry.baseDelayMs ?? DEFAULT_BASE_DELAY_MS) * 2 ** attempt;

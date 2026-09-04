@@ -1,12 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { searchLists, searchDrives } from '../../nodes/BcGovSharePoint/methods/loadOptions';
+import { _resetCachesForTesting } from '../../nodes/BcGovSharePoint/transport/cache';
+
+beforeEach(() => {
+  _resetCachesForTesting();
+});
 
 function makeLoadOptionsFunctions(httpMock: ReturnType<typeof vi.fn>) {
   return {
     getCredentials: vi.fn().mockResolvedValue({
+      tenantId: 'tenant-1',
+      clientId: 'client-1',
       graphBaseUrl: 'https://graph.microsoft.com/v1.0',
       defaultSiteUrl: 'https://bcgov.sharepoint.com/sites/TEST',
       maxRetries: 3,
+      cacheTtlMinutes: 5,
     }),
     getNodeParameter: vi.fn().mockImplementation((name: string, fallback: unknown) => {
       if (name === 'site') return { mode: 'url', value: '' };
