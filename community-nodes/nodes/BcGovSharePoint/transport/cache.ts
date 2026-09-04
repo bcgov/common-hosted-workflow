@@ -42,3 +42,28 @@ export function buildCacheKey(credentialId: string, scopeKey: string): string {
   // sha256 used for deterministic cache-key derivation — not a security context.
   return createHash('sha256').update(`${credentialId}:${scopeKey}`).digest('hex');
 }
+
+/**
+ * Cache lifetime is per-credential (tenantId:clientId), not a single
+ * process-global instance — two different Graph tenants/app registrations
+ * must never share cached metadata (spec section 9). Shared between the
+ * execute() path and the loadOptions dropdowns (methods/loadOptions.ts) so
+ * opening the "add field" column picker reuses the same warm cache instead
+ * of re-fetching site/list/column metadata from Graph on every open.
+ */
+const cachesByCredentialId = new Map<string, TtlCache<unknown>>();
+
+/** @internal Test-only: clear all cached resolvers between tests. */
+export function _resetCachesForTesting(): void {
+  cachesByCredentialId.clear();
+}
+
+export function getCacheForCredential(credentialId: string, ttlMinutes: number, refresh: boolean): TtlCache<unknown> {
+  let cache = cachesByCredentialId.get(credentialId);
+  if (!cache) {
+    cache = new TtlCache<unknown>(ttlMinutes * 60_000);
+    cachesByCredentialId.set(credentialId, cache);
+  }
+  if (refresh) cache.clear();
+  return cache;
+}

@@ -92,7 +92,7 @@ Files larger than 4 MB are uploaded via Graph's resumable upload session protoco
 
 ### Metadata Caching
 
-Site IDs, list IDs, and column maps are cached in a per-credential TTL cache (default 15 minutes) to reduce Graph API calls. The cache can be refreshed per-execution via the **Refresh Metadata Cache** toggle.
+Site IDs, list IDs, and column maps are cached in a per-credential TTL cache (default 15 minutes) to reduce Graph API calls. The same cache backs both node execution and the Site/List/"Add Column" dropdowns, so opening the column picker repeatedly doesn't re-hit Graph every time. The cache can be refreshed via the **Refresh Metadata Cache** toggle — checking it busts the cache for the next execution _and_ the next dropdown open, which is useful right after adding, renaming, or removing a SharePoint column.
 
 ### Retry with Backoff
 

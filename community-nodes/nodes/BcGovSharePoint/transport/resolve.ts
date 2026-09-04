@@ -54,7 +54,7 @@ export interface GraphColumn {
   required?: boolean;
   text?: unknown;
   note?: unknown;
-  choice?: { choices?: string[]; allowMultipleSelection?: boolean };
+  choice?: { choices?: string[]; allowMultipleSelection?: boolean; displayAs?: string };
   number?: unknown;
   currency?: unknown;
   boolean?: unknown;
@@ -124,7 +124,11 @@ function toEntry(column: GraphColumn): ColumnMapEntry {
     required: column.required ?? false,
     choices: column.choice?.choices,
     allowMultiple:
-      column.choice?.allowMultipleSelection ??
+      // Graph's choicecolumn facet has no `allowMultipleSelection` property —
+      // a multi-select choice column is only distinguishable by
+      // `displayAs: "checkBoxes"` (single-select uses "dropDownMenu" or
+      // "radioButtons").
+      (column.choice ? column.choice.displayAs === 'checkBoxes' : undefined) ??
       column.personOrGroup?.allowMultipleSelection ??
       column.lookup?.allowMultipleValues,
     lookup: column.lookup ? { listId: column.lookup.listId, column: column.lookup.columnName } : undefined,

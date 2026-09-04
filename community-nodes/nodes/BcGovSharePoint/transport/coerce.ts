@@ -144,6 +144,33 @@ async function coerceSingleScalar(
 const LOOKUP_ID_TYPES = new Set<ColumnMapEntry['type']>(['personOrGroup', 'lookup']);
 
 /**
+ * Normalize a multi-value column's raw input into an array of scalar values.
+ *
+ * When the "Value" field is used in Expression mode, n8n evaluates an array
+ * expression (e.g. ["Angling","Hunting"]) and flattens it to a comma-joined
+ * string ("Angling,Hunting") before the node's execute code runs. A real
+ * array (JSON mode, or a value already re-hydrated by normalizeFieldValue)
+ * arrives intact. This recovers both shapes:
+ *   - a real array passes through unchanged
+ *   - a comma-joined string is split back into trimmed, non-empty values
+ *   - any other scalar becomes a single-element array
+ *
+ * Comma-splitting is only applied here, in the allowMultiple branch, so
+ * single-value columns whose legitimate value contains a comma are never
+ * affected.
+ */
+function toMultiValueArray(rawValue: unknown): unknown[] {
+  if (Array.isArray(rawValue)) return rawValue;
+  if (typeof rawValue === 'string' && rawValue.includes(',')) {
+    return rawValue
+      .split(',')
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+  }
+  return [rawValue];
+}
+
+/**
  * Coerce one raw field value into its Graph write payload fragment (spec
  * section 6.3). Person/Lookup columns write to an "{Internal}LookupId" key;
  * multi-value columns add the matching "@odata.type" sibling key.
@@ -159,10 +186,18 @@ export async function coerceFieldValue(
   const targetKey = LOOKUP_ID_TYPES.has(entry.type) ? `${entry.internalName}LookupId` : entry.internalName;
 
   if (entry.allowMultiple) {
-    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    const values = toMultiValueArray(rawValue);
     const coerced = await Promise.all(
       values.map((value) => coerceSingleScalar(context, baseUrl, retry, siteId, entry, value)),
     );
+    // Graph requires the Collection(...) @odata.type annotation on every
+    // multi-value column write — Person/Lookup columns write integer LookupId
+    // collections (Collection(Edm.Int32)); multi-choice string columns write
+    // Collection(Edm.String). Omitting the annotation is what SharePoint
+    // rejects with an opaque 500 "generalException" (confirmed against
+    // Microsoft's documented multi-select write shape and the n8n community's
+    // report that the built-in node's plain-array write also fails with a 400
+    // for exactly this reason).
     const odataType = LOOKUP_ID_TYPES.has(entry.type) ? 'Collection(Edm.Int32)' : 'Collection(Edm.String)';
     return { [`${targetKey}@odata.type`]: odataType, [targetKey]: coerced };
   }
@@ -203,7 +238,8 @@ export async function coerceFieldsForWrite(
     }
 
     try {
-      Object.assign(output, await coerceFieldValue(context, baseUrl, retry, siteId, entry, rawValue));
+      const fragment = await coerceFieldValue(context, baseUrl, retry, siteId, entry, rawValue);
+      Object.assign(output, fragment);
     } catch (error) {
       if (error instanceof NodeOperationError || error instanceof NodeApiError) throw error;
       throw new NodeOperationError(context.getNode(), (error as Error).message);
