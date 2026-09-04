@@ -6,6 +6,6 @@ version: 0.1.0
 appVersion: '0.1.0'
 dependencies:
   - name: seaweedfs
-    version: '4.42.0'
+    version: '4.44.0'
     repository: 'https://seaweedfs.github.io/seaweedfs/helm'
     condition: seaweedfs.enabled
