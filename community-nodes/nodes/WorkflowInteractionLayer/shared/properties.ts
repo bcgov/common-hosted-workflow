@@ -131,6 +131,26 @@ function listFields(resource: string): INodeProperties[] {
   ];
 }
 
+/**
+ * Builds the `displayOptions` for a `showform` create field, merging any extra
+ * conditions (e.g. `skipChefsSubmission`, `callbackDataMode`) onto the shared base.
+ * Centralizes the repeated show-condition object used by every showform field.
+ */
+function showformDisplay(extra?: Record<string, unknown[]>): DisplayOptions {
+  return {
+    show: { resource: ['action'], operation: ['create'], actionType: ['showform'], ...extra },
+  };
+}
+
+/**
+ * `displayOptions` for a showform field that only applies when Skip CHEFS Submission is on
+ * and Callback Data is "Selected Fields Only". Extra conditions (e.g. the field-mapping
+ * mode) are merged on top.
+ */
+function selectedFieldsDisplay(extra?: Record<string, unknown[]>): DisplayOptions {
+  return showformDisplay({ skipChefsSubmission: [true], callbackDataMode: ['selected'], ...extra });
+}
+
 // ── Exported property arrays ──
 
 export const messageCreateProperties: INodeProperties[] = [
@@ -232,7 +252,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '',
     required: true,
     description: 'CHEFS form name shown for the form action',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+    displayOptions: showformDisplay(),
   },
   {
     displayName: 'CHEFS Form ID',
@@ -241,7 +261,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '',
     required: true,
     description: 'CHEFS form ID to render',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+    displayOptions: showformDisplay(),
   },
   {
     displayName: 'CHEFS Form API Key',
@@ -251,7 +271,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '',
     required: true,
     description: 'CHEFS form API key used server-side to obtain a form token',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+    displayOptions: showformDisplay(),
   },
   {
     displayName: 'CHEFS Form Submission ID',
@@ -260,7 +280,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '',
     description:
       'Optional existing CHEFS form submission ID to load. When provided, this takes priority over Form Pre-Fill Data.',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+    displayOptions: showformDisplay(),
   },
   {
     displayName: 'Form Pre-Fill Data',
@@ -269,7 +289,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '{}',
     description:
       'Optional object of CHEFS field API names and values to prefill over rendered form data. Ignored when CHEFS Form Submission ID is provided.',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+    displayOptions: showformDisplay(),
   },
   {
     displayName: 'Send Form Data to Callback (Skip CHEFS Submission)',
@@ -278,7 +298,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: false,
     description:
       'When enabled, the form data is NOT submitted to CHEFS. Instead, the form data is sent directly to the callback URL so the workflow can process it. The form is still rendered and validated by CHEFS, but no submission record is created in CHEFS.',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+    displayOptions: showformDisplay(),
   },
   {
     displayName: 'Callback Data',
@@ -291,9 +311,7 @@ export const actionCreateProperties: INodeProperties[] = [
     ],
     description:
       'Choose whether the entire form response or only specific fields are sent to the callback URL. Selecting only the fields you need keeps sensitive data in the browser and gives the workflow a smaller, predictable payload.',
-    displayOptions: {
-      show: { resource: ['action'], operation: ['create'], actionType: ['showform'], skipChefsSubmission: [true] },
-    },
+    displayOptions: showformDisplay({ skipChefsSubmission: [true] }),
   },
   {
     displayName: 'Field Selection Mode',
@@ -305,15 +323,7 @@ export const actionCreateProperties: INodeProperties[] = [
       { name: 'JSON', value: 'json' },
     ],
     description: 'Choose how to define which form fields are sent to the callback',
-    displayOptions: {
-      show: {
-        resource: ['action'],
-        operation: ['create'],
-        actionType: ['showform'],
-        skipChefsSubmission: [true],
-        callbackDataMode: ['selected'],
-      },
-    },
+    displayOptions: selectedFieldsDisplay(),
   },
   {
     displayName: 'Fields to Send',
@@ -347,16 +357,7 @@ export const actionCreateProperties: INodeProperties[] = [
     ],
     description:
       'Map each form field you want to send. Output Key is what the workflow receives; Source Path is where to read it from in the form data.',
-    displayOptions: {
-      show: {
-        resource: ['action'],
-        operation: ['create'],
-        actionType: ['showform'],
-        skipChefsSubmission: [true],
-        callbackDataMode: ['selected'],
-        callbackFieldMappingMode: ['keyValue'],
-      },
-    },
+    displayOptions: selectedFieldsDisplay({ callbackFieldMappingMode: ['keyValue'] }),
   },
   {
     displayName: 'Fields to Send (JSON)',
@@ -365,16 +366,7 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '{}',
     description:
       'JSON object mapping output keys to dot-notation source paths, e.g. { "city": "address.city", "name": "firstName" }',
-    displayOptions: {
-      show: {
-        resource: ['action'],
-        operation: ['create'],
-        actionType: ['showform'],
-        skipChefsSubmission: [true],
-        callbackDataMode: ['selected'],
-        callbackFieldMappingMode: ['json'],
-      },
-    },
+    displayOptions: selectedFieldsDisplay({ callbackFieldMappingMode: ['json'] }),
   },
   {
     displayName: 'Missing Field Behavior',
@@ -387,15 +379,7 @@ export const actionCreateProperties: INodeProperties[] = [
     ],
     description:
       'What to do when a Source Path is not present in the submitted form data. "Return Null" includes the Output Key with a null value; "Omit Field" leaves the key out of the callback payload entirely.',
-    displayOptions: {
-      show: {
-        resource: ['action'],
-        operation: ['create'],
-        actionType: ['showform'],
-        skipChefsSubmission: [true],
-        callbackDataMode: ['selected'],
-      },
-    },
+    displayOptions: selectedFieldsDisplay(),
   },
   {
     displayName: 'Payload',
