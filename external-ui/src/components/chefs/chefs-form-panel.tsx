@@ -1,6 +1,7 @@
 import { IconLoader2 } from '@tabler/icons-react';
 import { ChefsFormViewer } from './chefs-form-viewer';
 import type { HostSubmitDetail } from './types';
+import type { CallbackFieldMapping, MissingPathBehavior } from './field-extractor';
 import { StatusPending, StatusSuccess, StatusError, ErrorAlert } from '../shared/status-views';
 
 export interface ChefsFormPanelInitData {
@@ -14,6 +15,10 @@ export interface ChefsFormPanelInitData {
   headers: Record<string, string>;
   /** When true, the form data is sent to the callback URL instead of submitted to CHEFS. */
   skipChefsSubmission?: boolean;
+  /** When set (skip-CHEFS only), only these fields are sent to the callback URL. */
+  callbackFieldMappings?: CallbackFieldMapping[];
+  /** How to handle source paths not found in the submitted data. Defaults to 'returnNull'. */
+  callbackMissingPathBehavior?: MissingPathBehavior;
 }
 
 interface ChefsFormPanelProps {

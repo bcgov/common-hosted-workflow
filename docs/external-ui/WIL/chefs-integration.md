@@ -212,7 +212,9 @@ After `formio:submitDone`:
 | `'chefs'` (default) | none (default)       | `formio:submitDone` | `{ formId, submission_id }` | Yes                      |
 | `'none'`            | `submit-mode="none"` | `formio:hostSubmit` | `{ formId, formData }`      | No                       |
 
-When `skipChefsSubmission === true`, the handler passes `submitMode="none"` and an `onHostSubmit` callback. CHEFS still renders and validates the form, but does not persist a submission; the full validated form data arrives in `detail.data` on the `formio:hostSubmit` event and is forwarded to the callback URL. Draft saves (`detail.isDraft === true`) are ignored. The user sees the same "Form submitted successfully" confirmation in both modes.
+When `skipChefsSubmission === true`, the handler passes `submitMode="none"` and an `onHostSubmit` callback. CHEFS still renders and validates the form, but does not persist a submission; the validated form data arrives in `detail.data` on the `formio:hostSubmit` event and is forwarded to the callback URL. Draft saves (`detail.isDraft === true`) are ignored. The user sees the same "Form submitted successfully" confirmation in both modes.
+
+**Field selection.** If the action also carries `callbackFieldMappings` (from **Callback Data → Selected Fields Only** on the node), the handler runs `extractCallbackFields(detail.data, mappings, missingPathBehavior)` from `components/chefs/field-extractor.ts` and sends only the mapped fields as `formData`. Otherwise it sends the full `detail.data`. This filtering is client-side, so unmapped fields never leave the browser. `extractCallbackFields` mirrors the dot-notation resolution used by the `CHEFSSubmissionExtractor` node; `missingPathBehavior` is `returnNull` (include the key as `null`) or `omit` (drop the key).
 
 `submit-mode="none"` is only emitted when the mode is not the default `'chefs'`, so the default flow is byte-for-byte unchanged.
 

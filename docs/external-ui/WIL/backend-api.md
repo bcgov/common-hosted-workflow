@@ -118,11 +118,15 @@ Exchanges a FormAPIKey (stored in the action record) for a short-lived CHEFS JWT
   "formId": "chefs-form-uuid",
   "formName": "My Form",
   "baseUrl": "https://submit.digital.gov.bc.ca/app",
-  "skipChefsSubmission": true
+  "skipChefsSubmission": true,
+  "callbackFieldMappings": [{ "outputKey": "city", "sourcePath": "address.city" }],
+  "callbackMissingPathBehavior": "returnNull"
 }
 ```
 
 `skipChefsSubmission` is only included (as `true`) when the action payload has it set — that is, when the workflow designer enabled **Send Form Data to Callback** on the `showform` action. When absent, the UI submits the form to CHEFS as normal.
+
+`callbackFieldMappings` and `callbackMissingPathBehavior` are only included when the action was configured with **Callback Data → Selected Fields Only**. When present, the UI sends only the mapped fields to the callback; when absent, it sends the full form data. All three fields are only ever included alongside `skipChefsSubmission`.
 
 **Error Responses:**
 
@@ -145,7 +149,7 @@ Exchanges a FormAPIKey (stored in the action record) for a short-lived CHEFS JWT
 6. Calls `ChefsService.getFormToken({ formId, formApiKey })`
    - POSTs to `{CHEFS_GATEWAY_URL}/auth/token/forms/{formId}` with Basic Auth
    - Returns `{ authToken, formId, baseUrl }`
-7. If `payload.skipChefsSubmission === true`, includes `skipChefsSubmission: true` in the response so the UI can switch the form viewer to host-controlled submission (`submit-mode="none"`)
+7. If `payload.skipChefsSubmission === true`, includes `skipChefsSubmission: true` in the response so the UI can switch the form viewer to host-controlled submission (`submit-mode="none"`). Also passes through `callbackFieldMappings` (array) and `callbackMissingPathBehavior` (string) when present, so the UI can filter the form data to the selected fields before firing the callback.
 
 ---
 
@@ -164,12 +168,13 @@ Proxies interaction responses to the upstream webhook URL stored in the action r
 
 The `body` object is opaque to this endpoint — it is forwarded to the upstream `callbackUrl` as-is. Its shape depends on the action type and, for `showform`, on the **Send Form Data to Callback** toggle:
 
-| Action                             | `body` shape                                  |
-| ---------------------------------- | --------------------------------------------- |
-| `getapproval`                      | `{ "option": "Approve" }`                     |
-| `waitonevent`                      | `{ "eventName": "clicked" }`                  |
-| `showform` (default)               | `{ "formId": "...", "submission_id": "..." }` |
-| `showform` (skip CHEFS submission) | `{ "formId": "...", "formData": { ... } }`    |
+| Action                                   | `body` shape                                            |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `getapproval`                            | `{ "option": "Approve" }`                               |
+| `waitonevent`                            | `{ "eventName": "clicked" }`                            |
+| `showform` (default)                     | `{ "formId": "...", "submission_id": "..." }`           |
+| `showform` (skip CHEFS, full data)       | `{ "formId": "...", "formData": { ...all fields } }`    |
+| `showform` (skip CHEFS, selected fields) | `{ "formId": "...", "formData": { ...mapped fields } }` |
 
 **Response (success):**
 

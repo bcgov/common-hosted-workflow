@@ -131,6 +131,8 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       const formId = payload.formId as string | undefined;
       const formName = payload.formName as string | undefined;
       const skipChefsSubmission = payload.skipChefsSubmission === true;
+      const callbackFieldMappings = payload.callbackFieldMappings;
+      const callbackMissingPathBehavior = payload.callbackMissingPathBehavior;
 
       if (!formApiKey) {
         throw new AppError(400, 'Missing formApiKey');
@@ -148,6 +150,8 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
         formName,
         baseUrl: tokenResult.baseUrl,
         ...(skipChefsSubmission && { skipChefsSubmission: true }),
+        ...(skipChefsSubmission && Array.isArray(callbackFieldMappings) && { callbackFieldMappings }),
+        ...(skipChefsSubmission && typeof callbackMissingPathBehavior === 'string' && { callbackMissingPathBehavior }),
       });
     },
   );
