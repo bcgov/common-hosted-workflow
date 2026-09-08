@@ -7,6 +7,7 @@ import { useSessionSnapshot, useTenantGroupsById, useTenantRolesById } from '../
 import { ChefsFormPanel } from '../chefs/chefs-form-panel';
 import type { ChefsFormPanelInitData } from '../chefs/chefs-form-panel';
 import type { HostSubmitDetail } from '../chefs/types';
+import { extractCallbackFields } from '../chefs/field-extractor';
 import { buildTokenObject, buildUserObject, buildUserProfile } from '../chefs/user-claims-utils';
 import { extractSubmissionId } from '../chefs/submission-utils';
 import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
@@ -42,6 +43,8 @@ async function initializeForm(params: {
     user: buildUserObject(params.claims, { roles: params.tenantRoles, groups: params.tenantGroups }),
     headers: userToken ? { Authorization: `Bearer ${userToken}` } : {},
     skipChefsSubmission: tokenResponse.skipChefsSubmission === true,
+    callbackFieldMappings: tokenResponse.callbackFieldMappings,
+    callbackMissingPathBehavior: tokenResponse.callbackMissingPathBehavior,
   };
 }
 
@@ -106,19 +109,35 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
   );
 
   // When skipChefsSubmission is enabled, the form is not submitted to CHEFS.
-  // Instead the full validated form data is sent to the callback URL.
+  // Instead the validated form data is sent to the callback URL. If the action
+  // defines field mappings, only the selected fields are sent; otherwise the
+  // full form data is sent.
   const handleHostSubmit = useCallback(
     (detail: HostSubmitDetail) => {
       // Ignore draft saves — only forward final submissions
       if (detail.isDraft) return;
       if (callbackMutation.isPending || callbackMutation.isSuccess) return;
+
+      const mappings = initMutation.data?.callbackFieldMappings;
+      const formData =
+        mappings && mappings.length > 0
+          ? extractCallbackFields(detail.data, mappings, initMutation.data?.callbackMissingPathBehavior)
+          : detail.data;
+
       callbackMutation.mutate({
         tenantId,
         actionId: action.id,
-        body: { formId: initMutation.data?.formId ?? '', formData: detail.data },
+        body: { formId: initMutation.data?.formId ?? '', formData },
       });
     },
-    [action.id, tenantId, callbackMutation, initMutation.data?.formId],
+    [
+      action.id,
+      tenantId,
+      callbackMutation,
+      initMutation.data?.formId,
+      initMutation.data?.callbackFieldMappings,
+      initMutation.data?.callbackMissingPathBehavior,
+    ],
   );
 
   const handleBeforeSubmit = useCallback(async (): Promise<boolean> => {

@@ -277,8 +277,125 @@ export const actionCreateProperties: INodeProperties[] = [
     type: 'boolean',
     default: false,
     description:
-      'When enabled, the form data is NOT submitted to CHEFS. Instead, the complete form data is sent directly to the callback URL so the workflow can process it. The form is still rendered and validated by CHEFS, but no submission record is created in CHEFS.',
+      'When enabled, the form data is NOT submitted to CHEFS. Instead, the form data is sent directly to the callback URL so the workflow can process it. The form is still rendered and validated by CHEFS, but no submission record is created in CHEFS.',
     displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['showform'] } },
+  },
+  {
+    displayName: 'Callback Data',
+    name: 'callbackDataMode',
+    type: 'options',
+    default: 'full',
+    options: [
+      { name: 'Full Form Data', value: 'full' },
+      { name: 'Selected Fields Only', value: 'selected' },
+    ],
+    description:
+      'Choose whether the entire form response or only specific fields are sent to the callback URL. Selecting only the fields you need keeps sensitive data in the browser and gives the workflow a smaller, predictable payload.',
+    displayOptions: {
+      show: { resource: ['action'], operation: ['create'], actionType: ['showform'], skipChefsSubmission: [true] },
+    },
+  },
+  {
+    displayName: 'Field Selection Mode',
+    name: 'callbackFieldMappingMode',
+    type: 'options',
+    default: 'keyValue',
+    options: [
+      { name: 'UI Field Pairs', value: 'keyValue' },
+      { name: 'JSON', value: 'json' },
+    ],
+    description: 'Choose how to define which form fields are sent to the callback',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['create'],
+        actionType: ['showform'],
+        skipChefsSubmission: [true],
+        callbackDataMode: ['selected'],
+      },
+    },
+  },
+  {
+    displayName: 'Fields to Send',
+    name: 'callbackFieldMappings',
+    type: 'fixedCollection',
+    typeOptions: { multipleValues: true },
+    default: {},
+    placeholder: 'Add Field',
+    options: [
+      {
+        name: 'mapping',
+        displayName: 'Field',
+        values: [
+          {
+            displayName: 'Output Key',
+            name: 'outputKey',
+            type: 'string',
+            default: '',
+            description: 'The key name to use in the callback payload sent to the workflow',
+          },
+          {
+            displayName: 'Source Path',
+            name: 'sourcePath',
+            type: 'string',
+            default: '',
+            description:
+              'Dot-notation path into the submitted form data, e.g. firstName, address.city, or items.0.name',
+          },
+        ],
+      },
+    ],
+    description:
+      'Map each form field you want to send. Output Key is what the workflow receives; Source Path is where to read it from in the form data.',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['create'],
+        actionType: ['showform'],
+        skipChefsSubmission: [true],
+        callbackDataMode: ['selected'],
+        callbackFieldMappingMode: ['keyValue'],
+      },
+    },
+  },
+  {
+    displayName: 'Fields to Send (JSON)',
+    name: 'callbackFieldMappingJson',
+    type: 'json',
+    default: '{}',
+    description:
+      'JSON object mapping output keys to dot-notation source paths, e.g. { "city": "address.city", "name": "firstName" }',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['create'],
+        actionType: ['showform'],
+        skipChefsSubmission: [true],
+        callbackDataMode: ['selected'],
+        callbackFieldMappingMode: ['json'],
+      },
+    },
+  },
+  {
+    displayName: 'Missing Field Behavior',
+    name: 'callbackMissingPathBehavior',
+    type: 'options',
+    default: 'returnNull',
+    options: [
+      { name: 'Return Null', value: 'returnNull' },
+      { name: 'Omit Field', value: 'omit' },
+    ],
+    description:
+      'What to do when a Source Path is not present in the submitted form data. "Return Null" includes the Output Key with a null value; "Omit Field" leaves the key out of the callback payload entirely.',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['create'],
+        actionType: ['showform'],
+        skipChefsSubmission: [true],
+        callbackDataMode: ['selected'],
+      },
+    },
   },
   {
     displayName: 'Payload',

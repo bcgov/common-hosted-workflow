@@ -47,6 +47,11 @@ Creates a new action in the WIL API layer.
 | CHEFS Form Submission ID                           | string  | No                                 | -             | Existing CHEFS form submission ID to prefill from prior data                                     |
 | Form Pre-Fill Data                                 | JSON    | No                                 | `{}`          | Object of CHEFS field API names and values                                                       |
 | Send Form Data to Callback (Skip CHEFS Submission) | boolean | No                                 | `false`       | For `showform`. When on, the form data is sent to the callback URL instead of submitted to CHEFS |
+| Callback Data                                      | options | No                                 | `full`        | For `showform` + skip on. `Full Form Data` or `Selected Fields Only`                             |
+| Field Selection Mode                               | options | No                                 | `keyValue`    | Shown for `Selected Fields Only`. `UI Field Pairs` or `JSON`                                     |
+| Fields to Send                                     | list    | Yes, for `Selected Fields Only`    | -             | Repeatable Output Key + Source Path (dot-notation) pairs                                         |
+| Fields to Send (JSON)                              | JSON    | Yes, for `Selected Fields Only`    | `{}`          | Object mapping output keys to dot-notation source paths                                          |
+| Missing Field Behavior                             | options | No                                 | `returnNull`  | Shown for `Selected Fields Only`. `Return Null` or `Omit Field`                                  |
 | Payload                                            | JSON    | Yes, for `waitonevent`             | `{}`          | Free-form wait-on-event payload, for example `{ "eventName": "clicked" }`                        |
 | Callback Method                                    | options | No                                 | `POST`        | `none`, `POST`, `PUT`, `PATCH`                                                                   |
 | Callback URL                                       | string  | Yes (when Callback Method != None) | -             | URL called when action completes                                                                 |
@@ -61,7 +66,7 @@ Creates a new action in the WIL API layer.
 #### Payload by Action Type
 
 - `getapproval` builds payload `{ "html": "...", "options": ["Yes", "No"] }`.
-- `showform` builds payload `{ "formName": "...", "formId": "...", "formApiKey": "...", "submissionId": "...", "formPreFillData": {} }`. When **Send Form Data to Callback** is enabled, `"skipChefsSubmission": true` is added to the payload.
+- `showform` builds payload `{ "formName": "...", "formId": "...", "formApiKey": "...", "submissionId": "...", "formPreFillData": {} }`. When **Send Form Data to Callback** is enabled, `"skipChefsSubmission": true` is added. When **Callback Data** is `Selected Fields Only`, `"callbackFieldMappings": [...]` and `"callbackMissingPathBehavior": "returnNull" | "omit"` are also added.
 - `waitonevent` uses the raw Payload JSON field, matching the previous behavior.
 
 #### getapproval HTML Details
@@ -261,6 +266,57 @@ In both cases the user sees the same "Form submitted successfully" confirmation 
   }
 }
 ```
+
+##### Callback Data: Full Form Data vs Selected Fields Only
+
+When **Send Form Data to Callback** is on, a **Callback Data** option appears:
+
+- **Full Form Data** (default) — the entire form response is sent as `formData`, exactly as shown above.
+- **Selected Fields Only** — you define which fields to send. Only those fields ever leave the user's browser, and the workflow receives a smaller, predictable payload. This uses the same dot-notation mapping style as the **CHEFS Submission Extractor** node, but applied in the browser before the callback fires.
+
+With **Selected Fields Only** you provide a set of mappings, each with:
+
+| Field        | Description                                                                        |
+| ------------ | ---------------------------------------------------------------------------------- |
+| `outputKey`  | The key name the workflow receives in `formData`                                   |
+| `sourcePath` | Dot-notation path into the submitted form data, e.g. `firstName` or `address.city` |
+
+Mappings can be entered as **UI Field Pairs** or as a **JSON** object (`{ "city": "address.city" }`). At least one field is required — the node rejects the action at configuration time if none are provided.
+
+**Missing Field Behavior** controls what happens when a `sourcePath` is not present in the submitted data:
+
+- **Return Null** (default) — the `outputKey` is included with a `null` value.
+- **Omit Field** — the `outputKey` is left out of `formData` entirely.
+
+**Example payload (Selected Fields Only):**
+
+```json
+{
+  "formName": "Income Verification",
+  "formId": "11111111-1111-1111-1111-111111111111",
+  "formApiKey": "...",
+  "skipChefsSubmission": true,
+  "callbackFieldMappings": [
+    { "outputKey": "firstName", "sourcePath": "firstName" },
+    { "outputKey": "city", "sourcePath": "address.city" }
+  ],
+  "callbackMissingPathBehavior": "returnNull"
+}
+```
+
+**Example callback body received by the workflow (Selected Fields Only):**
+
+```json
+{
+  "formId": "11111111-1111-1111-1111-111111111111",
+  "formData": {
+    "firstName": "Nicholas",
+    "city": "Victoria"
+  }
+}
+```
+
+The user still sees the same "Form submitted successfully" confirmation. Field selection happens entirely in the browser, so fields you do not map are never transmitted to the callback.
 
 ### Other Action Operations
 

@@ -52,12 +52,19 @@ export type WilListParams = {
   signal?: AbortSignal;
 };
 
+export type WilCallbackFieldMapping = {
+  outputKey: string;
+  sourcePath: string;
+};
+
 export type WilChefsTokenResponse = {
   authToken: string;
   formId: string;
   formName: string;
   baseUrl: string;
   skipChefsSubmission?: boolean;
+  callbackFieldMappings?: WilCallbackFieldMapping[];
+  callbackMissingPathBehavior?: 'returnNull' | 'omit';
 };
 
 export type WilActionCountsResponse = {

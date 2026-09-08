@@ -43,6 +43,52 @@ function collectOptionLabels(value: unknown): string[] {
   return [];
 }
 
+interface CallbackFieldMapping {
+  outputKey: string;
+  sourcePath: string;
+}
+
+/**
+ * Collects the callback field mappings for a skip-CHEFS showform action from either
+ * the UI field-pairs collection or the JSON field. Entries with an empty outputKey or
+ * sourcePath are dropped. Mirrors the mapping shape used by the CHEFSSubmissionExtractor node.
+ */
+function collectCallbackFieldMappings(ctx: IExecuteFunctions, i: number): CallbackFieldMapping[] {
+  const mode = ctx.getNodeParameter('callbackFieldMappingMode', i, 'keyValue') as string;
+
+  if (mode === 'json') {
+    const parsed = safeParse(ctx.getNodeParameter('callbackFieldMappingJson', i, '{}'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new NodeOperationError(
+        ctx.getNode(),
+        new Error('Fields to Send (JSON) must be an object mapping output keys to source path strings'),
+        { itemIndex: i },
+      );
+    }
+    const mappings: CallbackFieldMapping[] = [];
+    for (const [outputKey, sourcePath] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof sourcePath !== 'string') {
+        throw new NodeOperationError(
+          ctx.getNode(),
+          new Error(`Source path for "${outputKey}" must be a string, got ${typeof sourcePath}`),
+          { itemIndex: i },
+        );
+      }
+      if (outputKey.length > 0 && sourcePath.length > 0) {
+        mappings.push({ outputKey, sourcePath });
+      }
+    }
+    return mappings;
+  }
+
+  const collection = ctx.getNodeParameter('callbackFieldMappings', i, {}) as {
+    mapping?: Array<{ outputKey?: string; sourcePath?: string }>;
+  };
+  return (collection.mapping ?? [])
+    .map(({ outputKey, sourcePath }) => ({ outputKey: outputKey ?? '', sourcePath: sourcePath ?? '' }))
+    .filter((m) => m.outputKey.length > 0 && m.sourcePath.length > 0);
+}
+
 function buildActionPayload(ctx: IExecuteFunctions, i: number, actionType: string): Record<string, unknown> {
   if (actionType === 'showform') {
     const payload: Record<string, unknown> = {
@@ -58,7 +104,27 @@ function buildActionPayload(ctx: IExecuteFunctions, i: number, actionType: strin
     if (formPreFillData) payload.formPreFillData = formPreFillData as Record<string, unknown>;
 
     const skipChefsSubmission = ctx.getNodeParameter('skipChefsSubmission', i, false) as boolean;
-    if (skipChefsSubmission) payload.skipChefsSubmission = true;
+    if (skipChefsSubmission) {
+      payload.skipChefsSubmission = true;
+
+      const callbackDataMode = ctx.getNodeParameter('callbackDataMode', i, 'full') as string;
+      if (callbackDataMode === 'selected') {
+        const mappings = collectCallbackFieldMappings(ctx, i);
+        if (mappings.length === 0) {
+          throw new NodeOperationError(
+            ctx.getNode(),
+            new Error('At least one field is required when Callback Data is set to "Selected Fields Only"'),
+            { itemIndex: i },
+          );
+        }
+        payload.callbackFieldMappings = mappings;
+        payload.callbackMissingPathBehavior = ctx.getNodeParameter(
+          'callbackMissingPathBehavior',
+          i,
+          'returnNull',
+        ) as string;
+      }
+    }
 
     return payload;
   }

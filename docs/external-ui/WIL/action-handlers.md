@@ -116,6 +116,8 @@ An embedded CHEFS form with full authentication context, prefill data, and submi
   formPreFillData?: Record<string, unknown>;   // Workflow-defined prefill values
   submissionId?: string;                       // Existing submission (if editing)
   skipChefsSubmission?: boolean;               // When true, send form data to callback instead of submitting to CHEFS
+  callbackFieldMappings?: Array<{ outputKey: string; sourcePath: string }>; // Skip-CHEFS: only send these fields
+  callbackMissingPathBehavior?: 'returnNull' | 'omit';                       // How to handle unresolved source paths
   // formApiKey is NEVER present — stripped server-side
 }
 ```
@@ -170,13 +172,18 @@ formio:hostSubmit event fires  (detail: { data, isDraft, ... })
     │
     ├── Ignore draft saves (isDraft === true)
     │
-    ├── callbackMutation.mutate({ tenantId, actionId, body: { formId, formData: detail.data } })
+    ├── If callbackFieldMappings present → formData = extractCallbackFields(detail.data, mappings, behavior)
+    │   Else                             → formData = detail.data (full form data)
+    │
+    ├── callbackMutation.mutate({ tenantId, actionId, body: { formId, formData } })
     │       └── POST /ui-api/wil/callback
     │
     ├── [Pending] Overlay with "Submitting…" spinner, form blocked
     ├── [Success] "Form submitted successfully" + onInteractionSuccess()   ← same confirmation as default path
     └── [Error] Error alert above form (form still visible for context)
 ```
+
+Field selection is applied client-side by `extractCallbackFields` (`components/chefs/field-extractor.ts`) before the callback fires, so unmapped fields never leave the browser. When no mappings are configured, the full `detail.data` is sent.
 
 Both paths reuse the same `callbackMutation` and success UI — only the callback body differs (`submission_id` vs `formData`).
 
