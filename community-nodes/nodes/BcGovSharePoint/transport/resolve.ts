@@ -58,7 +58,7 @@ export interface GraphColumn {
   number?: unknown;
   currency?: unknown;
   boolean?: unknown;
-  dateTime?: unknown;
+  dateTime?: { format?: string; displayAs?: string };
   personOrGroup?: { allowMultipleSelection?: boolean };
   lookup?: { listId?: string; columnName?: string; allowMultipleValues?: boolean };
   hyperlinkOrPicture?: unknown;
@@ -75,6 +75,8 @@ export interface ColumnMapEntry {
   choices?: string[];
   allowMultiple?: boolean;
   lookup?: { listId?: string; column?: string };
+  /** For type 'dateTime': Graph's dateTimeColumn.format — 'dateOnly' or 'dateTime'. */
+  dateFormat?: string;
 }
 
 export interface ColumnMap {
@@ -132,6 +134,7 @@ function toEntry(column: GraphColumn): ColumnMapEntry {
       column.personOrGroup?.allowMultipleSelection ??
       column.lookup?.allowMultipleValues,
     lookup: column.lookup ? { listId: column.lookup.listId, column: column.lookup.columnName } : undefined,
+    dateFormat: column.dateTime?.format,
   };
 }
 
