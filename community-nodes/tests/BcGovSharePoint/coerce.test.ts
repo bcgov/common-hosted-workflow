@@ -47,8 +47,8 @@ describe('coerceDateTime', () => {
     expect(coerceDateTime('Due Date', 1768464000000)).toBe(new Date(1768464000000).toISOString());
   });
 
-  it('accepts a yyyy-MM-dd string as UTC midnight', () => {
-    expect(coerceDateTime('Due Date', '2026-01-15')).toBe('2026-01-15T00:00:00.000Z');
+  it('accepts a yyyy-MM-dd string anchored to UTC noon to avoid timezone day-rollback', () => {
+    expect(coerceDateTime('Due Date', '2026-01-15')).toBe('2026-01-15T12:00:00.000Z');
   });
 
   it('accepts an ISO string directly', () => {
@@ -57,6 +57,41 @@ describe('coerceDateTime', () => {
 
   it('rejects an unparseable value', () => {
     expect(() => coerceDateTime('Due Date', 'not a date')).toThrow(/Due Date/);
+  });
+
+  describe('with format "dateOnly"', () => {
+    it('passes a bare yyyy-MM-dd string through unchanged', () => {
+      expect(coerceDateTime('Due Date', '2026-01-15', 'dateOnly')).toBe('2026-01-15');
+    });
+
+    it('extracts the date portion of a full ISO string without converting timezones', () => {
+      expect(coerceDateTime('Due Date', '2026-01-15T23:00:00-08:00', 'dateOnly')).toBe('2026-01-15');
+    });
+
+    it("prefers a Luxon-shaped value's toISODate() over toISO()", () => {
+      const luxonLike = { toISO: () => '2026-01-16T00:00:00.000-08:00', toISODate: () => '2026-01-15' };
+      expect(coerceDateTime('Due Date', luxonLike, 'dateOnly')).toBe('2026-01-15');
+    });
+
+    it('falls back to slicing toISO() when toISODate() is unavailable', () => {
+      const luxonLike = { toISO: () => '2026-01-15T10:00:00.000Z' };
+      expect(coerceDateTime('Due Date', luxonLike, 'dateOnly')).toBe('2026-01-15');
+    });
+
+    it('extracts the UTC date from a native JS Date', () => {
+      const date = new Date('2026-01-15T00:00:00.000Z');
+      expect(coerceDateTime('Due Date', date, 'dateOnly')).toBe('2026-01-15');
+    });
+
+    it('extracts the UTC date from epoch milliseconds', () => {
+      expect(coerceDateTime('Due Date', 1768464000000, 'dateOnly')).toBe(
+        new Date(1768464000000).toISOString().slice(0, 10),
+      );
+    });
+
+    it('rejects an unparseable value', () => {
+      expect(() => coerceDateTime('Due Date', 'not a date', 'dateOnly')).toThrow(/Due Date/);
+    });
   });
 });
 

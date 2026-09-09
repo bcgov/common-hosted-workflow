@@ -11,18 +11,58 @@ export function findColumnEntry(columnMap: ColumnMap, key: string): ColumnMapEnt
   return columnMap.byDisplayName.get(key.toLowerCase()) ?? columnMap.byInternalName.get(key);
 }
 
-function isLuxonLike(value: unknown): value is { toISO: () => string | null } {
+function isLuxonLike(value: unknown): value is { toISO: () => string | null; toISODate?: () => string | null } {
   return typeof value === 'object' && value !== null && typeof (value as { toISO?: unknown }).toISO === 'function';
 }
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Coerce a dateTime column's raw value to ISO 8601 UTC (spec section 6.3).
+ * Extract just the yyyy-MM-dd calendar date the caller intended, for a
+ * SharePoint column whose Graph format is 'dateOnly'. Graph stores no time
+ * component for these columns, so there is no site-timezone display
+ * conversion to worry about — we just need the date as typed/intended,
+ * not an instant. Prefers the literal date substring over converting
+ * through a UTC instant, which would risk shifting the date for values
+ * that carry a non-UTC offset.
+ */
+function extractDateOnly(fieldLabel: string, value: unknown): string {
+  if (isLuxonLike(value)) {
+    const isoDate = value.toISODate?.();
+    if (isoDate) return isoDate;
+    const iso = value.toISO();
+    if (iso) return iso.slice(0, 10);
+  }
+  if (typeof value === 'string') {
+    if (DATE_ONLY_PATTERN.test(value)) return value;
+    const match = /^(\d{4}-\d{2}-\d{2})T/.exec(value);
+    if (match) return match[1];
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'number') {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  }
+  throw new Error(`Field "${fieldLabel}" must be a date/time — received: ${JSON.stringify(value)}`);
+}
+
+/**
+ * Coerce a dateTime column's raw value for Graph API (spec section 6.3).
  * Accepts a Luxon-shaped DateTime (duck-typed — no luxon import, NFR1), a
  * native JS Date, epoch milliseconds, a bare yyyy-MM-dd date, or an ISO string.
+ *
+ * `format` is the Graph column's dateTime.format ('dateOnly' | 'dateTime').
+ * For 'dateOnly' columns, Graph expects (and SharePoint stores) just the
+ * calendar date with no time/timezone, so we send that as-is rather than
+ * inventing a time-of-day. For 'dateTime' columns (or when the format is
+ * unknown), a full ISO instant is required.
  */
-export function coerceDateTime(fieldLabel: string, value: unknown): string {
+export function coerceDateTime(fieldLabel: string, value: unknown, format?: string): string {
+  if (format === 'dateOnly') {
+    return extractDateOnly(fieldLabel, value);
+  }
   if (isLuxonLike(value)) {
     const iso = value.toISO();
     if (iso) return iso;
@@ -36,7 +76,11 @@ export function coerceDateTime(fieldLabel: string, value: unknown): string {
   }
   if (typeof value === 'string') {
     if (DATE_ONLY_PATTERN.test(value)) {
-      return new Date(`${value}T00:00:00.000Z`).toISOString();
+      // Anchor to noon UTC, not midnight — SharePoint renders dateTime values
+      // converted to the site's regional timezone, so midnight UTC rolls back
+      // to the previous day for any site behind UTC. Noon UTC stays within the
+      // same calendar day for every real-world timezone (UTC-12 to UTC+14).
+      return new Date(`${value}T12:00:00.000Z`).toISOString();
     }
     const date = new Date(value);
     if (!Number.isNaN(date.getTime())) return date.toISOString();
@@ -113,7 +157,7 @@ async function coerceSingleScalar(
     case 'boolean':
       return coerceBoolean(entry.displayName, value);
     case 'dateTime':
-      return coerceDateTime(entry.displayName, value);
+      return coerceDateTime(entry.displayName, value, entry.dateFormat);
     case 'hyperlinkOrPicture':
       return coerceHyperlink(entry.displayName, value);
     case 'personOrGroup': {
