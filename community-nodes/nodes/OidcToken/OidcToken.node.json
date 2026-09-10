@@ -2,7 +2,8 @@
   "node": "community-nodes.oidcToken",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Development", "Transform"],
+  "categories": ["Common Hosted Workflow", "Development", "Transform"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CITZ", "CUSTOM"],
   "resources": {
     "credentialDocumentation": [
       {

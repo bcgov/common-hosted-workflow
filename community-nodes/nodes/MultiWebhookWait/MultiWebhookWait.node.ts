@@ -51,7 +51,7 @@ export class MultiWebhookWait implements INodeType {
       light: 'file:../../icons/multi-webhook-wait.svg',
       dark: 'file:../../icons/multi-webhook-wait.dark.svg',
     },
-    group: ['transform'],
+    group: ['organization'],
     version: 1,
     usableAsTool: true,
     subtitle: '=Multi Webhook Wait',

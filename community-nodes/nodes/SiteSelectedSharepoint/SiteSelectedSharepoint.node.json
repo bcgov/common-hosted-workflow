@@ -1,0 +1,19 @@
+{
+  "node": "community-nodes.siteSelectedSharepoint",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Common Hosted Workflow", "Utility"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "SharePoint", "CITZ", "CUSTOM"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/site-selected-sharepoint/credentials"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/site-selected-sharepoint"
+      }
+    ]
+  }
+}

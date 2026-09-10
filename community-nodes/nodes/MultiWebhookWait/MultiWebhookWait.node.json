@@ -2,7 +2,8 @@
   "node": "community-nodes.multiWebhookWait",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Utility"],
+  "categories": ["Common Hosted Workflow", "Utility"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CITZ", "CUSTOM"],
   "resources": {
     "primaryDocumentation": [
       {

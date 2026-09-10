@@ -2,7 +2,8 @@
   "node": "n8n-nodes-devx-message-connector",
   "nodeVersion": "0.1",
   "codexVersion": "0.1",
-  "categories": [],
+  "categories": ["Common Hosted Workflow"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CITZ", "CUSTOM"],
   "resources": {
     "credentialDocumentation": [
       {
