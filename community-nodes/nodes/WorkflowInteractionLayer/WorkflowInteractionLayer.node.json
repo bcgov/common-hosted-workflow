@@ -2,7 +2,8 @@
   "node": "community-nodes.workflowInteractionLayer",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Development"],
+  "categories": ["Common Hosted Workflow", "Development"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CITZ", "WIL", "CUSTOM"],
   "resources": {
     "credentialDocumentation": [
       {

@@ -2,7 +2,8 @@
   "node": "n8n-nodes-chefs",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": [],
+  "categories": ["Common Hosted Workflow"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CHEF", "CITZ", "CUSTOM"],
   "resources": {
     "credentialDocumentation": [
       {

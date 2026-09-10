@@ -2,7 +2,8 @@
   "node": "community-nodes.documentTextExtractor",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Files", "Transform"],
+  "categories": ["Common Hosted Workflow", "Files", "Transform"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CITZ", "CUSTOM"],
   "resources": {
     "credentialDocumentation": [
       {
