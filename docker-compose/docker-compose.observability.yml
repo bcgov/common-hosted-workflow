@@ -88,7 +88,7 @@ services:
   grafana:
     <<: *common-props
     container_name: grafana
-    image: grafana/grafana:12.3.1
+    image: grafana/grafana:12.4.9
     environment:
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_SECURITY_ADMIN_USER: admin
@@ -132,7 +132,7 @@ services:
   loki:
     <<: *common-props
     container_name: loki
-    image: grafana/loki:3.6.12
+    image: grafana/loki:3.7.6
     command: [-config.file=/etc/loki/config.yaml]
     ports:
     - 3100:3100

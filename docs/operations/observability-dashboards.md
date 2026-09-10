@@ -336,19 +336,15 @@ Grafana dashboard
        ↓
 Infinity datasource  →  /rest/custom/v1/obs/projects  (on n8n)
                                    ↓
-                        CSTAR (tenant membership)
-                        n8n DB   (personal project)
-                        Redis    (1-hour cache per user sub)
+                        n8n DB  (projects synced from CSTAR at every user login)
 ```
 
-When the `project_id` variable loads (on dashboard open or refresh), Grafana's Infinity datasource calls the n8n projects API with the user's SSO Bearer token forwarded via `oauthPassThru`. The API:
+When the `project_id` variable loads (on dashboard open or refresh), Grafana's Infinity datasource calls the n8n projects API with the user's SSO Bearer token forwarded via `oauthPassThru`. For allowed requests, the API:
 
-1. Verifies the Bearer token against the Keycloak JWKS endpoint.
-2. Extracts the SSO user ID (`sub`) and roles (`client_roles`) from the JWT.
-3. Calls CSTAR to resolve the user's tenant memberships and maps tenant IDs to n8n project IDs via the `tenant_project_relation` table.
-4. Looks up the user's personal n8n project from the database.
-5. Caches the resolved list in Redis for 1 hour (keyed by JWT `sub`).
-6. Returns `{ isAdmin, projects: [{ id, name }] }`.
+1. Verifies the `X-Grafana-Secret` header against `GRAFANA_PROJECTS_SECRET`.
+2. Verifies the Bearer token against the Keycloak JWKS endpoint and extracts the user's `email`.
+3. Calls `loadUserContext(email)` to resolve the user's role and accessible project list directly from the n8n database. No external API calls are made at request time — CSTAR tenant memberships are synced into n8n project records at every user login by `TenantProjectSyncService`.
+4. Returns `{ isAdmin, projects: [{ id, name }] }`.
 
 The `workflow_id` variable calls the same API's `/workflows` endpoint filtered by the selected `project_id`. This is re-fetched every time the user changes the project dropdown.
 
@@ -361,19 +357,19 @@ Two checks are applied on every request to the projects API:
 | Grafana identity | `X-Grafana-Secret`              | Confirms the request is from a configured Grafana instance. Validated against `GRAFANA_PROJECTS_SECRET` in external-hooks. |
 | User identity    | `Authorization: Bearer <token>` | Identifies the calling user. Forwarded by the Infinity datasource via `oauthPassThru`.                                     |
 
-A missing, invalid, or expired token returns **401**. A CSTAR failure is non-fatal — the user still gets their personal project. An unrecoverable error returns **503**.
+A missing, invalid, or expired token returns **401**. An unrecoverable error returns **503**.
 
 ### Admin users
 
-Users whose Keycloak token contains `global:owner` or `global:admin` in the `client_roles` claim are treated as admins:
+Users whose n8n account has the `global:owner` or `global:admin` role (set via SSO role mapping at login) are treated as admins:
 
-- The API returns **all team projects** from the n8n database (bypasses the CSTAR lookup).
+- The API returns **all team projects** from the n8n database.
 - The admin's own personal project is appended to the list.
 - `isAdmin: true` is returned alongside the project list; dashboards use this to unlock admin-only panels.
 
-### Caching
+### Project membership and freshness
 
-Project lists are cached in Redis for **1 hour** keyed by JWT `sub`. Project membership changes (e.g. being added to a CSTAR tenant) take up to 1 hour to reflect. Logging out and back in starts a fresh token but the cache must also expire before the new membership appears.
+Project membership is resolved from the n8n database, which is kept in sync with CSTAR tenant memberships by `TenantProjectSyncService`. This service runs at every user login — membership changes in CSTAR take effect in Grafana the next time the user logs in to n8n. There is no additional caching layer on the projects API: all queries are lightweight local DB reads.
 
 ### Label schema
 
@@ -389,12 +385,12 @@ The **Project** filter in the n8n Logs dashboard queries against the `project_id
 
 ### What users can see (dashboards)
 
-| User type                               | Project dropdown                         | Data                                 |
-| --------------------------------------- | ---------------------------------------- | ------------------------------------ |
-| Admin (`global:admin` / `global:owner`) | All team projects + personal project     | Data for all projects                |
-| User with one or more CSTAR tenants     | Their tenant projects + personal project | Data for their projects only         |
-| User with a personal project only       | Personal project                         | Data for their personal project only |
-| User with no projects                   | Empty                                    | No data                              |
+| User type                               | Project dropdown                       | Data                                 |
+| --------------------------------------- | -------------------------------------- | ------------------------------------ |
+| Admin (`global:admin` / `global:owner`) | All team projects + personal project   | Data for all projects                |
+| User with one or more team projects     | Their team projects + personal project | Data for their projects only         |
+| User with a personal project only       | Personal project                       | Data for their personal project only |
+| User with no projects                   | Empty                                  | No data                              |
 
 ---
 

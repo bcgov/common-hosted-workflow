@@ -1,13 +1,17 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { GRAFANA_PROJECTS_SECRET } from '@config';
-import { GrafanaOrgService } from '../services/grafana-org.service';
+import { GRAFANA_PROJECTS_SECRET, OIDC_JWKS_URI, OIDC_ISSUER } from '@config';
 import { createLogger } from '../utils/logger';
+import { createOidcJwtMiddleware } from '../middlewares';
 import type { ApiRouteContext } from '../types/routes';
 
 const log = createLogger('GrafanaProjects');
 
+function isAdminRole(slug?: string | null) {
+  return slug === 'global:owner' || slug === 'global:admin';
+}
+
 export function buildGrafanaProjectsRouter(routeContext: ApiRouteContext): Router {
-  const { services, customRepositories, n8nRepositories } = routeContext;
+  const { services, n8nRepositories } = routeContext;
   const router = Router();
 
   if (!GRAFANA_PROJECTS_SECRET) {
@@ -18,40 +22,61 @@ export function buildGrafanaProjectsRouter(routeContext: ApiRouteContext): Route
     return router;
   }
 
-  const grafanaOrgService = new GrafanaOrgService(
-    services.cstar,
-    customRepositories.tenantProjectRelation,
-    n8nRepositories.project,
-    n8nRepositories.user,
-  );
-
-  function validateSecret(req: Request, res: Response, next: NextFunction) {
+  router.use((req: Request, res: Response, next: NextFunction) => {
     if (req.headers['x-grafana-secret'] !== GRAFANA_PROJECTS_SECRET) {
       log.warn('Grafana projects: invalid or missing secret', { path: req.path });
       return res.status(401).json({ error: 'Unauthorized' });
     }
     return next();
-  }
+  });
 
-  router.use(validateSecret);
+  router.use(
+    createOidcJwtMiddleware({
+      issuer: OIDC_ISSUER,
+      jwksUri: OIDC_JWKS_URI,
+    }),
+  );
 
   /**
    * GET /rest/custom/v1/obs/projects
    *
-   * Returns the list of projects the authenticated user can access, resolved
-   * from CSTAR tenants and n8n personal project. Used by the Grafana Infinity
-   * datasource to populate the project_id dashboard variable.
+   * Returns the list of projects the authenticated user can access, with human-readable names.
+   * Used by the Grafana Infinity datasource to populate the project_id dashboard variable.
    *
    * Response: { isAdmin: boolean, projects: Array<{ id: string, name: string }> }
    */
-  router.get('/', async (req: Request, res: Response) => {
+  router.get('/', async (_req: Request, res: Response) => {
     try {
-      const { isAdmin, projects } = await grafanaOrgService.resolveProjects(req.headers.authorization);
+      const email = res.locals.oidcTokenDetails?.email;
+      if (!email) return res.status(401).json({ error: 'Unauthorized' });
+
+      const context = await services.uiApi.loadUserContext(email);
+      const isAdmin = isAdminRole(context.n8nUser?.role?.slug);
+
+      let projects: Array<{ id: string; name: string }>;
+      if (isAdmin) {
+        projects = [];
+        let page = 1;
+        const pageSize = 100;
+        while (true) {
+          const { projects: batch, totalCount } = await n8nRepositories.project.listPaginated(page, pageSize, {
+            type: 'team',
+          });
+          projects.push(...batch.map((p) => ({ id: p.id, name: p.name })));
+          if (projects.length >= totalCount) break;
+          page++;
+        }
+        const personal = context.projects.find((p) => p.type === 'personal');
+        if (personal) projects.push({ id: personal.id, name: 'My Personal Project' });
+      } else {
+        projects = context.projects.map((p) => ({
+          id: p.id,
+          name: p.type === 'personal' ? 'My Personal Project' : p.name,
+        }));
+      }
+
       return res.json({ isAdmin, projects });
     } catch (err: unknown) {
-      if ((err as { status?: number }).status === 401) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
       log.error('Grafana projects: failed to resolve projects', { error: String(err) });
       return res.status(503).json({ error: 'Project resolution unavailable — please retry' });
     }
@@ -68,8 +93,12 @@ export function buildGrafanaProjectsRouter(routeContext: ApiRouteContext): Route
    */
   router.get('/workflows', async (req: Request, res: Response) => {
     try {
-      const { isAdmin, projects } = await grafanaOrgService.resolveProjects(req.headers.authorization);
-      const projectIds = projects.map((p) => p.id);
+      const email = res.locals.oidcTokenDetails?.email;
+      if (!email) return res.status(401).json({ error: 'Unauthorized' });
+
+      const context = await services.uiApi.loadUserContext(email);
+      const isAdmin = isAdminRole(context.n8nUser?.role?.slug);
+      const projectIds = context.accessibleProjectIds;
 
       // Optional project filter from the Grafana variable URL. Infinity's backend
       // parser doesn't support post-fetch filters, so filtering is done here instead.
@@ -102,9 +131,6 @@ export function buildGrafanaProjectsRouter(routeContext: ApiRouteContext): Route
       // variable's regex "^.+$" excludes it from the visible dropdown options.
       return res.json(items.length > 0 ? items : [{ id: '', name: '', projectId: '' }]);
     } catch (err: unknown) {
-      if ((err as { status?: number }).status === 401) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
       log.error('Grafana projects: failed to resolve workflows', { error: String(err) });
       return res.status(503).json({ error: 'Workflow resolution unavailable — please retry' });
     }

@@ -57,11 +57,6 @@ export type TenantGroup = {
   groups: string[];
 };
 
-type GrafanaProjectsRecord = {
-  isAdmin: boolean;
-  projects: Array<{ id: string; name: string }>;
-};
-
 const REFRESH_TOKEN_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ID_TOKEN_DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const TENANT_ROLES_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -150,11 +145,6 @@ function isValidTenantGroupArray(v: unknown): v is TenantGroup[] {
       Array.isArray((e as Record<string, unknown>).groups) &&
       ((e as Record<string, unknown>).groups as unknown[]).every((r) => typeof r === 'string'),
   );
-}
-function isValidGrafanaProjectsRecord(v: unknown): v is GrafanaProjectsRecord {
-  if (typeof v !== 'object' || v === null) return false;
-  const r = v as Record<string, unknown>;
-  return typeof r.isAdmin === 'boolean' && Array.isArray(r.projects);
 }
 
 /**
@@ -728,34 +718,4 @@ export async function deleteUiTenantGroups(email: string) {
 export async function getUiOidcAccessTokenByEmail(email: string): Promise<string | null> {
   const client = await getRedisClient();
   return await client.get(getAccessTokenByEmailKey(email));
-}
-
-// --- Grafana projects cache ---
-
-const GRAFANA_PROJECTS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function getGrafanaProjectsKey(sub: string) {
-  return `${UI_OIDC_REDIS_PREFIX}gfprojects:${sub}`;
-}
-
-export async function getGrafanaProjectsCache(sub: string): Promise<GrafanaProjectsRecord | null> {
-  const client = await getRedisClient();
-  const raw = await client.get(getGrafanaProjectsKey(sub));
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isValidGrafanaProjectsRecord(parsed)) {
-      storeLog.warn('Malformed GrafanaProjectsRecord, failing closed', { sub });
-      return null;
-    }
-    return parsed;
-  } catch {
-    storeLog.warn('Invalid JSON GrafanaProjectsRecord, failing closed', { sub });
-    return null;
-  }
-}
-
-export async function setGrafanaProjectsCache(sub: string, data: GrafanaProjectsRecord): Promise<void> {
-  const client = await getRedisClient();
-  await client.set(getGrafanaProjectsKey(sub), JSON.stringify(data), { PX: GRAFANA_PROJECTS_CACHE_TTL_MS });
 }
