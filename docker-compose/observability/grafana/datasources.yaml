@@ -29,3 +29,34 @@ datasources:
   uid: loki
   url: http://loki:3100
   isDefault: false
+  # Loki tenant ID. "fake" is Loki's conventional placeholder org ID for
+  # single-tenant configurations. With auth_enabled=false, Loki does not
+  # authenticate or authorize this tenant value; it is used only to satisfy
+  # clients/proxies that expect an X-Scope-OrgID header.
+  jsonData:
+    httpHeaderName1: X-Scope-OrgID
+  secureJsonData:
+    httpHeaderValue1: fake
+# Infinity datasource — used by dashboard variables to fetch the user's accessible
+# projects and workflows from the n8n projects API endpoint.
+# X-Grafana-Secret authenticates the request as coming from Grafana
+# (validated against GRAFANA_PROJECTS_SECRET in external-hooks).
+# oauthPassThru forwards the user's Keycloak Bearer token so the API can
+# resolve the user's per-project access.
+- name: n8n Projects
+  type: yesoreyeram-infinity-datasource
+  uid: n8n-projects
+  # Base URL keeps variable queries environment-agnostic: they use relative paths (/rest/...)
+  # and Infinity prepends this URL. Each environment overrides this via its own datasources config.
+  url: http://n8n:5678
+  jsonData:
+    oauthPassThru: true
+    auth_type: oauthPassthru
+    httpHeaderName1: X-Grafana-Secret
+    # allowedHosts forces Infinity to route requests through Grafana's backend plugin rather
+    # than the browser. Without this, http://n8n:5678 is treated as a public/browser call
+    # which can't reach Docker-internal addresses, and all queries silently return "No data".
+    allowedHosts:
+    - http://n8n:5678
+  secureJsonData:
+    httpHeaderValue1: $GRAFANA_PROJECTS_SECRET

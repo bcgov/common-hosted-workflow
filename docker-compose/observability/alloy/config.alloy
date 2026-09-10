@@ -1,0 +1,137 @@
+// docker-compose variant of the Alloy pipeline config.
+// Differences from helm/main/alloy/config.alloy:
+//   - discovery.kubernetes, discovery.relabel, and loki.source.kubernetes are removed.
+//     Those components require KUBERNETES_SERVICE_HOST/PORT and crash Alloy
+//     when running outside a cluster. System logs (job="n8n-system-logs")
+//     are therefore not collected locally; all other pipelines are identical.
+
+// ── Prometheus metrics ────────────────────────────────────────────────────────
+
+prometheus.scrape "n8n" {
+  targets = [{
+    "__address__"      = env("ALLOY_N8N_ADDRESS"),
+    "__metrics_path__" = "/metrics",
+    "job"              = "n8n",
+    "app"              = "n8n",
+  }]
+  scrape_interval = "30s"
+  scrape_timeout  = "20s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = env("ALLOY_MIMIR_URL")
+
+    queue_config {
+      capacity    = 10000
+      min_backoff = "1s"
+      max_backoff = "5m"
+    }
+  }
+}
+
+// ── OTLP traces ───────────────────────────────────────────────────────────────
+
+otelcol.receiver.otlp "n8n" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces = [otelcol.processor.transform.rename_spans.input]
+  }
+}
+
+// Enrich span names with workflow/node names so the node graph shows labels.
+// After this transform, exact-match TraceQL like {name = "workflow.execute"}
+// returns zero results — use prefix: {name =~ "workflow.execute.*"}.
+otelcol.processor.transform "rename_spans" {
+  trace_statements {
+    context = "span"
+    statements = [
+      `set(span.name, Concat([span.name, ": ", span.attributes["n8n.workflow.name"]], "")) where span.name == "workflow.execute" and span.attributes["n8n.workflow.name"] != nil and span.attributes["n8n.workflow.name"] != ""`,
+      `set(span.name, Concat([span.name, ": ", span.attributes["n8n.node.name"]], "")) where span.name == "node.execute" and span.attributes["n8n.node.name"] != nil and span.attributes["n8n.node.name"] != ""`,
+    ]
+  }
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = env("ALLOY_TEMPO_URL")
+    tls {
+      insecure = true
+    }
+  }
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "1s"
+    max_interval     = "30s"
+    max_elapsed_time = "5m"
+  }
+}
+
+// ── n8n log streaming (syslog → Loki) ────────────────────────────────────────
+
+loki.source.syslog "n8n_events" {
+  listener {
+    address  = "0.0.0.0:5514"
+    protocol = "tcp"
+    labels = {
+      job    = "n8n-log-streaming",
+      source = "n8n",
+    }
+  }
+  forward_to = [loki.process.n8n_events.receiver]
+}
+
+loki.process "n8n_events" {
+  stage.json {
+    expressions = {
+      event_name    = "eventName",
+      event_type    = "__type",
+      workflow_id   = "payload.workflowId",
+      execution_id  = "payload.executionId",
+      project_name  = "payload.projectName",
+      project_id    = "payload.projectId",
+      workflow_name = "payload.workflowName",
+      mode          = "payload.mode",
+      ts            = "ts",
+    }
+  }
+
+  stage.labels {
+    values = {
+      event_name    = "",
+      event_type    = "",
+      project_name  = "",
+      project_id    = "",
+      mode          = "",
+      workflow_name = "",
+      workflow_id   = "",
+    }
+  }
+
+  stage.timestamp {
+    source            = "ts"
+    format            = "RFC3339Nano"
+    fallback_formats  = ["RFC3339"]
+    action_on_failure = "skip"
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
+// ── Loki sink ─────────────────────────────────────────────────────────────────
+
+loki.write "loki" {
+  endpoint {
+    url = env("ALLOY_LOKI_URL")
+  }
+  wal {
+    enabled         = true
+    max_segment_age = "1h"
+  }
+}

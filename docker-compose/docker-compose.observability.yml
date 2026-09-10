@@ -88,7 +88,7 @@ services:
   grafana:
     <<: *common-props
     container_name: grafana
-    image: grafana/grafana:12.4.9
+    image: grafana/grafana:12.3.1
     environment:
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_SECURITY_ADMIN_USER: admin
@@ -105,6 +105,18 @@ services:
       GF_AUTH_GENERIC_OAUTH_API_URL: ${OIDC_USERINFO_ENDPOINT}
       # Reuse the n8n roles already provisioned by keycloak-provision
       GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: contains(client_roles[*], 'global:admin') && 'Admin' || contains(client_roles[*], 'global:member') && 'Editor' || 'Viewer'
+      # Enables Grafana to retain/use the OAuth refresh token and refresh expired
+      # access tokens. Required by the Infinity datasource oauthPassThru config so
+      # Grafana forwards the user's OAuth access token to the projects API.
+      GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN: 'true'
+      # Allow Viewer-role users to access Explore and make temporary dashboard
+      # edits without granting them permission to save dashboard changes.
+      GF_USERS_VIEWERS_CAN_EDIT: 'true'
+      # Pin the Infinity datasource version used by dashboard variables.
+      GF_INSTALL_PLUGINS: yesoreyeram-infinity-datasource 4.0.0
+      # Passed to datasources.yaml secureJsonData as $GRAFANA_PROJECTS_SECRET.
+      # Must match the value configured in n8n (GRAFANA_PROJECTS_SECRET).
+      GRAFANA_PROJECTS_SECRET: ${GRAFANA_PROJECTS_SECRET}
     ports:
     - 3000:3000
     volumes:
@@ -112,6 +124,7 @@ services:
     - ./observability/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
     - ./observability/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
     - ../helm/main/dashboards/n8n:/etc/grafana/provisioning/dashboards/n8n
+    - ../helm/main/dashboards/n8n-admin:/etc/grafana/provisioning/dashboards/n8n-admin
     depends_on:
       mimir:
         condition: service_started
@@ -119,7 +132,7 @@ services:
   loki:
     <<: *common-props
     container_name: loki
-    image: grafana/loki:3.7.6
+    image: grafana/loki:3.6.12
     command: [-config.file=/etc/loki/config.yaml]
     ports:
     - 3100:3100
@@ -146,7 +159,7 @@ services:
       ALLOY_TEMPO_URL: tempo:4317
       ALLOY_LOKI_URL: http://loki:3100/loki/api/v1/push
     volumes:
-    - ../helm/main/alloy/config.alloy:/etc/alloy/config.alloy
+    - ./observability/alloy/config.alloy:/etc/alloy/config.alloy
     depends_on:
       mimir:
         condition: service_started

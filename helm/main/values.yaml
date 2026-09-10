@@ -40,7 +40,7 @@ n8n:
     # Credentials are injected via extraEnv from the chwf-s3-account secret.
     # Bucket name is set per environment in values-<namespace>-<env>-<zone>.yaml
     N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
-    N8N_EXECUTION_DATA_STORAGE_MODE: "default"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "database"
     N8N_EXTERNAL_STORAGE_S3_HOST: "commonservices.objectstore.gov.bc.ca"
     N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "https"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "ca-central-1"
@@ -599,6 +599,7 @@ tempo:
   persistence:
     enabled: false
   tempo:
+    multitenancy_enabled: false
     extraVolumeMounts:
       - name: tempo-wal
         mountPath: /var/tempo
@@ -650,6 +651,8 @@ grafana:
       drop:
         - ALL
     seccompProfile: null  # Container-level seccompProfile triggers alpha annotation rejected by OpenShift SCC
+  plugins:
+    - yesoreyeram-infinity-datasource
   envValueFrom:
     GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
       secretKeyRef:
@@ -659,7 +662,16 @@ grafana:
       secretKeyRef:
         name: chwf # pragma: allowlist secret
         key: OIDC_CLIENT_SECRET
+    # Shared secret injected into the Infinity datasource as X-Grafana-Secret.
+    # The n8n projects API endpoint validates this header to confirm the caller is Grafana.
+    GRAFANA_PROJECTS_SECRET:
+      secretKeyRef:
+        name: chwf # pragma: allowlist secret
+        key: GRAFANA_PROJECTS_SECRET
   grafana.ini:
+    users:
+      # Tenant users land on Viewer role (no global:member claim). Allow them to use Explore.
+      viewers_can_edit: true
     smtp:
       enabled: true
       host: apps.smtp.gov.bc.ca:25
@@ -674,6 +686,9 @@ grafana:
       allow_sign_up: true
       scopes: openid profile email
       role_attribute_path: "contains(client_roles[*], 'global:admin') && 'Admin' || contains(client_roles[*], 'global:member') && 'Editor' || 'Viewer'"
+      # Required for oauthPassThru: Grafana stores the access token in the session
+      # only when refresh tokens are enabled, so datasources can forward it to the API.
+      use_refresh_token: true
   sidecar:
     dashboards:
       enabled: true
@@ -704,6 +719,13 @@ grafana:
           uid: loki
           url: http://chwf-loki:3100 # NOSONAR - internal cluster service URL
           isDefault: false
+          # Loki is single-tenant (auth_enabled: false), but Grafana's Loki plugin tries
+          # to derive X-Scope-OrgID from the stored OAuth token when use_refresh_token is
+          # enabled. Keycloak tokens have no org claim, so the tenant must be set explicitly.
+          jsonData:
+            httpHeaderName1: X-Scope-OrgID
+          secureJsonData:
+            httpHeaderValue1: fake
         - name: Tempo
           type: tempo
           uid: tempo
@@ -723,6 +745,23 @@ grafana:
           # requirement and avoids a fatal "data source not found" provisioning error on first boot.
           url: http://chwf-mimir:8080/prometheus # NOSONAR - internal cluster service URL
           isDefault: true
+        - name: n8n Projects
+          type: yesoreyeram-infinity-datasource
+          uid: n8n-projects
+          # Base URL: dashboard variable queries use relative paths (/rest/...) so this must
+          # match the in-cluster n8n service name.
+          url: http://chwf-n8n-main:5678 # NOSONAR - internal cluster service URL
+          jsonData:
+            oauthPassThru: true
+            auth_type: oauthPassthru
+            httpHeaderName1: X-Grafana-Secret
+            # allowedHosts forces Infinity to route requests through Grafana's backend plugin
+            # rather than the browser. Without this, the in-cluster URL is treated as a
+            # public/browser call, which can't reach cluster-internal addresses.
+            allowedHosts:
+              - http://chwf-n8n-main:5678
+          secureJsonData:
+            httpHeaderValue1: $GRAFANA_PROJECTS_SECRET
 
 # n8n log streaming destinations — rendered to JSON by configmaps/n8n-log-streaming.yaml.
 # N8N_LOG_STREAMING_DESTINATIONS is injected via n8n.extraEnv.configMapKeyRef above.

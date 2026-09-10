@@ -88,6 +88,11 @@ export const AUTHZ_CLIENT_SECRET = process.env.AUTHZ_CLIENT_SECRET || '';
 // Derived: cookie signing key for OIDC state cookies
 export const OIDC_COOKIE_SECRET_BASE = N8N_ENCRYPTION_KEY || OIDC_CLIENT_SECRET || 'n8n-oidc-hook-secret';
 
+// Shared secret the Infinity datasource sends as X-Grafana-Secret on every request to the
+// projects/workflows endpoints. Proves the caller is the configured Grafana instance.
+// The endpoint is disabled (503) when this is empty.
+export const GRAFANA_PROJECTS_SECRET = process.env.GRAFANA_PROJECTS_SECRET ?? '';
+
 // WIL Encryption – used to encrypt credential data (e.g. CHEFS API keys) at rest
 export const WIL_ENCRYPTION_KEY = process.env.WIL_ENCRYPTION_KEY ?? '';
 export const WIL_ENCRYPTION_KEY_ACTIVE = Number.parseInt(process.env.WIL_ENCRYPTION_KEY_ACTIVE ?? '1', 10);

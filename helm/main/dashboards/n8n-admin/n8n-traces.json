@@ -26,13 +26,68 @@
   "templating": {
     "list": [
       {
+        "name": "project_id",
+        "label": "Tenant",
+        "type": "query",
+        "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "n8n-projects" },
+        "query": {
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects",
+            "root_selector": "projects",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": { "method": "GET", "body_content_type": "text/plain" }
+          }
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false,
+        "current": {}
+      },
+      {
         "name": "workflow_id",
         "label": "Workflow",
-        "type": "textbox",
-        "current": { "selected": false, "text": ".*", "value": ".*" },
-        "options": [{ "selected": true, "text": ".*", "value": ".*" }],
-        "query": ".*",
-        "hide": 0
+        "type": "query",
+        "regex": "^.+$",
+        "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "n8n-projects" },
+        "query": {
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects/workflows?projectId=${project_id:raw}",
+            "root_selector": "",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": { "method": "GET", "body_content_type": "text/plain" }
+          }
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false,
+        "current": {}
       },
       {
         "name": "status",
@@ -70,7 +125,7 @@
           "refId": "A",
           "datasource": { "type": "tempo", "uid": "tempo" },
           "queryType": "traceql",
-          "query": "{span.n8n.workflow.id =~ \"${workflow_id}\" && (${status})} | select(span.n8n.workflow.name, span.n8n.project.custom.name, span.n8n.execution.id, span.n8n.execution.mode, span.n8n.execution.status, span.n8n.execution.is_retry, span.n8n.execution.error_type)",
+          "query": "{span.n8n.workflow.id =~ \"${workflow_id}\" && span.n8n.project.id =~ \"${project_id}\" && (${status})} | select(span.n8n.workflow.name, span.n8n.project.custom.name, span.n8n.execution.id, span.n8n.execution.mode, span.n8n.execution.status, span.n8n.execution.is_retry, span.n8n.execution.error_type)",
           "limit": 50,
           "tableType": "spans"
         }
