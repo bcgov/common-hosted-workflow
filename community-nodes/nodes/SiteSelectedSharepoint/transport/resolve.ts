@@ -456,6 +456,71 @@ export async function resolvePersonLookupId(
 }
 
 /**
+ * Reverse of resolvePersonLookupId: resolve a person's details from their
+ * SharePoint LookupId via the hidden User Information List (spec section 7.4).
+ * Person/Lookup columns on a list item only expose the integer
+ * "{Internal}LookupId" — Graph never resolves the display name inline — so
+ * workflow authors need this to turn e.g. RequestingOfficerLookupId=17 into a
+ * name/email. Fetches the single principal by item ID (one Graph call per id).
+ * Returns null when no principal exists for that id, letting callers decide
+ * per-item behaviour rather than forcing an error.
+ */
+export async function resolvePersonByLookupId(
+  context: GraphContext,
+  baseUrl: string,
+  retry: RetryOptions,
+  siteId: string,
+  lookupId: number,
+): Promise<PersonLookupResult | null> {
+  const userListId = await resolveListId(
+    context,
+    baseUrl,
+    retry,
+    siteId,
+    { mode: 'name', value: USER_INFO_LIST_NAME },
+    { includeHiddenLists: true },
+  );
+
+  let match: UserListItem;
+  try {
+    match = await graphRequest<UserListItem>(
+      context,
+      {
+        method: 'GET',
+        url: `${baseUrl}/sites/${siteId}/lists/${userListId}/items/${lookupId}`,
+        qs: { $expand: 'fields($select=EMail,UserName,Title,Id,ContentType)' },
+        json: true,
+      },
+      retry,
+    );
+  } catch (error) {
+    // A missing principal surfaces as a 404 from Graph — treat it as "not
+    // found" rather than a hard failure so callers can continue.
+    if (isNotFoundError(error)) {
+      return null;
+    }
+    throw error;
+  }
+
+  return {
+    email: match.fields.EMail ?? '',
+    lookupId: Number(match.id),
+    displayName: match.fields.Title ?? '',
+    userName: match.fields.UserName ?? '',
+  };
+}
+
+/**
+ * Detect a Graph 404 across the shapes n8n's request helpers surface it in
+ * (httpCode string, statusCode number, or an embedded status).
+ */
+function isNotFoundError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as { httpCode?: string; statusCode?: number; status?: number };
+  return candidate.httpCode === '404' || candidate.statusCode === 404 || candidate.status === 404;
+}
+
+/**
  * Resolve a Lookup column's target item ID from its display value — the
  * caller must send the non-indexed-query header since lookup columns are
  * rarely indexed (spec section 3).
