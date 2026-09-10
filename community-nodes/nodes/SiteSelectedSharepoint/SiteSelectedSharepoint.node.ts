@@ -25,6 +25,7 @@ import { getManyItems, type SimpleFilterCondition } from './actions/item/getMany
 import { createOrUpdateItem } from './actions/item/createOrUpdate';
 import { getUserLookupId } from './actions/user/getLookupId';
 import { getManyUsers } from './actions/user/getMany';
+import { getUserByLookupId } from './actions/user/getByLookupId';
 import { downloadFile } from './actions/file/download';
 import { uploadFile, type UploadFileOptions } from './actions/file/upload';
 import { updateFile, type UpdateFileOptions } from './actions/file/update';
@@ -138,6 +139,11 @@ export class SiteSelectedSharepoint implements INodeType {
         noDataExpression: true,
         displayOptions: { show: { resource: ['user'] } },
         options: [
+          {
+            name: 'Get by Lookup ID',
+            value: 'getByLookupId',
+            action: 'Get a user by their SharePoint lookup ID',
+          },
           { name: 'Get Lookup ID', value: 'getLookupId', action: "Get a user's SharePoint lookup ID" },
           { name: 'Get Many', value: 'getMany', action: 'Get many users from the site' },
         ],
@@ -554,6 +560,9 @@ export class SiteSelectedSharepoint implements INodeType {
         name: 'odataFilter',
         type: 'string',
         default: '',
+        placeholder: "fields/Status eq 'Approved' and fields/Age ge 18",
+        description:
+          "Raw Microsoft Graph $filter expression passed through verbatim. Reference columns by their internal name under the fields/ prefix, wrap text values in single quotes (escape a literal quote by doubling it, e.g. 'O''Brien'), and write dates as ISO 8601 without quotes. Examples: contains(fields/Title, 'Referral'); fields/Created ge 2026-01-01T00:00:00Z; fields/IsActive eq true. Use Simple mode instead if you want display names resolved automatically.",
         displayOptions: { show: { resource: ['item'], itemOperation: ['getMany'], filterMode: ['odata'] } },
       },
       {
@@ -585,6 +594,29 @@ export class SiteSelectedSharepoint implements INodeType {
         displayOptions: { show: { resource: ['item'], itemOperation: ['get', 'getMany'] } },
         description:
           'Whether to flatten the fields object and re-key internal column names to display names for easier downstream use',
+      },
+      {
+        displayName: 'Lookup ID',
+        name: 'lookupId',
+        type: 'string',
+        default: '',
+        required: true,
+        placeholder: '17 or 17,16',
+        description:
+          'A SharePoint person/lookup LookupId (the integer a list item returns, e.g. RequestingOfficerLookupId). Enter one, or several comma-separated to resolve in a single step. Each unique ID is resolved against the hidden User Information List.',
+        displayOptions: { show: { resource: ['user'], userOperation: ['getByLookupId'] } },
+      },
+      {
+        displayName: 'On Not Found',
+        name: 'lookupIdOnNotFound',
+        type: 'options',
+        noDataExpression: true,
+        displayOptions: { show: { resource: ['user'], userOperation: ['getByLookupId'] } },
+        options: [
+          { name: 'Error', value: 'error' },
+          { name: 'Continue (Empty Fields)', value: 'continue' },
+        ],
+        default: 'error',
       },
       {
         displayName: 'Email',
@@ -899,6 +931,15 @@ async function executeUserOperation(
       this.helpers.returnJsonArray((result ?? { email, lookupId: null }) as IDataObject),
       { itemData: { item: itemIndex } },
     );
+  }
+
+  if (operation === 'getByLookupId') {
+    const lookupId = this.getNodeParameter('lookupId', itemIndex) as string;
+    const onNotFound = this.getNodeParameter('lookupIdOnNotFound', itemIndex) as 'error' | 'continue';
+    const result = await getUserByLookupId(context, baseUrl, retry, siteId, lookupId, onNotFound);
+    return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(result), {
+      itemData: { item: itemIndex },
+    });
   }
 
   if (operation === 'getMany') {

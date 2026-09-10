@@ -42,7 +42,7 @@ community-nodes/
 │       │   ├── file/                             # Download, Upload, Update
 │       │   ├── item/                             # Create, CreateOrUpdate, Delete, Get, GetMany, Update
 │       │   ├── list/                             # Get, GetMany
-│       │   └── user/                             # EnsureUser, GetLookupId, GetMany
+│       │   └── user/                             # EnsureUser, GetByLookupId, GetLookupId, GetMany
 │       ├── methods/                              # loadOptions + resourceMapping
 │       └── transport/                            # graphRequest, resolve, cache, coerce, simplify
 └── tests/
@@ -132,8 +132,18 @@ All Graph requests automatically retry on HTTP 429 (throttled) and 503 (service 
 
 1. Set Resource = Item, Operation = Get Many
 2. Choose a Filter Type:
-   - **Simple** — add conditions via the UI (column, operator, value)
-   - **OData** — enter a raw OData `$filter` expression
+   - **Simple** — add conditions via the UI (column, operator, value); display names are resolved automatically
+   - **OData** — enter a raw OData `$filter` expression, e.g. `fields/Status eq 'Approved' and fields/Age ge 18`. Reference columns by internal name under the `fields/` prefix; wrap text in single quotes; write dates as ISO 8601 without quotes. See [Node Operations → OData Filter](node-operations.md#odata-filter-raw-filter) for details.
+
+### Resolve a person from a LookupId
+
+Item Get/Get Many return Person columns as raw integers (e.g. `RequestingOfficerLookupId: 17`). To get the person's name/email:
+
+1. Set Resource = User, Operation = Get by Lookup ID
+2. In **Lookup ID**, enter the integer — a single value or comma-separated (`17,16`) — e.g. `={{ $json.fields.RequestingOfficerLookupId }}`
+3. The node returns `{ displayName, email, userName, lookupId, requestedLookupId }` per ID
+
+This is the reverse of **User → Get Lookup ID** (email → LookupId).
 
 ## Known Limitations
 

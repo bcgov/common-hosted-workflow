@@ -137,6 +137,37 @@ Fetch multiple list items with optional filtering and pagination.
 
 Simple conditions are AND-composed. For OR logic or complex expressions, use OData mode.
 
+#### OData Filter (raw `$filter`)
+
+When **Filter Type = OData**, the **OData Filter** string is passed through **verbatim** as the Microsoft Graph `$filter` query parameter against the list-items endpoint:
+
+```
+GET /sites/{siteId}/lists/{listId}/items?$expand=fields&$filter=<your filter>
+```
+
+Unlike Simple mode, OData mode does **not** resolve display names to internal names and does **not** escape quotes for you. You must therefore:
+
+1. Reference columns by their **internal name** under the `fields/` prefix (e.g. `fields/Status`). Use **Item: Get Column Map** to look up internal names — they often differ from the display name (a column shown as `COORS #` may be `OData__x0043_oors__x0023_`).
+2. Wrap text literals in single quotes, and escape a literal single quote by doubling it (`'` → `''`).
+3. Write dates as ISO 8601 **without** quotes.
+
+The node always sends the `Prefer: HonorNonIndexedQueriesWarningMayFailRandomly` header, so filtering on non-indexed columns works.
+
+**Examples:**
+
+| Goal                         | OData Filter                                           |
+| ---------------------------- | ------------------------------------------------------ |
+| Text equals                  | `fields/Status eq 'Approved'`                          |
+| Contains / starts with       | `contains(fields/Title, 'Referral')`                   |
+| Number comparison            | `fields/Age ge 18`                                     |
+| Boolean                      | `fields/IsActive eq true`                              |
+| Date (ISO 8601, no quotes)   | `fields/Created ge 2026-01-01T00:00:00Z`               |
+| Combine with `and` / `or`    | `fields/Status eq 'Open' and fields/Region eq 'North'` |
+| Escape a literal apostrophe  | `fields/LastName eq 'O''Brien'`                        |
+| Person/Lookup column (by ID) | `fields/AssignedToLookupId eq 5`                       |
+
+> **Tip:** If a filter unexpectedly returns nothing, the usual cause is a display-name-vs-internal-name mismatch. Switch to **Simple** mode (which resolves display names automatically) or confirm the internal name via **Get Column Map**.
+
 ---
 
 ### Item: Get Column Map
@@ -308,6 +339,49 @@ Resolve an email address to the integer SharePoint LookupId needed for Person/Gr
 
 ---
 
+### User: Get by Lookup ID
+
+The reverse of **Get Lookup ID**: resolve a person/lookup **LookupId** back to the principal's display name, email, and username via the hidden User Information List.
+
+Use this when an **Item: Get** or **Item: Get Many** returns Person/Group columns as raw integers (e.g. `RequestingOfficerLookupId: 17`, `SupervisorLookupId: 16`). Microsoft Graph never resolves the display name inline on list items, so this operation performs the lookup explicitly.
+
+| Parameter    | Type   | Required | Default | Description                                                                                    |
+| ------------ | ------ | -------- | ------- | ---------------------------------------------------------------------------------------------- |
+| Lookup ID    | string | Yes      | —       | A single LookupId (`17`) or a comma-separated list (`17,16`). Duplicate IDs are resolved once. |
+| On Not Found | select | No       | `Error` | Behaviour when a LookupId has no matching principal on the site.                               |
+
+#### On Not Found Options
+
+| Option                  | Behaviour                                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| Error                   | Throw an error naming the missing LookupId (default)                                                  |
+| Continue (Empty Fields) | Return a row with empty `email`/`displayName`/`userName` for the missing ID, so the workflow proceeds |
+
+**Behaviour:**
+
+- Each **unique** LookupId is resolved with a single Graph call (`GET .../User Information List/items/{lookupId}`). Duplicates are de-duplicated, so `17,16` = 2 fetches and `17,17` = 1 fetch — no N+1 explosion.
+- Non-numeric or non-positive input is rejected with a clear error rather than producing a silent miss.
+
+**Output:** One object per requested ID. `requestedLookupId` echoes the input so results can be joined back to their source rows.
+
+```json
+[
+  {
+    "requestedLookupId": 17,
+    "lookupId": 17,
+    "email": "jane.doe@gov.bc.ca",
+    "displayName": "Jane Doe",
+    "userName": "jane.doe@gov.bc.ca"
+  }
+]
+```
+
+**Typical flow:** chain **Item: Get** (or **Get Many**) into **User: Get by Lookup ID** with an expression such as `={{ $json.fields.RequestingOfficerLookupId }}` to turn the LookupId into a name.
+
+> **Limitation:** Resolves Person/Group and lookup-to-user columns only, since it reads the User Information List. A lookup column pointing at a non-user list is not resolved by this operation. The person must also have accessed the site at least once to appear in the User Information List.
+
+---
+
 ### User: Get Many
 
 Enumerate users from the site's User Information List.
@@ -413,6 +487,8 @@ n8n's `displayOptions` controls which fields are shown in the UI based on the cu
 | Simplify           | Item: Get / Get Many                           |
 | Email              | User: Get Lookup ID                            |
 | On Not Found       | User: Get Lookup ID                            |
+| Lookup ID          | User: Get by Lookup ID                         |
+| On Not Found       | User: Get by Lookup ID                         |
 | Conflict Behaviour | File: Upload                                   |
 | Update Mode        | File: Update                                   |
 | Include Columns    | List: Get / Get Many                           |

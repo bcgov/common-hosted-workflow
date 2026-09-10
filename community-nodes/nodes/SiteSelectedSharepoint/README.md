@@ -13,7 +13,7 @@ A custom n8n community node for reading and writing SharePoint list items, files
 | Credential      | `siteSelectedSharepointOAuth2Api` (extends n8n OAuth2 API) |
 | Category        | Transform                                                  |
 | AI-tool capable | Yes (`usableAsTool: true`)                                 |
-| Resources       | Item (7 ops), File (3 ops), List (2 ops), User (2 ops)     |
+| Resources       | Item (7 ops), File (3 ops), List (2 ops), User (3 ops)     |
 
 ## Documentation
 
@@ -51,7 +51,8 @@ community-nodes/
 │       │   │   └── getMany.ts                    # List: Get Many
 │       │   └── user/
 │       │       ├── ensureUser.ts                 # User: Ensure User (provision via REST)
-│       │       ├── getLookupId.ts                # User: Get Lookup ID
+│       │       ├── getByLookupId.ts              # User: Get by Lookup ID (LookupId → person)
+│       │       ├── getLookupId.ts                # User: Get Lookup ID (email → LookupId)
 │       │       └── getMany.ts                    # User: Get Many
 │       ├── methods/
 │       │   ├── loadOptions.ts                    # Dropdown loaders (lists, drives, columns)
