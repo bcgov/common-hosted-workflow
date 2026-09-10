@@ -47,9 +47,33 @@
         "name": "workflow_id",
         "label": "Workflow",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "query": { "query": "label_values(n8n_workflow_started_total, workflow_id)", "refId": "A" },
-        "refresh": 2,
+        "regex": "^.+$",
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "n8n-projects"
+        },
+        "query": {
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects/workflows",
+            "root_selector": "",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": {
+              "method": "GET",
+              "body_content_type": "text/plain"
+            }
+          }
+        },
+        "refresh": 1,
         "sort": 1,
         "includeAll": true,
         "allValue": ".*",
