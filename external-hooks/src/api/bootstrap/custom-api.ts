@@ -3,6 +3,7 @@ import { buildActionRouter } from '../routes/actions';
 import { buildActorRouter } from '../routes/actors';
 import { buildAdminRouter } from '../routes/admin';
 import { buildChefsSubmissionRouter } from '../routes/chefs-submission';
+import { buildGrafanaProjectsRouter } from '../routes/grafana-projects';
 import { buildMessageRouter } from '../routes/messages';
 import { buildMultiWebhookWaitRouter } from '../routes/multi-webhook-wait';
 import { mountSwaggerUi } from '../swagger-ui';
@@ -17,6 +18,8 @@ export function mountCustomApi(app: Express, routeContext: ApiRouteContext) {
   v1Router.use(buildActionRouter(routeContext));
   v1Router.use('/chefs', buildChefsSubmissionRouter(routeContext));
   v1Router.use('/multi-webhook-wait', buildMultiWebhookWaitRouter(routeContext));
+
+  v1Router.use('/obs/projects', buildGrafanaProjectsRouter(routeContext));
 
   mountSwaggerUi(app);
   app.use('/rest/custom/v1', v1Router);

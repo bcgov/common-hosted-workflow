@@ -103,7 +103,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.cancelled\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__range]))",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -197,7 +197,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.cancelled\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range])) / sum(count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range])) * 100",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__range])) / sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range])) * 100",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -271,7 +271,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.audit.*\", workflow_name=~\"$workflow_name\"}[$__range]))",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.audit.*\"}[$__range]))",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -449,7 +449,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.started\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.started\", workflow_id=~\"$workflow_id\"}[$__range]))",
           "hide": true,
           "instant": true,
           "queryType": "instant",
@@ -461,7 +461,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range]))",
           "hide": true,
           "instant": true,
           "queryType": "instant",
@@ -673,7 +673,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.workflow.(started|success|failed|cancelled)\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__interval]))",
+          "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(started|success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__interval]))",
           "instant": false,
           "legendFormat": "{{event_name}}",
           "queryType": "range",
@@ -729,7 +729,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.cancelled\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__interval]))",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__interval]))",
           "instant": false,
           "legendFormat": "Cancelled",
           "queryType": "range",
@@ -756,7 +756,7 @@
           "links": [
             {
               "title": "Filter to this workflow",
-              "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-workflow_name=${__data.fields.workflow_name}&var-event_name=All&var-project_id=All&var-mode=All",
+              "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-workflow_name=${__data.fields.workflow_name}&var-event_name=All&var-mode=All",
               "targetBlank": false
             }
           ]
@@ -862,7 +862,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "topk(20, sum by (project_name, workflow_name, last_node) (count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.failed\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"} | json project_name=\"payload.projectName\", last_node=\"payload.lastNodeExecuted\" [$__range])))",
+          "expr": "topk(20, sum by (project_name, workflow_name, last_node) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"} | json project_name=\"payload.projectName\", last_node=\"payload.lastNodeExecuted\" [$__range])))",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -902,7 +902,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{job=\"n8n-log-streaming\", event_name=\"n8n.workflow.failed\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}",
+          "expr": "{job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}",
           "queryType": "range",
           "refId": "A"
         }
@@ -940,7 +940,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{job=\"n8n-log-streaming\", event_name=\"n8n.workflow.cancelled\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}",
+          "expr": "{job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}",
           "queryType": "range",
           "refId": "A"
         }
@@ -1057,7 +1057,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "topk(30, sum by (node_name, node_type, workflow_name) (count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.node.finished\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"} | json node_name=\"payload.nodeName\", node_type=\"payload.nodeType\" [$__range])))",
+          "expr": "topk(30, sum by (node_name, node_type, workflow_name) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.node.finished\", workflow_id=~\"$workflow_id\"} | json node_name=\"payload.nodeName\", node_type=\"payload.nodeType\" [$__range])))",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -1290,7 +1290,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{job=\"n8n-log-streaming\", event_name=~\"$event_name\", project_name=~\"$project_name\", mode=~\"$mode\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}",
+          "expr": "{job=\"n8n-log-streaming\", event_name=~\"$event_name\", project_id=~\"$project_id\", mode=~\"$mode\", workflow_id=~\"$workflow_id\"}",
           "queryType": "range",
           "refId": "A"
         }
@@ -1539,7 +1539,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.failed\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}[$__range]))",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -1633,7 +1633,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.failed\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range])) / sum(count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"}[$__range])) * 100",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}[$__range])) / sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range])) * 100",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -1755,7 +1755,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "topk(20, sum by (workflow_name, error_message) (count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.workflow.failed\", workflow_name=~\"$workflow_name\", workflow_id=~\"$workflow_id\"} | json error_message=\"payload.errorMessage\" [$__range])))",
+          "expr": "topk(20, sum by (workflow_name, error_message) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"} | json error_message=\"payload.errorMessage\" [$__range])))",
           "instant": true,
           "legendFormat": "__auto",
           "queryType": "instant",
@@ -1772,92 +1772,68 @@
   "templating": {
     "list": [
       {
+        "name": "project_id",
+        "label": "Tenant",
+        "type": "query",
+        "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "n8n-projects" },
+        "query": {
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects",
+            "root_selector": "projects",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": { "method": "GET", "body_content_type": "text/plain" }
+          }
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
         "allValue": ".*",
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "definition": "",
+        "multi": false,
         "hide": 0,
-        "includeAll": true,
-        "label": "Workflow",
-        "multi": false,
-        "name": "workflow_name",
-        "options": [],
-        "query": {
-          "label": "workflow_name",
-          "refId": "StandardVariableQuery",
-          "stream": "{job=\"n8n-log-streaming\"}",
-          "type": 1
-        },
-        "refresh": 2,
-        "regex": "",
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "definition": "",
-        "hide": 2,
-        "includeAll": true,
-        "label": "Workflow ID",
-        "multi": false,
-        "name": "workflow_id",
-        "options": [],
-        "query": {
-          "label": "workflow_id",
-          "refId": "StandardVariableQuery",
-          "stream": "{job=\"n8n-log-streaming\"}",
-          "type": 1
-        },
-        "refresh": 2,
-        "regex": "",
-        "sort": 1,
         "skipUrlSync": false,
-        "type": "query"
+        "current": {}
       },
       {
-        "allValue": ".*",
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Project",
-        "multi": true,
-        "name": "project_name",
-        "options": [],
+        "name": "workflow_id",
+        "label": "Workflow",
+        "type": "query",
+        "regex": "^.+$",
+        "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "n8n-projects" },
         "query": {
-          "label": "project_name",
-          "refId": "StandardVariableQuery",
-          "stream": "{job=\"n8n-log-streaming\"}",
-          "type": 1
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects/workflows?projectId=${project_id:raw}",
+            "root_selector": "",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": { "method": "GET", "body_content_type": "text/plain" }
+          }
         },
         "refresh": 2,
-        "regex": "",
         "sort": 1,
-        "type": "query"
+        "includeAll": true,
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false,
+        "current": {}
       },
       {
         "allValue": ".*",
@@ -1890,32 +1866,28 @@
       },
       {
         "allValue": ".*",
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "loki"
-        },
-        "definition": "",
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "definition": "Manual : manual,Webhook : webhook,Scheduled : trigger,Retry : retry,Error Handler : error,Sub-workflow : integrated,CLI : cli,Chat : chat,Agent : agent",
         "hide": 0,
         "includeAll": true,
         "label": "Mode",
         "multi": true,
         "name": "mode",
-        "options": [],
-        "query": {
-          "label": "mode",
-          "refId": "StandardVariableQuery",
-          "stream": "{job=\"n8n-log-streaming\"}",
-          "type": 1
-        },
-        "refresh": 2,
-        "regex": "",
+        "options": [
+          { "selected": false, "text": "Manual", "value": "manual" },
+          { "selected": false, "text": "Webhook", "value": "webhook" },
+          { "selected": false, "text": "Scheduled", "value": "trigger" },
+          { "selected": false, "text": "Retry", "value": "retry" },
+          { "selected": false, "text": "Error Handler", "value": "error" },
+          { "selected": false, "text": "Sub-workflow", "value": "integrated" },
+          { "selected": false, "text": "CLI", "value": "cli" },
+          { "selected": false, "text": "Chat", "value": "chat" },
+          { "selected": false, "text": "Agent", "value": "agent" }
+        ],
+        "query": "Manual : manual,Webhook : webhook,Scheduled : trigger,Retry : retry,Error Handler : error,Sub-workflow : integrated,CLI : cli,Chat : chat,Agent : agent",
+        "skipUrlSync": false,
         "sort": 1,
-        "type": "query"
+        "type": "custom"
       }
     ]
   },

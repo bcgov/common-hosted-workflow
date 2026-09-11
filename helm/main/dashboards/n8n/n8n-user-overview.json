@@ -1,0 +1,933 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Unified user view: workflow execution KPIs from log streaming and distributed traces with per-project multi-tenant isolation. Filter by workflow name or execution status.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "n8n Logs",
+      "tooltip": "",
+      "type": "link",
+      "url": "/d/n8n-logs/n8n-logs"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "n8n Traces",
+      "tooltip": "",
+      "type": "link",
+      "url": "/d/n8n-traces/n8n-traces"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Failed workflow executions in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "no value",
+                "result": {
+                  "color": "text",
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "instant": true,
+          "legendFormat": "__auto",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed Executions",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Executions started minus completed (success, failed, or cancelled) in the selected time range. A persistently positive number indicates workflows that started but never finished.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "no value",
+                "result": {
+                  "color": "green",
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            },
+            {
+              "options": {
+                "from": -9999,
+                "to": 0,
+                "result": {
+                  "color": "green",
+                  "text": "0"
+                }
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.started\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "hide": true,
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "hide": true,
+          "instant": true,
+          "queryType": "instant",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "$A - $B",
+          "hide": false,
+          "refId": "C",
+          "type": "math"
+        }
+      ],
+      "title": "In-Flight Executions",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Cancelled executions.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "no value",
+                "result": {
+                  "color": "text",
+                  "text": "0"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "instant": true,
+          "legendFormat": "__auto",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Cancelled Executions",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "title": "Log Streaming",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Count of workflow lifecycle events per interval grouped by event type.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": ["sum"],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(started|success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__interval]))",
+          "legendFormat": "{{event_name}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Workflow Events Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Live workflow event stream. Expand any entry to see full payload including execution ID, project, mode, and run data.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 8,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{job=\"n8n-log-streaming\", project_id=~\"$project_id\", workflow_id=~\"$workflow_id\"} | json",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Live Workflow Event Stream",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 9,
+      "title": "Traces",
+      "type": "row"
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Workflow Executions",
+      "description": "One row per workflow execution. Filter by Workflow and Status above. Click a Trace ID to open the span waterfall in Explore.",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 18
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{span.n8n.workflow.id =~ \"${workflow_id}\" && span.n8n.project.id =~ \"${project_id}\" && (${status})} | select(span.n8n.workflow.name, span.n8n.project.custom.name, span.n8n.execution.id, span.n8n.execution.mode, span.n8n.execution.status, span.n8n.execution.is_retry, span.n8n.execution.error_type)",
+          "limit": 50,
+          "tableType": "spans"
+        }
+      ],
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Started",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceIdHidden"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Trace ID"
+              },
+              {
+                "id": "custom.width",
+                "value": 310
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View span waterfall",
+                    "url": "/explore?orgId=1&left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bspan.n8n.execution.id%20%3D%20%5C%22${__data.fields[\"n8n.execution.id\"]}%5C%22%7D%22%2C%22tableType%22%3A%22traces%22%2C%22limit%22%3A5%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${__from}%22%2C%22to%22%3A%22${__to}%22%7D%7D",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceService"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceName"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "spanID"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "name"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.workflow.id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.workflow.name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Workflow"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.project.custom.name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Project"
+              },
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "\u00e2\u20ac\u201d",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.execution.id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.execution.mode"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Mode"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.execution.status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "n8n Status"
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.execution.is_retry"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Retry"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": {
+                        "text": "Yes",
+                        "color": "orange",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "\u00e2\u20ac\u201d",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n8n.execution.error_type"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Error Type"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "startTime"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Started"
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Duration"
+              },
+              {
+                "id": "unit",
+                "value": "ns"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["n8n", "observability", "user"],
+  "templating": {
+    "list": [
+      {
+        "name": "project_id",
+        "label": "Tenant",
+        "type": "query",
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "n8n-projects"
+        },
+        "query": {
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects",
+            "root_selector": "projects",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": {
+              "method": "GET",
+              "body_content_type": "text/plain"
+            }
+          }
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false,
+        "current": {}
+      },
+      {
+        "name": "workflow_id",
+        "label": "Workflow",
+        "type": "query",
+        "regex": "^.+$",
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "n8n-projects"
+        },
+        "query": {
+          "refId": "variable",
+          "queryType": "infinity",
+          "infinityQuery": {
+            "type": "json",
+            "parser": "backend",
+            "source": "url",
+            "url": "/rest/custom/v1/obs/projects/workflows?projectId=${project_id:raw}",
+            "root_selector": "",
+            "columns": [
+              { "selector": "name", "text": "__text", "type": "string" },
+              { "selector": "id", "text": "__value", "type": "string" }
+            ],
+            "filters": [],
+            "format": "table",
+            "url_options": {
+              "method": "GET",
+              "body_content_type": "text/plain"
+            }
+          }
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false,
+        "current": {}
+      },
+      {
+        "name": "status",
+        "label": "Status",
+        "type": "custom",
+        "query": "All : status = ok || status = error || status = unset,Success : status = ok,Failed : status = error",
+        "definition": "All : status = ok || status = error || status = unset,Success : status = ok,Failed : status = error",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "status = ok || status = error || status = unset"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "status = ok || status = error || status = unset"
+          },
+          {
+            "selected": false,
+            "text": "Success",
+            "value": "status = ok"
+          },
+          {
+            "selected": false,
+            "text": "Failed",
+            "value": "status = error"
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "n8n User Overview",
+  "uid": "n8n-user-overview",
+  "version": 1
+}
