@@ -50,7 +50,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Total log lines from selected n8n pod(s) in the time range. A sudden drop to zero means the pod stopped logging — check for crashes.",
       "fieldConfig": {
@@ -112,7 +112,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} [$__range]))",
@@ -127,7 +127,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Log lines matching error keywords (error, exception, fatal, panic). Any non-zero value warrants investigation.",
       "fieldConfig": {
@@ -193,7 +193,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} |~ \"(?i)(error|exception|fatal|panic)\" [$__range]))",
@@ -208,7 +208,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Log lines matching warn keywords. Warnings often precede errors — a spike here before an error spike is a useful leading indicator.",
       "fieldConfig": {
@@ -270,7 +270,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} |~ \"(?i)(warn)\" [$__range]))",
@@ -285,7 +285,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Error line percentage of total output. A persistently high ratio indicates a component in a bad state.",
       "fieldConfig": {
@@ -363,7 +363,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} |~ \"(?i)(error|exception|fatal|panic)\" [$__range]))",
@@ -375,7 +375,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} [$__range]))",
@@ -401,7 +401,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Log throughput per n8n component over time. Gaps in a line mean that pod produced no output — could be idle (normal for runner) or stuck (abnormal for main/worker).",
       "fieldConfig": {
@@ -444,7 +444,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum by (container) (count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} [$__interval]))",
@@ -460,7 +460,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Error and warn lines over time, broken down by component. Correlate spikes here with the workflow execution timeline in the n8n Executions dashboard.",
       "fieldConfig": {
@@ -534,7 +534,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum by (container) (count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} |~ \"(?i)(error|exception|fatal|panic)\" [$__interval]))",
@@ -546,7 +546,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "sum by (container) (count_over_time({job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} |~ \"(?i)(warn)\" [$__interval]))",
@@ -562,7 +562,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Error and exception lines from all selected components. Expand each line for full context. Use the pod label to correlate with a specific replica.",
       "gridPos": {
@@ -586,7 +586,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "{job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"} |~ \"(?i)(error|exception|fatal|panic)\"",
@@ -600,7 +600,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "loki-system"
       },
       "description": "Full stdout/stderr stream for the selected component(s). Use the search bar above the logs panel to filter by keyword. Switch the Pod variable to isolate a specific replica.",
       "gridPos": {
@@ -624,7 +624,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "loki-system"
           },
           "editorMode": "code",
           "expr": "{job=\"n8n-system-logs\", container=~\"$container\", pod=~\"$pod\"}",
@@ -650,7 +650,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "loki"
+          "uid": "loki-system"
         },
         "definition": "",
         "hide": 0,
@@ -679,7 +679,7 @@
         },
         "datasource": {
           "type": "loki",
-          "uid": "loki"
+          "uid": "loki-system"
         },
         "definition": "",
         "hide": 0,

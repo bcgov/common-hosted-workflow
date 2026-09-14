@@ -112,6 +112,8 @@ tempo:
 
 mimir:
   enabled: false
+  retention:
+    blockRetention: 720h   # 30 days
   storage:
     s3:
       endpoint: chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333

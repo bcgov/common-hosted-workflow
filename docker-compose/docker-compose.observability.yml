@@ -139,6 +139,9 @@ services:
     volumes:
     - loki_data:/loki
     - ./observability/loki/config.yaml:/etc/loki/config.yaml
+    depends_on:
+      seaweedfs-provision:
+        condition: service_completed_successfully
 
   alloy:
     <<: *common-props

@@ -29,14 +29,22 @@ datasources:
   uid: loki
   url: http://loki:3100
   isDefault: false
-  # Loki tenant ID. "fake" is Loki's conventional placeholder org ID for
-  # single-tenant configurations. With auth_enabled=false, Loki does not
-  # authenticate or authorize this tenant value; it is used only to satisfy
-  # clients/proxies that expect an X-Scope-OrgID header.
+  # Streaming logs tenant — n8n log streaming.
   jsonData:
     httpHeaderName1: X-Scope-OrgID
   secureJsonData:
-    httpHeaderValue1: fake
+    httpHeaderValue1: streaming
+- name: Loki System Logs
+  type: loki
+  uid: loki-system
+  url: http://loki:3100
+  isDefault: false
+  # System logs tenant — pod stdout/stderr. Separate tenant enables a shorter
+  # compactor retention period (6 months in prod) vs streaming logs (6 years).
+  jsonData:
+    httpHeaderName1: X-Scope-OrgID
+  secureJsonData:
+    httpHeaderValue1: system-logs
 # Infinity datasource — used by dashboard variables to fetch the user's accessible
 # projects and workflows from the n8n projects API endpoint.
 # X-Grafana-Secret authenticates the request as coming from Grafana

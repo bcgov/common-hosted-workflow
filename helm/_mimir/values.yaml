@@ -38,6 +38,9 @@ storage:
     alertmanagerBucket: ''
     rulerBucket: ''
 
+retention:
+  blockRetention: ""   # e.g. "720h" or "2190d"; empty = keep forever
+
 envSecretName: ""
 
 env: {}
