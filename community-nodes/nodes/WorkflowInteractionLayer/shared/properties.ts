@@ -2,7 +2,7 @@ import type { INodeProperties } from 'n8n-workflow';
 
 type DisplayOptions = INodeProperties['displayOptions'];
 
-/** Operations that create an action and share the same payload fields (`Create` and `Create Action and Get Data`). */
+/** Operations that create an action and share the same payload fields (`Create` and `Create, Wait and Get Data`). */
 const ACTION_CREATE_OPERATIONS = ['create', 'createAndWait'];
 
 // ── Shared field factories ──

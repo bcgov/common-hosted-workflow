@@ -47,7 +47,7 @@ export class WorkflowInteractionLayer implements INodeType {
     usableAsTool: true,
     inputs: [NodeConnectionTypes.Main],
     outputs: [NodeConnectionTypes.Main],
-    // Only used by the "Create Action and Get Data" operation, which locks the action's
+    // Only used by the "Create, Wait and Get Data" operation, which locks the action's
     // callback to this URL and pauses the execution until the WIL backend calls it back.
     waitingNodeTooltip:
       '={{ "Waiting for the actor to complete the action at: <a href=\\"" + $execution.resumeUrl + "\\" target=\\"_blank\\">" + $execution.resumeUrl + "</a>" }}',
@@ -106,7 +106,7 @@ export class WorkflowInteractionLayer implements INodeType {
         options: [
           { name: 'Create', value: 'create', action: 'Create an action' },
           {
-            name: 'Create Action and Get Data',
+            name: 'Create, Wait and Get Data',
             value: 'createAndWait',
             action: 'Create an action and wait for the actor to complete it',
           },
@@ -172,7 +172,7 @@ export class WorkflowInteractionLayer implements INodeType {
   }
 
   /**
-   * Resume handler for the "Create Action and Get Data" operation. WIL calls this URL
+   * Resume handler for the "Create, Wait and Get Data" operation. WIL calls this URL
    * (set as the action's callback) once the actor completes the action; the callback
    * body becomes this node's output. Marks `wilActionStatus` completed in the execution's
    * custom data so downstream nodes can tell this apart from a local-timeout resume, which

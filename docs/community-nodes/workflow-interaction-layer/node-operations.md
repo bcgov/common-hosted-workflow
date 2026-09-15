@@ -318,7 +318,7 @@ Mappings can be entered as **UI Field Pairs** or as a **JSON** object (`{ "city"
 
 The user still sees the same "Form submitted successfully" confirmation. Field selection happens entirely in the browser, so fields you do not map are never transmitted to the callback.
 
-### Create Action and Get Data
+### Create, Wait and Get Data
 
 Creates an action exactly like **Create** (same Action Type, Actor, form/approval/wait-on-event fields, Due Date, Priority, Check In, Metadata), then pauses the workflow execution until the actor completes it, and outputs the data WIL sends back on completion.
 
@@ -355,7 +355,7 @@ There is no `expired` value written by this node — n8n has no hook that runs a
 **Read `customData` from a Code node, not a plain expression field.** `$execution.customData.get(...)` has been confirmed to resolve reliably inside a Code node's JS, but not consistently inside a plain `={{ ... }}` expression on an arbitrary downstream node's parameter (an n8n-platform quirk, not something this node controls). Bridge the values into regular `$json` fields first:
 
 ```
-Create Action and Get Data
+Create, Wait and Get Data
   → Code node:
       for (const item of $input.all()) {
         item.json.actionId = $execution.customData.get("wilActionId");

@@ -257,7 +257,7 @@ export async function createAction(ctx: IExecuteFunctions, i: number): Promise<A
  * here. So `actionId`/status can't be read from this node's output after a timeout; instead
  * they're stashed in execution-scoped `customData` (set here to "waiting", set to "completed"
  * in `webhook()` on real completion) so they survive either way — see `$execution.customData`
- * in the "Create Action and Get Data" notice shown in the n8n UI.
+ * in the "Create, Wait and Get Data" notice shown in the n8n UI.
  */
 export async function createActionAndWait(ctx: IExecuteFunctions, i: number): Promise<IDataObject> {
   const body = buildActionCreateBody(ctx, i);
