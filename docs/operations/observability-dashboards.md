@@ -12,6 +12,34 @@ Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They a
 
 ---
 
+## Component Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       Grafana (UI)                              │
+│   n8n Executions  │   n8n Traces     │ n8n Logs                 │
+│   n8n Health      │                  │                          │
+└──────┬──────────────────┬──────────────────┬────────────────────┘
+       │ PromQL           │ TraceQL          │ LogQL
+       ▼                  ▼                  ▼
+    Mimir              Tempo               Loki
+  (metrics)           (traces)            (logs)
+       ▲                  ▲                  ▲
+       └──────────────────┴──────────────────┘
+                          │
+                       Alloy
+                   (collection agent)
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+    scrapes /metrics        receives OTLP + syslog
+         (pull)                   (push)
+              │                       │
+           n8n pod                 n8n pod
+```
+
+---
+
 ## Accessing Grafana
 
 | Environment   | URL                                     | Auth             |
@@ -280,6 +308,8 @@ Shows raw pod stdout/stderr from all n8n components — main, worker, webhook, a
 
 > **Availability:** This dashboard requires `systemLogs.enabled: true` in Helm values and is only available in OpenShift environments. It will show no data in the local docker-compose sandbox, which has no Kubernetes API for Alloy to read from.
 
+> **Datasource:** This dashboard uses the **Loki System Logs** datasource (uid: `loki-system`), which queries the `system-logs` Loki tenant. If you write custom LogQL queries in Grafana Explore for pod logs, select **Loki System Logs** — the default **Loki** datasource queries the `streaming` tenant and will return no pod log data.
+
 Default time range: **last 1 hour** — widen the time picker for historical investigation.
 
 ### Filters
@@ -335,7 +365,7 @@ before the first notification, and repeat every four hours while an alert remain
 
 ### System-log alerts
 
-The following rules query the `n8n-system-logs` Loki stream and route to the `platform` team:
+The following rules query the `n8n-system-logs` Loki stream via the **Loki System Logs** datasource (`loki-system` tenant) and route to the `platform` team:
 
 | Alert                                | Condition                                                                                                            | Evaluation                           |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
@@ -359,11 +389,43 @@ rule label in sync: an unmatched team label falls back to Grafana's default rece
 ## How metrics, traces, and logs reach Grafana
 
 ```
-n8n /metrics           →  Alloy (scrapes every 30 s)          →  Mimir  →  Grafana
-n8n OTLP               →  Alloy (OTLP receiver :4318)         →  Tempo  →  Grafana
-n8n log streaming      →  Alloy (syslog TCP :5514)            →  Loki   →  Grafana
-n8n pod stdout/stderr  →  Alloy (loki.source.kubernetes)      →  Loki   →  Grafana
+n8n /metrics           →  Alloy (scrapes every 30 s)        →  Mimir                       →  Grafana (datasource "Mimir")
+n8n OTLP               →  Alloy (OTLP receiver :4318)       →  Tempo                       →  Grafana (datasource "Tempo")
+n8n log streaming      →  Alloy (syslog TCP :5514)          →  Loki  tenant: streaming     →  Grafana (datasource "Loki")
+n8n pod stdout/stderr  →  Alloy (loki.source.kubernetes)    →  Loki  tenant: system-logs   →  Grafana (datasource "Loki System Logs")
 ```
+
+Loki runs with `auth_enabled: true` and uses two logical tenants for Grafana datasource separation — `streaming` for workflow events, `system-logs` for pod output. Alloy sets the `X-Scope-OrgID` header on every write. Each tenant's data lands under a separate S3 prefix in SeaweedFS. Retention for the two log types is set independently via Loki's `retention_stream` config (not prefix-scoped lifecycle rules).
+
+When writing custom LogQL queries in Grafana Explore, select the matching datasource for the log type you want to query: **Loki** for workflow events and audit logs, **Loki System Logs** for pod stdout/stderr.
+
+---
+
+## Data retention
+
+Retention is enforced natively by each component's built-in compactor, which deletes old data from SeaweedFS via S3 `DeleteObject` calls.
+
+| Signal                | Dev     | Test    | Prod         |
+| --------------------- | ------- | ------- | ------------ |
+| Streaming logs (Loki) | 30 days | 30 days | **6 years**  |
+| System logs (Loki)    | 30 days | 30 days | **6 months** |
+| Traces (Tempo)        | 30 days | 30 days | **6 years**  |
+| Metrics (Mimir)       | 30 days | 30 days | **6 years**  |
+
+Streaming logs carry the workflow audit trail and are retained for 6 years in production. System logs (pod stdout/stderr) are operational and retained for 6 months. The two log types expire at different rates using Loki's `retention_stream` feature — no multi-tenancy or S3 prefix scoping required for retention.
+
+### Changing a retention period
+
+Edit the environment's Helm values file and redeploy:
+
+| File                                     | What to edit                                                                                                                                               |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `helm/main/values-c89a45-dev-gold.yaml`  | `tempo.tempo.retention`, `mimir.retention.blockRetention`                                                                                                  |
+| `helm/main/values-c89a45-test-gold.yaml` | same as dev                                                                                                                                                |
+| `helm/main/values-c89a45-prod-gold.yaml` | `loki.loki.limits_config.retention_period`, `loki.loki.limits_config.retention_stream[].period`, `tempo.tempo.retention`, `mimir.retention.blockRetention` |
+| `helm/main/values.yaml`                  | `loki.loki.limits_config.retention_period` (base default for dev/test)                                                                                     |
+
+After the Helm deploy, the compactors pick up the new period on their next compaction cycle — no restart required.
 
 ---
 

@@ -103,7 +103,7 @@ loki.process "n8n_events" {
     action_on_failure   = "skip"
   }
 
-  forward_to = [loki.write.loki.receiver]
+  forward_to = [loki.write.streaming.receiver]
 }
 
 // Discover pods in Alloy's own namespace via the Kubernetes API.
@@ -191,15 +191,29 @@ loki.process "n8n_system_logs" {
     }
   }
 
-  forward_to = [loki.write.loki.receiver]
+  forward_to = [loki.write.system_logs.receiver]
 }
 
-loki.write "loki" {
+// Two loki.write components route logs to separate Loki tenants.
+// With auth_enabled=true, Loki stores each tenant under its own S3 prefix
+// (streaming/ and system-logs/). Loki's compactor uses retention_stream to apply
+// independent retention periods: 6 years for streaming logs, 6 months for system logs.
+loki.write "streaming" {
   endpoint {
-    url = env("ALLOY_LOKI_URL")
+    url     = env("ALLOY_LOKI_URL")
+    headers = { "X-Scope-OrgID" = "streaming" }
   }
-  // Buffer to disk when Loki is temporarily unavailable; replays on recovery.
-  // max_segment_age caps WAL growth — entries older than 1h are dropped rather than filling disk.
+  wal {
+    enabled         = true
+    max_segment_age = "1h"
+  }
+}
+
+loki.write "system_logs" {
+  endpoint {
+    url     = env("ALLOY_LOKI_URL")
+    headers = { "X-Scope-OrgID" = "system-logs" }
+  }
   wal {
     enabled         = true
     max_segment_age = "1h"

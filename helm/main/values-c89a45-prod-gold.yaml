@@ -87,7 +87,11 @@ loki:
       s3:
         endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
     limits_config:
-      retention_period: 2160h  # 90 days
+      retention_period: 52560h # 6 years — workflow event audit trail
+      retention_stream:
+        - selector: '{job="n8n-system-logs"}'
+          priority: 1
+          period: 4320h        # 6 months — pod stdout/stderr
   singleBinary:
     resources:
       requests:
@@ -104,7 +108,7 @@ loki:
 tempo:
   enabled: false
   tempo:
-    retention: 2160h  # 90 days
+    retention: 52560h # 6 years (2190d × 24h)
     storage:
       trace:
         s3:
@@ -120,6 +124,8 @@ tempo:
 
 mimir:
   enabled: false
+  retention:
+    blockRetention: 52560h   # 6 years
   storage:
     s3:
       endpoint: chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
