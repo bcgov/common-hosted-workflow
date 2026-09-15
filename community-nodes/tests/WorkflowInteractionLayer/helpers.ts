@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 
 vi.mock('n8n-workflow', () => ({
   NodeConnectionTypes: { Main: 'main' },
+  WAIT_INDEFINITELY: new Date('3000-01-01T00:00:00.000Z'),
   NodeApiError: class NodeApiError extends Error {
     constructor(_node: unknown, err: unknown) {
       super((err as Error)?.message ?? 'API error');
@@ -81,10 +82,21 @@ interface CreateContextOptions {
   /** Supply an array to have httpRequest return different values per call (for pagination). */
   httpResponses?: unknown[];
   continueOnFail?: boolean;
+  resumeUrl?: string;
 }
 
+export const MOCK_RESUME_URL = 'https://n8n.example.com/webhook-waiting/exec-99';
+
 export function createExecutionContext(opts: CreateContextOptions) {
-  const { resource, operation, params = {}, httpResponse = {}, httpResponses, continueOnFail = false } = opts;
+  const {
+    resource,
+    operation,
+    params = {},
+    httpResponse = {},
+    httpResponses,
+    continueOnFail = false,
+    resumeUrl = MOCK_RESUME_URL,
+  } = opts;
 
   const httpRequest = httpResponses
     ? vi.fn().mockImplementation(() => {
@@ -106,6 +118,13 @@ export function createExecutionContext(opts: CreateContextOptions) {
     getExecutionId: vi.fn(() => MOCK_EXECUTION_ID),
     getNode: vi.fn(() => ({ name: 'WIL Test' })),
     continueOnFail: vi.fn(() => continueOnFail),
+    evaluateExpression: vi.fn(() => resumeUrl),
+    putExecutionToWait: vi.fn().mockResolvedValue(undefined),
+    getWorkflowDataProxy: vi.fn(() => ({
+      $execution: {
+        customData: { set: vi.fn(), get: vi.fn(), setAll: vi.fn(), getAll: vi.fn() },
+      },
+    })),
     helpers: {
       httpRequest,
       constructExecutionMetaData: vi.fn((items: unknown[], meta: { itemData: { item: number } }) =>

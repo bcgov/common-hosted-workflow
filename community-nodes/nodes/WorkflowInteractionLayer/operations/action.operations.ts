@@ -1,4 +1,4 @@
-import { NodeOperationError, type IExecuteFunctions, type IDataObject } from 'n8n-workflow';
+import { NodeOperationError, WAIT_INDEFINITELY, type IExecuteFunctions, type IDataObject } from 'n8n-workflow';
 import { wilApiRequest, wilApiRequestAllItems, safeParse } from '../shared/GenericFunctions';
 import type { ActionCreatePayload, ActionResponse } from '../shared/GenericFunctions';
 
@@ -163,7 +163,12 @@ function buildActionPayload(ctx: IExecuteFunctions, i: number, actionType: strin
   return parsedPayload ? (parsedPayload as Record<string, unknown>) : {};
 }
 
-export async function createAction(ctx: IExecuteFunctions, i: number): Promise<ActionResponse> {
+/**
+ * Builds the action-create request body shared by `createAction` and `createActionAndWait`.
+ * Callback fields are deliberately left unset here — each caller resolves them differently
+ * (user-configured for `createAction`, locked to the resume URL for `createActionAndWait`).
+ */
+function buildActionCreateBody(ctx: IExecuteFunctions, i: number): ActionCreatePayload {
   const workflow = ctx.getWorkflow();
   const executionId = ctx.getExecutionId();
   const actionType = ctx.getNodeParameter('actionType', i) as string;
@@ -180,18 +185,6 @@ export async function createAction(ctx: IExecuteFunctions, i: number): Promise<A
   const actionTitle = ctx.getNodeParameter('actionTitle', i, '') as string;
   if (actionTitle) body.actionTitle = actionTitle;
 
-  const callbackMethod = ctx.getNodeParameter('callbackMethod', i) as ActionCreatePayload['callbackMethod'];
-  if (callbackMethod && callbackMethod !== 'none') {
-    body.callbackMethod = callbackMethod;
-    body.callbackUrl = ctx.getNodeParameter('callbackUrl', i) as string;
-
-    const callbackPayloadSpec = safeParse(ctx.getNodeParameter('callbackPayloadSpec', i, '{}'));
-    if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec as Record<string, unknown>;
-  } else {
-    body.callbackMethod = 'none';
-    body.callbackUrl = '';
-  }
-
   const dueDate = ctx.getNodeParameter('dueDate', i, '') as string;
   if (dueDate) body.dueDate = dueDate;
 
@@ -204,7 +197,89 @@ export async function createAction(ctx: IExecuteFunctions, i: number): Promise<A
   const metadata = safeParse(ctx.getNodeParameter('metadata', i, '{}'));
   if (metadata) body.metadata = metadata as Record<string, unknown>;
 
+  return body;
+}
+
+/** Resolves how long `createActionAndWait` should wait before resuming with a timeout status. */
+function resolveWaitTill(ctx: IExecuteFunctions, i: number): Date {
+  const limitWaitTime = ctx.getNodeParameter('limitWaitTime', i, false) as boolean;
+  if (!limitWaitTime) return WAIT_INDEFINITELY;
+
+  const limitType = ctx.getNodeParameter('limitType', i, 'afterTimeInterval') as string;
+  if (limitType === 'atSpecifiedTime') {
+    const maxDateAndTime = ctx.getNodeParameter('maxDateAndTime', i, '') as string;
+    if (!maxDateAndTime) {
+      throw new NodeOperationError(
+        ctx.getNode(),
+        new Error('Max Date and Time is required when Limit Type is "At Specified Time"'),
+        { itemIndex: i },
+      );
+    }
+    return new Date(maxDateAndTime);
+  }
+
+  let waitSeconds = ctx.getNodeParameter('timeoutAmount', i, 1) as number;
+  const unit = ctx.getNodeParameter('timeoutUnit', i, 'hours') as string;
+
+  if (unit === 'minutes') waitSeconds *= 60;
+  else if (unit === 'hours') waitSeconds *= 60 * 60;
+  else if (unit === 'days') waitSeconds *= 60 * 60 * 24;
+
+  return new Date(Date.now() + waitSeconds * 1000);
+}
+
+export async function createAction(ctx: IExecuteFunctions, i: number): Promise<ActionResponse> {
+  const body = buildActionCreateBody(ctx, i);
+
+  const callbackMethod = ctx.getNodeParameter('callbackMethod', i) as ActionCreatePayload['callbackMethod'];
+  if (callbackMethod && callbackMethod !== 'none') {
+    body.callbackMethod = callbackMethod;
+    body.callbackUrl = ctx.getNodeParameter('callbackUrl', i) as string;
+
+    const callbackPayloadSpec = safeParse(ctx.getNodeParameter('callbackPayloadSpec', i, '{}'));
+    if (callbackPayloadSpec) body.callbackPayloadSpec = callbackPayloadSpec as Record<string, unknown>;
+  } else {
+    body.callbackMethod = 'none';
+    body.callbackUrl = '';
+  }
+
   return wilApiRequest<ActionResponse>(ctx, 'POST', '/actions', body as unknown as IDataObject);
+}
+
+/**
+ * Creates an action with its callback locked to this execution's resume URL, then pauses
+ * the execution (`putExecutionToWait`) until the actor completes it. The WIL backend calls
+ * the callback URL on completion, which resumes execution via the node's `webhook()` handler
+ * with the callback body as output.
+ *
+ * n8n does not re-run node code when a local wait time limit elapses — it just resumes
+ * downstream nodes with this node's *input* data, discarding whatever `execute()` returns
+ * here. So `actionId`/status can't be read from this node's output after a timeout; instead
+ * they're stashed in execution-scoped `customData` (set here to "waiting", set to "completed"
+ * in `webhook()` on real completion) so they survive either way — see `$execution.customData`
+ * in the "Create, Wait and Get Data" notice shown in the n8n UI.
+ */
+export async function createActionAndWait(ctx: IExecuteFunctions, i: number): Promise<IDataObject> {
+  const body = buildActionCreateBody(ctx, i);
+  body.callbackMethod = 'POST';
+  body.callbackUrl = ctx.evaluateExpression('{{ $execution.resumeUrl }}', i) as string;
+
+  const action = await wilApiRequest<ActionResponse>(ctx, 'POST', '/actions', body as unknown as IDataObject);
+
+  // `this.customData` is not wired to the execution's persisted custom data — n8n's own
+  // built-in Execution Data node writes through `getWorkflowDataProxy(i).$execution.customData`
+  // instead, which is the API that `$execution.customData.get(...)` reads back downstream.
+  const { $execution } = ctx.getWorkflowDataProxy(i);
+  $execution.customData.set('wilActionId', action.id);
+  $execution.customData.set('wilActionStatus', 'waiting');
+
+  await ctx.putExecutionToWait(resolveWaitTill(ctx, i));
+
+  return {
+    status: 'timeout',
+    message: `Timed out waiting for actor "${body.actorId}" to complete action "${action.id}".`,
+    actionId: action.id,
+  };
 }
 
 export async function getAction(ctx: IExecuteFunctions, i: number): Promise<ActionResponse> {

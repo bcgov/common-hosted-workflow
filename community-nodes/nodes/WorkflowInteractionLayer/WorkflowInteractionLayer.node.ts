@@ -5,12 +5,21 @@ import {
   type INodeType,
   type INodeTypeDescription,
   type IExecuteFunctions,
+  type IWebhookFunctions,
+  type IWebhookResponseData,
   type INodeExecutionData,
   type IDataObject,
   type JsonObject,
 } from 'n8n-workflow';
 import { createMessage, listMessages, getMessagesByActor } from './operations/message.operations';
-import { createAction, getAction, getActionsByActor, listActions, updateAction } from './operations/action.operations';
+import {
+  createAction,
+  createActionAndWait,
+  getAction,
+  getActionsByActor,
+  listActions,
+  updateAction,
+} from './operations/action.operations';
 import {
   messageCreateProperties,
   messageGetByActorProperties,
@@ -22,6 +31,7 @@ import {
   actionUpdateProperties,
 } from './shared/properties';
 
+// eslint-disable-next-line @n8n/community-nodes/webhook-lifecycle-complete
 export class WorkflowInteractionLayer implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Workflow Interaction Layer',
@@ -37,6 +47,20 @@ export class WorkflowInteractionLayer implements INodeType {
     usableAsTool: true,
     inputs: [NodeConnectionTypes.Main],
     outputs: [NodeConnectionTypes.Main],
+    // Only used by the "Create, Wait and Get Data" operation, which locks the action's
+    // callback to this URL and pauses the execution until the WIL backend calls it back.
+    waitingNodeTooltip:
+      '={{ "Waiting for the actor to complete the action at: <a href=\\"" + $execution.resumeUrl + "\\" target=\\"_blank\\">" + $execution.resumeUrl + "</a>" }}',
+    webhooks: [
+      {
+        name: 'default',
+        httpMethod: 'POST',
+        responseMode: 'onReceived',
+        responseData: '',
+        path: '',
+        restartWebhook: true,
+      },
+    ],
     credentials: [
       {
         name: 'workflowInteractionLayerApi',
@@ -81,6 +105,11 @@ export class WorkflowInteractionLayer implements INodeType {
         displayOptions: { show: { resource: ['action'] } },
         options: [
           { name: 'Create', value: 'create', action: 'Create an action' },
+          {
+            name: 'Create, Wait and Get Data',
+            value: 'createAndWait',
+            action: 'Create an action and wait for the actor to complete it',
+          },
           { name: 'Get', value: 'get', action: 'Get an action' },
           { name: 'Get Actions by Actor ID', value: 'getByActor', action: 'Get actions by actor ID' },
           { name: 'Get Many', value: 'list', action: 'Get many actions' },
@@ -110,22 +139,18 @@ export class WorkflowInteractionLayer implements INodeType {
     const resource = this.getNodeParameter('resource', 0) as string;
     const operation = this.getNodeParameter('operation', 0) as string;
 
+    // Puts the whole execution to wait, so it's handled once up front rather than per item.
+    if (resource === 'action' && operation === 'createAndWait') {
+      try {
+        return [this.helpers.returnJsonArray(await createActionAndWait(this, 0))];
+      } catch (error) {
+        throwMappedError(this, error, 0);
+      }
+    }
+
     for (const [i] of items.entries()) {
       try {
-        let responseData: unknown;
-
-        if (resource === 'message') {
-          if (operation === 'create') responseData = await createMessage(this, i);
-          else if (operation === 'list') responseData = await listMessages(this, i);
-          else if (operation === 'getByActor') responseData = await getMessagesByActor(this, i);
-        } else if (resource === 'action') {
-          if (operation === 'create') responseData = await createAction(this, i);
-          else if (operation === 'get') responseData = await getAction(this, i);
-          else if (operation === 'getByActor') responseData = await getActionsByActor(this, i);
-          else if (operation === 'list') responseData = await listActions(this, i);
-          else if (operation === 'update') responseData = await updateAction(this, i);
-        }
-
+        const responseData = await dispatchOperation(this, resource, operation, i);
         const executionData = this.helpers.constructExecutionMetaData(
           this.helpers.returnJsonArray(responseData as IDataObject | IDataObject[]),
           { itemData: { item: i } },
@@ -139,13 +164,60 @@ export class WorkflowInteractionLayer implements INodeType {
           });
           continue;
         }
-        if ((error as Error & { response?: unknown }).response) {
-          throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
-        }
-        throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+        throwMappedError(this, error, i);
       }
     }
 
     return [returnData];
   }
+
+  /**
+   * Resume handler for the "Create, Wait and Get Data" operation. WIL calls this URL
+   * (set as the action's callback) once the actor completes the action; the callback
+   * body becomes this node's output. Marks `wilActionStatus` completed in the execution's
+   * custom data so downstream nodes can tell this apart from a local-timeout resume, which
+   * never reaches this handler and leaves `wilActionStatus` at "waiting".
+   *
+   * IWebhookFunctions has no `getWorkflowDataProxy`, so the same `$execution.customData.set(...)`
+   * that `createActionAndWait` calls directly is triggered here via `evaluateExpression` instead —
+   * it runs in the same expression sandbox that resolves `{{ $execution.customData.get(...) }}`.
+   */
+  async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+    const body = this.getBodyData() as IDataObject;
+    this.evaluateExpression('{{ $execution.customData.set("wilActionStatus", "completed") }}');
+    return {
+      webhookResponse: { status: 'received' },
+      workflowData: [this.helpers.returnJsonArray(body)],
+    };
+  }
+}
+
+async function dispatchOperation(
+  ctx: IExecuteFunctions,
+  resource: string,
+  operation: string,
+  i: number,
+): Promise<unknown> {
+  if (resource === 'message') {
+    if (operation === 'create') return createMessage(ctx, i);
+    if (operation === 'list') return listMessages(ctx, i);
+    if (operation === 'getByActor') return getMessagesByActor(ctx, i);
+    return undefined;
+  }
+  if (resource === 'action') {
+    if (operation === 'create') return createAction(ctx, i);
+    if (operation === 'get') return getAction(ctx, i);
+    if (operation === 'getByActor') return getActionsByActor(ctx, i);
+    if (operation === 'list') return listActions(ctx, i);
+    if (operation === 'update') return updateAction(ctx, i);
+    return undefined;
+  }
+  return undefined;
+}
+
+function throwMappedError(ctx: IExecuteFunctions, error: unknown, itemIndex: number): never {
+  if ((error as Error & { response?: unknown }).response) {
+    throw new NodeApiError(ctx.getNode(), error as unknown as JsonObject);
+  }
+  throw new NodeOperationError(ctx.getNode(), error as Error, { itemIndex });
 }

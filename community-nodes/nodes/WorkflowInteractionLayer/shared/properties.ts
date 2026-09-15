@@ -2,6 +2,9 @@ import type { INodeProperties } from 'n8n-workflow';
 
 type DisplayOptions = INodeProperties['displayOptions'];
 
+/** Operations that create an action and share the same payload fields (`Create` and `Create, Wait and Get Data`). */
+const ACTION_CREATE_OPERATIONS = ['create', 'createAndWait'];
+
 // ── Shared field factories ──
 
 function actorIdField(displayOptions: DisplayOptions, options?: Partial<INodeProperties>): INodeProperties {
@@ -138,7 +141,7 @@ function listFields(resource: string): INodeProperties[] {
  */
 function showformDisplay(extra?: Record<string, unknown[]>): DisplayOptions {
   return {
-    show: { resource: ['action'], operation: ['create'], actionType: ['showform'], ...extra },
+    show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS, actionType: ['showform'], ...extra },
   };
 }
 
@@ -184,9 +187,25 @@ export const messageGetByActorProperties: INodeProperties[] = getByActorFields('
 export const messageListProperties: INodeProperties[] = listFields('message');
 
 export const actionCreateProperties: INodeProperties[] = [
-  autoFieldsNotice('autoFieldsNoticeAction', { show: { resource: ['action'], operation: ['create'] } }),
-  actorIdField({ show: { resource: ['action'], operation: ['create'] } }),
-  actorTypeField({ show: { resource: ['action'], operation: ['create'] } }),
+  autoFieldsNotice('autoFieldsNoticeAction', { show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } }),
+  {
+    displayName:
+      'Callback URL and Callback Method are set automatically to resume this execution when the actor completes the action. Optionally limit how long to wait below.',
+    name: 'autoCallbackNoticeAction',
+    type: 'notice',
+    default: '',
+    displayOptions: { show: { resource: ['action'], operation: ['createAndWait'] } },
+  },
+  {
+    displayName:
+      'On timeout, this node’s output is NOT usable — n8n resumes with this node’s input data instead, not the action result. Instead, add a downstream Code node reading $execution.customData.get("wilActionId") and $execution.customData.get("wilActionStatus") into $json (plain {{ }} expressions on other nodes may not resolve customData reliably): status is "completed" if the actor responded, or still "waiting" if the wait timed out first (there is no "expired" value — that only happens when a downstream node updates the action status).',
+    name: 'customDataNoticeAction',
+    type: 'notice',
+    default: '',
+    displayOptions: { show: { resource: ['action'], operation: ['createAndWait'] } },
+  },
+  actorIdField({ show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } }),
+  actorTypeField({ show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } }),
   {
     displayName: 'Action Type',
     name: 'actionType',
@@ -199,7 +218,7 @@ export const actionCreateProperties: INodeProperties[] = [
       { name: 'Wait on Event', value: 'waitonevent' },
     ],
     description: 'The type of action to create',
-    displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+    displayOptions: { show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } },
   },
   {
     displayName: 'Action Title',
@@ -207,7 +226,7 @@ export const actionCreateProperties: INodeProperties[] = [
     type: 'string',
     default: '',
     description: 'Optional title shown for this action',
-    displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+    displayOptions: { show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } },
   },
   {
     displayName: 'HTML',
@@ -217,7 +236,9 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '',
     required: true,
     description: 'Required HTML content shown to the user before they choose an approval option',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['getapproval'] } },
+    displayOptions: {
+      show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS, actionType: ['getapproval'] },
+    },
   },
   {
     displayName: 'Options (Required)',
@@ -243,7 +264,9 @@ export const actionCreateProperties: INodeProperties[] = [
       },
     ],
     description: 'Required approval options the user can choose from. Add at least one option.',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['getapproval'] } },
+    displayOptions: {
+      show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS, actionType: ['getapproval'] },
+    },
   },
   {
     displayName: 'CHEFS Form Name',
@@ -388,7 +411,9 @@ export const actionCreateProperties: INodeProperties[] = [
     default: '{}',
     required: true,
     description: 'Free-form payload for wait on event actions, for example { "eventName": "clicked" }',
-    displayOptions: { show: { resource: ['action'], operation: ['create'], actionType: ['waitonevent'] } },
+    displayOptions: {
+      show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS, actionType: ['waitonevent'] },
+    },
   },
   {
     displayName: 'Callback Method',
@@ -431,7 +456,7 @@ export const actionCreateProperties: INodeProperties[] = [
     type: 'dateTime',
     default: '',
     description: 'Optional due date in RFC 3339 format',
-    displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+    displayOptions: { show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } },
   },
   {
     displayName: 'Priority',
@@ -442,7 +467,7 @@ export const actionCreateProperties: INodeProperties[] = [
       { name: 'Critical', value: 'critical' },
       { name: 'Normal', value: 'normal' },
     ],
-    displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+    displayOptions: { show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } },
   },
   {
     displayName: 'Check In',
@@ -450,9 +475,86 @@ export const actionCreateProperties: INodeProperties[] = [
     type: 'dateTime',
     default: '',
     description: 'Optional reminder timestamp in RFC 3339 format',
-    displayOptions: { show: { resource: ['action'], operation: ['create'] } },
+    displayOptions: { show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } },
   },
-  metadataField({ show: { resource: ['action'], operation: ['create'] } }),
+  metadataField({ show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS } }),
+  {
+    displayName: 'Limit Wait Time',
+    name: 'limitWaitTime',
+    type: 'boolean',
+    default: false,
+    description:
+      'Whether to set a maximum time to wait for the actor before resuming automatically with a timeout status',
+    displayOptions: { show: { resource: ['action'], operation: ['createAndWait'] } },
+  },
+  {
+    displayName: 'Limit Type',
+    name: 'limitType',
+    type: 'options',
+    default: 'afterTimeInterval',
+    description: 'Sets the condition for the execution to resume. Can be a specified date or after some time.',
+    options: [
+      { name: 'After Time Interval', value: 'afterTimeInterval', description: 'Waits for a certain amount of time' },
+      {
+        name: 'At Specified Time',
+        value: 'atSpecifiedTime',
+        description: 'Waits until the set date and time to continue',
+      },
+    ],
+    displayOptions: { show: { resource: ['action'], operation: ['createAndWait'], limitWaitTime: [true] } },
+  },
+  {
+    displayName: 'Amount',
+    name: 'timeoutAmount',
+    type: 'number',
+    default: 1,
+    typeOptions: { minValue: 0, numberPrecision: 2 },
+    description: 'The time to wait before resuming',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['createAndWait'],
+        limitWaitTime: [true],
+        limitType: ['afterTimeInterval'],
+      },
+    },
+  },
+  {
+    displayName: 'Unit',
+    name: 'timeoutUnit',
+    type: 'options',
+    default: 'hours',
+    options: [
+      { name: 'Days', value: 'days' },
+      { name: 'Hours', value: 'hours' },
+      { name: 'Minutes', value: 'minutes' },
+      { name: 'Seconds', value: 'seconds' },
+    ],
+    description: 'The time unit of the wait amount',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['createAndWait'],
+        limitWaitTime: [true],
+        limitType: ['afterTimeInterval'],
+      },
+    },
+  },
+  {
+    displayName: 'Max Date and Time',
+    name: 'maxDateAndTime',
+    type: 'dateTime',
+    default: '',
+    description: 'Continue execution after this specified date and time',
+    displayOptions: {
+      show: {
+        resource: ['action'],
+        operation: ['createAndWait'],
+        limitWaitTime: [true],
+        limitType: ['atSpecifiedTime'],
+      },
+    },
+  },
 ];
 
 export const actionGetProperties: INodeProperties[] = [
