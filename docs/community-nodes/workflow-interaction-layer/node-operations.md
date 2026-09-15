@@ -318,6 +318,56 @@ Mappings can be entered as **UI Field Pairs** or as a **JSON** object (`{ "city"
 
 The user still sees the same "Form submitted successfully" confirmation. Field selection happens entirely in the browser, so fields you do not map are never transmitted to the callback.
 
+### Create Action and Get Data
+
+Creates an action exactly like **Create** (same Action Type, Actor, form/approval/wait-on-event fields, Due Date, Priority, Check In, Metadata), then pauses the workflow execution until the actor completes it, and outputs the data WIL sends back on completion.
+
+| Parameter                                                                                  | Type     | Required                                    | Default             | Description                                                                               |
+| ------------------------------------------------------------------------------------------ | -------- | ------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| _(all Create fields above, except Callback Method / Callback URL / Callback Payload Spec)_ |          |                                             |                     |                                                                                           |
+| Limit Wait Time                                                                            | boolean  | No                                          | `false`             | Whether to resume automatically after a limit if the actor never responds                 |
+| Limit Type                                                                                 | options  | No                                          | `afterTimeInterval` | Shown when Limit Wait Time is on. `After Time Interval` or `At Specified Time`.           |
+| Amount                                                                                     | number   | No                                          | `1`                 | Shown when Limit Type is `After Time Interval`. The amount of time to wait.               |
+| Unit                                                                                       | options  | No                                          | `hours`             | Shown when Limit Type is `After Time Interval`. `seconds`, `minutes`, `hours`, or `days`. |
+| Max Date and Time                                                                          | dateTime | Yes, when Limit Type is `At Specified Time` | -                   | Shown when Limit Type is `At Specified Time`. The exact date/time to resume at.           |
+
+**Callback URL and Callback Method are not configurable for this operation.** They are set automatically to `POST` against this execution's resume URL (`$execution.resumeUrl`), so the WIL backend calls back into this node when the actor completes the action.
+
+For `showform`, the same **Send Form Data to Callback (Skip CHEFS Submission)** and **Callback Data** (`Full Form Data` / `Selected Fields Only`) options from Create are available, with identical behavior:
+
+- Skip off (default): the actor's response arrives as `{ "formId": "...", "submission_id": "..." }`. The workflow is responsible for fetching the full submission from CHEFS afterward if needed (for example with the CHEFS Submission Extractor node).
+- Skip on: the actor's response arrives as `{ "formId": "...", "formData": { ... } }` (or a subset of fields, if Callback Data is set to Selected Fields Only) — no separate CHEFS submission is created.
+
+#### Detecting a timeout — use `$execution.customData`, not this node's output
+
+**On a real timeout, this node's output cannot be used to detect that a timeout happened.** n8n does not re-run node code when a local wait time limit elapses — it simply resumes downstream nodes using this node's _input_ data (the same items that fed into it), not any value the node's own code returned before pausing. This matches n8n's native Wait node's own behavior for time-based resumes. Concretely: on a real actor completion, `$json` contains the actor's response (see above); on a timeout, `$json` contains whatever this node's _input_ was — not a status field, not the action ID.
+
+To reliably detect a timeout and get the action ID afterward, this operation stashes both in execution-scoped `customData` instead, which survives regardless of how the execution resumes:
+
+| Key               | Set to                  | When                                                                |
+| ----------------- | ----------------------- | ------------------------------------------------------------------- |
+| `wilActionId`     | the created action's ID | Always, right after the action is created (before the wait starts)  |
+| `wilActionStatus` | `waiting`               | Right after the action is created (before the wait starts)          |
+| `wilActionStatus` | `completed`             | When the actor actually completes the action (the callback arrives) |
+
+There is no `expired` value written by this node — n8n has no hook that runs at the exact moment a wait time limit elapses, so nothing can flip the status then. If `wilActionStatus` is still `waiting` after this node resumes, that **is** the timeout signal.
+
+**Read `customData` from a Code node, not a plain expression field.** `$execution.customData.get(...)` has been confirmed to resolve reliably inside a Code node's JS, but not consistently inside a plain `={{ ... }}` expression on an arbitrary downstream node's parameter (an n8n-platform quirk, not something this node controls). Bridge the values into regular `$json` fields first:
+
+```
+Create Action and Get Data
+  → Code node:
+      for (const item of $input.all()) {
+        item.json.actionId = $execution.customData.get("wilActionId");
+        item.json.actionStatus = $execution.customData.get("wilActionStatus");
+      }
+      return $input.all();
+  → IF {{ $json.actionStatus }} != "completed"
+      → Action: Update (Action ID = {{ $json.actionId }}, Status = Expired)
+```
+
+**Note:** this operation pauses the entire n8n execution (not just this node) until resumed, so it only supports a single item at a time — if multiple items reach this node, only the first is processed.
+
 ### Other Action Operations
 
 - `Get` retrieves a single action by ID.
