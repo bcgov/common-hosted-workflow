@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { WilActionItem } from '../../services/backend/wil';
 import { postWilChefsToken, postWilCallback } from '../../services/backend/wil';
+import type { WilCallbackResponse } from '../../services/backend/wil';
 import { getStoredAppToken } from '../../services/backend/axios';
 import { useSessionSnapshot, useTenantGroupsById, useTenantRolesById } from '../../state/session';
 import { ChefsFormPanel } from '../chefs/chefs-form-panel';
@@ -12,12 +13,15 @@ import { buildTokenObject, buildUserObject, buildUserProfile } from '../chefs/us
 import { extractSubmissionId } from '../chefs/submission-utils';
 import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
 import { ClaimErrorView } from './claim-error-view';
+import { isServerUnavailableError, SERVER_UNAVAILABLE_MESSAGE } from '../shared/error-utils';
+import { buildCancelledActionSnapshot, buildCompletedActionSnapshot } from './cancelled-action';
 
 interface ShowFormHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
   onRefresh?: () => void;
+  onActionUpdated?: (action: WilActionItem | null) => void;
 }
 
 async function initializeForm(params: {
@@ -49,12 +53,19 @@ async function initializeForm(params: {
 }
 
 /** Renders a CHEFS form for a `showform` action and posts the submission to the WIL callback API. */
-export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefresh }: Readonly<ShowFormHandlerProps>) {
+export function ShowFormHandler({
+  action,
+  tenantId,
+  onInteractionSuccess,
+  onRefresh,
+  onActionUpdated,
+}: Readonly<ShowFormHandlerProps>) {
   const { session } = useSessionSnapshot();
   const tenantRoles = useTenantRolesById(tenantId);
   const tenantGroups = useTenantGroupsById(tenantId);
   const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
+  const onActionUpdatedRef = useRef(onActionUpdated);
   const { claimError, setClaimError } = useClaimVerification({
     tenantId,
     actionId: action.id,
@@ -62,14 +73,32 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
   });
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
-  }, [onInteractionSuccess]);
+    onActionUpdatedRef.current = onActionUpdated;
+  }, [onInteractionSuccess, onActionUpdated]);
 
   const initMutation = useMutation({ mutationFn: initializeForm });
 
-  const callbackMutation = useMutation({
-    mutationFn: (params: { tenantId: string; actionId: string; body: Record<string, unknown> }) =>
-      postWilCallback(params),
-    onSuccess: () => onInteractionSuccessRef.current?.(),
+  const callbackMutation = useMutation<
+    WilCallbackResponse,
+    Error,
+    { tenantId: string; actionId: string; body: Record<string, unknown> }
+  >({
+    mutationFn: (params) => postWilCallback(params),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+      // The callback target was gone (e.g. finished n8n execution); the action was
+      // auto-cancelled server-side. Flip the pane to the cancelled view (carrying the
+      // reason) so the user sees why it was cancelled.
+      if (result.cancelled) {
+        onActionUpdatedRef.current?.(buildCancelledActionSnapshot(action, result));
+        return;
+      }
+      // Form submitted: the action is completed server-side. Flip the pane to the
+      // terminal (completed) view so claim/unclaim controls are no longer shown.
+      onActionUpdatedRef.current?.(buildCompletedActionSnapshot(action));
+      onInteractionSuccessRef.current?.();
+    },
   });
 
   // Re-initialize whenever the action or session claims change
@@ -162,6 +191,12 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
     return <ClaimErrorView message={claimError} onRefresh={handleRefresh} />;
   }
 
+  // Map upstream "server down"/timeout (502/504) to a retry-friendly message.
+  // extractErrorMessage prefers the server-provided message for axios errors, so
+  // substitute a plain Error carrying the user-facing text for these cases.
+  const rawSubmitError = callbackMutation.isError ? callbackMutation.error : null;
+  const submitError = isServerUnavailableError(rawSubmitError) ? new Error(SERVER_UNAVAILABLE_MESSAGE) : rawSubmitError;
+
   return (
     <ChefsFormPanel
       initPending={initMutation.isPending}
@@ -169,7 +204,7 @@ export function ShowFormHandler({ action, tenantId, onInteractionSuccess, onRefr
       initData={initMutation.data}
       submitPending={callbackMutation.isPending}
       submitSuccess={callbackMutation.isSuccess}
-      submitError={callbackMutation.isError ? callbackMutation.error : null}
+      submitError={submitError}
       submitErrorFallback="Failed to submit form response. Please try again."
       submitMode={skipChefsSubmission ? 'none' : 'chefs'}
       onSubmissionComplete={handleSubmissionComplete}

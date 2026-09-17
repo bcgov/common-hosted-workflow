@@ -195,6 +195,67 @@ describe('POST /wil/callback', () => {
     expect(actionService.updateStatus).not.toHaveBeenCalled();
   });
 
+  it.each([409, 404, 410])(
+    'auto-cancels the action and returns a cancelled response on upstream %i',
+    async (upstreamStatus) => {
+      const action = makeActionRequestRow({ callbackMethod: 'POST', callbackUrl: 'https://upstream.test/hook' });
+      const { router, actionService } = createTestRouter({ action: { getById: vi.fn().mockResolvedValue(action) } });
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: upstreamStatus,
+        text: vi
+          .fn()
+          .mockResolvedValue(`{"code":${upstreamStatus},"message":"The execution 3836 has finished already."}`),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const handlers = getRouteHandlers(router, 'post', '/callback');
+      const req = createMockRequest({
+        body: { actionId: 'act-99', body: { option: 'yes' } },
+        session: {} as any,
+      });
+      const res = createMockResponse();
+
+      const error = await runHandlerChain(handlers!, req, res);
+
+      expect(error).toBeNull();
+      expect(actionService.updateStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'cancelled', cancellationReason: expect.any(String) }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false, cancelled: true, message: expect.any(String) }),
+      );
+    },
+  );
+
+  it('does NOT cancel and passes through other non-2xx codes (e.g. 500)', async () => {
+    const action = makeActionRequestRow({ callbackMethod: 'POST', callbackUrl: 'https://upstream.test/hook' });
+    const { router, actionService } = createTestRouter({ action: { getById: vi.fn().mockResolvedValue(action) } });
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue('Internal Server Error'),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const handlers = getRouteHandlers(router, 'post', '/callback');
+    const req = createMockRequest({
+      body: { actionId: 'act-99', body: { data: 'test' } },
+      session: {} as any,
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: { message: 'Internal Server Error' } });
+    expect(actionService.updateStatus).not.toHaveBeenCalled();
+  });
+
   it('throws 504 AppError on upstream timeout', async () => {
     const action = makeActionRequestRow({ callbackMethod: 'POST', callbackUrl: 'https://upstream.test/hook' });
     const { router } = createTestRouter({ action: { getById: vi.fn().mockResolvedValue(action) } });

@@ -75,7 +75,7 @@ export function ActionDetailPane({
   if (isTerminalStatus(action.status)) return <CompletedActionView action={action} />;
 
   const handleRefresh = () => onActionUpdated?.(null);
-  const handler = renderActionHandler(action, tenantId, onInteractionSuccess, handleRefresh);
+  const handler = renderActionHandler(action, tenantId, onInteractionSuccess, handleRefresh, onActionUpdated);
 
   return (
     <div className="flex h-full flex-col gap-4.5 rounded-card border border-[#e2e8f0] bg-surface p-6">
@@ -98,6 +98,7 @@ function renderActionHandler(
   tenantId: string,
   onInteractionSuccess?: () => void,
   onRefresh?: () => void,
+  onActionUpdated?: (action: WilActionItem | null) => void,
 ): React.ReactNode {
   switch (action.actionType) {
     case 'getapproval':
@@ -107,6 +108,7 @@ function renderActionHandler(
           tenantId={tenantId}
           onInteractionSuccess={onInteractionSuccess}
           onRefresh={onRefresh}
+          onActionUpdated={onActionUpdated}
         />
       );
     case 'showform':
@@ -116,6 +118,7 @@ function renderActionHandler(
           tenantId={tenantId}
           onInteractionSuccess={onInteractionSuccess}
           onRefresh={onRefresh}
+          onActionUpdated={onActionUpdated}
         />
       );
     case 'waitonevent':
@@ -125,6 +128,7 @@ function renderActionHandler(
           tenantId={tenantId}
           onInteractionSuccess={onInteractionSuccess}
           onRefresh={onRefresh}
+          onActionUpdated={onActionUpdated}
         />
       );
     default:

@@ -34,7 +34,7 @@ function getOutputMessage(action: WilActionItem): string | null {
     if (action.actionType === 'getapproval') return 'Approval decision recorded.';
     return 'Action completed.';
   }
-  if (action.status === 'cancelled') return 'Action was cancelled.';
+  if (action.status === 'cancelled') return action.cancellationReason ?? 'Action was cancelled.';
   if (action.status === 'expired') return 'Action expired before completion.';
   if (action.status === 'deleted') return 'Action was deleted.';
   return null;

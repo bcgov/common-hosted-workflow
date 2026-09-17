@@ -4,16 +4,18 @@ import DOMPurify from 'dompurify';
 import { IconLoader2, IconCheck } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { postWilCallback } from '../../services/backend/wil';
-import type { WilActionItem } from '../../services/backend/wil';
-import { extractErrorMessage } from '../shared/error-utils';
+import type { WilActionItem, WilCallbackResponse } from '../../services/backend/wil';
+import { extractErrorMessage, isServerUnavailableError, SERVER_UNAVAILABLE_MESSAGE } from '../shared/error-utils';
 import { useClaimVerification, verifyClaimBeforeSubmit } from './use-claim-verification';
 import { ClaimErrorView } from './claim-error-view';
+import { buildCancelledActionSnapshot, buildCompletedActionSnapshot } from './cancelled-action';
 
 interface GetApprovalHandlerProps {
   action: WilActionItem;
   tenantId: string;
   onInteractionSuccess?: () => void;
   onRefresh?: () => void;
+  onActionUpdated?: (action: WilActionItem | null) => void;
 }
 
 const ALLOWED_TAGS = [
@@ -160,6 +162,7 @@ export function GetApprovalHandler({
   tenantId,
   onInteractionSuccess,
   onRefresh,
+  onActionUpdated,
 }: Readonly<GetApprovalHandlerProps>) {
   const [clickedOption, setClickedOption] = useState<string | null>(null);
   const { claimError, setClaimError } = useClaimVerification({
@@ -169,11 +172,13 @@ export function GetApprovalHandler({
   });
   const queryClient = useQueryClient();
   const onInteractionSuccessRef = useRef(onInteractionSuccess);
+  const onActionUpdatedRef = useRef(onActionUpdated);
   useEffect(() => {
     onInteractionSuccessRef.current = onInteractionSuccess;
+    onActionUpdatedRef.current = onActionUpdated;
   });
 
-  const approvalMutation = useMutation({
+  const approvalMutation = useMutation<WilCallbackResponse, Error, string>({
     mutationFn: async (option: string) => {
       // Pre-submit claim verification for role/group actions
       const valid = await verifyClaimBeforeSubmit({
@@ -185,7 +190,19 @@ export function GetApprovalHandler({
       if (!valid) throw new Error('Claim lost');
       return postWilCallback({ tenantId, actionId: action.id, body: { option } });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['wil-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['wil-action-counts'] });
+      // The callback target was gone (e.g. finished n8n execution); the action was
+      // auto-cancelled server-side. Flip the pane to the cancelled view (carrying the
+      // reason) so the user sees why it was cancelled.
+      if (result.cancelled) {
+        onActionUpdatedRef.current?.(buildCancelledActionSnapshot(action, result));
+        return;
+      }
+      // Response recorded: the action is completed server-side. Flip the pane to the
+      // terminal (completed) view so claim/unclaim controls are no longer shown.
+      onActionUpdatedRef.current?.(buildCompletedActionSnapshot(action));
       onInteractionSuccessRef.current?.();
     },
     onError: () => {
@@ -226,7 +243,9 @@ export function GetApprovalHandler({
 
         {approvalMutation.isError && (
           <p className="text-sm text-red-600" role="alert">
-            {extractErrorMessage(approvalMutation.error, 'An unexpected error occurred. Please try again.')}
+            {isServerUnavailableError(approvalMutation.error)
+              ? SERVER_UNAVAILABLE_MESSAGE
+              : extractErrorMessage(approvalMutation.error, 'An unexpected error occurred. Please try again.')}
           </p>
         )}
       </div>

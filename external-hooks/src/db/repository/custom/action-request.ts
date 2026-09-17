@@ -86,6 +86,7 @@ export class ActionRequestRepository {
     additionalFields?: {
       completedBy?: string;
       completedAt?: Date;
+      metadata?: Record<string, unknown> | null;
     };
     where?: any[];
   }): Promise<ActionRequest | null> {

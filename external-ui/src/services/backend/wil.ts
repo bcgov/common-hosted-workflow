@@ -27,6 +27,8 @@ export type WilActionItem = {
   claimedAt: string | null;
   completedBy: string | null;
   completedAt: string | null;
+  /** Reason shown when the action was cancelled (e.g. its workflow already finished). */
+  cancellationReason?: string | null;
 };
 
 export type WilMessageItem = {
@@ -104,9 +106,20 @@ export function getWilTenants(signal?: AbortSignal) {
   return instance.get<WilTenantsResponse>('/ui-api/wil/tenants', { signal }).then((res) => res.data);
 }
 
-export function postWilCallback(params: { tenantId: string; actionId: string; body: Record<string, unknown> }) {
+export type WilCallbackResponse = {
+  success: boolean;
+  /** True when the action was auto-cancelled because its callback target is gone. */
+  cancelled?: boolean;
+  message?: string;
+};
+
+export function postWilCallback(params: {
+  tenantId: string;
+  actionId: string;
+  body: Record<string, unknown>;
+}): Promise<WilCallbackResponse> {
   return instance
-    .post<void>(
+    .post<WilCallbackResponse>(
       '/ui-api/wil/callback',
       { actionId: params.actionId, body: params.body },
       {

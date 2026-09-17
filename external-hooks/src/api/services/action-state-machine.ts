@@ -10,6 +10,7 @@ export const ACTION_STATUS_PENDING = 'pending' as const;
 export const ACTION_STATUS_CLAIMED = 'claimed' as const;
 export const ACTION_STATUS_IN_PROGRESS = 'in_progress' as const;
 export const ACTION_STATUS_COMPLETED = 'completed' as const;
+export const ACTION_STATUS_CANCELLED = 'cancelled' as const;
 
 /** Actor types that require the claim ceremony before action execution. */
 export const ACTOR_TYPE_ROLE = 'role' as const;
@@ -24,13 +25,22 @@ export const ACTOR_TYPE_GROUP = 'group' as const;
  * - claimed → in_progress (via ClaimService.start)
  * - claimed → pending (via ClaimService.unclaim)
  * - in_progress → completed (via ActionService.updateStatus callback)
- * - completed is a terminal state with no outbound transitions
+ * - pending/claimed/in_progress → cancelled (via ActionService.updateStatus when the
+ *   callback's upstream execution is gone — e.g. an n8n resume URL for an execution
+ *   that has already finished/is not found/no longer waiting)
+ * - completed and cancelled are terminal states with no outbound transitions
  */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  [ACTION_STATUS_PENDING]: [ACTION_STATUS_CLAIMED, ACTION_STATUS_IN_PROGRESS, ACTION_STATUS_COMPLETED],
-  [ACTION_STATUS_CLAIMED]: [ACTION_STATUS_IN_PROGRESS, ACTION_STATUS_PENDING],
-  [ACTION_STATUS_IN_PROGRESS]: [ACTION_STATUS_COMPLETED],
+  [ACTION_STATUS_PENDING]: [
+    ACTION_STATUS_CLAIMED,
+    ACTION_STATUS_IN_PROGRESS,
+    ACTION_STATUS_COMPLETED,
+    ACTION_STATUS_CANCELLED,
+  ],
+  [ACTION_STATUS_CLAIMED]: [ACTION_STATUS_IN_PROGRESS, ACTION_STATUS_PENDING, ACTION_STATUS_CANCELLED],
+  [ACTION_STATUS_IN_PROGRESS]: [ACTION_STATUS_COMPLETED, ACTION_STATUS_CANCELLED],
   [ACTION_STATUS_COMPLETED]: [],
+  [ACTION_STATUS_CANCELLED]: [],
 };
 
 /** Returns true if transitioning from `from` to `to` is a valid state change. */
