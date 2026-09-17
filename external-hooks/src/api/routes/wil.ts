@@ -12,8 +12,12 @@ import { OkResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { buildTriggerRouter } from './triggers';
 import { callWebhook } from './helpers/webhook-fire';
-import { CALLBACK_TIMEOUT_MS } from './constants/constants';
-import { isSharedActorType } from '../services/action-state-machine';
+import {
+  CALLBACK_TIMEOUT_MS,
+  CALLBACK_CANCEL_STATUS_CODES,
+  ACTION_NO_LONGER_VALID_MESSAGE,
+} from './constants/constants';
+import { isSharedActorType, ACTION_STATUS_CANCELLED } from '../services/action-state-machine';
 import type { z } from 'zod';
 
 export function buildWilRouter(routeContext: ApiRouteContext) {
@@ -206,8 +210,28 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
         unreachableMessage: 'Upstream request failed',
       });
 
-      // Non-2xx → return upstream error without updating status
+      // Non-2xx handling.
       if (!upstreamResponse.ok) {
+        // "Gone" status codes (404/409/410) mean the callback target no longer
+        // exists — e.g. an n8n execution-resume URL for an execution that has
+        // already finished. The action can never be completed, so auto-cancel it
+        // and tell the UI it is no longer valid. Detection is by status code only.
+        if (CALLBACK_CANCEL_STATUS_CODES.has(upstreamResponse.status)) {
+          await services.action.updateStatus({
+            allowedProjectIds,
+            actionId,
+            actorMatchers,
+            status: ACTION_STATUS_CANCELLED,
+            actorEmail: session.email,
+            currentAction: action,
+            cancellationReason: ACTION_NO_LONGER_VALID_MESSAGE,
+          });
+          OkResponse(res, { success: false, cancelled: true, message: ACTION_NO_LONGER_VALID_MESSAGE });
+          return;
+        }
+
+        // Any other non-2xx → surface the upstream error without changing status,
+        // so the user can retry (the execution may still be waiting).
         const upstreamBody = await upstreamResponse.text();
         res.status(upstreamResponse.status).json({
           error: { message: upstreamBody || `Upstream returned ${upstreamResponse.status}` },

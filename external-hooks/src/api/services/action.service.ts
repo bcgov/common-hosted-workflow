@@ -65,6 +65,8 @@ export type UpdateActionStatusParams = {
   status: string;
   /** Pre-fetched action row — skips the internal getById when provided. */
   currentAction?: ActionRequest;
+  /** Human-readable reason stored in metadata (e.g. why an action was cancelled). */
+  cancellationReason?: string;
 };
 
 export type DirectUpdateParams = {
@@ -94,6 +96,32 @@ export class ActionService {
       return [eq(actionRequest.actorId, params.actorId)];
     }
     return [];
+  }
+
+  /**
+   * Builds the extra DB columns to set alongside a status change:
+   * - completion audit fields when transitioning to `completed`
+   * - a `cancellationReason` merged into existing metadata when supplied
+   *
+   * Returns `undefined` when there is nothing extra to set.
+   */
+  private buildStatusUpdateFields(
+    params: UpdateActionStatusParams,
+    current: ActionRequest,
+  ): { completedBy?: string; completedAt?: Date; metadata?: Record<string, unknown> | null } | undefined {
+    const fields: { completedBy?: string; completedAt?: Date; metadata?: Record<string, unknown> | null } = {};
+
+    if (params.status === ACTION_STATUS_COMPLETED) {
+      fields.completedBy = params.actorEmail;
+      fields.completedAt = new Date();
+    }
+
+    if (params.cancellationReason) {
+      const existingMetadata = (current.metadata as Record<string, unknown> | null) ?? {};
+      fields.metadata = { ...existingMetadata, cancellationReason: params.cancellationReason };
+    }
+
+    return Object.keys(fields).length > 0 ? fields : undefined;
   }
 
   private buildListWhere(params: {
@@ -228,11 +256,8 @@ export class ActionService {
       }
     }
 
-    // 4. Build additional fields for completion
-    const additionalFields =
-      params.status === ACTION_STATUS_COMPLETED
-        ? { completedBy: params.actorEmail, completedAt: new Date() }
-        : undefined;
+    // 4. Build additional fields for completion / cancellation reason
+    const additionalFields = this.buildStatusUpdateFields(params, current);
 
     // 5. Update with optimistic locking on current status
     const row = await this.customRepositories.actionRequest.updateStatus({

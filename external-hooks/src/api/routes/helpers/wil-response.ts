@@ -16,13 +16,25 @@ export type UiActionResponse = {
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Human-readable reason surfaced when the action was cancelled (from metadata). */
+  cancellationReason: string | null;
 };
+
+/** Reads the cancellation reason stored in the action's metadata, if present. */
+function extractCancellationReason(metadata: unknown): string | null {
+  if (metadata && typeof metadata === 'object') {
+    const reason = (metadata as Record<string, unknown>).cancellationReason;
+    if (typeof reason === 'string' && reason.length > 0) return reason;
+  }
+  return null;
+}
 
 /**
  * Maps an action DB row to a UI-safe response shape.
  *
- * Strips sensitive fields (callback URLs, internal IDs, metadata) and removes
- * any key whose lowercase form matches `formapikey` from showform payloads.
+ * Strips sensitive fields (callback URLs, internal IDs, raw metadata) and removes
+ * any key whose lowercase form matches `formapikey` from showform payloads. The
+ * only metadata surfaced is the human-readable `cancellationReason`.
  */
 export function mapActionToUiResponse(action: ActionRequest): UiActionResponse {
   const payload = { ...(action.payload as Record<string, unknown>) };
@@ -51,6 +63,7 @@ export function mapActionToUiResponse(action: ActionRequest): UiActionResponse {
     completedAt: action.completedAt,
     createdAt: action.createdAt,
     updatedAt: action.updatedAt,
+    cancellationReason: extractCancellationReason(action.metadata),
   };
 }
 

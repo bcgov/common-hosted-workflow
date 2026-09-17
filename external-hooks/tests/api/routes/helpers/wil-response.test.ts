@@ -183,4 +183,28 @@ describe('mapActionToUiResponse', () => {
 
     expect(originalPayload).toHaveProperty('formApiKey', 'secret');
   });
+
+  it('surfaces cancellationReason from metadata', () => {
+    const action = makeActionRequest({
+      status: 'cancelled',
+      metadata: { source: 'n8n', cancellationReason: 'The workflow has already finished.' },
+    });
+    const result = mapActionToUiResponse(action);
+
+    expect(result.cancellationReason).toBe('The workflow has already finished.');
+  });
+
+  it('returns null cancellationReason when metadata has no reason', () => {
+    const action = makeActionRequest({ metadata: { source: 'n8n' } });
+    const result = mapActionToUiResponse(action);
+
+    expect(result.cancellationReason).toBeNull();
+  });
+
+  it('returns null cancellationReason when metadata is null', () => {
+    const action = makeActionRequest({ metadata: null });
+    const result = mapActionToUiResponse(action);
+
+    expect(result.cancellationReason).toBeNull();
+  });
 });
