@@ -36,11 +36,10 @@ n8n:
     # See https://docs.n8n.io/hosting/configuration/configuration-examples/user-folder/#specify-user-folder-path
     N8N_BLOCKLIST_FUNCTIONS_ALLOW_BUILTIN: "*"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/binary-data/#binary-data-environment-variables
-    # Both binary data and execution data are stored in S3. Requires an Enterprise license.
+    # Default to filesystem/database (free tier).
     # Credentials are injected via extraEnv from the chwf-s3-account secret.
-    # Bucket name is set per environment in values-<namespace>-<env>-<zone>.yaml
-    N8N_DEFAULT_BINARY_DATA_MODE: "s3"
-    N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
+    N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "database"
     N8N_EXTERNAL_STORAGE_S3_HOST: "commonservices.objectstore.gov.bc.ca"
     N8N_EXTERNAL_STORAGE_S3_PROTOCOL: "https"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_REGION: "ca-central-1"
@@ -96,23 +95,10 @@ n8n:
     AUTHZ_SERVICE_URL: https://api.loginproxy.gov.bc.ca/api/v1
     AUTHZ_TOKEN_ENDPOINT: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
     EXTERNAL_UI_ENABLED: 'true'
-    # Prometheus metrics → Alloy → Mimir
+    # Prometheus metrics, OTEL tracing, and log streaming — disabled by default.
+    # Enable per environment in values-<namespace>-<env>-<zone>.yaml for environments with the observability stack.
     N8N_METRICS: "false"
-    # Executions dashboard — labels on execution_duration_seconds needed for workflow name join
-    N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL: "true"
-    N8N_METRICS_INCLUDE_WORKFLOW_NAME_LABEL: "true"
-    # Executions dashboard — enables n8n_workflow_started_total (join target for workflow name)
-    N8N_METRICS_INCLUDE_MESSAGE_EVENT_BUS_METRICS: "true"
-    N8N_METRICS_INCLUDE_QUEUE_METRICS: "true"
-    # Health dashboard — instance stats and cache performance
-    N8N_METRICS_INCLUDE_WORKFLOW_STATISTICS: "true"
-    N8N_METRICS_INCLUDE_CACHE_METRICS: "true"
-    # OpenTelemetry tracing — exports spans to Alloy → Tempo
     N8N_OTEL_ENABLED: "false"
-    N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://chwf-alloy:4318  # NOSONAR - internal cluster service URL
-    N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"
-    # Log streaming — event list is in logStreaming.subscribedEvents.
-    # Rendered to JSON by configmaps/n8n-log-streaming.yaml and injected via extraEnv below.
     N8N_LOG_FORMAT: "json"
     N8N_LOG_STREAMING_MANAGED_BY_ENV: "false"
 
