@@ -88,6 +88,7 @@ loki:
         endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
     limits_config:
       retention_period: 52560h # 6 years — workflow event audit trail
+      max_query_length: 52561h # 1h over retention — ensures full audit-trail queries never hit the boundary
       retention_stream:
         - selector: '{job="n8n-system-logs"}'
           priority: 1
@@ -109,6 +110,10 @@ tempo:
   enabled: false
   tempo:
     retention: 52560h # 6 years (2190d × 24h)
+    extraConfig:
+      query_frontend:
+        search:
+          max_duration: 52560h  # matches 6-year retention; allows full audit-trail searches
     storage:
       trace:
         s3:

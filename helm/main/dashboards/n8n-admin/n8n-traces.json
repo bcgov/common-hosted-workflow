@@ -7,7 +7,7 @@
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 27,
-  "refresh": "30s",
+  "refresh": "5m",
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "links": [

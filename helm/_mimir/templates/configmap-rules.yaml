@@ -1,0 +1,11 @@
+{{- if .Values.rulesSync.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-rules
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  n8n-recording-rules.yaml: |
+    {{- .Files.Get "rules-mimir-api.yaml" | nindent 4 }}
+{{- end }}

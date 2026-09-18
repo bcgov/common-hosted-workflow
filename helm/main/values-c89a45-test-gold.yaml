@@ -80,6 +80,7 @@ loki:
         endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
     limits_config:
       retention_period: 720h  # 30 days
+      max_query_length: 721h  # matches retention; prevents queries spanning beyond stored data
   singleBinary:
     resources:
       requests:
@@ -97,6 +98,10 @@ tempo:
   enabled: false
   tempo:
     retention: 720h  # 30 days
+    extraConfig:
+      query_frontend:
+        search:
+          max_duration: 720h  # matches retention; allows full 30-day trace searches
     storage:
       trace:
         s3:

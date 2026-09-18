@@ -7,9 +7,9 @@
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 38,
-  "refresh": "30s",
+  "refresh": "5m",
   "time": {
-    "from": "now-7d",
+    "from": "now-24h",
     "to": "now"
   },
   "templating": {
@@ -76,7 +76,6 @@
         "refresh": 1,
         "sort": 1,
         "includeAll": true,
-        "allValue": ".*",
         "multi": false,
         "hide": 0,
         "skipUrlSync": false,
@@ -148,7 +147,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "round(sum(increase(n8n_workflow_started_total{workflow_id=~\"$workflow_id\"}[$__range])))",
           "legendFormat": "Total"
         }
       ]
@@ -203,7 +202,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",status=\"success\",workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "round(sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range])))",
           "legendFormat": "Success"
         }
       ]
@@ -268,7 +267,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",status=\"failed\",workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "round(sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)))",
           "legendFormat": "Failed"
         }
       ]
@@ -331,7 +330,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",status=\"success\",workflow_id=~\"$workflow_id\"}[$__range])) / clamp_min(sum(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__range])), 1)",
+          "expr": "sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) / clamp_min(sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)), 1)",
           "legendFormat": "Rate"
         }
       ]
@@ -385,7 +384,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__range])) * 60",
+          "expr": "sum(n8n:workflow_execution_duration_seconds_count:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}) * 60",
           "legendFormat": "exec/min"
         }
       ]
@@ -536,7 +535,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by(status)(rate(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__rate_interval])) * 60",
+          "expr": "sum by(status)(n8n:workflow_execution_duration_seconds_count:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}) * 60",
           "legendFormat": "{{status}}"
         }
       ]
@@ -740,7 +739,7 @@
                 "value": [
                   {
                     "title": "View ${__data.fields.status} logs",
-                    "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-event_name=n8n.workflow.${__data.fields.status}&var-mode=${__data.fields.mode}&var-workflow_name=${__data.fields.workflow_name}&var-workflow_id=${__data.fields.workflow_id}",
+                    "url": "/d/n8n-logs/n8n-logs?from=${__from}&to=${__to}&var-event_name=n8n.workflow.${__data.fields.status}&var-mode=${__data.fields.mode}&var-workflow_id=${__data.fields.workflow_id}",
                     "targetBlank": false
                   }
                 ]
@@ -790,7 +789,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by(workflow_id, workflow_name, mode, status)(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__range]) * on(workflow_id) group_left(workflow_name) (last_over_time(n8n:workflow_info[2m]) * 0 + 1))",
+          "expr": "sum by(workflow_id, workflow_name, mode, status)(increase(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__range]) * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))",
           "legendFormat": ""
         }
       ],
@@ -856,7 +855,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum by(le)(rate(n8n_workflow_execution_duration_seconds_bucket{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by(le)(n8n:workflow_execution_duration_seconds_bucket:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}))",
           "legendFormat": "p50"
         },
         {
@@ -866,7 +865,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.90, sum by(le)(rate(n8n_workflow_execution_duration_seconds_bucket{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.90, sum by(le)(n8n:workflow_execution_duration_seconds_bucket:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}))",
           "legendFormat": "p90"
         },
         {
@@ -876,7 +875,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by(le)(rate(n8n_workflow_execution_duration_seconds_bucket{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by(le)(n8n:workflow_execution_duration_seconds_bucket:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}))",
           "legendFormat": "p99"
         }
       ]
@@ -928,7 +927,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(n8n_workflow_execution_duration_seconds_sum{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__rate_interval])) / clamp_min(sum(rate(n8n_workflow_execution_duration_seconds_count{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}[$__rate_interval])), 0.0001)",
+          "expr": "sum(n8n:workflow_execution_duration_seconds_sum:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}) / clamp_min(sum(n8n:workflow_execution_duration_seconds_count:rate5m{mode=~\"$mode\",workflow_id=~\"$workflow_id\"}), 0.001)",
           "legendFormat": "avg duration"
         }
       ]

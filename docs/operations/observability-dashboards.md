@@ -2,13 +2,14 @@
 
 Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They are provisioned automatically — no manual import is needed.
 
-| Dashboard           | Audience                     | Scope                                         |
-| ------------------- | ---------------------------- | --------------------------------------------- |
-| **n8n Executions**  | Workflow authors, team leads | Are my workflows running and how fast?        |
-| **n8n Health**      | Platform / ops team          | Is the n8n process itself healthy?            |
-| **n8n Traces**      | Workflow authors, platform   | What happened inside a single run?            |
-| **n8n Logs**        | Platform / ops team          | What failed, who changed what, audit trail?   |
-| **n8n System Logs** | Platform / ops team          | What did the n8n pods print to stdout/stderr? |
+| Dashboard             | Audience                     | Scope                                         |
+| --------------------- | ---------------------------- | --------------------------------------------- |
+| **n8n User Overview** | Workflow authors             | How are my workflows performing?              |
+| **n8n Executions**    | Workflow authors, team leads | Are my workflows running and how fast?        |
+| **n8n Health**        | Platform / ops team          | Is the n8n process itself healthy?            |
+| **n8n Traces**        | Workflow authors, platform   | What happened inside a single run?            |
+| **n8n Logs**          | Platform / ops team          | What failed, who changed what, audit trail?   |
+| **n8n System Logs**   | Platform / ops team          | What did the n8n pods print to stdout/stderr? |
 
 ---
 
@@ -47,7 +48,53 @@ Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They a
 | Local sandbox | `http://localhost:3000`                 | SSO via Keycloak |
 | Dev / prod    | Grafana route configured in Helm values | SSO via Keycloak |
 
-Both dashboards are in the **n8n** folder in Grafana's left sidebar.
+**n8n User Overview** is in the **n8n** folder in Grafana's left sidebar. All other dashboards (**n8n Executions**, **n8n Health**, **n8n Traces**, **n8n Logs**, **n8n System Logs**) are in the **n8n-admin** folder.
+
+---
+
+## n8n User Overview
+
+A personal overview for workflow authors. Shows KPI stats, execution trends, duration percentiles, a live event stream, and a trace table — all scoped to the logged-in user's accessible workflows.
+
+### Filters
+
+**Workflow** — filters all panels to a specific workflow. Populated from the n8n projects API and scoped to the workflows the logged-in user can access. Defaults to All.
+
+### KPI panels
+
+| Panel                     | What it shows                                                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Total Executions**      | Workflows started in the selected time range                                                                                              |
+| **Successful Executions** | Executions that completed successfully — green background                                                                                 |
+| **Failed Executions**     | Executions that failed — background turns red when non-zero                                                                               |
+| **Cancelled Executions**  | Executions manually stopped — background turns orange when non-zero                                                                       |
+| **Success Rate**          | Successful executions as a percentage of terminal executions (success + failed + cancelled). Green at ≥ 95 %, orange at ≥ 80 %, red below |
+| **Avg Duration**          | Mean execution duration across all selected workflows and the selected time range                                                         |
+
+### Execution Trends
+
+| Panel                    | What it shows                                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Executions Over Time** | Workflow lifecycle events per second (started, success, failed, cancelled) over time. A persistent gap between the started line and the completion lines indicates stuck in-flight executions. |
+
+### Performance
+
+| Panel                                    | What it shows                                                                                         |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Execution Duration — p50 / p90 / p99** | Duration percentiles over time. A widening gap between p99 and p50 indicates slow outlier executions  |
+| **Per-Workflow Breakdown**               | Table of total runs, successes, failures, and mean duration per workflow over the selected time range |
+
+### Live Events
+
+| Panel                          | What it shows                                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Live Workflow Event Stream** | Raw n8n log streaming events in real time, filtered by project and workflow. Only populated where log streaming is enabled. Shows blank otherwise. |
+
+### Traces
+
+| Panel                   | What it shows                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Workflow Executions** | One row per workflow execution span sourced from Tempo. Columns: Trace ID, Start time, Retry, Mode, Status, Project, Workflow, Duration. Click the **Trace ID** to open the span waterfall in Explore. |
 
 ---
 
@@ -512,8 +559,8 @@ Short-lived executions that complete between scrapes contribute to histogram buc
 **Log metric panels lag raw log panels by 10–30 seconds**
 Stat and table panels on the Logs dashboard (Failed Executions count, Top Error Messages, etc.) use aggregated Loki metric queries that go through Loki's result cache. Raw log panels (Recent Failures, Audit Log, Raw Logs) query the store directly and update immediately. The gap closes on the next dashboard refresh cycle.
 
-**New workflows don't appear in the Workflow dropdown immediately**
-The Workflow filter is populated from Loki label values. A newly created workflow only appears in the dropdown after it has generated at least one log streaming event (e.g. a test run). Click the refresh icon next to the dropdown to force a reload.
+**New workflows don't appear in the n8n Logs Workflow dropdown immediately**
+The Workflow filter in **n8n Logs** is populated from Loki label values. A newly created workflow only appears in the dropdown after it has generated at least one log streaming event (e.g. a test run). Click the refresh icon next to the dropdown to force a reload. The Workflow filters in **n8n User Overview** and **n8n Executions** are populated from the n8n projects API and reflect new workflows as soon as they exist in n8n.
 
 **User login events are not filterable by workflow**
 `n8n.audit.user.*` events carry no workflow context. They appear only when the Workflow filter is set to All. Filtering to a specific workflow will hide all login and signup events.

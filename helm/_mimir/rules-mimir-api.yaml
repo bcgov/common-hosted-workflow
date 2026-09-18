@@ -1,0 +1,36 @@
+name: n8n_execution_aggregations
+interval: 1m
+rules:
+  # Records the active workflow_name for each workflow_id while the source
+  # counter is being emitted. Historical samples allow dashboards to recover
+  # the most recent name within the selected time range without scanning the
+  # raw metric via an expensive max_over_time subquery.
+  - record: "n8n:workflow_name:current"
+    expr: 'max by(workflow_id, workflow_name)(n8n_workflow_started_total * 0 + 1)'
+
+  # Pre-aggregates histogram buckets so p50/p90/p99 panels read pre-computed
+  # series instead of scanning raw bucket data at query time.
+  - record: "n8n:workflow_execution_duration_seconds_bucket:rate5m"
+    expr: 'sum by(le, mode, workflow_id)(rate(n8n_workflow_execution_duration_seconds_bucket[5m]))'
+
+  # Pre-aggregates duration sum and count rates for avg-duration and
+  # executions-per-minute panels.
+  - record: "n8n:workflow_execution_duration_seconds_sum:rate5m"
+    expr: 'sum by(mode, workflow_id)(rate(n8n_workflow_execution_duration_seconds_sum[5m]))'
+
+  - record: "n8n:workflow_execution_duration_seconds_count:rate5m"
+    expr: 'sum by(mode, workflow_id, status)(rate(n8n_workflow_execution_duration_seconds_count[5m]))'
+
+  # Execution event rates by outcome — used by the Executions Over Time panel
+  # and the n8n-user-overview rate timeseries.
+  - record: "n8n:workflow_started:rate5m"
+    expr: 'sum by(workflow_id)(rate(n8n_workflow_started_total[5m]))'
+
+  - record: "n8n:workflow_success:rate5m"
+    expr: 'sum by(workflow_id)(rate(n8n_workflow_success_total[5m]))'
+
+  - record: "n8n:workflow_failed:rate5m"
+    expr: 'sum by(workflow_id)(rate(n8n_workflow_failed_total[5m]))'
+
+  - record: "n8n:workflow_cancelled:rate5m"
+    expr: 'sum by(workflow_id)(rate(n8n_workflow_cancelled_total[5m]))'
