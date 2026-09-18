@@ -1,0 +1,61 @@
+{{- if .Values.rulesSync.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "_.fullname" . }}-rules-sync
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "_.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: rules-sync
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ default .Values.serviceAccountName .Values.global.serviceAccountName }}
+      automountServiceAccountToken: false
+      securityContext: {}
+      containers:
+        - name: rules-sync
+          image: {{ .Values.rulesSync.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext: {}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              MIMIR_URL="http://{{ include "_.fullname" . }}:8080"
+              echo "Waiting for Mimir to be ready..."
+              until curl -sf "${MIMIR_URL}/ready" > /dev/null 2>&1; do
+                sleep 5
+              done
+              echo "Mimir is ready. Syncing recording rules..."
+              curl -sf -X POST \
+                "${MIMIR_URL}/prometheus/config/v1/rules/n8n" \
+                -H "Content-Type: application/yaml" \
+                --data-binary @/rules/n8n-recording-rules.yaml
+              echo "Recording rules synced."
+          volumeMounts:
+            - name: rules
+              mountPath: /rules
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: rules
+          configMap:
+            name: {{ include "_.fullname" . }}-rules
+{{- end }}

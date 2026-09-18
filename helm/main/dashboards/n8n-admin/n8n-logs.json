@@ -37,8 +37,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Cancelled executions.",
       "fieldConfig": {
@@ -104,8 +104,6 @@
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "instant": true,
-          "legendFormat": "__auto",
           "queryType": "instant",
           "refId": "A"
         }
@@ -115,8 +113,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Share of completed executions that were cancelled rather than succeeding or failing.",
       "fieldConfig": {
@@ -193,14 +191,12 @@
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__range])) / sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range])) * 100",
+          "expr": "round(sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) / clamp_min(sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)), 1) * 100)",
           "instant": true,
-          "legendFormat": "__auto",
-          "queryType": "instant",
           "refId": "A"
         }
       ],
@@ -209,8 +205,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Count of audit events (workflow config changes and user actions) in the selected time range. When a workflow is selected above, shows only audit events for that workflow. User login events have no workflow context so they only appear under All.",
       "fieldConfig": {
@@ -272,8 +268,6 @@
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.audit.*\"}[$__range]))",
-          "instant": true,
-          "legendFormat": "__auto",
           "queryType": "instant",
           "refId": "A"
         }
@@ -283,8 +277,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Queue jobs where the worker became unresponsive mid-execution. The queue auto-retries stalled jobs but the original execution attempt is lost. Any non-zero value warrants investigation. Only fires in queue mode.",
       "fieldConfig": {
@@ -357,8 +351,6 @@
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.queue.job.stalled\"}[$__range]))",
-          "instant": true,
-          "legendFormat": "__auto",
           "queryType": "instant",
           "refId": "A"
         }
@@ -368,8 +360,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Executions started minus completed (success, failed, or cancelled) in the selected time range. A persistently positive number indicates workflows that started but never finished — check for stuck or very long-running executions.",
       "fieldConfig": {
@@ -445,37 +437,13 @@
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.started\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "hide": true,
+          "expr": "round(sum(increase(n8n_workflow_started_total{workflow_id=~\"$workflow_id\"}[$__range])) - sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) - sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) - sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)))",
           "instant": true,
-          "queryType": "instant",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "hide": true,
-          "instant": true,
-          "queryType": "instant",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "expression": "$A - $B",
-          "hide": false,
-          "refId": "C",
-          "type": "math"
         }
       ],
       "title": "In-Flight Executions",
@@ -483,8 +451,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Failed login attempts in the selected time range. Repeated failures may indicate a credential attack or a misconfigured SSO client.",
       "fieldConfig": {
@@ -554,8 +522,6 @@
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-log-streaming\", event_name=\"n8n.audit.user.login.failed\"}[$__range]))",
-          "instant": true,
-          "legendFormat": "__auto",
           "queryType": "instant",
           "refId": "A"
         }
@@ -565,8 +531,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "All four workflow lifecycle events in one view. Started that exceed success+failed+cancelled indicates stuck or long-running executions. Spikes in failed without matching started spikes suggest retries or queue-level failures.",
       "fieldConfig": {
@@ -674,8 +640,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(started|success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__interval]))",
-          "instant": false,
-          "legendFormat": "{{event_name}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -685,8 +649,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "n8n cancels an execution when a user manually stops it or when the workflow's \"On new execution\" policy stops a running one.",
       "fieldConfig": {
@@ -730,8 +694,6 @@
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__interval]))",
-          "instant": false,
-          "legendFormat": "Cancelled",
           "queryType": "range",
           "refId": "A"
         }
@@ -893,7 +855,8 @@
         "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "wrapLogMessage": false,
+        "maxLines": 1000
       },
       "targets": [
         {
@@ -931,7 +894,8 @@
         "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "wrapLogMessage": false,
+        "maxLines": 1000
       },
       "targets": [
         {
@@ -1069,8 +1033,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Workflow CRUD changes over time — created, deleted, activated, deactivated, updated. Useful for correlating execution behaviour changes with config edits.",
       "fieldConfig": {
@@ -1120,8 +1084,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.audit.workflow.*\"}[$__interval]))",
-          "instant": false,
-          "legendFormat": "{{event_name}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -1131,8 +1093,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Login success/failure, signups, and account deletions.",
       "fieldConfig": {
@@ -1213,8 +1175,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.audit.user.*\"}[$__interval]))",
-          "instant": false,
-          "legendFormat": "{{event_name}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -1243,7 +1203,8 @@
         "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "wrapLogMessage": false,
+        "maxLines": 1000
       },
       "targets": [
         {
@@ -1281,7 +1242,8 @@
         "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "wrapLogMessage": false,
+        "maxLines": 1000
       },
       "targets": [
         {
@@ -1300,8 +1262,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Queue job lifecycle — only fires when n8n runs in queue mode. No data here means the instance is in regular single-process mode.",
       "fieldConfig": {
@@ -1424,8 +1386,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", event_name=~\"n8n.queue.job.*\"}[$__interval]))",
-          "instant": false,
-          "legendFormat": "{{event_name}}",
           "queryType": "range",
           "refId": "A"
         }
@@ -1454,7 +1414,8 @@
         "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "wrapLogMessage": false,
+        "maxLines": 1000
       },
       "targets": [
         {
@@ -1473,8 +1434,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Failed workflow executions in the selected time range.",
       "fieldConfig": {
@@ -1540,8 +1501,6 @@
           },
           "editorMode": "code",
           "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "instant": true,
-          "legendFormat": "__auto",
           "queryType": "instant",
           "refId": "A"
         }
@@ -1551,8 +1510,8 @@
     },
     {
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "description": "Percentage of completed executions that failed. Elevated values indicate a systemic problem rather than isolated workflow bugs.",
       "fieldConfig": {
@@ -1629,14 +1588,12 @@
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}[$__range])) / sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range])) * 100",
+          "expr": "round(sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) / clamp_min(sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)), 1) * 100)",
           "instant": true,
-          "legendFormat": "__auto",
-          "queryType": "instant",
           "refId": "A"
         }
       ],
@@ -1766,7 +1723,7 @@
       "type": "table"
     }
   ],
-  "refresh": "30s",
+  "refresh": "5m",
   "schemaVersion": 39,
   "tags": ["n8n", "logs", "loki"],
   "templating": {
@@ -1827,7 +1784,7 @@
             "url_options": { "method": "GET", "body_content_type": "text/plain" }
           }
         },
-        "refresh": 2,
+        "refresh": 1,
         "sort": 1,
         "includeAll": true,
         "multi": false,
@@ -1892,7 +1849,7 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},

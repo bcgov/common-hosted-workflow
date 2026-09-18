@@ -102,15 +102,38 @@ loki.process "n8n_events" {
     }
   }
 
+  // Promote only bounded dimensions so stage.metrics picks up exactly these
+  // four as Prometheus label dimensions (event_name × project_id ×
+  // workflow_id × mode).
   stage.labels {
     values = {
       event_name    = "",
+      project_id  = "",
+      workflow_id = "",
+      mode        = "",
+    }
+  }
+
+  // Emit n8n_log_events_total counter to Mimir.  Labels at this point:
+  // job, source (from syslog static labels) + the four above.
+  stage.metrics {
+    metric.counter {
+      name              = "n8n_log_events_total"
+      description       = "n8n log-streaming events counted by event, project, workflow and mode"
+      match_all         = true
+      action            = "inc"
+      max_idle_duration = "24h"
+    }
+  }
+
+  // Attach mutable/high-cardinality fields as structured metadata so they are
+  // available for LogQL filtering without inflating the Loki stream index.
+  stage.structured_metadata {
+    values = {
       event_type    = "",
       project_name  = "",
-      project_id    = "",
-      mode          = "",
       workflow_name = "",
-      workflow_id   = "",
+      execution_id  = "",
     }
   }
 
@@ -128,7 +151,8 @@ loki.process "n8n_events" {
 
 loki.write "loki" {
   endpoint {
-    url = env("ALLOY_LOKI_URL")
+    url     = env("ALLOY_LOKI_URL")
+    headers = { "X-Scope-OrgID" = "streaming" }
   }
   wal {
     enabled         = true

@@ -71,6 +71,36 @@ services:
       seaweedfs-provision:
         condition: service_completed_successfully
 
+  mimir-rules-sync:
+    <<: *common-props
+    container_name: mimir-rules-sync
+    restart: no     # Should only run once
+    image: curlimages/curl:8.7.1
+    volumes:
+    - ../helm/_mimir/rules-mimir-api.yaml:/rules.yaml:ro
+    entrypoint: [/bin/sh, -c]
+    command:
+    - |
+      set -eu
+
+      until curl -sf http://mimir:9009/ready; do
+        echo 'Mimir not ready, retrying...'
+        sleep 2
+      done
+
+      echo 'Mimir ready; uploading recording rules...'
+
+      curl -sf \
+        -X POST \
+        -H 'Content-Type: application/yaml' \
+        --data-binary @/rules.yaml \
+        http://mimir:9009/prometheus/config/v1/rules/n8n
+
+      echo 'Recording rules uploaded successfully'
+    depends_on:
+      mimir:
+        condition: service_started
+
   tempo:
     <<: *common-props
     container_name: tempo

@@ -17,11 +17,20 @@ n8n:
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
     AUTHZ_ENVIRONMENT: dev
-    N8N_OTEL_TRACES_PRODUCTION_ONLY: "false"  # trace all executions in dev, not just production triggers
     N8N_LICENSE_AUTO_RENEW_ENABLED: "true"
+    N8N_DEFAULT_BINARY_DATA_MODE: "s3"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-dev"
     N8N_METRICS: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_NAME_LABEL: "true"
+    N8N_METRICS_INCLUDE_MESSAGE_EVENT_BUS_METRICS: "true"
+    N8N_METRICS_INCLUDE_QUEUE_METRICS: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_STATISTICS: "true"
+    N8N_METRICS_INCLUDE_CACHE_METRICS: "true"
     N8N_OTEL_ENABLED: "true"
+    N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://chwf-alloy:4318  # NOSONAR - internal cluster service URL
+    N8N_OTEL_TRACES_PRODUCTION_ONLY: "false"  # trace all executions in dev, not just production triggers
     N8N_LOG_STREAMING_MANAGED_BY_ENV: "true"
 
   route:
@@ -106,6 +115,7 @@ loki:
         endpoint: http://chwf-seaweedfs-s3.c89a45-tools.svc.cluster.local:8333
     limits_config:
       retention_period: 720h  # 30 days
+      max_query_length: 721h  # matches retention; prevents queries spanning beyond stored data
   singleBinary:
     resources:
       requests:
@@ -123,6 +133,10 @@ tempo:
   enabled: true
   tempo:
     retention: 720h  # 30 days
+    extraConfig:
+      query_frontend:
+        search:
+          max_duration: 720h  # matches retention; allows full 30-day trace searches
     storage:
       trace:
         s3:

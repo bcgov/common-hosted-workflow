@@ -16,6 +16,10 @@ compactor:
   compaction:
     block_retention: 48h
 
+query_frontend:
+  search:
+    max_duration: 49h  # matches 48h block retention with a small buffer
+
 storage:
   trace:
     backend: s3

@@ -48,28 +48,150 @@
   ],
   "panels": [
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
+      "id": 20,
+      "type": "stat",
+      "title": "Total Executions",
+      "description": "Workflows started in the selected time range",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
       },
-      "description": "Failed workflow executions in the selected time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "noValue": "0"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "mappings": [
-            {
-              "options": {
-                "match": "no value",
-                "result": {
-                  "color": "text",
-                  "text": "0"
-                }
-              },
-              "type": "special"
-            }
-          ],
+          "expr": "round(sum(increase(n8n_workflow_started_total{workflow_id=~\"$workflow_id\"}[$__range])))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Total"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "stat",
+      "title": "Successful Executions",
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "noValue": "0"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "round(sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range])))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Successful"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Failed Executions",
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "noValue": "0"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -82,185 +204,55 @@
                 "value": 1
               }
             ]
-          },
-          "unit": "short"
+          }
         },
         "overrides": []
       },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "round(sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Failed"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Cancelled Executions",
+      "description": "",
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 0,
+        "w": 4,
+        "x": 12,
         "y": 0
       },
-      "id": 1,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
         "reduceOptions": {
           "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.failed\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "instant": true,
-          "legendFormat": "__auto",
-          "queryType": "instant",
-          "refId": "A"
-        }
-      ],
-      "title": "Failed Executions",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "description": "Executions started minus completed (success, failed, or cancelled) in the selected time range. A persistently positive number indicates workflows that started but never finished.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [
-            {
-              "options": {
-                "match": "no value",
-                "result": {
-                  "color": "green",
-                  "text": "0"
-                }
-              },
-              "type": "special"
-            },
-            {
-              "options": {
-                "from": -9999,
-                "to": 0,
-                "result": {
-                  "color": "green",
-                  "text": "0"
-                }
-              },
-              "type": "range"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 0
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "wideLayout": true
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "noValue": "0"
       },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.started\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "hide": true,
-          "instant": true,
-          "queryType": "instant",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__range]))",
-          "hide": true,
-          "instant": true,
-          "queryType": "instant",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "expression": "$A - $B",
-          "hide": false,
-          "refId": "C",
-          "type": "math"
-        }
-      ],
-      "title": "In-Flight Executions",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "description": "Cancelled executions.",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [
-            {
-              "options": {
-                "match": "no value",
-                "result": {
-                  "color": "text",
-                  "text": "0"
-                }
-              },
-              "type": "special"
-            }
-          ],
+          "unit": "short",
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -273,49 +265,152 @@
                 "value": 1
               }
             ]
-          },
-          "unit": "short"
+          }
         },
         "overrides": []
       },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "round(sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Cancelled"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Success Rate",
+      "description": "Successful executions as a percentage of terminal executions",
       "gridPos": {
         "h": 4,
-        "w": 8,
+        "w": 4,
         "x": 16,
         "y": 0
       },
-      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
         "reduceOptions": {
           "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
-        "textMode": "auto",
-        "wideLayout": true
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "noValue": "\u2014"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "\u2014",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
       },
       "targets": [
         {
+          "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=\"n8n.workflow.cancelled\", workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "round(  (sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)))  / clamp_min(    sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0))    + sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0))    + sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)),  1) * 100)",
           "instant": true,
-          "legendFormat": "__auto",
-          "queryType": "instant",
-          "refId": "A"
+          "range": false,
+          "legendFormat": "Success Rate"
         }
-      ],
-      "title": "Cancelled Executions",
-      "type": "stat"
+      ]
     },
     {
+      "id": 25,
+      "type": "stat",
+      "title": "Avg Duration",
+      "description": "Mean execution duration across all selected workflows and time range",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "noValue": "\u2014"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "\u2014",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_sum{workflow_id=~\"$workflow_id\"}[$__range])) / sum(increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range]))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Avg Duration"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "type": "row",
+      "title": "Execution Trends",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -323,142 +418,503 @@
         "x": 0,
         "y": 4
       },
-      "id": 5,
-      "title": "Log Streaming",
-      "type": "row"
+      "panels": []
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "description": "Count of workflow lifecycle events per interval grouped by event type.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 0,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
+      "id": 6,
+      "type": "timeseries",
+      "title": "Executions Over Time",
+      "description": "Workflow lifecycle events per second, filtered by project and workflow",
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
         "y": 5
       },
-      "id": 6,
-      "options": {
-        "legend": {
-          "calcs": ["sum"],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
         },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "started"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "success"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "success"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "failed"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "cancelled"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cancelled"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
         "tooltip": {
           "mode": "multi",
           "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
         }
       },
       "targets": [
         {
+          "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "editorMode": "code",
-          "expr": "sum by (event_name) (count_over_time({job=\"n8n-log-streaming\", project_id=~\"$project_id\", event_name=~\"n8n.workflow.(started|success|failed|cancelled)\", workflow_id=~\"$workflow_id\"}[$__interval]))",
-          "legendFormat": "{{event_name}}",
-          "queryType": "range",
-          "refId": "A"
+          "expr": "sum(n8n:workflow_started:rate5m{workflow_id=~\"$workflow_id\"})",
+          "legendFormat": "started"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(n8n:workflow_success:rate5m{workflow_id=~\"$workflow_id\"})",
+          "legendFormat": "success"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(n8n:workflow_failed:rate5m{workflow_id=~\"$workflow_id\"})",
+          "legendFormat": "failed"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(n8n:workflow_cancelled:rate5m{workflow_id=~\"$workflow_id\"})",
+          "legendFormat": "cancelled"
         }
-      ],
-      "title": "Workflow Events Over Time",
-      "type": "timeseries"
+      ]
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "description": "Live workflow event stream. Expand any entry to see full payload including execution ID, project, mode, and run data.",
+      "id": 41,
+      "type": "row",
+      "title": "Performance",
+      "collapsed": false,
       "gridPos": {
-        "h": 10,
+        "h": 1,
         "w": 24,
         "x": 0,
         "y": 13
       },
-      "id": 8,
+      "panels": []
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Execution Duration \u2014 p50 / p90 / p99",
+      "description": "Duration percentiles over time. A widening gap between p99 and p50 indicates slow outlier executions.",
+      "gridPos": {
+        "h": 9,
+        "w": 14,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p50"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p90"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p99"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
+          "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "editorMode": "code",
-          "expr": "{job=\"n8n-log-streaming\", project_id=~\"$project_id\", workflow_id=~\"$workflow_id\"} | json",
-          "legendFormat": "",
-          "queryType": "range",
-          "refId": "A"
+          "instant": false,
+          "expr": "histogram_quantile(0.5, sum by(le)(n8n:workflow_execution_duration_seconds_bucket:rate5m{workflow_id=~\"$workflow_id\"}))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": false,
+          "expr": "histogram_quantile(0.9, sum by(le)(n8n:workflow_execution_duration_seconds_bucket:rate5m{workflow_id=~\"$workflow_id\"}))",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": false,
+          "expr": "histogram_quantile(0.99, sum by(le)(n8n:workflow_execution_duration_seconds_bucket:rate5m{workflow_id=~\"$workflow_id\"}))",
+          "legendFormat": "p99"
         }
-      ],
-      "title": "Live Workflow Event Stream",
-      "type": "logs"
+      ]
     },
     {
+      "id": 31,
+      "type": "table",
+      "title": "Per-Workflow Breakdown",
+      "description": "Total runs, success, failures and mean duration per workflow over the selected range",
+      "gridPos": {
+        "h": 9,
+        "w": 10,
+        "x": 14,
+        "y": 14
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "workflow_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Workflow"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #Total"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Runs"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #Success"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Success"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #Failed"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Failed"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #AvgDur"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Avg Duration"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Runs",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["workflow_name", "Value #Total", "Value #Success", "Value #Failed", "Value #AvgDur"]
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "Total",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "",
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))"
+        },
+        {
+          "refId": "Success",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "",
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\",status=\"success\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))"
+        },
+        {
+          "refId": "Failed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "",
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\",status=\"failed\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))"
+        },
+        {
+          "refId": "AvgDur",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "legendFormat": "",
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_sum{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) / clamp_min(sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])), 0.001)"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "type": "row",
+      "title": "Live Events",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -466,20 +922,68 @@
         "x": 0,
         "y": 23
       },
-      "id": 9,
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Live Workflow Event Stream",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false,
+        "prettifyLogMessage": false
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{job=\"n8n-log-streaming\", project_id=~\"$project_id\", workflow_id=~\"$workflow_id\"}",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "type": "row",
       "title": "Traces",
-      "type": "row"
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "panels": []
     },
     {
       "id": 10,
       "type": "table",
       "title": "Workflow Executions",
-      "description": "One row per workflow execution. Filter by Workflow and Status above. Click a Trace ID to open the span waterfall in Explore.",
+      "description": "One row per workflow execution. Filter by Workflow ID and Status above. Click a Trace ID to open the span waterfall in Explore.",
       "gridPos": {
-        "x": 0,
-        "y": 24,
+        "h": 18,
         "w": 24,
-        "h": 18
+        "x": 0,
+        "y": 36
       },
       "datasource": {
         "type": "tempo",
@@ -538,7 +1042,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "View span waterfall",
+                    "title": "View span waterfall in Explore",
                     "url": "/explore?orgId=1&left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bspan.n8n.execution.id%20%3D%20%5C%22${__data.fields[\"n8n.execution.id\"]}%5C%22%7D%22%2C%22tableType%22%3A%22traces%22%2C%22limit%22%3A5%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22${__from}%22%2C%22to%22%3A%22${__to}%22%7D%7D",
                     "targetBlank": true
                   }
@@ -640,7 +1144,7 @@
                     "options": {
                       "match": "null",
                       "result": {
-                        "text": "\u00e2\u20ac\u201d",
+                        "text": "\u2014",
                         "index": 0
                       }
                     }
@@ -725,7 +1229,7 @@
                     "options": {
                       "match": "null",
                       "result": {
-                        "text": "\u00e2\u20ac\u201d",
+                        "text": "\u2014",
                         "index": 1
                       }
                     }
@@ -806,7 +1310,7 @@
       }
     }
   ],
-  "refresh": "30s",
+  "refresh": "5m",
   "schemaVersion": 39,
   "tags": ["n8n", "observability", "user"],
   "templating": {
