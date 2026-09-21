@@ -14,10 +14,12 @@ import { TenantProjectSyncService } from '../services/tenant-project-sync.servic
 import { UiApiService } from '../services/ui-api';
 import {
   N8N_AUTH_SERVICE_PATH,
+  N8N_CORE_PATH,
   N8N_JWT_SERVICE_PATH,
   N8N_NODE_MAILER_PATH,
   N8N_USER_SERVICE_PATH,
 } from '../constants/n8n-paths';
+import { CredentialDecryptService } from '../services/credential-decrypt.service';
 import type { N8nRepositories, N8nContainer } from './n8n-repositories';
 import type { CustomRepositories } from './custom-repositories';
 import type { ApiServices } from '../types/services';
@@ -32,6 +34,7 @@ export type N8nServices = {
   jwtService: JwtService;
   nodeMailerService: NodeMailerService;
   userService: UserService;
+  credentialDecrypt: CredentialDecryptService;
 };
 
 export function buildN8nServices(container: N8nContainer): N8nServices {
@@ -39,12 +42,17 @@ export function buildN8nServices(container: N8nContainer): N8nServices {
   const { JwtService: BaseJwtServiceClass } = require(N8N_JWT_SERVICE_PATH) as { JwtService: unknown };
   const { NodeMailer: BaseNodeMailerServiceClass } = require(N8N_NODE_MAILER_PATH) as { NodeMailer: unknown };
   const { UserService: BaseUserServiceClass } = require(N8N_USER_SERVICE_PATH) as { UserService: unknown };
+  // n8n's `Credentials` class decrypts credential data via the DI-injected Cipher.
+  const { Credentials: N8nCredentialsClass } = require(N8N_CORE_PATH) as { Credentials: unknown };
 
   return {
     authService: new AuthService(container.get<BaseAuthService>(BaseAuthServiceClass)),
     jwtService: new JwtService(container.get<BaseJwtService>(BaseJwtServiceClass)),
     nodeMailerService: new NodeMailerService(container.get<BaseNodeMailerService>(BaseNodeMailerServiceClass)),
     userService: new UserService(container.get<BaseUserService>(BaseUserServiceClass)),
+    credentialDecrypt: new CredentialDecryptService(
+      N8nCredentialsClass as ConstructorParameters<typeof CredentialDecryptService>[0],
+    ),
   };
 }
 
@@ -65,7 +73,7 @@ export async function buildApiServices(
     action: new ActionService(n8nRepositories, customRepositories),
     claim: new ClaimService(customRepositories.actionRequest),
     trigger: new TriggerService(customRepositories),
-    chefs: new ChefsService(),
+    chefs: new ChefsService(n8nRepositories, n8nServices.credentialDecrypt),
     cstar: cstarService,
     featureFlag,
     message: new MessageService(n8nRepositories, customRepositories),

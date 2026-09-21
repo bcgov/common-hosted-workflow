@@ -29,6 +29,7 @@ import {
   actionGetByActorProperties,
   actionListProperties,
   actionUpdateProperties,
+  ACTION_CREATE_OPERATIONS,
 } from './shared/properties';
 
 // eslint-disable-next-line @n8n/community-nodes/webhook-lifecycle-complete
@@ -63,8 +64,20 @@ export class WorkflowInteractionLayer implements INodeType {
     ],
     credentials: [
       {
+        // Always required — authenticates WIL API calls (action creation). Shown at the
+        // top of the node's credentials section for every resource/operation.
         name: 'workflowInteractionLayerApi',
         required: true,
+      },
+      {
+        // Only required for the "Show Form" action type, where the WIL API needs the
+        // CHEFS form ID/API key to render and submit the form. n8n renders this as a
+        // second entry in the same top credentials section, hidden otherwise.
+        name: 'chefsFormAuth',
+        required: true,
+        displayOptions: {
+          show: { resource: ['action'], operation: ACTION_CREATE_OPERATIONS, actionType: ['showform'] },
+        },
       },
     ],
     properties: [

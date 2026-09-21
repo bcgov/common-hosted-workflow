@@ -33,40 +33,38 @@ Both operations support actor, workflow instance, `since`, and `limit` filters a
 
 Creates a new action in the WIL API layer.
 
-| Parameter                                          | Type    | Required                           | Default       | Description                                                                                      |
-| -------------------------------------------------- | ------- | ---------------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
-| Actor ID                                           | string  | Yes                                | -             | Target actor identifier                                                                          |
-| Actor Type                                         | options | Yes                                | `user`        | `user`, `group`, `role`, `system`, `other`                                                       |
-| Action Type                                        | options | Yes                                | `getapproval` | `getapproval`, `showform`, `waitonevent`                                                         |
-| Action Title                                       | string  | No                                 | -             | Optional title for the action                                                                    |
-| HTML                                               | string  | Yes, for `getapproval`             | -             | HTML content shown before approval options                                                       |
-| Options                                            | list    | Yes, for `getapproval`             | -             | Repeatable approval option labels. At least one option is required.                              |
-| CHEFS Form Name                                    | string  | Yes, for `showform`                | -             | CHEFS form name shown for the form action                                                        |
-| CHEFS Form ID                                      | string  | Yes, for `showform`                | -             | CHEFS form ID to render                                                                          |
-| CHEFS Form API Key                                 | string  | Yes, for `showform`                | -             | CHEFS form API key used server-side                                                              |
-| CHEFS Form Submission ID                           | string  | No                                 | -             | Existing CHEFS form submission ID to prefill from prior data                                     |
-| Form Pre-Fill Data                                 | JSON    | No                                 | `{}`          | Object of CHEFS field API names and values                                                       |
-| Send Form Data to Callback (Skip CHEFS Submission) | boolean | No                                 | `false`       | For `showform`. When on, the form data is sent to the callback URL instead of submitted to CHEFS |
-| Callback Data                                      | options | No                                 | `full`        | For `showform` + skip on. `Full Form Data` or `Selected Fields Only`                             |
-| Field Selection Mode                               | options | No                                 | `keyValue`    | Shown for `Selected Fields Only`. `UI Field Pairs` or `JSON`                                     |
-| Fields to Send                                     | list    | Yes, for `Selected Fields Only`    | -             | Repeatable Output Key + Source Path (dot-notation) pairs                                         |
-| Fields to Send (JSON)                              | JSON    | Yes, for `Selected Fields Only`    | `{}`          | Object mapping output keys to dot-notation source paths                                          |
-| Missing Field Behavior                             | options | No                                 | `returnNull`  | Shown for `Selected Fields Only`. `Return Null` or `Omit Field`                                  |
-| Payload                                            | JSON    | Yes, for `waitonevent`             | `{}`          | Free-form wait-on-event payload, for example `{ "eventName": "clicked" }`                        |
-| Callback Method                                    | options | No                                 | `POST`        | `none`, `POST`, `PUT`, `PATCH`                                                                   |
-| Callback URL                                       | string  | Yes (when Callback Method != None) | -             | URL called when action completes                                                                 |
-| Callback Payload Spec                              | JSON    | No                                 | `{}`          | Template for expected callback body                                                              |
-| Due Date                                           | string  | No                                 | -             | RFC 3339 timestamp                                                                               |
-| Priority                                           | options | No                                 | `normal`      | `normal` or `critical`                                                                           |
-| Check In                                           | string  | No                                 | -             | RFC 3339 reminder timestamp                                                                      |
-| Metadata                                           | JSON    | No                                 | `{}`          | Arbitrary JSON metadata                                                                          |
+| Parameter                                          | Type       | Required                           | Default       | Description                                                                                                       |
+| -------------------------------------------------- | ---------- | ---------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Actor ID                                           | string     | Yes                                | -             | Target actor identifier                                                                                           |
+| Actor Type                                         | options    | Yes                                | `user`        | `user`, `group`, `role`, `system`, `other`                                                                        |
+| Action Type                                        | options    | Yes                                | `getapproval` | `getapproval`, `showform`, `waitonevent`                                                                          |
+| Action Title                                       | string     | No                                 | -             | Optional title for the action                                                                                     |
+| HTML                                               | string     | Yes, for `getapproval`             | -             | HTML content shown before approval options                                                                        |
+| Options                                            | list       | Yes, for `getapproval`             | -             | Repeatable approval option labels. At least one option is required.                                               |
+| CHEFS Form Authentication (credential)             | credential | Yes, for `showform`                | -             | Select a `chefsFormAuth` credential; supplies the CHEFS form ID and API key (see [Credentials](./credentials.md)) |
+| CHEFS Form Submission ID                           | string     | No                                 | -             | Existing CHEFS form submission ID to prefill from prior data                                                      |
+| Form Pre-Fill Data                                 | JSON       | No                                 | `{}`          | Object of CHEFS field API names and values                                                                        |
+| Send Form Data to Callback (Skip CHEFS Submission) | boolean    | No                                 | `false`       | For `showform`. When on, the form data is sent to the callback URL instead of submitted to CHEFS                  |
+| Callback Data                                      | options    | No                                 | `full`        | For `showform` + skip on. `Full Form Data` or `Selected Fields Only`                                              |
+| Field Selection Mode                               | options    | No                                 | `keyValue`    | Shown for `Selected Fields Only`. `UI Field Pairs` or `JSON`                                                      |
+| Fields to Send                                     | list       | Yes, for `Selected Fields Only`    | -             | Repeatable Output Key + Source Path (dot-notation) pairs                                                          |
+| Fields to Send (JSON)                              | JSON       | Yes, for `Selected Fields Only`    | `{}`          | Object mapping output keys to dot-notation source paths                                                           |
+| Missing Field Behavior                             | options    | No                                 | `returnNull`  | Shown for `Selected Fields Only`. `Return Null` or `Omit Field`                                                   |
+| Payload                                            | JSON       | Yes, for `waitonevent`             | `{}`          | Free-form wait-on-event payload, for example `{ "eventName": "clicked" }`                                         |
+| Callback Method                                    | options    | No                                 | `POST`        | `none`, `POST`, `PUT`, `PATCH`                                                                                    |
+| Callback URL                                       | string     | Yes (when Callback Method != None) | -             | URL called when action completes                                                                                  |
+| Callback Payload Spec                              | JSON       | No                                 | `{}`          | Template for expected callback body                                                                               |
+| Due Date                                           | string     | No                                 | -             | RFC 3339 timestamp                                                                                                |
+| Priority                                           | options    | No                                 | `normal`      | `normal` or `critical`                                                                                            |
+| Check In                                           | string     | No                                 | -             | RFC 3339 reminder timestamp                                                                                       |
+| Metadata                                           | JSON       | No                                 | `{}`          | Arbitrary JSON metadata                                                                                           |
 
 `Action Title` is sent as top-level `actionTitle`; it is not nested inside `payload`.
 
 #### Payload by Action Type
 
 - `getapproval` builds payload `{ "html": "...", "options": ["Yes", "No"] }`.
-- `showform` builds payload `{ "formName": "...", "formId": "...", "formApiKey": "...", "submissionId": "...", "formPreFillData": {} }`. When **Send Form Data to Callback** is enabled, `"skipChefsSubmission": true` is added. When **Callback Data** is `Selected Fields Only`, `"callbackFieldMappings": [...]` and `"callbackMissingPathBehavior": "returnNull" | "omit"` are also added.
+- `showform` builds payload `{ "chefsCredentialId": "...", "submissionId": "...", "formPreFillData": {} }`. The `formId`, form name, and API key are **not** in the payload — they are resolved server-side from the selected `chefsFormAuth` credential (see [Credentials](./credentials.md)). When **Send Form Data to Callback** is enabled, `"skipChefsSubmission": true` is added. When **Callback Data** is `Selected Fields Only`, `"callbackFieldMappings": [...]` and `"callbackMissingPathBehavior": "returnNull" | "omit"` are also added.
 - `waitonevent` uses the raw Payload JSON field, matching the previous behavior.
 
 #### getapproval HTML Details
@@ -217,16 +215,16 @@ Generated payload:
 
 #### showform Details
 
-| Field                 | Type    | Required | Description                                                                                           |
-| --------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `formName`            | string  | Yes      | CHEFS form name shown for the form action                                                             |
-| `formId`              | string  | Yes      | CHEFS form ID to render                                                                               |
-| `formApiKey`          | string  | Yes      | CHEFS form API key used server-side. The backend strips it before returning actions to the UI.        |
-| `submissionId`        | string  | No       | Existing CHEFS form submission ID used to prefill the form from prior submission data                 |
-| `formPreFillData`     | object  | No       | Key-value pairs matching CHEFS form field API names                                                   |
-| `skipChefsSubmission` | boolean | No       | Set to `true` by the **Send Form Data to Callback** toggle. Only present in the payload when enabled. |
+| Field                 | Type    | Required | Description                                                                                                                                                                   |
+| --------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chefsCredentialId`   | string  | Yes      | ID of the selected `chefsFormAuth` credential. external-hooks resolves this server-side into the form ID and API key — the credential's own values are never in this payload. |
+| `submissionId`        | string  | No       | Existing CHEFS form submission ID used to prefill the form from prior submission data                                                                                         |
+| `formPreFillData`     | object  | No       | Key-value pairs matching CHEFS form field API names                                                                                                                           |
+| `skipChefsSubmission` | boolean | No       | Set to `true` by the **Send Form Data to Callback** toggle. Only present in the payload when enabled.                                                                         |
 
 If `submissionId` is provided, it takes full priority: the form loads the existing submission data and `formPreFillData` is ignored.
+
+> **Migration note:** actions created before this change may still carry the legacy `formId`/`formName`/`formApiKey` fields instead of `chefsCredentialId`. external-hooks accepts both during the transition, but new actions should always use the credential-based flow — there is no `CHEFS Form Name`/`CHEFS Form ID`/`CHEFS Form API Key` parameter on the node anymore.
 
 ##### Send Form Data to Callback (Skip CHEFS Submission)
 
@@ -247,9 +245,7 @@ In both cases the user sees the same "Form submitted successfully" confirmation 
 
 ```json
 {
-  "formName": "Income Verification",
-  "formId": "11111111-1111-1111-1111-111111111111",
-  "formApiKey": "...",
+  "chefsCredentialId": "cred-abc123",
   "skipChefsSubmission": true
 }
 ```
@@ -292,9 +288,7 @@ Mappings can be entered as **UI Field Pairs** or as a **JSON** object (`{ "city"
 
 ```json
 {
-  "formName": "Income Verification",
-  "formId": "11111111-1111-1111-1111-111111111111",
-  "formApiKey": "...",
+  "chefsCredentialId": "cred-abc123",
   "skipChefsSubmission": true,
   "callbackFieldMappings": [
     { "outputKey": "firstName", "sourcePath": "firstName" },

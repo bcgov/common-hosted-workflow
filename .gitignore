@@ -5,3 +5,4 @@ node_modules
 /.kiro
 .next/
 .vscode/settings.json
+/.vscode

@@ -83,6 +83,8 @@ interface CreateContextOptions {
   httpResponses?: unknown[];
   continueOnFail?: boolean;
   resumeUrl?: string;
+  /** Credential bindings exposed via `getNode().credentials` (e.g. chefsFormAuth by ID). */
+  nodeCredentials?: Record<string, { id: string | null; name: string }>;
 }
 
 export const MOCK_RESUME_URL = 'https://n8n.example.com/webhook-waiting/exec-99';
@@ -96,6 +98,7 @@ export function createExecutionContext(opts: CreateContextOptions) {
     httpResponses,
     continueOnFail = false,
     resumeUrl = MOCK_RESUME_URL,
+    nodeCredentials,
   } = opts;
 
   const httpRequest = httpResponses
@@ -116,7 +119,7 @@ export function createExecutionContext(opts: CreateContextOptions) {
     }),
     getWorkflow: vi.fn(() => MOCK_WORKFLOW),
     getExecutionId: vi.fn(() => MOCK_EXECUTION_ID),
-    getNode: vi.fn(() => ({ name: 'WIL Test' })),
+    getNode: vi.fn(() => ({ name: 'WIL Test', ...(nodeCredentials ? { credentials: nodeCredentials } : {}) })),
     continueOnFail: vi.fn(() => continueOnFail),
     evaluateExpression: vi.fn(() => resumeUrl),
     putExecutionToWait: vi.fn().mockResolvedValue(undefined),

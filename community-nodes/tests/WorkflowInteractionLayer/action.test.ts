@@ -9,6 +9,7 @@ import {
   MOCK_WORKFLOW,
 } from './helpers';
 import { actionCreateProperties } from '../../nodes/WorkflowInteractionLayer/shared/properties';
+import { WorkflowInteractionLayer } from '../../nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node';
 
 describe('WorkflowInteractionLayer — Action', () => {
   describe('create', () => {
@@ -201,19 +202,18 @@ describe('WorkflowInteractionLayer — Action', () => {
       expect(lastHttpBody(httpRequest).payload).toEqual({ html: 'Are you giving consent?', options: ['Yes', 'No'] });
     });
 
-    it('builds a showform payload from structured fields', async () => {
+    it('builds a showform payload from the node-level CHEFS credential selection', async () => {
       const { httpRequest } = await executeWith({
         resource: 'action',
         operation: 'create',
+        // The conditional chefsFormAuth node credential stores its selection in node.credentials[chefsFormAuth].
+        nodeCredentials: { chefsFormAuth: { id: 'cred-777', name: 'My CHEFS Form' } },
         params: {
           actorId: 'user-1',
           actorType: 'user',
           actionType: 'showform',
           callbackUrl: 'https://example.com/cb',
           callbackMethod: 'POST',
-          formName: 'Income Disclosure',
-          formId: 'form-123',
-          formApiKey: 'chefs-secret', // pragma: allowlist secret
           submissionId: 'submission-456',
           formPreFillData: '{"firstName":"Alice"}',
           callbackPayloadSpec: '{}',
@@ -225,13 +225,62 @@ describe('WorkflowInteractionLayer — Action', () => {
         httpResponse: makeActionResponse(),
       });
 
+      // Only the credential ID reference is forwarded — the raw key/form ID are
+      // resolved server-side and never enter the payload or execution data.
       expect(lastHttpBody(httpRequest).payload).toEqual({
-        formName: 'Income Disclosure',
-        formId: 'form-123',
-        formApiKey: 'chefs-secret', // pragma: allowlist secret
+        chefsCredentialId: 'cred-777',
         submissionId: 'submission-456',
         formPreFillData: { firstName: 'Alice' },
       });
+    });
+
+    it('never forwards a raw CHEFS API key in the showform payload', async () => {
+      const { httpRequest } = await executeWith({
+        resource: 'action',
+        operation: 'create',
+        nodeCredentials: { chefsFormAuth: { id: 'cred-777', name: 'My CHEFS Form' } },
+        params: {
+          actorId: 'user-1',
+          actorType: 'user',
+          actionType: 'showform',
+          callbackUrl: 'https://example.com/cb',
+          callbackMethod: 'POST',
+          callbackPayloadSpec: '{}',
+          dueDate: '',
+          priority: 'normal',
+          checkIn: '',
+          metadata: '{}',
+        },
+        httpResponse: makeActionResponse(),
+      });
+
+      const payload = lastHttpBody(httpRequest).payload;
+      expect(payload).toEqual({ chefsCredentialId: 'cred-777' });
+      expect(payload).not.toHaveProperty('formApiKey');
+      expect(payload).not.toHaveProperty('formId');
+    });
+
+    it('throws when a showform action has no CHEFS credential selected', async () => {
+      await expect(
+        executeWith({
+          resource: 'action',
+          operation: 'create',
+          // No CHEFS credential bound → required but missing.
+          params: {
+            actorId: 'user-1',
+            actorType: 'user',
+            actionType: 'showform',
+            callbackUrl: 'https://example.com/cb',
+            callbackMethod: 'POST',
+            callbackPayloadSpec: '{}',
+            dueDate: '',
+            priority: 'normal',
+            checkIn: '',
+            metadata: '{}',
+          },
+          httpResponse: makeActionResponse(),
+        }),
+      ).rejects.toThrow(/CHEFS Form Authentication/);
     });
 
     it('keeps waitonevent payload as parsed JSON', async () => {
@@ -257,12 +306,30 @@ describe('WorkflowInteractionLayer — Action', () => {
       expect(lastHttpBody(httpRequest).payload).toEqual({ eventName: 'clicked' });
     });
 
-    it('marks showform structured fields required in the n8n property config', () => {
-      const requiredFieldNames = actionCreateProperties
-        .filter((property) => property.displayOptions?.show?.actionType?.includes('showform') && property.required)
-        .map((property) => property.name);
+    it('no longer exposes manual CHEFS form fields (form ID/name/API key come from the credential)', () => {
+      // The inline formName/formId/formApiKey fields were removed so the CHEFS API key
+      // can only be supplied via the chefsFormAuth credential and is resolved server-side.
+      const removedFieldNames = actionCreateProperties
+        .map((property) => property.name)
+        .filter((name) => ['formName', 'formId', 'formApiKey'].includes(name));
 
-      expect(requiredFieldNames).toEqual(expect.arrayContaining(['formName', 'formId', 'formApiKey']));
+      expect(removedFieldNames).toEqual([]);
+    });
+
+    it('declares the WIL API credential (always shown) and the CHEFS credential (shown only for Show Form)', () => {
+      const node = new WorkflowInteractionLayer();
+      const credentials = node.description.credentials ?? [];
+
+      // WIL API credential is always required and always shown.
+      const wilCredential = credentials.find((c) => c.name === 'workflowInteractionLayerApi');
+      expect(wilCredential?.required).toBe(true);
+      expect(wilCredential?.displayOptions).toBeUndefined();
+
+      // CHEFS credential is required but only shown for the "Show Form" action type,
+      // via the standard node-level credentials displayOptions mechanism.
+      const chefsCredential = credentials.find((c) => c.name === 'chefsFormAuth');
+      expect(chefsCredential?.required).toBe(true);
+      expect(chefsCredential?.displayOptions?.show?.actionType).toEqual(['showform']);
     });
 
     it('marks approval options required in the n8n property config', () => {
