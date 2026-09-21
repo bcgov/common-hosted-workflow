@@ -1,0 +1,14 @@
+{
+  "node": "community-nodes.dmnDecisionTable",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Common Hosted Workflow", "Development", "Transform"],
+  "alias": ["Common Hosted Workflow", "CHW", "BC Gov", "CITZ", "CUSTOM", "DMN", "Decision Table"],
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/dmn-decision-table"
+      }
+    ]
+  }
+}
