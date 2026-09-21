@@ -1,0 +1,200 @@
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="fixture" name="fixture" namespace="urn:fixture">
+  <decision id="dmnFullTimeLivingCategory" name="dmnFullTimeLivingCategory">
+    <decisionTable id="DecisionTable_1njb3c0" hitPolicy="FIRST">
+      <input id="InputClause_0996gkj" label="studentDataRelationshipStatus" ns1:width="191">
+        <inputExpression id="LiteralExpression_0b8i7u8" typeRef="string">
+          <text>studentDataRelationshipStatus</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_0g476ks" label="studentDataDependantstatus">
+        <inputExpression id="LiteralExpression_1tpjvmh" typeRef="string">
+          <text>studentDataDependantstatus</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_04jj8xv" label="calculatedDataTotalEligibleDependants">
+        <inputExpression id="LiteralExpression_04rhdqi" typeRef="number">
+          <text>calculatedDataTotalEligibleDependants</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_070kjf4" label="studentDataLivingAtHome">
+        <inputExpression id="LiteralExpression_04z1pfi" typeRef="string">
+          <text>studentDataLivingAtHome</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_1hs1vcy" label="studentDataSelfContainedSuite">
+        <inputExpression id="LiteralExpression_09hpkvz" typeRef="string">
+          <text>studentDataSelfContainedSuite</text>
+        </inputExpression>
+      </input>
+      <output id="OutputClause_09h4v04" label="calculatedDataLivingCategory" name="calculatedDataLivingCategory" typeRef="string" />
+      <rule id="DecisionRule_0gbbhwy">
+        <description>MARRIED STUDENT &amp; SPOUSE (no dependent considered)</description>
+        <inputEntry id="UnaryTests_0u6j89b">
+          <text>"married"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_013dsvd">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_1fx6w6b">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_0ghqnmy">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_0gx8vme">
+          <text />
+        </inputEntry>
+        <outputEntry id="LiteralExpression_17hh8j4">
+          <text>"M"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_1ah885h">
+        <description>SINGLE PARENT (no dependent considered)</description>
+        <inputEntry id="UnaryTests_1chf6od">
+          <text>"single","other", "marriedUnable"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_11wucu3">
+          <text>"independant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1ekoma4">
+          <text>&gt;0</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_11xjk8g">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_1bdb05w">
+          <text />
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0fu4e7b">
+          <text>"SP"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_150hgzj">
+        <description>SINGLE INDEPENDANT STUDENT - AWAY FROM HOME</description>
+        <inputEntry id="UnaryTests_0jkshtj">
+          <text>"single","other", "marriedUnable"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_03yw3ba">
+          <text>"independant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_03idtsg">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_0j5im9o">
+          <text>"no"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_10wv0zu">
+          <text />
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0p0jalj">
+          <text>"SIA"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_1lvxks7">
+        <description>SINGLE INDEPENDANT STUDENT - AWAY FROM HOME(Self-contained Suite)</description>
+        <inputEntry id="UnaryTests_1sv0r1b">
+          <text>"single","other", "marriedUnable"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1ibp4ew">
+          <text>"independant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_07ft57o">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_13vo5ji">
+          <text>"yes"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_00io0rz">
+          <text>"yes"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_05mdimk">
+          <text>"SIA"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0xu18nr">
+        <description>SINGLE INDEPENDANT STUDENT - AT HOME </description>
+        <inputEntry id="UnaryTests_10iyo6w">
+          <text>"single","other", "marriedUnable"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0jmosno">
+          <text>"independant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0fj6x8s">
+          <text />
+        </inputEntry>
+        <inputEntry id="UnaryTests_173m3qh">
+          <text>"yes"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0i7a1oy">
+          <text>"no"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_10jzu1x">
+          <text>"SIH"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_1c0t8dl">
+        <description>SINGLE DEPENDANT STUDENT - AWAY FROM HOME</description>
+        <inputEntry id="UnaryTests_0pdo27s">
+          <text>"single","other"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_075jf0y">
+          <text>"dependant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0dkx4ao">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_09csktz">
+          <text>"no"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1xrntk1">
+          <text />
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0k832yw">
+          <text>"SDA"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_076pir4">
+        <description>SINGLE DEPENDANT STUDENT - AWAY FROM HOME(Self-contained Suite)</description>
+        <inputEntry id="UnaryTests_055jzos">
+          <text>"single","other"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0qxas8q">
+          <text>"dependant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1q0da4u">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_107c8lf">
+          <text>"yes"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1npmeod">
+          <text>"yes"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0fgp9j6">
+          <text>"SDA"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_1n7gzo6">
+        <description>SINGLE DEPENDANT STUDENT-  LIVING AT HOME</description>
+        <inputEntry id="UnaryTests_10lf9t5">
+          <text>"single","other"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1aevm8x">
+          <text>"dependant"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1u006t6">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1h1k4ps">
+          <text>"yes"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1qpdpgb">
+          <text>"no"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_1u2jmki">
+          <text>"SDH"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
