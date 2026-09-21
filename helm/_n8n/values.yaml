@@ -15,6 +15,13 @@ serviceAccountName:
 customDatabase:
   secretName: pgo-pguser-n8n-custom # pragma: allowlist secret
 
+# Optional name of an externally managed Secret holding `encryption-key` and
+# `runners-auth-token`. When empty (default), the chart auto-generates and
+# preserves "<fullname>-shared" via templates/secrets/n8n.yaml. Set this to
+# share one key across releases (e.g. n8n-sync subscriber reuses the
+# publisher's secret for credential sync).
+sharedSecretName: ""
+
 envSecretName:
 env: {}
 extraEnv: {}

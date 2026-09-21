@@ -8,7 +8,7 @@ nameOverride: chwf
 fullnameOverride: chwf
 
 # See https://github.com/8gears/n8n-helm-chart/blob/main/charts/n8n/values.yaml
-n8n:
+n8n: &n8n
   enabled: false
 
   nameOverride: chwf-n8n
@@ -22,7 +22,7 @@ n8n:
   customDatabase:
     secretName: chwf-pgo-pguser-n8n-custom # pragma: allowlist secret
 
-  env:
+  env: &n8n-env
     # See https://docs.n8n.io/hosting/configuration/supported-databases-settings/#postgresdb
     DB_TYPE: "postgresdb"
     # DB_POSTGRESDB_DATABASE: "n8n"
@@ -57,6 +57,10 @@ n8n:
     # See https://docs.n8n.io/hosting/configuration/environment-variables/queue-mode/#queue-mode-environment-variables
     OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS: "true"
     QUEUE_BULL_PREFIX: ""
+    # Namespaces Bull queues only. The instance registry, leader election
+    # ({prefix}:main_instance_leader) and cache use N8N_REDIS_KEY_PREFIX —
+    # it must also differ per instance sharing this Redis.
+    N8N_REDIS_KEY_PREFIX: "n8n"
     QUEUE_BULL_REDIS_HOST: "chwf-redis-master"
     QUEUE_BULL_REDIS_PORT: "6379"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/executions/#executions-environment-variables
@@ -101,8 +105,15 @@ n8n:
     N8N_OTEL_ENABLED: "false"
     N8N_LOG_FORMAT: "json"
     N8N_LOG_STREAMING_MANAGED_BY_ENV: "false"
+    SYNC_AUTH_MODE: "hmac"
+    SYNC_ENTITIES: "workflows,credentials"
 
   extraEnv:
+    SYNC_SHARED_SECRET:
+      valueFrom:
+        secretKeyRef:
+          name: chwf # pragma: allowlist secret
+          key: SYNC_SHARED_SECRET
     DB_POSTGRESDB_DATABASE:
       valueFrom:
         secretKeyRef:
@@ -165,12 +176,23 @@ n8n:
       OIDC_ROLES_CLAIM: client_roles
       ENABLE_SWAGGER_UI: 'false'
 
+      # n8n-sync publisher role — this instance is the sync source.
+      # Dockerfile default loads both bundles; narrow to publisher.cjs here
+      # (webhook pods unset EXTERNAL_HOOK_FILES in the subchart; main fires the hooks).
+      EXTERNAL_HOOK_FILES: "/external-hooks/api/hooks.cjs:/opt/n8n-hooks/publisher.cjs"
+      SYNC_SOURCE_ID: "n8n"
+      SYNC_PUBLISHER_STATE_PATH: "/home/node/.n8n/sync-state/publisher-ordering.json"
+      SYNC_PUBLISHER_INVALID_STATE: "quarantine-reset"
+      SYNC_FILTER_BY_TAG: "true"
+
     envSecretName: chwf # pragma: allowlist secret
 
+    # Minimum safe sizing: requests cut for quota, limits kept to avoid
+    # OOMKills and CPU-throttle-induced liveness failures at startup.
     resources:
       requests:
-        cpu: 300m
-        memory: 576Mi
+        cpu: 200m
+        memory: 384Mi
       limits:
         cpu: 500m
         memory: 1Gi
@@ -182,8 +204,8 @@ n8n:
 
     resources:
       requests:
-        cpu: 300m
-        memory: 576Mi
+        cpu: 200m
+        memory: 384Mi
       limits:
         cpu: 500m
         memory: 1Gi
@@ -198,11 +220,11 @@ n8n:
 
     resources:
       requests:
-        cpu: 300m
-        memory: 576Mi
+        cpu: 100m
+        memory: 256Mi
       limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 768Mi
 
   runner:
     enabled: false
@@ -218,8 +240,8 @@ n8n:
 
     resources:
       requests:
-        cpu: 400m
-        memory: 768Mi
+        cpu: 200m
+        memory: 512Mi
       limits:
         cpu: 500m
         memory: 1Gi
@@ -234,6 +256,109 @@ n8n:
 
   persistence:
     size: 2Gi
+
+  route:
+    host:
+
+# Second n8n instance sharing the same CrunchyDB cluster (new n8n-sync database)
+# and the same Redis (distinct QUEUE_BULL_PREFIX). Inherits n8n defaults via
+# YAML merge keys; nested maps replaced wholesale so env re-merges &n8n-env
+# and extraEnv is restated with the n8n-sync DB secret.
+# NOTE: anchors do not cross -f file boundaries; per-env overrides in
+# values-<namespace>-<env>-<zone>.yaml still need their own n8n-sync block.
+n8n-sync:
+  <<: *n8n
+  enabled: false
+
+  nameOverride: chwf-n8n-sync
+  fullnameOverride: chwf-n8n-sync
+
+  # Shares the custom extensions database with the primary instance.
+  # For full isolation add a n8n-sync-custom pgo user and point here instead.
+  customDatabase:
+    secretName: chwf-pgo-pguser-n8n-custom # pragma: allowlist secret
+
+  # Credential sync requires the SAME N8N_ENCRYPTION_KEY on both instances.
+  # Preferred: set n8n-sync.sharedSecretName to the publisher's secret
+  # (e.g. "chwf-n8n-shared") so both releases mount the same Secret and the
+  # auto-generated "<fullname>-shared" is skipped for the subscriber.
+  # Legacy manual path (before the subscriber writes credentials): copy
+  # encryption-key from chwf-n8n-shared into chwf-n8n-sync-shared; the lookup
+  # hook then preserves it.
+
+  sharedSecretName: chwf-n8n-shared # pragma: allowlist secret
+
+  env:
+    <<: *n8n-env
+    QUEUE_BULL_PREFIX: "sync:"
+
+  extraEnv:
+    # Same value as n8n's — managed out-of-band in the chwf secret.
+    SYNC_SHARED_SECRET:
+      valueFrom:
+        secretKeyRef:
+          name: chwf # pragma: allowlist secret
+          key: SYNC_SHARED_SECRET
+    DB_POSTGRESDB_DATABASE:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n-sync
+          key: dbname
+    DB_POSTGRESDB_HOST:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n-sync
+          key: pgbouncer-host
+    DB_POSTGRESDB_PORT:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n-sync
+          key: pgbouncer-port
+    DB_POSTGRESDB_USER:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n-sync
+          key: user
+    DB_POSTGRESDB_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-pgo-pguser-n8n-sync
+          key: password
+    QUEUE_BULL_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-redis
+          key: redis-password
+    UI_OIDC_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-redis
+          key: redis-password
+    N8N_EXTERNAL_STORAGE_S3_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-s3-account  # pragma: allowlist secret
+          key: access-key
+          optional: true
+    N8N_EXTERNAL_STORAGE_S3_ACCESS_SECRET:
+      valueFrom:
+        secretKeyRef:
+          name: chwf-s3-account  # pragma: allowlist secret
+          key: secret-key
+          optional: true
+    N8N_LOG_STREAMING_DESTINATIONS:
+      valueFrom:
+        configMapKeyRef:
+          name: chwf-n8n-log-streaming
+          key: destinations
+
+  main:
+    env:
+      EXTERNAL_HOOK_FILES: "/external-hooks/api/hooks.cjs:/opt/n8n-hooks/subscriber.cjs"
+      N8N_REDIS_KEY_PREFIX: "n8n-sync"
+      SYNC_SOURCE_ID: "n8n-sync"
+      SYNC_SUBSCRIBER_STATE_PATH: "/home/node/.n8n/sync-state/subscriber-ordering.json"
+      SYNC_APPLY_ACTIVE_STATE: "true"
 
   route:
     host:
@@ -304,6 +429,10 @@ pgo:
   - name: n8n-custom
     databases:
       - n8n-custom
+    options: CREATEROLE NOSUPERUSER
+  - name: n8n-sync
+    databases:
+      - n8n-sync
     options: CREATEROLE NOSUPERUSER
 
   instance:
@@ -393,6 +522,7 @@ backup-storage:
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
     postgres=chwf-pgo-replicas:5432/n8n-custom
+    postgres=chwf-pgo-replicas:5432/n8n-sync
 
     */10 * * * * default ./backup.sh -s
     0 7 * * 1-5 default ./backup.sh -s -v all

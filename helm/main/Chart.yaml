@@ -9,6 +9,11 @@ dependencies:
     version: '0.1.0'
     repository: 'file://../_n8n'
     condition: n8n.enabled
+  - name: n8n
+    alias: n8n-sync
+    version: '0.1.0'
+    repository: 'file://../_n8n'
+    condition: n8n-sync.enabled
   - name: pgo
     version: '0.1.0'
     repository: 'file://../_pgo'

@@ -69,12 +69,12 @@ spec:
             - name: N8N_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "_.fullname" . }}-shared
+                  name: {{ include "_.sharedSecretName" . }}
                   key: encryption-key
             - name: N8N_RUNNERS_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "_.fullname" . }}-shared
+                  name: {{ include "_.sharedSecretName" . }}
                   key: runners-auth-token
             - name: CUSTOM_DB_USER
               valueFrom:

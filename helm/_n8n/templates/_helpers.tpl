@@ -59,6 +59,16 @@ Merge baseExcludedNodes + extraExcludedNodes
 {{- end }}
 
 {{/*
+Resolve the shared secret name holding encryption-key + runners-auth-token.
+Defaults to "<fullname>-shared" to preserve current behavior; set
+.Values.sharedSecretName to point all deployments at an externally managed
+secret (e.g. share one key across releases for credential sync).
+*/}}
+{{- define "_.sharedSecretName" -}}
+{{- coalesce .Values.sharedSecretName (printf "%s-shared" (include "_.fullname" .)) -}}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "_.serviceAccountName" -}}

@@ -23,8 +23,12 @@ Dockerfile*
 *.dll
 *.so
 
-# Environment secrets and logs
+# Environment secrets and logs (nested dirs included — **/.env only matches
+# subdirectories, so the root-level entries are listed explicitly too)
 .env
+**/.env
+.env.*
+**/.env.*
 *.log
 npm-debug.log*
 yarn-debug.log*

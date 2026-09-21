@@ -17,10 +17,47 @@ n8n:
     FEATURES_ENABLED: "workflow-share"
     N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
     N8N_EXECUTION_DATA_STORAGE_MODE: "default"
+    # n8n-sync publisher target (this instance is the source). Base URL only, no path.
+    SYNC_SUBSCRIBER_URLS: "https://test-chwf-sync.apps.gold.devops.gov.bc.ca"
+
+  persistence:
+    size: 1Gi
 
   route:
     enabled: true
     host: test-chwf.apps.gold.devops.gov.bc.ca
+
+  worker:
+    enabled: true
+
+  webhook:
+    enabled: true
+
+  runner:
+    enabled: true
+
+# NOTE: YAML anchors from values.yaml do not cross -f boundaries, so this
+# repeats the small test delta explicitly. Base n8n-sync (fullname,
+# DB secret, QUEUE_BULL_PREFIX=sync:) is inherited from values.yaml via
+# Helm's deep merge.
+n8n-sync:
+  enabled: true
+  env:
+    WEBHOOK_URL: "https://test-chwf-sync.apps.gold.devops.gov.bc.ca"
+    N8N_BASE_URL: https://test-chwf-sync.apps.gold.devops.gov.bc.ca
+    OIDC_ISSUER: https://test.loginproxy.gov.bc.ca/auth/realms/standard
+    UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc-sync:test:"
+    AUTHZ_ENVIRONMENT: test
+    CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
+    QUEUE_BULL_PREFIX: "sync:"
+    SYNC_FILTER_BY_TAG: "true"
+
+  persistence:
+    size: 1Gi
+
+  route:
+    enabled: true
+    host: test-chwf-sync.apps.gold.devops.gov.bc.ca
 
   worker:
     enabled: true
@@ -81,6 +118,7 @@ backup-storage:
   backupConfig: |
     postgres=chwf-pgo-replicas:5432/n8n
     postgres=chwf-pgo-replicas:5432/n8n-custom
+    postgres=chwf-pgo-replicas:5432/n8n-sync
 
     */10 * * * * default ./backup.sh -s
     0 3 * * 1-5 default ./backup.sh -s -v all

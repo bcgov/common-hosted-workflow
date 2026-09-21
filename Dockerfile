@@ -1,3 +1,5 @@
+ARG N8N_SYNC_VERSION=0.21.0
+
 FROM node:24.19.0-alpine3.23 AS build-nodes
 
 RUN apk add --no-cache libc6-compat
@@ -43,6 +45,26 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY external-ui .
 RUN pnpm build
 
+# Download @egose/n8n-sync from npm and extract the hook bundles.
+# Override with --build-arg N8N_SYNC_VERSION=<version>.
+FROM node:22-alpine AS build-n8n-sync
+ARG N8N_SYNC_VERSION
+
+WORKDIR /tmp
+# NOTE: the published layout is package/publisher.cjs + package/subscriber.cjs;
+# older example revisions used package/dist/*.cjs. Handle both.
+RUN set -eux; \
+    npm pack "@egose/n8n-sync@${N8N_SYNC_VERSION}" --pack-destination /tmp; \
+    tarball="$(ls egose-n8n-sync-*.tgz)"; \
+    tar -xzf "${tarball}"; \
+    mkdir -p /bundles; \
+    if [ -f package/dist/publisher.cjs ]; then \
+      cp package/dist/publisher.cjs package/dist/subscriber.cjs /bundles/; \
+    else \
+      cp package/publisher.cjs package/subscriber.cjs /bundles/; \
+    fi; \
+    ls -l /bundles/
+
 FROM n8nio/n8n:2.36.2
 
 WORKDIR /home/node
@@ -58,6 +80,7 @@ COPY --from=build-hooks /app/pnpm-workspace.yaml /external-hooks/pnpm-workspace.
 COPY --from=build-hooks /app/src/api/assets /external-hooks/api/assets
 COPY --from=build-ui /app/dist /external-ui/dist
 COPY external-hooks/drizzle /external-hooks/drizzle
+COPY --from=build-n8n-sync /bundles/ /opt/n8n-hooks/
 
 USER root
 RUN npm install -g pnpm@11.17.0
@@ -66,6 +89,12 @@ RUN cd /external-hooks && pnpm install --frozen-lockfile --prod
 USER node
 
 # Keep Swagger UI disabled by default. Enable per environment.
+# Select the n8n-sync role for this container (override at runtime as needed):
+#   publisher:  /external-hooks/api/hooks.cjs:/opt/n8n-hooks/publisher.cjs
+#   subscriber: /external-hooks/api/hooks.cjs:/opt/n8n-hooks/subscriber.cjs
+#   both:       /external-hooks/api/hooks.cjs:/opt/n8n-hooks/publisher.cjs:/opt/n8n-hooks/subscriber.cjs
+# Publisher also needs SYNC_SUBSCRIBER_URLS, SYNC_SOURCE_ID, SYNC_SHARED_SECRET.
+# Subscriber needs SYNC_SHARED_SECRET.
 ENV N8N_PORT=5678 \
     ENABLE_SWAGGER_UI=false \
     N8N_TRUST_PROXY=true \
