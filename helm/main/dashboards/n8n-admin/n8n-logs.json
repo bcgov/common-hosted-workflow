@@ -37,8 +37,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Cancelled executions.",
       "fieldConfig": {
@@ -205,8 +205,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Count of audit events (workflow config changes and user actions) in the selected time range. When a workflow is selected above, shows only audit events for that workflow. User login events have no workflow context so they only appear under All.",
       "fieldConfig": {
@@ -277,8 +277,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Queue jobs where the worker became unresponsive mid-execution. The queue auto-retries stalled jobs but the original execution attempt is lost. Any non-zero value warrants investigation. Only fires in queue mode.",
       "fieldConfig": {
@@ -451,8 +451,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Failed login attempts in the selected time range. Repeated failures may indicate a credential attack or a misconfigured SSO client.",
       "fieldConfig": {
@@ -531,8 +531,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "All four workflow lifecycle events in one view. Started that exceed success+failed+cancelled indicates stuck or long-running executions. Spikes in failed without matching started spikes suggest retries or queue-level failures.",
       "fieldConfig": {
@@ -649,8 +649,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "n8n cancels an execution when a user manually stops it or when the workflow's \"On new execution\" policy stops a running one.",
       "fieldConfig": {
@@ -1033,8 +1033,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Workflow CRUD changes over time — created, deleted, activated, deactivated, updated. Useful for correlating execution behaviour changes with config edits.",
       "fieldConfig": {
@@ -1093,8 +1093,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Login success/failure, signups, and account deletions.",
       "fieldConfig": {
@@ -1262,8 +1262,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Queue job lifecycle — only fires when n8n runs in queue mode. No data here means the instance is in regular single-process mode.",
       "fieldConfig": {
@@ -1434,8 +1434,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Failed workflow executions in the selected time range.",
       "fieldConfig": {

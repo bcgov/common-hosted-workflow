@@ -97,7 +97,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "round(sum(increase(n8n_workflow_started_total{workflow_id=~\"$workflow_id\"}[$__range])))",
+          "expr": "round(sum(increase(n8n_workflow_success_total{workflow_id=~\"$workflow_id\"}[$__range])) + sum(increase(n8n_workflow_failed_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)) + sum(increase(n8n_workflow_cancelled_total{workflow_id=~\"$workflow_id\"}[$__range]) or vector(0)))",
           "instant": true,
           "range": false,
           "legendFormat": "Total"
@@ -400,7 +400,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_sum{workflow_id=~\"$workflow_id\"}[$__range])) / sum(increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range]))",
+          "expr": "sum(increase(n8n_workflow_execution_duration_seconds_sum{workflow_id=~\"$workflow_id\"}[$__range])) / clamp_min(sum(increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])), 0.0001)",
           "instant": true,
           "range": false,
           "legendFormat": "Avg Duration"
@@ -871,7 +871,7 @@
           "range": false,
           "format": "table",
           "legendFormat": "",
-          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))"
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) >= 0.5"
         },
         {
           "refId": "Success",
@@ -883,7 +883,7 @@
           "range": false,
           "format": "table",
           "legendFormat": "",
-          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\",status=\"success\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))"
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\",status=\"success\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) >= 0.5"
         },
         {
           "refId": "Failed",
@@ -895,7 +895,7 @@
           "range": false,
           "format": "table",
           "legendFormat": "",
-          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\",status=\"failed\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range]))"
+          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\",status=\"failed\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) >= 0.5"
         },
         {
           "refId": "AvgDur",
@@ -907,7 +907,7 @@
           "range": false,
           "format": "table",
           "legendFormat": "",
-          "expr": "sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_sum{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) / clamp_min(sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])), 0.001)"
+          "expr": "(sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_sum{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) / clamp_min(sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])), 0.001)) and on(workflow_name) (sum by(workflow_name)(  increase(n8n_workflow_execution_duration_seconds_count{workflow_id=~\"$workflow_id\"}[$__range])  * on(workflow_id) group_left(workflow_name) last_over_time(n8n:workflow_name:current{workflow_id=~\"$workflow_id\"}[$__range])) >= 0.5)"
         }
       ]
     },
