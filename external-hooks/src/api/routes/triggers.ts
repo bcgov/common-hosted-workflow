@@ -322,13 +322,15 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       const meta = trigger.metadata as Record<string, unknown>;
       const formId = meta.formId as string | undefined;
       const formName = (meta.formName as string) ?? '';
+      const credentialBaseUrl =
+        typeof meta.baseUrl === 'string' && meta.baseUrl.trim() ? meta.baseUrl.trim() : undefined;
 
       if (!formId) {
         throw new AppError(400, 'Missing formId in trigger metadata');
       }
 
       const formApiKey = await services.trigger.getChefsApiKeyForTrigger(triggerId);
-      const tokenResult = await services.chefs.getFormToken({ formId, formApiKey });
+      const tokenResult = await services.chefs.getFormToken({ formId, formApiKey, credentialBaseUrl });
 
       OkResponse(
         res,

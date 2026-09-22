@@ -18,6 +18,7 @@ export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   type: 'chefs-form',
   formId: '',
   formName: '',
+  baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
   apiKey: '',
   allowedActors: '*',
   allowedActorsType: '',
@@ -54,6 +55,7 @@ export function ChefsFormFields({
   const isValid =
     value.formId.trim() &&
     value.formName.trim() &&
+    value.baseUrl.trim() &&
     value.apiKey.trim() &&
     value.callbackWebhookUrl.trim() &&
     value.allowedActorsType !== '';
@@ -63,7 +65,7 @@ export function ChefsFormFields({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="chefs-form-id">
-            Form ID <span className="text-red-500">*</span>
+            CHEFS Form ID <span className="text-red-500">*</span>
           </Label>
           <Input
             id="chefs-form-id"
@@ -74,7 +76,7 @@ export function ChefsFormFields({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chefs-form-name">
-            Form Name <span className="text-red-500">*</span>
+            CHEFS Form Name <span className="text-red-500">*</span>
           </Label>
           <Input
             id="chefs-form-name"
@@ -84,10 +86,21 @@ export function ChefsFormFields({
           />
         </div>
       </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="chefs-base-url">
+          CHEFS Base URL <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="chefs-base-url"
+          placeholder="e.g. https://submit.digital.gov.bc.ca/app/api/v1"
+          value={value.baseUrl}
+          onChange={(e) => set('baseUrl', e.target.value)}
+        />
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="chefs-api-key">
-            API Key <span className="text-red-500">*</span>
+            CHEFS Form API Key <span className="text-red-500">*</span>
           </Label>
           <div className="relative">
             <Input

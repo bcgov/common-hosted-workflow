@@ -6,6 +6,7 @@ export interface ChefsFormTriggerPayload {
   type: 'chefs-form';
   formId: string;
   formName: string;
+  baseUrl: string;
   apiKey: string;
   allowedActors: string;
   allowedActorsType: TriggerActorType;

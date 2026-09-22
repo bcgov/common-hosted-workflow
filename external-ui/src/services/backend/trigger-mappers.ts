@@ -33,6 +33,7 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
       type: TRIGGER_TYPES.CHEFS_FORM,
       formId: (meta.formId as string) ?? '',
       formName: (meta.formName as string) ?? '',
+      baseUrl: (meta.baseUrl as string) ?? '',
       // A non-empty placeholder value signals that a credential exists on the server.
       // An empty string means no credential is stored yet.
       apiKey: (meta.apiKey as string) ?? '',
@@ -71,6 +72,7 @@ export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: s
           type: TRIGGER_TYPES.CHEFS_FORM,
           formId: '',
           formName: item.triggerName,
+          baseUrl: '',
           apiKey: '',
           postBody: '',
           allowedActors,
@@ -103,6 +105,7 @@ export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
       metadata: {
         formId: config.formId,
         formName: config.formName,
+        baseUrl: config.baseUrl,
         apiKey: config.apiKey,
         includeActorId: config.includeActorId,
         postBody: config.postBody,
@@ -135,6 +138,7 @@ export function payloadToUpdateBody(config: TriggerPayload, actorId: string) {
     const metadata: Record<string, unknown> = {
       formId: config.formId,
       formName: config.formName,
+      baseUrl: config.baseUrl,
       includeActorId: config.includeActorId,
       apiKey: config.apiKey,
       postBody: config.postBody,
