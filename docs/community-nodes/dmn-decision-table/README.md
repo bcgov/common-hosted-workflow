@@ -87,4 +87,5 @@ Multi-hit output uses one array per declared output, e.g. `{ "grade": ["A", "B"]
 
 ## More Information
 
+- [Table source examples](table-source-examples.md)
 - [Node operations](node-operations.md)

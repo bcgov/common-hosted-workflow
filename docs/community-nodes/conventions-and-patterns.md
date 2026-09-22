@@ -1,6 +1,6 @@
 # Custom Nodes — Conventions & Patterns
 
-This guide describes the conventions and patterns used by the custom n8n nodes in [`community-nodes`](../../community-nodes). It is intended for anyone adding a new node, modifying an existing one, or doing a code review. Following these conventions keeps nodes consistent, testable, and compatible with the n8n-node toolchain.
+This guide describes the conventions and patterns used by the custom n8n nodes in `community-nodes/`. It is intended for anyone adding a new node, modifying an existing one, or doing a code review. Following these conventions keeps nodes consistent, testable, and compatible with the n8n-node toolchain.
 
 ## Repository Layout
 
