@@ -70,8 +70,26 @@ describe('ChefsService.resolveFormCredential', () => {
       formId: 'form-123',
       formApiKey: 'decrypted-key', // pragma: allowlist secret
       formName: 'My CHEFS Form',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
     });
     expect(decryptData).toHaveBeenCalledWith(CHEFS_CREDENTIAL_ROW);
+  });
+
+  it('omits baseUrl when the credential has no Base URL stored', async () => {
+    const { service } = createService({
+      decrypted: {
+        formId: 'form-123',
+        apiKey: 'decrypted-key', // pragma: allowlist secret
+        formName: 'My CHEFS Form',
+      },
+    });
+
+    const result = await service.resolveFormCredential({
+      credentialId: CREDENTIAL_ID,
+      allowedProjectIds: ALLOWED_PROJECT_IDS,
+    });
+
+    expect(result.baseUrl).toBeUndefined();
   });
 
   it('throws 404 when the credential does not exist', async () => {
