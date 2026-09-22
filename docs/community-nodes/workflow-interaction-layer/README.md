@@ -4,16 +4,16 @@ The Workflow Interaction Layer (WIL-API Layer) is a custom n8n community node th
 
 ## Overview
 
-| Property        | Value                                                                           |
-| --------------- | ------------------------------------------------------------------------------- |
-| Node name       | `workflowInteractionLayer`                                                      |
-| Display name    | Workflow Interaction Layer                                                      |
-| Style           | Programmatic (`execute()` method)                                               |
-| Version         | 1                                                                               |
-| Credential      | `workflowInteractionLayerApi` (always), `chefsFormAuth` (Show Form action only) |
-| Category        | Communication                                                                   |
-| AI-tool capable | Yes (`usableAsTool: true`)                                                      |
-| API base path   | `/rest/custom/v1`                                                               |
+| Property        | Value                             |
+| --------------- | --------------------------------- |
+| Node name       | `workflowInteractionLayer`        |
+| Display name    | Workflow Interaction Layer        |
+| Style           | Programmatic (`execute()` method) |
+| Version         | 1                                 |
+| Credential      | `workflowInteractionLayerApi`     |
+| Category        | Communication                     |
+| AI-tool capable | Yes (`usableAsTool: true`)        |
+| API base path   | `/rest/custom/v1`                 |
 
 ## Documentation Index
 
@@ -41,7 +41,7 @@ community-nodes/
 
 ## Quick Start
 
-1. Configure credentials (see [Credentials](./credentials.md)) — `workflowInteractionLayerApi` is always required; add a `chefsFormAuth` credential too if you'll use the Show Form action
+1. Configure credentials (see [Credentials](./credentials.md))
 2. Drag the "Workflow Interaction Layer" node into your workflow
 3. Select a resource (Message or Action) and an operation
 4. The node auto-populates `workflowId` and `workflowInstanceId` from the current execution context
