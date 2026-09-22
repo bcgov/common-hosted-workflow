@@ -2,6 +2,8 @@
 
 This document describes every property available in the DMN Decision Table node as seen in the n8n UI.
 
+For complete manual, JSON, and DMN XML configurations, see [Table source examples](table-source-examples.md).
+
 ## Node Properties
 
 | Property               | Type            | Required | Default              | Description                                                                                                                                                                                                                                                                                                                                    |

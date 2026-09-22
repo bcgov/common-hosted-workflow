@@ -35,11 +35,11 @@ All endpoints live under `/rest/custom/v1` and require the standard authenticati
 
 ## Payload by Action Type
 
-| Action Type   | Payload Shape                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------ |
-| `getapproval` | `{ "html": "<p>Do you want to approve?</p>", "options": ["Yes", "No"] }`                   |
-| `showform`    | `{ "chefsCredentialId": "...", "submissionId": "...", "formPreFillData": {} }`             |
-| `waitonevent` | Free-form JSON, preserving the previous behavior, for example `{ "eventName": "clicked" }` |
+| Action Type   | Payload Shape                                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `getapproval` | `{ "html": "<p>Do you want to approve?</p>", "options": ["Yes", "No"] }`                                    |
+| `showform`    | `{ "formName": "...", "formId": "...", "formApiKey": "...", "submissionId": "...", "formPreFillData": {} }` |
+| `waitonevent` | Free-form JSON, preserving the previous behavior, for example `{ "eventName": "clicked" }`                  |
 
 ### getapproval Payload
 
@@ -77,9 +77,7 @@ Allowed attributes include `href`, `target`, `rel`, `src`, `alt`, `width`, `heig
 }
 ```
 
-For `showform`, `chefsCredentialId` is required — it is the ID of a `chefsFormAuth` n8n credential selected on the node, not a raw value. The backend resolves the credential server-side (verifying it is shared into the caller's tenant/project scope) and decrypts it via n8n's own credential-decryption mechanism to obtain the CHEFS `formId` and API key; neither value is ever present in the payload, execution data, or the response returned to the browser. `submissionId` is an optional CHEFS form submission ID used to prefill the form from prior submission data. `formPreFillData` is an optional object used to prefill over rendered form data. When `submissionId` is provided, it takes full priority over `formPreFillData`.
-
-**Legacy compatibility:** actions created before this credential-based flow may instead carry `formName`, `formId`, and `formApiKey` directly in the payload. The backend still accepts this shape as a fallback (and still strips `formApiKey` before returning actions to the browser), but it is deprecated — new actions should always use `chefsCredentialId`.
+For `showform`, `formName`, `formId`, and `formApiKey` are required by the n8n node. `formName` is the CHEFS form name, `formId` is the CHEFS form ID, and `formApiKey` is the CHEFS form API key. `submissionId` is an optional CHEFS form submission ID used to prefill the form from prior submission data. `formPreFillData` is an optional object used to prefill over rendered form data. When `submissionId` is provided, it takes full priority over `formPreFillData`. The backend strips `formApiKey` before returning actions to the browser.
 
 ## Other Endpoints
 
