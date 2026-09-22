@@ -15,13 +15,11 @@ describe('WorkflowInteractionLayer — Action — createAndWait', () => {
     const { ctx, result, httpRequest } = await executeWith({
       resource: 'action',
       operation: 'createAndWait',
+      nodeCredentials: { chefsFormAuth: { id: 'cred-777', name: 'My CHEFS Form' } },
       params: {
         actorId: 'user-1',
         actorType: 'user',
         actionType: 'showform',
-        formName: 'Income Verification',
-        formId: 'form-123',
-        formApiKey: 'chefs-secret', // pragma: allowlist secret
         submissionId: '',
         formPreFillData: '{}',
         dueDate: '',
@@ -128,13 +126,11 @@ describe('WorkflowInteractionLayer — Action — createAndWait', () => {
     const { httpRequest } = await executeWith({
       resource: 'action',
       operation: 'createAndWait',
+      nodeCredentials: { chefsFormAuth: { id: 'cred-777', name: 'My CHEFS Form' } },
       params: {
         actorId: 'user-1',
         actorType: 'user',
         actionType: 'showform',
-        formName: 'Income Verification',
-        formId: 'form-123',
-        formApiKey: 'chefs-secret', // pragma: allowlist secret
         submissionId: '',
         formPreFillData: '{}',
         skipChefsSubmission: true,

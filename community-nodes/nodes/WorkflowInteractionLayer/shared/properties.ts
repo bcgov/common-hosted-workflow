@@ -3,7 +3,7 @@ import type { INodeProperties } from 'n8n-workflow';
 type DisplayOptions = INodeProperties['displayOptions'];
 
 /** Operations that create an action and share the same payload fields (`Create` and `Create, Wait and Get Data`). */
-const ACTION_CREATE_OPERATIONS = ['create', 'createAndWait'];
+export const ACTION_CREATE_OPERATIONS = ['create', 'createAndWait'];
 
 // ── Shared field factories ──
 
@@ -232,7 +232,7 @@ export const actionCreateProperties: INodeProperties[] = [
     displayName: 'HTML',
     name: 'approvalHtml',
     type: 'string',
-    typeOptions: { rows: 4 },
+    typeOptions: { editor: 'htmlEditor' },
     default: '',
     required: true,
     description: 'Required HTML content shown to the user before they choose an approval option',
@@ -269,31 +269,11 @@ export const actionCreateProperties: INodeProperties[] = [
     },
   },
   {
-    displayName: 'CHEFS Form Name',
-    name: 'formName',
-    type: 'string',
+    displayName:
+      'Select a "CHEFS Form Authentication" credential above (in the node\'s Credentials section) — it is required for the Show Form action.',
+    name: 'chefsFormAuthNotice',
+    type: 'notice',
     default: '',
-    required: true,
-    description: 'CHEFS form name shown for the form action',
-    displayOptions: showformDisplay(),
-  },
-  {
-    displayName: 'CHEFS Form ID',
-    name: 'formId',
-    type: 'string',
-    default: '',
-    required: true,
-    description: 'CHEFS form ID to render',
-    displayOptions: showformDisplay(),
-  },
-  {
-    displayName: 'CHEFS Form API Key',
-    name: 'formApiKey',
-    type: 'string',
-    typeOptions: { password: true },
-    default: '',
-    required: true,
-    description: 'CHEFS form API key used server-side to obtain a form token',
     displayOptions: showformDisplay(),
   },
   {

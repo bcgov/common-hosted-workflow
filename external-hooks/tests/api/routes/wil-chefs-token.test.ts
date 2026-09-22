@@ -76,6 +76,11 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
       formId: 'form-123',
       baseUrl: 'https://submit.digital.gov.bc.ca/app',
     }),
+    resolveFormCredential: vi.fn().mockResolvedValue({
+      formId: 'form-123',
+      formApiKey: 'resolved-api-key', // pragma: allowlist secret
+      formName: 'Credential Form',
+    }),
     ...serviceOverrides.chefs,
   };
 
@@ -286,5 +291,128 @@ describe('POST /wil/chefs-token', () => {
 
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).statusCode).toBe(400);
+  });
+});
+
+/* ================================================================== */
+/*  POST /chefs-token — credential-ID (chefsFormAuth) path             */
+/* ================================================================== */
+
+describe('POST /wil/chefs-token — credential ID path', () => {
+  const CREDENTIAL_ACTION = {
+    ...SHOWFORM_ACTION,
+    payload: { chefsCredentialId: 'cred-999' },
+  };
+
+  it('resolves the credential and exchanges the token when chefsCredentialId is present', async () => {
+    const { router, chefsService } = createTestRouter({
+      action: { getById: vi.fn().mockResolvedValue(CREDENTIAL_ACTION) },
+    });
+    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
+    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(chefsService.resolveFormCredential).toHaveBeenCalledWith({
+      credentialId: 'cred-999',
+      allowedProjectIds: ALLOWED_PROJECT_IDS,
+    });
+    // Key comes from the resolved credential, never from the payload.
+    expect(chefsService.getFormToken).toHaveBeenCalledWith({
+      formId: 'form-123',
+      formApiKey: 'resolved-api-key', // pragma: allowlist secret
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('prefers the credential ID over any inline formApiKey in the payload', async () => {
+    const mixedAction = {
+      ...SHOWFORM_ACTION,
+      payload: { chefsCredentialId: 'cred-999', formApiKey: 'stale-inline-key', formId: 'stale-form' }, // pragma: allowlist secret
+    };
+    const { router, chefsService } = createTestRouter({
+      action: { getById: vi.fn().mockResolvedValue(mixedAction) },
+    });
+    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
+    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
+    const res = createMockResponse();
+
+    await runHandlerChain(handlers!, req, res);
+
+    expect(chefsService.resolveFormCredential).toHaveBeenCalledTimes(1);
+    expect(chefsService.getFormToken).toHaveBeenCalledWith({
+      formId: 'form-123',
+      formApiKey: 'resolved-api-key', // pragma: allowlist secret
+    });
+  });
+
+  it('uses payload formName over the credential formName when both are present', async () => {
+    const actionWithName = {
+      ...SHOWFORM_ACTION,
+      payload: { chefsCredentialId: 'cred-999', formName: 'Payload Form Name' },
+    };
+    const { router } = createTestRouter({
+      action: { getById: vi.fn().mockResolvedValue(actionWithName) },
+    });
+    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
+    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
+    const res = createMockResponse();
+
+    await runHandlerChain(handlers!, req, res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.formName).toBe('Payload Form Name');
+  });
+
+  it('falls back to the credential formName when the payload has none', async () => {
+    const { router } = createTestRouter({
+      action: { getById: vi.fn().mockResolvedValue(CREDENTIAL_ACTION) },
+    });
+    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
+    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
+    const res = createMockResponse();
+
+    await runHandlerChain(handlers!, req, res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.formName).toBe('Credential Form');
+  });
+
+  it('propagates AppError 403 when the credential is outside the caller scope', async () => {
+    const { router } = createTestRouter({
+      action: { getById: vi.fn().mockResolvedValue(CREDENTIAL_ACTION) },
+      chefs: {
+        resolveFormCredential: vi
+          .fn()
+          .mockRejectedValue(new AppError(403, 'Not authorized to use this CHEFS credential')),
+      },
+    });
+    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
+    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).statusCode).toBe(403);
+  });
+
+  it('propagates AppError 404 when the credential is not found', async () => {
+    const { router } = createTestRouter({
+      action: { getById: vi.fn().mockResolvedValue(CREDENTIAL_ACTION) },
+      chefs: {
+        resolveFormCredential: vi.fn().mockRejectedValue(new AppError(404, 'CHEFS credential not found')),
+      },
+    });
+    const handlers = getRouteHandlers(router, 'post', '/chefs-token');
+    const req = createMockRequest({ body: { actionId: 'act-001' }, session: {} as any });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).statusCode).toBe(404);
   });
 });

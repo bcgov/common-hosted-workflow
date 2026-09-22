@@ -89,13 +89,30 @@ function collectCallbackFieldMappings(ctx: IExecuteFunctions, i: number): Callba
     .filter((m) => m.outputKey.length > 0 && m.sourcePath.length > 0);
 }
 
+/**
+ * Resolves the selected CHEFS credential ID for a showform action. `chefsFormAuth` is
+ * registered as a top-level node credential (conditionally shown for the "Show Form"
+ * action type), so n8n stores the picked credential's ID on the node itself. Only the
+ * ID is returned — the API key never enters the payload or workflow execution data.
+ */
+function resolveChefsCredentialId(ctx: IExecuteFunctions): string | null {
+  return ctx.getNode().credentials?.chefsFormAuth?.id ?? null;
+}
+
+function buildShowformCredentialFields(ctx: IExecuteFunctions): Record<string, unknown> {
+  const chefsCredentialId = resolveChefsCredentialId(ctx);
+  if (!chefsCredentialId) {
+    throw new NodeOperationError(
+      ctx.getNode(),
+      new Error('Select a "CHEFS Form Authentication" credential for the Show Form action'),
+    );
+  }
+  return { chefsCredentialId };
+}
+
 function buildActionPayload(ctx: IExecuteFunctions, i: number, actionType: string): Record<string, unknown> {
   if (actionType === 'showform') {
-    const payload: Record<string, unknown> = {
-      formName: ctx.getNodeParameter('formName', i) as string,
-      formId: ctx.getNodeParameter('formId', i) as string,
-      formApiKey: ctx.getNodeParameter('formApiKey', i) as string,
-    };
+    const payload: Record<string, unknown> = buildShowformCredentialFields(ctx);
 
     const submissionId = ctx.getNodeParameter('submissionId', i, '') as string;
     if (submissionId) payload.submissionId = submissionId;

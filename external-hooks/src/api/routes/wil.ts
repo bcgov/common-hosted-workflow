@@ -131,12 +131,30 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       }
 
       const payload = action.payload as Record<string, unknown>;
-      const formApiKey = payload.formApiKey as string | undefined;
-      const formId = payload.formId as string | undefined;
-      const formName = payload.formName as string | undefined;
+      const chefsCredentialId = payload.chefsCredentialId as string | undefined;
       const skipChefsSubmission = payload.skipChefsSubmission === true;
       const callbackFieldMappings = payload.callbackFieldMappings;
       const callbackMissingPathBehavior = payload.callbackMissingPathBehavior;
+
+      // Prefer the n8n credential reference (secret resolved server-side, never in
+      // execution data). Fall back to the legacy inline formId/formApiKey for actions
+      // created before the credential-based flow.
+      let formId: string | undefined;
+      let formApiKey: string | undefined;
+      let formName = payload.formName as string | undefined;
+
+      if (chefsCredentialId) {
+        const resolved = await services.chefs.resolveFormCredential({
+          credentialId: chefsCredentialId,
+          allowedProjectIds,
+        });
+        formId = resolved.formId;
+        formApiKey = resolved.formApiKey;
+        formName = formName ?? resolved.formName;
+      } else {
+        formId = payload.formId as string | undefined;
+        formApiKey = payload.formApiKey as string | undefined;
+      }
 
       if (!formApiKey) {
         throw new AppError(400, 'Missing formApiKey');

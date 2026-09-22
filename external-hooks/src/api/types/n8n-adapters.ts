@@ -84,8 +84,15 @@ export type BaseN8nWorkflowRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nEntityRecord | null>;
 };
 
+export type N8nCredentialRecord = N8nEntityRecord & {
+  name: string;
+  type: string;
+  /** Encrypted credential blob (JSON, encrypted with n8n's instance key). */
+  data: string;
+};
+
 export type BaseN8nCredentialRepository = BaseN8nRepository & {
-  findOneBy: (where: { id: string }) => Promise<N8nEntityRecord | null>;
+  findOneBy: (where: { id: string }) => Promise<N8nCredentialRecord | null>;
 };
 
 export type BaseN8nRepositoryEntityManager = {

@@ -47,6 +47,13 @@ export const WorkflowTriggerTypeEnum = {
   BUTTON: 'button' as WorkflowTriggerType,
 } as const;
 
+/**
+ * n8n credential type slug for the WIL "CHEFS Form Authentication" credential.
+ * Must match the `name` field of the `ChefsFormAuth` credential class in
+ * community-nodes (`credentials/ChefsFormAuth.credentials.ts`).
+ */
+export const CHEFS_FORM_AUTH_CREDENTIAL_TYPE = 'chefsFormAuth' as const;
+
 /** Allowed HTTP methods for workflow trigger invocation. */
 export const TRIGGER_HTTP_METHODS = ['GET', 'POST'] as const;
 export type TriggerHttpMethod = (typeof TRIGGER_HTTP_METHODS)[number];
