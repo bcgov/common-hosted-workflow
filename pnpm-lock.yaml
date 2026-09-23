@@ -18,8 +18,8 @@ importers:
         specifier: ^21.2.0
         version: 21.2.2
       '@release-it/bumper':
-        specifier: ^7.0.6
-        version: 7.0.6(release-it@20.2.1(@types/node@25.9.5))
+        specifier: ^8.0.0
+        version: 8.0.1(release-it@20.2.1(@types/node@25.9.5))
       '@repo-toolkit/changelog':
         specifier: ^0.20.0
         version: 0.20.0
@@ -163,9 +163,9 @@ packages:
     resolution: {integrity: sha512-aalGyl7dbB5PArRebDIX43ZvBlXrYm9uWzGJ26t+4SzJVPsOuvfILGGbw5X4yX7i50YEmJ8zvbiWnqH/AAnZqg==}
     engines: {node: '>=22'}
 
-  '@decimalturn/toml-patch@1.3.0':
-    resolution: {integrity: sha512-lnnGHUF8RhnPq0XiOenQCv0O6TO840bofShFrIr+Xu87x1Rm3bozgaCDQz6eTErO9rYf7YXCuK7ZHz65BtBwsA==}
-    engines: {node: '>=12'}
+  '@decimalturn/toml-patch@3.1.2':
+    resolution: {integrity: sha512-WNPcymRQUP38PxvZTRlY6WdGYPVtvd1t8PN+CQVZ/HvV8qMEwc0eEiMiYfajt7LXy93oaQd91TktaufK8oGlqw==}
+    engines: {node: '>=16'}
 
   '@fast-csv/format@5.0.7':
     resolution: {integrity: sha512-VdypoRxv7PF+LsyPouTMKdB0d76hync+gLpgdNqfqVK44MsgW4oiCJSdrki2FisWT7v2QGUYDHjp4L7w5oO6gw==}
@@ -387,11 +387,11 @@ packages:
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
 
-  '@release-it/bumper@7.0.6':
-    resolution: {integrity: sha512-vzKrEGPac/yim5WUjMmIQ9k+n3NlWHYraUIlLkHna2Ka0+zmmB1peW8POMjA6Fb7TwcIsNMuoXj2wLc8NFzgRg==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24.0.0}
+  '@release-it/bumper@8.0.1':
+    resolution: {integrity: sha512-C1yKYtdgY/NrLUm034kxHSwcwkK+TRg+EUDGaoIZmaWJlyGyIZm5IBA6Mq3CkAZ2Z5wYGy/NBQ2qJEhm3/yr1Q==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
     peerDependencies:
-      release-it: ^18.0.0 || ^19.0.0 || ^20.0.0
+      release-it: ^18.0.0 || ^19.0.0 || ^20.0.0 || ^21.0.0
 
   '@repo-toolkit/changelog@0.20.0':
     resolution: {integrity: sha512-6eTtap0YGrt2/GyHmzE6YUmc8HBmNZ4Jj33dcoFZRGSvjA4FMzGW2MGarj4jX4NQiRVBIjL0ypVzpsfUPNzW3w==}
@@ -1075,6 +1075,10 @@ packages:
     resolution: {integrity: sha512-IBTdIkzZNOpqm7q3dRqJvMaldXjDHWkEDfrwGEQTs5eaQMWV+djAhR+wahyNNMAa+qpbDUhBMVt4ZKNwpPm7xQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
 
+  ini@7.0.0:
+    resolution: {integrity: sha512-ifK0CgjALofS5bkrcTy4RaQ9Vx2Knf/eLeIO+NaswQEpH1UblrtTSCIvN71qQDMq0PeQ/SSPojvEJp9vvvfr+w==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+
   ip-address@10.5.0:
     resolution: {integrity: sha512-R5SnVLJmgYYvf2F2ZgwSBnelz5G4q5AxIC277GDfUaNbrZKNANcBC7RHqYYePlszf4kBolVkJauG0ZjHHFh55g==}
     engines: {node: '>= 12'}
@@ -1152,6 +1156,10 @@ packages:
 
   js-yaml@4.3.2:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
+    hasBin: true
+
+  js-yaml@5.4.2:
+    resolution: {integrity: sha512-m+aqu+LwO1O6sIopafj8HUVl5aawITwZQe/yHpMCKjaWBaA/d07B/QdMb3529REftiU+RMMHL3Vlsw3hON7vWg==}
     hasBin: true
 
   json-parse-even-better-errors@2.3.1:
@@ -1602,6 +1610,10 @@ packages:
   validate-npm-package-license@3.0.4:
     resolution: {integrity: sha512-DpKm2Ui/xN7/HQKCtpZxoRWBhZ9Z0kqtygG8XCgNQ8ZlDnxuQmWhj566j8fN4Cu3/JmbhsDo7fcAJq4s9h27Ew==}
 
+  verkit@0.4.1:
+    resolution: {integrity: sha512-mMVzj0TXExtVdlDEq+Mzp0eyOuyznNpFobNM3uAqe3HVm/Ps2c+u17BligMkZjZCA6EiXpoon8iRTer3iu40SQ==}
+    engines: {node: '>=18.12.0'}
+
   walk-up-path@4.0.0:
     resolution: {integrity: sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A==}
     engines: {node: 20 || >=22}
@@ -1801,7 +1813,7 @@ snapshots:
 
   '@conventional-changelog/template@1.4.0': {}
 
-  '@decimalturn/toml-patch@1.3.0': {}
+  '@decimalturn/toml-patch@3.1.2': {}
 
   '@fast-csv/format@5.0.7':
     dependencies:
@@ -2019,18 +2031,18 @@ snapshots:
 
   '@pinojs/redact@0.4.0': {}
 
-  '@release-it/bumper@7.0.6(release-it@20.2.1(@types/node@25.9.5))':
+  '@release-it/bumper@8.0.1(release-it@20.2.1(@types/node@25.9.5))':
     dependencies:
-      '@decimalturn/toml-patch': 1.3.0
+      '@decimalturn/toml-patch': 3.1.2
       '@iarna/toml': 3.0.0
       cheerio: 1.2.0
       detect-indent: 7.0.2
       fast-glob: 3.3.3
-      ini: 6.0.0
-      js-yaml: 4.3.2
+      ini: 7.0.0
+      js-yaml: 5.4.2
       lodash-es: 4.18.1
       release-it: 20.2.1(@types/node@25.9.5)
-      semver: 7.8.5
+      verkit: 0.4.1
 
   '@repo-toolkit/changelog@0.20.0':
     dependencies:
@@ -2668,6 +2680,8 @@ snapshots:
 
   ini@6.0.0: {}
 
+  ini@7.0.0: {}
+
   ip-address@10.5.0: {}
 
   is-arrayish@0.2.1: {}
@@ -2721,6 +2735,10 @@ snapshots:
   js-tokens@4.0.0: {}
 
   js-yaml@4.3.2:
+    dependencies:
+      argparse: 2.0.1
+
+  js-yaml@5.4.2:
     dependencies:
       argparse: 2.0.1
 
@@ -3188,6 +3206,8 @@ snapshots:
     dependencies:
       spdx-correct: 3.2.0
       spdx-expression-parse: 3.0.1
+
+  verkit@0.4.1: {}
 
   walk-up-path@4.0.0: {}
 
