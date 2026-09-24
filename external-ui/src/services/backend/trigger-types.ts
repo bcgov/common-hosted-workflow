@@ -4,9 +4,12 @@ export type TriggerMethod = 'POST' | 'GET';
 
 export interface ChefsFormTriggerPayload {
   type: 'chefs-form';
+  /** n8n `chefsFormAuth` credential id. Empty for triggers saved before credential selection. */
+  n8nCredentialId: string;
   formId: string;
   formName: string;
   baseUrl: string;
+  /** Legacy private key placeholder. Empty once an n8n credential is selected. */
   apiKey: string;
   allowedActors: string;
   allowedActorsType: TriggerActorType;

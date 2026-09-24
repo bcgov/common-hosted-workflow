@@ -67,13 +67,14 @@ export async function buildApiServices(
   const cstarService = new CstarService();
   const featureFlag = new FeatureFlagService();
   const tenantService = new TenantService(customRepositories, n8nRepositories, cstarService);
+  const chefs = new ChefsService(n8nRepositories, n8nServices.credentialDecrypt);
 
   return {
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
     claim: new ClaimService(customRepositories.actionRequest),
-    trigger: new TriggerService(customRepositories),
-    chefs: new ChefsService(n8nRepositories, n8nServices.credentialDecrypt),
+    trigger: new TriggerService(customRepositories, chefs),
+    chefs,
     cstar: cstarService,
     featureFlag,
     message: new MessageService(n8nRepositories, customRepositories),

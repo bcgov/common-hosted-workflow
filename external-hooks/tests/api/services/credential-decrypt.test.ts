@@ -43,6 +43,52 @@ describe('CredentialDecryptService', () => {
     expect(ctor).toHaveBeenCalledWith({ id: 'cred-1', name: 'CHEFS Form' }, 'chefsFormAuth', 'encrypted-blob');
   });
 
+  it('encrypts plain data and returns only the ciphertext', async () => {
+    const ctor = vi.fn();
+    class FakeCredentials {
+      private encrypted: string | undefined;
+      constructor(nodeCredentials: { id: string | null; name: string }, type: string, data?: string) {
+        ctor(nodeCredentials, type, data);
+      }
+      setData(plain: Record<string, unknown>) {
+        this.encrypted = `enc:${JSON.stringify(plain)}`;
+      }
+      getData() {
+        return Promise.resolve({});
+      }
+      getDataToSave() {
+        return { data: this.encrypted };
+      }
+    }
+    const service = new CredentialDecryptService(FakeCredentials as any);
+    const plain = { formId: 'form-1', apiKey: 'k' }; // pragma: allowlist secret
+
+    const result = await service.encryptData({ id: null, name: 'CHEFS Form', type: 'chefsFormAuth' }, plain);
+
+    expect(result).toBe(`enc:${JSON.stringify(plain)}`);
+    expect(result).not.toBe(plain.apiKey);
+    expect(ctor).toHaveBeenCalledWith({ id: null, name: 'CHEFS Form' }, 'chefsFormAuth', undefined);
+  });
+
+  it('wraps an encryption failure as AppError 500', async () => {
+    class FakeCredentials {
+      setData() {
+        throw new Error('cipher down');
+      }
+      getData() {
+        return Promise.resolve({});
+      }
+      getDataToSave() {
+        return { data: 'unused' };
+      }
+    }
+    const service = new CredentialDecryptService(FakeCredentials as any);
+
+    await expect(
+      service.encryptData({ id: null, name: 'CHEFS Form', type: 'chefsFormAuth' }, { formId: 'form-1' }),
+    ).rejects.toMatchObject({ statusCode: 500 });
+  });
+
   it('wraps a decryption failure as AppError 500', async () => {
     const { FakeCredentials } = makeCredentialsClass(() => Promise.reject(new Error('bad key')));
     const service = new CredentialDecryptService(FakeCredentials);

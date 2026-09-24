@@ -6,7 +6,11 @@ import { shortenIdForLog } from '../utils/string';
 import { CHEFS_BASE_URL, CHEFS_GATEWAY_URL } from '@config';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { CredentialDecryptService } from './credential-decrypt.service';
-import { CHEFS_FORM_AUTH_CREDENTIAL_TYPE } from '../constants/enum';
+import {
+  CHEFS_FORM_AUTH_CREDENTIAL_TYPE,
+  CREDENTIAL_ROLE_OWNER,
+  N8N_CREDENTIAL_ID_METADATA_KEY,
+} from '../constants/enum';
 
 const log = createLogger('ChefsService');
 
@@ -41,6 +45,33 @@ export type ResolvedFormCredential = {
   /** The credential's CHEFS API Base URL, when stored on the credential. */
   baseUrl?: string;
 };
+
+/** Public view of a `chefsFormAuth` credential. The API key is never included. */
+export type ChefsFormCredentialSummary = {
+  id: string;
+  name: string;
+  formName: string;
+  formId: string;
+  baseUrl: string;
+};
+
+export type CreateChefsFormCredentialParams = {
+  name: string;
+  formName: string;
+  baseUrl: string;
+  formId: string;
+  apiKey: string;
+  /** n8n project IDs the new credential is shared with (tenant scope). */
+  projectIds: string[];
+};
+
+/** Reads a non-empty n8n credential id from trigger metadata. */
+export function readN8nCredentialId(metadata: Record<string, unknown>): string | null {
+  const value = metadata[N8N_CREDENTIAL_ID_METADATA_KEY];
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 export class ChefsService {
   private readonly gatewayUrl: string;
@@ -92,6 +123,125 @@ export class ChefsService {
     }
 
     return { formId, formApiKey: apiKey, formName, baseUrl };
+  }
+
+  /**
+   * Lists `chefsFormAuth` credentials shared with the caller's tenant projects.
+   * Decrypted fields are limited to display values. A credential that cannot be
+   * decrypted is skipped so one bad row does not hide the rest.
+   */
+  async listFormCredentials(allowedProjectIds: string[]): Promise<ChefsFormCredentialSummary[]> {
+    const records = await this.n8nRepositories.credential.listByTypeSharedWithProjects(
+      CHEFS_FORM_AUTH_CREDENTIAL_TYPE,
+      allowedProjectIds,
+      this.n8nRepositories.sharedCredential.metadata,
+    );
+
+    const summaries: ChefsFormCredentialSummary[] = [];
+    for (const record of records) {
+      const summary = await this.toPublicSummary(record);
+      if (summary) summaries.push(summary);
+    }
+    return summaries;
+  }
+
+  /**
+   * Creates an n8n `chefsFormAuth` credential, encrypted with n8n's cipher, and
+   * shares it with each project in the tenant scope as `credential:owner`.
+   * The API key is not returned.
+   */
+  async createFormCredential(params: CreateChefsFormCredentialParams): Promise<ChefsFormCredentialSummary> {
+    const draft = normalizeCreateParams(params);
+    const data = await this.credentialDecrypt.encryptData(
+      { id: null, name: draft.name, type: CHEFS_FORM_AUTH_CREDENTIAL_TYPE },
+      { formName: draft.formName, baseUrl: draft.baseUrl, formId: draft.formId, apiKey: draft.apiKey },
+    );
+
+    try {
+      const created = this.n8nRepositories.credential.create({
+        name: draft.name,
+        type: CHEFS_FORM_AUTH_CREDENTIAL_TYPE,
+        data,
+        isManaged: false,
+        isGlobal: false,
+        isResolvable: false,
+        resolvableAllowFallback: false,
+        resolverId: null,
+        usageScope: 'project',
+      });
+      const saved = await this.n8nRepositories.credential.save(created);
+      if (!saved.id) {
+        throw new AppError(500, 'Failed to save CHEFS credential');
+      }
+      await this.shareNewCredential(saved.id, draft.projectIds);
+      return {
+        id: saved.id,
+        name: draft.name,
+        formName: draft.formName,
+        formId: draft.formId,
+        baseUrl: draft.baseUrl,
+      };
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      log.error('Create CHEFS credential error', { error: String(err) });
+      throw new AppError(500, 'Internal Server Error');
+    }
+  }
+
+  /**
+   * When trigger metadata names an n8n credential, replaces client-supplied form
+   * fields with the decrypted credential and removes any API key. Metadata
+   * without a credential id is returned unchanged so legacy triggers still work.
+   */
+  async applyCredentialToTriggerMetadata(
+    metadata: Record<string, unknown>,
+    allowedProjectIds: string[],
+  ): Promise<Record<string, unknown>> {
+    const credentialId = readN8nCredentialId(metadata);
+    if (!credentialId) return metadata;
+
+    const resolved = await this.resolveFormCredential({ credentialId, allowedProjectIds });
+    const next = stripApiKey(metadata);
+    next[N8N_CREDENTIAL_ID_METADATA_KEY] = credentialId;
+    next.formId = resolved.formId;
+    next.formName = resolved.formName ?? '';
+    next.baseUrl = resolved.baseUrl ?? '';
+    return next;
+  }
+
+  private async toPublicSummary(record: {
+    id: string;
+    name: string;
+    type: string;
+    data: string;
+  }): Promise<ChefsFormCredentialSummary | null> {
+    try {
+      const data = await this.credentialDecrypt.decryptData(record);
+      return {
+        id: record.id,
+        name: record.name,
+        formName: typeof data.formName === 'string' ? data.formName : '',
+        formId: typeof data.formId === 'string' ? data.formId : '',
+        baseUrl: typeof data.baseUrl === 'string' ? data.baseUrl : '',
+      };
+    } catch (err) {
+      log.warn('Skipping CHEFS credential that could not be decrypted', {
+        credentialId: shortenIdForLog(record.id),
+        error: String(err),
+      });
+      return null;
+    }
+  }
+
+  private async shareNewCredential(credentialId: string, projectIds: string[]): Promise<void> {
+    for (const projectId of projectIds) {
+      const share = this.n8nRepositories.sharedCredential.create({
+        credentialsId: credentialId,
+        projectId,
+        role: CREDENTIAL_ROLE_OWNER,
+      });
+      await this.n8nRepositories.sharedCredential.save(share);
+    }
   }
 
   /**
@@ -158,4 +308,34 @@ export class ChefsService {
       throw new AppError(502, 'CHEFS token exchange failed');
     }
   }
+}
+
+function normalizeCreateParams(params: CreateChefsFormCredentialParams): CreateChefsFormCredentialParams {
+  const name = params.name.trim();
+  const formName = params.formName.trim();
+  const baseUrl = params.baseUrl.trim();
+  const formId = params.formId.trim();
+  const apiKey = params.apiKey.trim();
+
+  if (params.projectIds.length === 0) {
+    throw new AppError(400, 'No project available for this credential');
+  }
+  if (name.length < 3 || name.length > 128) {
+    throw new AppError(400, 'Credential name must be 3 to 128 characters');
+  }
+  if (!formId || !apiKey || !baseUrl) {
+    throw new AppError(400, 'CHEFS credential requires a base URL, form id, and API key');
+  }
+
+  return { name, formName, baseUrl, formId, apiKey, projectIds: [...new Set(params.projectIds)] };
+}
+
+function stripApiKey(metadata: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (key.toLowerCase() !== 'apikey') {
+      result[key] = value;
+    }
+  }
+  return result;
 }

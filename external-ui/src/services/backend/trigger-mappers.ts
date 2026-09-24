@@ -1,5 +1,6 @@
 import type {
   ApiTriggerItem,
+  ChefsFormTriggerPayload,
   LimitedApiTriggerItem,
   Trigger,
   TriggerActorType,
@@ -31,11 +32,12 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
   if (item.triggerType === TRIGGER_TYPES.CHEFS_FORM) {
     config = {
       type: TRIGGER_TYPES.CHEFS_FORM,
+      n8nCredentialId: (meta.n8nCredentialId as string) ?? '',
       formId: (meta.formId as string) ?? '',
       formName: (meta.formName as string) ?? '',
       baseUrl: (meta.baseUrl as string) ?? '',
-      // A non-empty placeholder value signals that a credential exists on the server.
-      // An empty string means no credential is stored yet.
+      // A non-empty placeholder value signals that a legacy private key exists on the server.
+      // An empty string means no private key is stored.
       apiKey: (meta.apiKey as string) ?? '',
       postBody: (meta.postBody as string) ?? '',
       allowedActors,
@@ -70,6 +72,7 @@ export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: s
     item.triggerType === TRIGGER_TYPES.CHEFS_FORM
       ? {
           type: TRIGGER_TYPES.CHEFS_FORM,
+          n8nCredentialId: '',
           formId: '',
           formName: item.triggerName,
           baseUrl: '',
@@ -95,6 +98,26 @@ export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: s
   return { id: item.id, tenantId, createdAt: '', updatedAt: '', config };
 }
 
+/**
+ * CHEFS trigger metadata sent to the API.
+ * Once an n8n credential is selected, the API key is omitted so the server
+ * resolves the form from that credential instead of a private key.
+ */
+function chefsFormMetadata(config: ChefsFormTriggerPayload): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    n8nCredentialId: config.n8nCredentialId,
+    formId: config.formId,
+    formName: config.formName,
+    baseUrl: config.baseUrl,
+    includeActorId: config.includeActorId,
+    postBody: config.postBody,
+  };
+  if (!config.n8nCredentialId) {
+    metadata.apiKey = config.apiKey;
+  }
+  return metadata;
+}
+
 /** Builds the POST /triggers request body from the FE payload. */
 export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
   if (config.type === TRIGGER_TYPES.CHEFS_FORM) {
@@ -102,14 +125,7 @@ export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
       triggerType: TRIGGER_TYPES.CHEFS_FORM,
       triggerUrl: config.callbackWebhookUrl,
       triggerMethod: config.triggerMethod,
-      metadata: {
-        formId: config.formId,
-        formName: config.formName,
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        includeActorId: config.includeActorId,
-        postBody: config.postBody,
-      },
+      metadata: chefsFormMetadata(config),
       allowedActorsType: config.allowedActorsType,
       allowedActors: splitActors(config.allowedActors),
       createdBy: actorId,
@@ -133,20 +149,10 @@ export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
 /** Builds the PUT /triggers/:id request body from the FE payload. */
 export function payloadToUpdateBody(config: TriggerPayload, actorId: string) {
   if (config.type === TRIGGER_TYPES.CHEFS_FORM) {
-    // Always send apiKey as-is; the backend decides whether it's a placeholder
-    // (keep existing credential), empty (no change), or a real new value to persist.
-    const metadata: Record<string, unknown> = {
-      formId: config.formId,
-      formName: config.formName,
-      baseUrl: config.baseUrl,
-      includeActorId: config.includeActorId,
-      apiKey: config.apiKey,
-      postBody: config.postBody,
-    };
     return {
       triggerUrl: config.callbackWebhookUrl,
       triggerMethod: config.triggerMethod,
-      metadata,
+      metadata: chefsFormMetadata(config),
       allowedActorsType: config.allowedActorsType,
       allowedActors: splitActors(config.allowedActors),
       updatedBy: actorId,
