@@ -11,11 +11,17 @@ const log = createLogger('CredentialDecryptService');
  * n8n's own class keeps decryption forward-compatible with future encryption
  * changes rather than reimplementing crypto here.
  */
+type N8nCredentialsInstance = {
+  getData: () => Promise<Record<string, unknown>> | Record<string, unknown>;
+  setData: (data: Record<string, unknown>) => void | Promise<void>;
+  getDataToSave: () => { data?: string };
+};
+
 type N8nCredentialsClass = new (
   nodeCredentials: { id: string | null; name: string },
   type: string,
   data?: string,
-) => { getData: () => Promise<Record<string, unknown>> };
+) => N8nCredentialsInstance;
 
 /** The encrypted credential row shape we need from n8n's CredentialsRepository. */
 export type EncryptedCredentialRecord = {
@@ -49,6 +55,29 @@ export class CredentialDecryptService {
     } catch (err) {
       log.error('Failed to decrypt credential', { credentialType: record.type, error: String(err) });
       throw new AppError(500, 'Failed to decrypt credential');
+    }
+  }
+
+  /**
+   * Encrypts plain credential data with n8n's Cipher via `Credentials.setData`.
+   * Returns only the ciphertext. The plaintext is not logged.
+   */
+  async encryptData(
+    identity: { id: string | null; name: string; type: string },
+    plain: Record<string, unknown>,
+  ): Promise<string> {
+    const credentials = new this.CredentialsClass({ id: identity.id, name: identity.name }, identity.type);
+
+    try {
+      await credentials.setData(plain);
+      const saved = credentials.getDataToSave();
+      if (!saved.data) {
+        throw new Error('Credential encryption produced no data');
+      }
+      return saved.data;
+    } catch (err) {
+      log.error('Failed to encrypt credential', { credentialType: identity.type, error: String(err) });
+      throw new AppError(500, 'Failed to encrypt credential');
     }
   }
 }

@@ -1,14 +1,22 @@
 import { useState } from 'react';
-import { IconEye, IconEyeOff } from '@tabler/icons-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { extractErrorMessage } from '../../shared/error-utils';
+import {
+  chefsCredentialsQueryKey,
+  DEFAULT_CHEFS_BASE_URL,
+  listChefsCredentials,
+  type ChefsCredentialSummary,
+} from '../../../services/backend/chefs-credentials';
 import type { ChefsFormTriggerPayload } from '../../../services/backend/trigger-types';
+import { ChefsCredentialDialog } from './chefs-credential-dialog';
 import {
   ActorIdBanner,
   AllowedActorsField,
   AllowedActorsTypeField,
   PostBodyField,
+  Select,
   TriggerFormActions,
   TriggerMethodField,
   TriggerUrlField,
@@ -16,9 +24,10 @@ import {
 
 export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   type: 'chefs-form',
+  n8nCredentialId: '',
   formId: '',
   formName: '',
-  baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+  baseUrl: DEFAULT_CHEFS_BASE_URL,
   apiKey: '',
   allowedActors: '*',
   allowedActorsType: '',
@@ -29,6 +38,7 @@ export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
 };
 
 interface ChefsFormFieldsProps {
+  tenantId: string;
   value: ChefsFormTriggerPayload;
   onChange: (v: ChefsFormTriggerPayload) => void;
   onSave: () => void;
@@ -38,7 +48,26 @@ interface ChefsFormFieldsProps {
   actorsLocked?: boolean;
 }
 
+function credentialOptionLabel(credential: ChefsCredentialSummary): string {
+  return credential.formName ? `${credential.name} — ${credential.formName}` : credential.name;
+}
+
+function withSelectedCredential(
+  value: ChefsFormTriggerPayload,
+  credential: ChefsCredentialSummary,
+): ChefsFormTriggerPayload {
+  return {
+    ...value,
+    n8nCredentialId: credential.id,
+    formId: credential.formId,
+    formName: credential.formName,
+    baseUrl: credential.baseUrl || value.baseUrl,
+    apiKey: '',
+  };
+}
+
 export function ChefsFormFields({
+  tenantId,
   value,
   onChange,
   onSave,
@@ -46,88 +75,104 @@ export function ChefsFormFields({
   isSaving,
   actorsLocked = false,
 }: Readonly<ChefsFormFieldsProps>) {
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const credentialsQuery = useQuery({
+    queryKey: chefsCredentialsQueryKey(tenantId),
+    queryFn: ({ signal }) => listChefsCredentials({ tenantId, signal }),
+  });
 
   function set<K extends keyof ChefsFormTriggerPayload>(key: K, val: ChefsFormTriggerPayload[K]) {
     onChange({ ...value, [key]: val });
   }
 
-  const isValid =
-    value.formId.trim() &&
-    value.formName.trim() &&
-    value.baseUrl.trim() &&
-    value.apiKey.trim() &&
-    value.callbackWebhookUrl.trim() &&
-    value.allowedActorsType !== '';
+  const credentials = credentialsQuery.data ?? [];
+  const selected = credentials.find((credential) => credential.id === value.n8nCredentialId);
+  const savedCredentialMissing = Boolean(value.n8nCredentialId) && !selected && !credentialsQuery.isPending;
+  const usesLegacyKey = !value.n8nCredentialId && value.apiKey.trim().length > 0;
+
+  const isValid = Boolean(
+    value.n8nCredentialId.trim() && value.callbackWebhookUrl.trim() && value.allowedActorsType !== '',
+  );
+
+  function selectCredential(credentialId: string) {
+    const match = credentials.find((credential) => credential.id === credentialId);
+    if (!match) {
+      onChange({ ...value, n8nCredentialId: credentialId });
+      return;
+    }
+    onChange(withSelectedCredential(value, match));
+  }
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="chefs-form-id">
-            CHEFS Form ID <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="chefs-form-id"
-            placeholder="e.g. abc123-def456"
-            value={value.formId}
-            onChange={(e) => set('formId', e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="chefs-form-name">
-            CHEFS Form Name <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="chefs-form-name"
-            placeholder="e.g. My CHEFS Form"
-            value={value.formName}
-            onChange={(e) => set('formName', e.target.value)}
-          />
-        </div>
-      </div>
       <div className="space-y-1.5">
-        <Label htmlFor="chefs-base-url">
-          CHEFS Base URL <span className="text-red-500">*</span>
+        <Label htmlFor="chefs-credential">
+          CHEFS credential <span className="text-red-500">*</span>
         </Label>
-        <Input
-          id="chefs-base-url"
-          placeholder="e.g. https://submit.digital.gov.bc.ca/app/api/v1"
-          value={value.baseUrl}
-          onChange={(e) => set('baseUrl', e.target.value)}
-        />
+        <Select
+          id="chefs-credential"
+          value={value.n8nCredentialId}
+          onChange={selectCredential}
+          disabled={credentialsQuery.isPending}
+        >
+          <option value="">
+            {credentialsQuery.isPending ? 'Loading credentials...' : 'Select a CHEFS credential...'}
+          </option>
+          {savedCredentialMissing && (
+            <option value={value.n8nCredentialId}>{value.formName || 'Saved credential'} (unavailable)</option>
+          )}
+          {credentials.map((credential) => (
+            <option key={credential.id} value={credential.id}>
+              {credentialOptionLabel(credential)}
+            </option>
+          ))}
+        </Select>
+        {credentialsQuery.isError && (
+          <p className="text-sm text-red-600">
+            {extractErrorMessage(credentialsQuery.error, 'Could not load CHEFS credentials')}
+          </p>
+        )}
+        {!credentialsQuery.isPending && credentials.length === 0 && (
+          <p className="text-sm text-[var(--bc-muted)]">
+            No CHEFS Form Authentication credentials are shared with this project.
+          </p>
+        )}
+        <Button type="button" variant="outline" onClick={() => setDialogOpen(true)}>
+          Add CHEFS credential
+        </Button>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="chefs-api-key">
-            CHEFS Form API Key <span className="text-red-500">*</span>
-          </Label>
-          <div className="relative">
-            <Input
-              id="chefs-api-key"
-              type={showApiKey ? 'text' : 'password'}
-              placeholder="Form API key"
-              value={value.apiKey}
-              onChange={(e) => set('apiKey', e.target.value)}
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowApiKey(!showApiKey)}
-              aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--bc-muted)] hover:text-[var(--bc-text)]"
-            >
-              {showApiKey ? <IconEyeOff size={16} aria-hidden="true" /> : <IconEye size={16} aria-hidden="true" />}
-            </Button>
+      {usesLegacyKey && (
+        <p className="text-sm text-[var(--bc-muted)]">
+          This trigger still uses a stored API key. Select or add a CHEFS credential to replace it.
+        </p>
+      )}
+      {selected && (
+        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-[var(--bc-muted)]">Form name</dt>
+            <dd>{selected.formName || '—'}</dd>
           </div>
-        </div>
-        <TriggerMethodField
-          id="chefs-trigger-method"
-          value={value.triggerMethod}
-          onChange={(v) => set('triggerMethod', v)}
-        />
-      </div>
+          <div>
+            <dt className="text-[var(--bc-muted)]">Form ID</dt>
+            <dd className="break-all">{selected.formId || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--bc-muted)]">Base URL</dt>
+            <dd className="break-all">{selected.baseUrl || '—'}</dd>
+          </div>
+        </dl>
+      )}
+      <ChefsCredentialDialog
+        tenantId={tenantId}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={(credential) => onChange(withSelectedCredential(value, credential))}
+      />
+      <TriggerMethodField
+        id="chefs-trigger-method"
+        value={value.triggerMethod}
+        onChange={(v) => set('triggerMethod', v)}
+      />
       <div className="grid grid-cols-2 gap-4">
         <AllowedActorsTypeField
           id="chefs-actors-type"

@@ -4,6 +4,8 @@ import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import { encrypt, decrypt } from '../utils/secret-box';
 import { WIL_ENCRYPTION_KEY, WIL_ENCRYPTION_KEY_ACTIVE, CHEFS_API_KEY_PLACEHOLDER } from '@config';
 import { WorkflowTriggerTypeEnum } from '../constants/enum';
+import type { ChefsService } from './chefs.service';
+import { readN8nCredentialId } from './chefs.service';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { formatDbErrorForLog } from '../helpers/db-helper';
@@ -23,6 +25,8 @@ export type GetTriggerByIdParams = {
 
 export type CreateTriggerParams = {
   projectId: string;
+  /** Tenant project ids used to authorize an n8n CHEFS credential reference. */
+  allowedProjectIds: string[];
   triggerType: string;
   triggerUrl: string;
   triggerMethod: string;
@@ -51,7 +55,10 @@ export type DeleteTriggerParams = {
 };
 
 export class TriggerService {
-  constructor(private readonly customRepositories: CustomRepositories) {}
+  constructor(
+    private readonly customRepositories: CustomRepositories,
+    private readonly chefs: ChefsService,
+  ) {}
 
   async list(params: ListTriggersParams) {
     return await this.customRepositories.workflowTrigger.list({
@@ -71,9 +78,12 @@ export class TriggerService {
 
   async create(params: CreateTriggerParams) {
     const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
-    const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
+    const metadata = isChefsForm
+      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.allowedProjectIds)
+      : params.metadata;
+    const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
     if (isChefsForm && apiKey) requireEncryptionKey();
-    const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
+    const cleanMetadata = isChefsForm ? stripApiKey(metadata) : metadata;
 
     try {
       const trigger = await this.customRepositories.workflowTrigger.create({
@@ -114,9 +124,12 @@ export class TriggerService {
     if (!existing) throw new AppError(404, 'Trigger not found');
 
     const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
-    const apiKey = isChefsForm ? extractChefsApiKey(params.metadata) : null;
+    const metadata = isChefsForm
+      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.projectIds)
+      : params.metadata;
+    const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
     if (isChefsForm && apiKey) requireEncryptionKey();
-    const cleanMetadata = isChefsForm ? stripApiKey(params.metadata) : params.metadata;
+    const cleanMetadata = isChefsForm ? stripApiKey(metadata) : metadata;
 
     try {
       const updated = await this.customRepositories.workflowTrigger.update({
@@ -132,7 +145,9 @@ export class TriggerService {
       });
       if (!updated) throw new AppError(404, 'Trigger not found');
 
-      if (isChefsForm && apiKey) {
+      if (isChefsForm && readN8nCredentialId(cleanMetadata)) {
+        await this.deletePrivateChefsCredentials(params.triggerId);
+      } else if (isChefsForm && apiKey) {
         await this.persistChefsCredential(params.triggerId, apiKey);
       }
 
@@ -158,12 +173,7 @@ export class TriggerService {
     if (!existing) throw new AppError(404, 'Trigger not found');
 
     if (existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM) {
-      const relations = await this.customRepositories.triggerCredentialRelation.listByTriggerId(params.triggerId);
-      if (relations.length > 0) {
-        const credentialIds = relations.map((r) => r.credentialId);
-        await this.customRepositories.triggerCredentialRelation.deleteByAssociatedTriggerId(params.triggerId);
-        await this.customRepositories.credentialEntity.deleteByAssociatedTriggerId(credentialIds);
-      }
+      await this.deletePrivateChefsCredentials(params.triggerId);
     }
 
     try {
@@ -199,6 +209,14 @@ export class TriggerService {
     }
 
     return decrypt(credential.data as string, key);
+  }
+
+  private async deletePrivateChefsCredentials(triggerId: string): Promise<void> {
+    const relations = await this.customRepositories.triggerCredentialRelation.listByTriggerId(triggerId);
+    if (relations.length === 0) return;
+    const credentialIds = relations.map((relation) => relation.credentialId);
+    await this.customRepositories.triggerCredentialRelation.deleteByAssociatedTriggerId(triggerId);
+    await this.customRepositories.credentialEntity.deleteByAssociatedTriggerId(credentialIds);
   }
 
   private async persistChefsCredential(triggerId: string, apiKey: string): Promise<void> {

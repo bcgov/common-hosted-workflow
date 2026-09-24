@@ -91,6 +91,7 @@ export function TriggerFormPane({
       </div>
       {triggerType === TRIGGER_TYPES.CHEFS_FORM && (
         <ChefsFormFields
+          tenantId={tenantId}
           value={chefsForm}
           onChange={onChefsFormChange}
           onSave={onSave}

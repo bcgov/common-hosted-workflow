@@ -93,6 +93,8 @@ export type N8nCredentialRecord = N8nEntityRecord & {
 
 export type BaseN8nCredentialRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nCredentialRecord | null>;
+  create: (value: Record<string, unknown>) => N8nCredentialRecord;
+  save: (value: N8nCredentialRecord) => Promise<N8nCredentialRecord>;
 };
 
 export type BaseN8nRepositoryEntityManager = {
