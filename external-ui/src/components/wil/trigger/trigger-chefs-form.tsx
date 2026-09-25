@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
+import { IconKey } from '@tabler/icons-react';
 import { Label } from '@/components/ui/label';
 import { extractErrorMessage } from '../../shared/error-utils';
 import {
@@ -10,13 +10,13 @@ import {
   type ChefsCredentialSummary,
 } from '../../../services/backend/chefs-credentials';
 import type { ChefsFormTriggerPayload } from '../../../services/backend/trigger-types';
+import { ChefsCredentialCombobox } from './chefs-credential-combobox';
 import { ChefsCredentialDialog } from './chefs-credential-dialog';
 import {
   ActorIdBanner,
   AllowedActorsField,
   AllowedActorsTypeField,
   PostBodyField,
-  Select,
   TriggerFormActions,
   TriggerMethodField,
   TriggerUrlField,
@@ -48,10 +48,6 @@ interface ChefsFormFieldsProps {
   actorsLocked?: boolean;
 }
 
-function credentialOptionLabel(credential: ChefsCredentialSummary): string {
-  return credential.formName ? `${credential.name} — ${credential.formName}` : credential.name;
-}
-
 function withSelectedCredential(
   value: ChefsFormTriggerPayload,
   credential: ChefsCredentialSummary,
@@ -76,6 +72,7 @@ export function ChefsFormFields({
   actorsLocked = false,
 }: Readonly<ChefsFormFieldsProps>) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCredential, setEditingCredential] = useState<ChefsCredentialSummary | null>(null);
   const credentialsQuery = useQuery({
     queryKey: chefsCredentialsQueryKey(tenantId),
     queryFn: ({ signal }) => listChefsCredentials({ tenantId, signal }),
@@ -109,64 +106,70 @@ export function ChefsFormFields({
         <Label htmlFor="chefs-credential">
           CHEFS credential <span className="text-red-500">*</span>
         </Label>
-        <Select
+        <ChefsCredentialCombobox
           id="chefs-credential"
+          credentials={credentials}
           value={value.n8nCredentialId}
-          onChange={selectCredential}
-          disabled={credentialsQuery.isPending}
-        >
-          <option value="">
-            {credentialsQuery.isPending ? 'Loading credentials...' : 'Select a CHEFS credential...'}
-          </option>
-          {savedCredentialMissing && (
-            <option value={value.n8nCredentialId}>{value.formName || 'Saved credential'} (unavailable)</option>
-          )}
-          {credentials.map((credential) => (
-            <option key={credential.id} value={credential.id}>
-              {credentialOptionLabel(credential)}
-            </option>
-          ))}
-        </Select>
+          onSelect={selectCredential}
+          onAddNew={() => {
+            setEditingCredential(null);
+            setDialogOpen(true);
+          }}
+          onEdit={(credential) => {
+            setEditingCredential(credential);
+            setDialogOpen(true);
+          }}
+          isLoading={credentialsQuery.isPending}
+          savedCredentialMissing={savedCredentialMissing}
+          missingLabel={value.formName || 'Saved credential'}
+        />
         {credentialsQuery.isError && (
           <p className="text-sm text-red-600">
             {extractErrorMessage(credentialsQuery.error, 'Could not load CHEFS credentials')}
           </p>
         )}
-        {!credentialsQuery.isPending && credentials.length === 0 && (
-          <p className="text-sm text-[var(--bc-muted)]">
-            No CHEFS Form Authentication credentials are shared with this project.
-          </p>
-        )}
-        <Button type="button" variant="outline" onClick={() => setDialogOpen(true)}>
-          Add CHEFS credential
-        </Button>
       </div>
+      {selected && (
+        <div className="rounded-lg border border-border-strong bg-surface-subtle px-3.5 py-3">
+          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <IconKey size={12} aria-hidden="true" />
+            From the selected credential
+          </p>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Form name</dt>
+              <dd className="text-foreground">{selected.formName || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Form ID</dt>
+              <dd className="text-foreground break-all">{selected.formId || '—'}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">Base URL</dt>
+              <dd className="text-foreground break-all">{selected.baseUrl || '—'}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
       {usesLegacyKey && (
         <p className="text-sm text-[var(--bc-muted)]">
           This trigger still uses a stored API key. Select or add a CHEFS credential to replace it.
         </p>
       )}
-      {selected && (
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-          <div>
-            <dt className="text-[var(--bc-muted)]">Form name</dt>
-            <dd>{selected.formName || '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-[var(--bc-muted)]">Form ID</dt>
-            <dd className="break-all">{selected.formId || '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-[var(--bc-muted)]">Base URL</dt>
-            <dd className="break-all">{selected.baseUrl || '—'}</dd>
-          </div>
-        </dl>
-      )}
       <ChefsCredentialDialog
         tenantId={tenantId}
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(next) => {
+          setDialogOpen(next);
+          if (!next) setEditingCredential(null);
+        }}
+        editing={editingCredential}
         onCreated={(credential) => onChange(withSelectedCredential(value, credential))}
+        onUpdated={(credential) => {
+          if (credential.id === value.n8nCredentialId) {
+            onChange(withSelectedCredential(value, credential));
+          }
+        }}
       />
       <TriggerMethodField
         id="chefs-trigger-method"

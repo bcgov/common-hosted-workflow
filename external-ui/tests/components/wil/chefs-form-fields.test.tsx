@@ -4,16 +4,17 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChefsFormFields, DEFAULT_CHEFS_FORM } from '@/components/wil/trigger/trigger-chefs-form';
-import { listChefsCredentials } from '@/services/backend/chefs-credentials';
+import { listChefsCredentials, updateChefsCredential } from '@/services/backend/chefs-credentials';
 
 vi.mock('@/services/backend/chefs-credentials', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/chefs-credentials')>(
     '@/services/backend/chefs-credentials',
   );
-  return { ...actual, listChefsCredentials: vi.fn(), createChefsCredential: vi.fn() };
+  return { ...actual, listChefsCredentials: vi.fn(), createChefsCredential: vi.fn(), updateChefsCredential: vi.fn() };
 });
 
 const listMock = vi.mocked(listChefsCredentials);
+const updateMock = vi.mocked(updateChefsCredential);
 
 function renderFields(onChange = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -35,6 +36,7 @@ function renderFields(onChange = vi.fn()) {
 describe('ChefsFormFields', () => {
   beforeEach(() => {
     listMock.mockReset();
+    updateMock.mockReset();
     listMock.mockResolvedValue([
       {
         id: 'cred-1',
@@ -51,9 +53,10 @@ describe('ChefsFormFields', () => {
     const onChange = renderFields();
 
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
-    expect(await screen.findByRole('option', { name: 'Intake credential — Intake' })).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText(/CHEFS credential/i), 'cred-1');
+    await user.click(screen.getByLabelText(/CHEFS credential/i));
+    const row = await screen.findByRole('button', { name: /Intake credential.*Intake/ });
+    await user.click(row);
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -61,6 +64,37 @@ describe('ChefsFormFields', () => {
         formId: 'form-123',
         formName: 'Intake',
         apiKey: '',
+      }),
+    );
+  });
+
+  it('opens the edit dialog pre-filled from the selected credential and saves changes', async () => {
+    const user = userEvent.setup();
+    updateMock.mockResolvedValue({
+      id: 'cred-1',
+      name: 'Intake credential (renamed)',
+      formName: 'Intake',
+      formId: 'form-123',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+    });
+    renderFields();
+
+    await user.click(screen.getByLabelText(/CHEFS credential/i));
+    await user.click(await screen.findByRole('button', { name: /Edit Intake credential/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Edit CHEFS credential' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Credential name/i)).toHaveValue('Intake credential');
+    expect(screen.getByLabelText(/Form ID/i)).toHaveValue('form-123');
+    expect(screen.queryByText('API key *')).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/Credential name/i));
+    await user.type(screen.getByLabelText(/Credential name/i), 'Intake credential (renamed)');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentialId: 'cred-1',
+        input: expect.objectContaining({ name: 'Intake credential (renamed)', apiKey: undefined }),
       }),
     );
   });

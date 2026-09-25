@@ -25,6 +25,8 @@ import {
   createChefsCredentialSchema,
   listChefsCredentialsResponseSchema,
   listChefsCredentialsSchema,
+  updateChefsCredentialResponseSchema,
+  updateChefsCredentialSchema,
 } from '../schemas/chefs-credential';
 import { readN8nCredentialId } from '../services/chefs.service';
 import { OkResponse, CreatedResponse, ForbiddenResponse, NoContentResponse } from './responses';
@@ -394,6 +396,25 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         projectIds: scope.projectIds,
       });
       CreatedResponse(res, created, createChefsCredentialResponseSchema);
+    },
+  );
+
+  /**
+   * PATCH /wil/chefs-credentials/:credentialId — updates a chefsFormAuth credential's
+   * display fields, and rotates the stored API key when a new one is supplied.
+   */
+  router.patch(
+    '/chefs-credentials/:credentialId',
+    createRequestParser(updateChefsCredentialSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof updateChefsCredentialSchema>>, res: Response) => {
+      const scope = await requireTriggerManager(req, res, customRepositories, n8nRepositories);
+      if (!scope) return;
+      const updated = await services.chefs.updateFormCredential({
+        credentialId: req.parsed.params.credentialId,
+        allowedProjectIds: scope.projectIds,
+        ...req.parsed.body,
+      });
+      OkResponse(res, updated, updateChefsCredentialResponseSchema);
     },
   );
 

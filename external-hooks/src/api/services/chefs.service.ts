@@ -65,6 +65,18 @@ export type CreateChefsFormCredentialParams = {
   projectIds: string[];
 };
 
+export type UpdateChefsFormCredentialParams = {
+  credentialId: string;
+  /** n8n project IDs the caller is allowed to act within (tenant scope). */
+  allowedProjectIds: string[];
+  name: string;
+  formName: string;
+  baseUrl: string;
+  formId: string;
+  /** Omitted or empty keeps the credential's existing stored API key. */
+  apiKey?: string;
+};
+
 /** Reads a non-empty n8n credential id from trigger metadata. */
 export function readN8nCredentialId(metadata: Record<string, unknown>): string | null {
   const value = metadata[N8N_CREDENTIAL_ID_METADATA_KEY];
@@ -184,6 +196,60 @@ export class ChefsService {
     } catch (err) {
       if (err instanceof AppError) throw err;
       log.error('Create CHEFS credential error', { error: String(err) });
+      throw new AppError(500, 'Internal Server Error');
+    }
+  }
+
+  /**
+   * Updates an existing `chefsFormAuth` credential's display fields and, when a new
+   * API key is supplied, rotates the stored key. Re-encrypts via n8n's own Cipher and
+   * saves in place, leaving the credential's `shared_credentials` rows untouched.
+   */
+  async updateFormCredential(params: UpdateChefsFormCredentialParams): Promise<ChefsFormCredentialSummary> {
+    const { credentialId, allowedProjectIds } = params;
+
+    const record = await this.n8nRepositories.credential.findOneBy({ id: credentialId });
+    if (!record) {
+      throw new AppError(404, 'CHEFS credential not found');
+    }
+    if (record.type !== CHEFS_FORM_AUTH_CREDENTIAL_TYPE) {
+      throw new AppError(400, 'Referenced credential is not a CHEFS form credential');
+    }
+
+    const credentialProjectIds = await this.n8nRepositories.sharedCredential.findProjectIds(credentialId);
+    const authorized = credentialProjectIds.some((projectId) => allowedProjectIds.includes(projectId));
+    if (!authorized) {
+      log.warn('CHEFS credential not in caller scope', { credentialId: shortenIdForLog(credentialId) });
+      throw new AppError(403, 'Not authorized to use this CHEFS credential');
+    }
+
+    const draft = normalizeUpdateParams(params);
+    let apiKey = draft.apiKey;
+    if (!apiKey) {
+      const existing = await this.credentialDecrypt.decryptData(record);
+      apiKey = typeof existing.apiKey === 'string' ? existing.apiKey : ''; // pragma: allowlist secret
+    }
+    if (!apiKey) {
+      throw new AppError(400, 'CHEFS credential is missing an API key');
+    }
+
+    const data = await this.credentialDecrypt.encryptData(
+      { id: credentialId, name: draft.name, type: CHEFS_FORM_AUTH_CREDENTIAL_TYPE },
+      { formName: draft.formName, baseUrl: draft.baseUrl, formId: draft.formId, apiKey },
+    );
+
+    try {
+      const saved = await this.n8nRepositories.credential.save({ ...record, name: draft.name, data });
+      return {
+        id: saved.id,
+        name: draft.name,
+        formName: draft.formName,
+        formId: draft.formId,
+        baseUrl: draft.baseUrl,
+      };
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      log.error('Update CHEFS credential error', { error: String(err) });
       throw new AppError(500, 'Internal Server Error');
     }
   }
@@ -328,6 +394,29 @@ function normalizeCreateParams(params: CreateChefsFormCredentialParams): CreateC
   }
 
   return { name, formName, baseUrl, formId, apiKey, projectIds: [...new Set(params.projectIds)] };
+}
+
+function normalizeUpdateParams(params: UpdateChefsFormCredentialParams): {
+  name: string;
+  formName: string;
+  baseUrl: string;
+  formId: string;
+  apiKey: string;
+} {
+  const name = params.name.trim();
+  const formName = params.formName.trim();
+  const baseUrl = params.baseUrl.trim();
+  const formId = params.formId.trim();
+  const apiKey = (params.apiKey ?? '').trim();
+
+  if (name.length < 3 || name.length > 128) {
+    throw new AppError(400, 'Credential name must be 3 to 128 characters');
+  }
+  if (!formId || !baseUrl) {
+    throw new AppError(400, 'CHEFS credential requires a base URL and form id');
+  }
+
+  return { name, formName, baseUrl, formId, apiKey };
 }
 
 function stripApiKey(metadata: Record<string, unknown>): Record<string, unknown> {

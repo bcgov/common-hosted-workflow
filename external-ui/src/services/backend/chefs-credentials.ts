@@ -45,3 +45,24 @@ export function createChefsCredential(params: {
     })
     .then((res) => res.data);
 }
+
+export interface UpdateChefsCredentialInput {
+  name: string;
+  formName: string;
+  baseUrl: string;
+  formId: string;
+  /** Omit to keep the credential's existing stored API key; provide a non-empty string to rotate it. */
+  apiKey?: string;
+}
+
+export function updateChefsCredential(params: {
+  tenantId: string;
+  credentialId: string;
+  input: UpdateChefsCredentialInput;
+}): Promise<ChefsCredentialSummary> {
+  return instance
+    .patch<ChefsCredentialSummary>(`/ui-api/wil/chefs-credentials/${params.credentialId}`, params.input, {
+      headers: { 'X-TENANT-ID': params.tenantId },
+    })
+    .then((res) => res.data);
+}
