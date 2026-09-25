@@ -28,7 +28,7 @@ function createService() {
   });
   const findProjectIds = vi.fn().mockResolvedValue(PROJECT_IDS);
   const create = vi.fn().mockImplementation((value) => value);
-  const save = vi.fn().mockImplementation(async (value) => ({ ...value, id: 'cred-new' }));
+  const save = vi.fn().mockImplementation(async (value) => ({ ...value, id: value.id ?? 'cred-new' }));
   const shareCreate = vi.fn().mockImplementation((value) => value);
   const shareSave = vi.fn().mockResolvedValue(undefined);
   const decryptData = vi.fn().mockResolvedValue(DECRYPTED);
@@ -47,7 +47,18 @@ function createService() {
     { decryptData, encryptData } as any,
   );
 
-  return { service, listByTypeSharedWithProjects, decryptData, encryptData, create, save, shareCreate, shareSave };
+  return {
+    service,
+    listByTypeSharedWithProjects,
+    findOneBy,
+    findProjectIds,
+    decryptData,
+    encryptData,
+    create,
+    save,
+    shareCreate,
+    shareSave,
+  };
 }
 
 beforeEach(() => {
@@ -139,6 +150,92 @@ describe('ChefsService.createFormCredential', () => {
       }),
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(encryptData).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChefsService.updateFormCredential', () => {
+  it('keeps the existing API key when none is supplied', async () => {
+    const { service, decryptData, encryptData, save } = createService();
+
+    const result = await service.updateFormCredential({
+      credentialId: 'cred-1',
+      allowedProjectIds: PROJECT_IDS,
+      name: 'Renamed credential',
+      formName: 'Renamed form',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+      formId: 'form-123',
+    });
+
+    expect(result).toEqual({
+      id: 'cred-1',
+      name: 'Renamed credential',
+      formName: 'Renamed form',
+      formId: 'form-123',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+    });
+    expect(decryptData).toHaveBeenCalled();
+    expect(encryptData).toHaveBeenCalledWith(
+      { id: 'cred-1', name: 'Renamed credential', type: 'chefsFormAuth' },
+      {
+        formName: 'Renamed form',
+        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+        formId: 'form-123',
+        apiKey: DECRYPTED.apiKey,
+      },
+    );
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'cred-1', name: 'Renamed credential' }));
+  });
+
+  it('rotates the API key when a new one is supplied', async () => {
+    const { service, decryptData, encryptData } = createService();
+
+    await service.updateFormCredential({
+      credentialId: 'cred-1',
+      allowedProjectIds: PROJECT_IDS,
+      name: 'Intake credential',
+      formName: 'Intake',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+      formId: 'form-123',
+      apiKey: 'rotated-key', // pragma: allowlist secret
+    });
+
+    expect(decryptData).not.toHaveBeenCalled();
+    expect(encryptData).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ apiKey: 'rotated-key' }), // pragma: allowlist secret
+    );
+  });
+
+  it('throws 404 when the credential does not exist', async () => {
+    const { service, findOneBy } = createService();
+    findOneBy.mockResolvedValueOnce(null);
+
+    await expect(
+      service.updateFormCredential({
+        credentialId: 'missing',
+        allowedProjectIds: PROJECT_IDS,
+        name: 'Intake credential',
+        formName: 'Intake',
+        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+        formId: 'form-123',
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('throws 403 when the credential is not shared with an allowed project', async () => {
+    const { service, findProjectIds } = createService();
+    findProjectIds.mockResolvedValueOnce(['other-proj']);
+
+    await expect(
+      service.updateFormCredential({
+        credentialId: 'cred-1',
+        allowedProjectIds: PROJECT_IDS,
+        name: 'Intake credential',
+        formName: 'Intake',
+        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+        formId: 'form-123',
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 });
 

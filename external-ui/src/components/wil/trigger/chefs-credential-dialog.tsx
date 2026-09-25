@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { extractErrorMessage } from '../../shared/error-utils';
 import {
   createChefsCredential,
+  updateChefsCredential,
   chefsCredentialsQueryKey,
   DEFAULT_CHEFS_BASE_URL,
   type ChefsCredentialSummary,
@@ -25,6 +26,9 @@ interface ChefsCredentialDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (credential: ChefsCredentialSummary) => void;
+  /** When set, the dialog edits this credential instead of creating a new one. */
+  editing?: ChefsCredentialSummary | null;
+  onUpdated?: (credential: ChefsCredentialSummary) => void;
 }
 
 interface Draft {
@@ -43,15 +47,25 @@ const EMPTY_DRAFT: Draft = {
   apiKey: '',
 };
 
-function isDraftValid(draft: Draft): boolean {
+function isDraftValid(draft: Draft, isEditing: boolean): boolean {
   return (
     draft.name.trim().length >= 3 &&
     draft.name.trim().length <= 128 &&
     draft.formName.trim().length > 0 &&
     draft.baseUrl.trim().length > 0 &&
     draft.formId.trim().length > 0 &&
-    draft.apiKey.trim().length > 0
+    (isEditing || draft.apiKey.trim().length > 0)
   );
+}
+
+function draftFromCredential(credential: ChefsCredentialSummary): Draft {
+  return {
+    name: credential.name,
+    formName: credential.formName,
+    baseUrl: credential.baseUrl || DEFAULT_CHEFS_BASE_URL,
+    formId: credential.formId,
+    apiKey: '',
+  };
 }
 
 export function ChefsCredentialDialog({
@@ -59,10 +73,19 @@ export function ChefsCredentialDialog({
   open,
   onOpenChange,
   onCreated,
+  editing = null,
+  onUpdated,
 }: Readonly<ChefsCredentialDialogProps>) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [showApiKey, setShowApiKey] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(editing ? draftFromCredential(editing) : EMPTY_DRAFT);
+    setShowApiKey(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reseed only when the dialog opens, not on every `editing` reference change
+  }, [open]);
 
   const createMutation = useMutation({
     mutationFn: (input: Draft) => createChefsCredential({ tenantId, input }),
@@ -78,12 +101,33 @@ export function ChefsCredentialDialog({
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (input: Draft) =>
+      updateChefsCredential({
+        tenantId,
+        credentialId: editing?.id ?? '',
+        input: { ...input, apiKey: input.apiKey.trim() ? input.apiKey : undefined },
+      }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData<ChefsCredentialSummary[]>(chefsCredentialsQueryKey(tenantId), (current) =>
+        (current ?? []).map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setDraft(EMPTY_DRAFT);
+      setShowApiKey(false);
+      onUpdated?.(updated);
+      onOpenChange(false);
+    },
+  });
+
+  const isEditing = Boolean(editing);
+  const activeMutation = isEditing ? updateMutation : createMutation;
+
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  const errorMessage = createMutation.isError
-    ? extractErrorMessage(createMutation.error, 'Could not save the CHEFS credential')
+  const errorMessage = activeMutation.isError
+    ? extractErrorMessage(activeMutation.error, 'Could not save the CHEFS credential')
     : '';
 
   return (
@@ -94,15 +138,18 @@ export function ChefsCredentialDialog({
           setDraft(EMPTY_DRAFT);
           setShowApiKey(false);
           createMutation.reset();
+          updateMutation.reset();
         }
         onOpenChange(next);
       }}
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add CHEFS credential</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit CHEFS credential' : 'Add CHEFS credential'}</DialogTitle>
           <DialogDescription>
-            Saves a CHEFS Form Authentication credential on this project in n8n. The API key stays on the server.
+            {isEditing
+              ? 'Updates this CHEFS Form Authentication credential in n8n. The API key stays on the server.'
+              : 'Saves a CHEFS Form Authentication credential on this project in n8n. The API key stays on the server.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -151,14 +198,14 @@ export function ChefsCredentialDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="chefs-credential-api-key">
-              API key <span className="text-red-500">*</span>
+              API key {!isEditing && <span className="text-red-500">*</span>}
             </Label>
             <div className="relative">
               <Input
                 id="chefs-credential-api-key"
                 type={showApiKey ? 'text' : 'password'}
                 value={draft.apiKey}
-                placeholder="Form API key"
+                placeholder={isEditing ? 'Leave blank to keep the current API key' : 'Form API key'}
                 onChange={(event) => setField('apiKey', event.target.value)}
                 className="pr-10"
               />
@@ -180,16 +227,16 @@ export function ChefsCredentialDialog({
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={createMutation.isPending}
+            disabled={activeMutation.isPending}
           >
             Cancel
           </Button>
           <Button
             type="button"
-            onClick={() => createMutation.mutate(draft)}
-            disabled={!isDraftValid(draft) || createMutation.isPending}
+            onClick={() => activeMutation.mutate(draft)}
+            disabled={!isDraftValid(draft, isEditing) || activeMutation.isPending}
           >
-            {createMutation.isPending ? 'Saving...' : 'Save credential'}
+            {activeMutation.isPending ? 'Saving...' : isEditing ? 'Save changes' : 'Save credential'}
           </Button>
         </DialogFooter>
       </DialogContent>
