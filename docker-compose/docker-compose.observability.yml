@@ -75,7 +75,7 @@ services:
     <<: *common-props
     container_name: mimir-rules-sync
     restart: no     # Should only run once
-    image: curlimages/curl:8.7.1
+    image: curlimages/curl:8.22.0
     volumes:
     - ../helm/_mimir/rules-mimir-api.yaml:/rules.yaml:ro
     entrypoint: [/bin/sh, -c]
@@ -118,7 +118,7 @@ services:
   grafana:
     <<: *common-props
     container_name: grafana
-    image: grafana/grafana:12.4.9
+    image: grafana/grafana:12.4.11
     environment:
       GF_SERVER_ROOT_URL: http://localhost:3000
       GF_SECURITY_ADMIN_USER: admin
@@ -162,7 +162,7 @@ services:
   loki:
     <<: *common-props
     container_name: loki
-    image: grafana/loki:3.7.6
+    image: grafana/loki:3.7.8
     command: [-config.file=/etc/loki/config.yaml]
     ports:
     - 3100:3100
@@ -176,7 +176,7 @@ services:
   alloy:
     <<: *common-props
     container_name: alloy
-    image: grafana/alloy:v1.18.1
+    image: grafana/alloy:v1.19.2
     command:
     - run
     - /etc/alloy/config.alloy
