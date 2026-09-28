@@ -42,7 +42,7 @@ export interface DecodedJwt {
 
 export interface VerifyOptions {
   jwksUri: string;
-  /** Allow clock skew in seconds when validating `exp` and `iat`. */
+  /** Finite, nonnegative clock skew in seconds for `exp`, `nbf`, and `iat`. */
   clockTolerance?: number;
   /** Expected `iss` claim, validated when set. */
   expectedIssuer?: string;
@@ -168,7 +168,11 @@ function buildTokenRequest(
   };
 
   if (creds.oidcClientSecret) {
-    const basic = Buffer.from(`${creds.oidcClientId}:${creds.oidcClientSecret}`).toString('base64');
+    // RFC 6749 §2.3.1: encode each component before adding the Basic separator.
+    const encodeComponent = (value: string) => new URLSearchParams({ value }).toString().slice('value='.length);
+    const basic = Buffer.from(
+      `${encodeComponent(creds.oidcClientId)}:${encodeComponent(creds.oidcClientSecret)}`,
+    ).toString('base64');
     headers.Authorization = `Basic ${basic}`;
   } else {
     body.set('client_id', creds.oidcClientId);
@@ -308,10 +312,56 @@ function assertKeyAlgConsistency(jwk: Jwk, alg: string): void {
 }
 
 /**
+ * Create one resolver per execution. Cache the request promise (including failures)
+ * and allow only one unknown-kid refresh across the entire batch. Selection and
+ * algorithm validation remain strict; refresh never permits fallback to another key.
+ */
+export function createJwksResolver(ctx: IExecuteFunctions, jwksUri: string) {
+  let cached: Promise<Jwk[]> | undefined;
+  let refreshed = false;
+
+  const fetchKeys = async (): Promise<Jwk[]> => {
+    const jwks = (await ctx.helpers.httpRequest({
+      method: 'GET',
+      url: jwksUri,
+      headers: { Accept: 'application/json' },
+      json: true,
+    })) as JwksResponse;
+    if (!jwks || !Array.isArray(jwks.keys) || jwks.keys.length === 0) {
+      throw new Error('JWKS response did not contain any keys');
+    }
+    return jwks.keys;
+  };
+
+  return async (header: Record<string, unknown>): Promise<Jwk> => {
+    let keys = await (cached ??= fetchKeys());
+    if (header.kid && !keys.some((key) => key.kid === header.kid)) {
+      if (!refreshed) {
+        refreshed = true;
+        cached = fetchKeys();
+      }
+      keys = await cached;
+    }
+    const key = selectJwk(keys, header);
+    if (!key) throw new Error('Could not find a matching JWK for the JWT');
+    return key;
+  };
+}
+
+/**
  * Cryptographically verify a JWT against keys fetched from a JWKS URI.
  * Verification implicitly decodes the token first.
  */
-export async function verifyJwt(ctx: IExecuteFunctions, token: string, opts: VerifyOptions): Promise<DecodedJwt> {
+export async function verifyJwt(
+  ctx: IExecuteFunctions,
+  token: string,
+  opts: VerifyOptions,
+  resolveJwk = createJwksResolver(ctx, opts.jwksUri),
+): Promise<DecodedJwt> {
+  const clockTolerance = opts.clockTolerance === undefined ? 0 : opts.clockTolerance;
+  if (typeof clockTolerance !== 'number' || !Number.isFinite(clockTolerance) || clockTolerance < 0) {
+    throw new Error('Clock Tolerance must be a finite nonnegative number');
+  }
   const decoded = decodeJwt(token);
   const { header, payload, signature } = decoded;
 
@@ -325,33 +375,28 @@ export async function verifyJwt(ctx: IExecuteFunctions, token: string, opts: Ver
     throw new Error('OIDC JWKS URI is required to verify the token signature');
   }
 
-  const jwksOptions: IHttpRequestOptions = {
-    method: 'GET',
-    url: opts.jwksUri,
-    headers: { Accept: 'application/json' },
-    json: true,
-  };
-  const jwks = (await ctx.helpers.httpRequest(jwksOptions)) as JwksResponse;
-  if (!jwks.keys || jwks.keys.length === 0) {
-    throw new Error('JWKS response did not contain any keys');
-  }
-
-  const jwk = selectJwk(jwks.keys, header);
-  if (!jwk) {
-    throw new Error('Could not find a matching JWK for the JWT');
-  }
+  const jwk = await resolveJwk(header);
   assertKeyAlgConsistency(jwk, alg);
   const keyObject = toKeyObject(jwk);
 
   // Claim validation happens after we have a key but is independent of it.
-  const clockTolerance = opts.clockTolerance ?? 0;
-
-  if (typeof payload.exp !== 'number') {
-    throw new Error('JWT does not contain an "exp" claim; expiry is required for verification');
+  if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp)) {
+    throw new Error('JWT must contain a finite numeric "exp" claim; expiry is required for verification');
   }
   const now = Math.floor(Date.now() / 1000);
-  if (now > payload.exp + clockTolerance) {
+  if (now >= payload.exp + clockTolerance) {
     throw new Error(`JWT has expired (exp: ${payload.exp}, now: ${now})`);
+  }
+  for (const claim of ['nbf', 'iat'] as const) {
+    if (Object.prototype.hasOwnProperty.call(payload, claim)) {
+      const value = payload[claim];
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`JWT "${claim}" claim must be a finite number`);
+      }
+      if (value > now + clockTolerance) {
+        throw new Error(claim === 'nbf' ? 'JWT is not yet valid (nbf)' : 'JWT was issued in the future (iat)');
+      }
+    }
   }
 
   if (opts.expectedIssuer && payload.iss !== opts.expectedIssuer) {

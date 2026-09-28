@@ -27,6 +27,7 @@ It supports two OAuth2 grant types:
 | [Architecture](./architecture.md)       | High-level design, token flow, verification model, and security notes |
 | [Node Operations](./node-operations.md) | Detailed guide to every node property and the three processing modes  |
 | [Credentials](./credentials.md)         | Credential setup and endpoint discovery configuration                 |
+| [Release Notes](./release-notes.md)     | Verification, authentication and batch compatibility changes          |
 
 ## Source Files
 
