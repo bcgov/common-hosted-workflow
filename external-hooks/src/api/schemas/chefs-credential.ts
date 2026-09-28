@@ -7,12 +7,14 @@ export const chefsCredentialSummarySchema = z.object({
   formName: z.string(),
   formId: z.string(),
   baseUrl: z.string(),
+  scopes: z.array(z.string()),
 });
 
 export type ChefsCredentialSummary = z.infer<typeof chefsCredentialSummarySchema>;
 
 export const listChefsCredentialsResponseSchema = z.object({
   data: z.array(chefsCredentialSummarySchema),
+  canCreate: z.boolean(),
 });
 
 /** GET /ui-api/wil/chefs-credentials */

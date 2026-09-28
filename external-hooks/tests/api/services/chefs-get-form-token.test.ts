@@ -15,6 +15,10 @@ vi.mock('@config', async (importOriginal) => {
     ...original,
     CHEFS_BASE_URL: 'https://chefs-env.example.gov.bc.ca',
     CHEFS_GATEWAY_URL: 'https://chefs-env.example.gov.bc.ca/app/gateway/v1',
+    // Origins used by the "credential Base URL" tests below must be explicitly
+    // allowlisted — a credential's Base URL is otherwise rejected in favour of
+    // the configured CHEFS_BASE_URL origin (see chefs.service.ts resolveChefsUrls).
+    CHEFS_ALLOWED_ORIGINS: ['https://chefs-dev.apps.silver.devops.gov.bc.ca', 'https://chefs-test.example.gov.bc.ca'],
   };
 });
 
@@ -32,7 +36,7 @@ import { ChefsService } from '../../../src/api/services/chefs.service';
 const postMock = axios.post as unknown as ReturnType<typeof vi.fn>;
 
 function createService() {
-  return new ChefsService({} as any, {} as any);
+  return new ChefsService({} as any, {} as any, {} as any);
 }
 
 beforeEach(() => {
@@ -104,6 +108,26 @@ describe('ChefsService.getFormToken', () => {
       formId: 'form-1',
       formApiKey: 'key', // pragma: allowlist secret
       credentialBaseUrl: 'not-a-url',
+    });
+
+    expect(postMock).toHaveBeenCalledWith(
+      'https://chefs-env.example.gov.bc.ca/app/gateway/v1/auth/token/forms/form-1',
+      undefined,
+      expect.anything(),
+    );
+    expect(result.baseUrl).toBe('https://chefs-env.example.gov.bc.ca/app');
+  });
+
+  it('falls back to the env-derived URLs when the credential Base URL origin is not allowlisted', async () => {
+    const service = createService();
+
+    const result = await service.getFormToken({
+      formId: 'form-1',
+      formApiKey: 'key', // pragma: allowlist secret
+      // Not the configured CHEFS_BASE_URL origin and not in CHEFS_ALLOWED_ORIGINS — an
+      // attacker-controlled credential or legacy trigger metadata must not be able to
+      // point the UI's script/render origin anywhere it likes.
+      credentialBaseUrl: 'https://evil.example/app/api/v1',
     });
 
     expect(postMock).toHaveBeenCalledWith(

@@ -6,6 +6,7 @@ import { WIL_ENCRYPTION_KEY, WIL_ENCRYPTION_KEY_ACTIVE, CHEFS_API_KEY_PLACEHOLDE
 import { WorkflowTriggerTypeEnum } from '../constants/enum';
 import type { ChefsService } from './chefs.service';
 import { readN8nCredentialId } from './chefs.service';
+import type { N8nUserEntity } from './n8n-credentials.service';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { formatDbErrorForLog } from '../helpers/db-helper';
@@ -35,6 +36,8 @@ export type CreateTriggerParams = {
   allowedActors: string[];
   authEnabled?: boolean;
   createdBy?: string | null;
+  /** Signed-in n8n user; n8n must grant them credential:read on a referenced CHEFS credential. */
+  n8nUser: N8nUserEntity | null;
 };
 
 export type UpdateTriggerParams = {
@@ -47,6 +50,8 @@ export type UpdateTriggerParams = {
   allowedActors: string[];
   authEnabled: boolean;
   updatedBy: string;
+  /** Signed-in n8n user; n8n must grant them credential:read on a referenced CHEFS credential. */
+  n8nUser: N8nUserEntity | null;
 };
 
 export type DeleteTriggerParams = {
@@ -79,7 +84,7 @@ export class TriggerService {
   async create(params: CreateTriggerParams) {
     const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const metadata = isChefsForm
-      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.allowedProjectIds)
+      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.allowedProjectIds, params.n8nUser)
       : params.metadata;
     const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
     if (isChefsForm && apiKey) requireEncryptionKey();
@@ -125,7 +130,7 @@ export class TriggerService {
 
     const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const metadata = isChefsForm
-      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.projectIds)
+      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.projectIds, params.n8nUser)
       : params.metadata;
     const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
     if (isChefsForm && apiKey) requireEncryptionKey();

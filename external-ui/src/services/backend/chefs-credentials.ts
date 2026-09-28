@@ -7,6 +7,19 @@ export interface ChefsCredentialSummary {
   formName: string;
   formId: string;
   baseUrl: string;
+  /** The caller's n8n scopes on this credential. */
+  scopes: string[];
+}
+
+export interface ChefsCredentialList {
+  credentials: ChefsCredentialSummary[];
+  /** True when n8n lets the caller create credentials in this tenant's project. */
+  canCreate: boolean;
+}
+
+/** n8n grants `credential:update` to owners' project admins/editors and global admins. */
+export function canEditCredential(credential: ChefsCredentialSummary): boolean {
+  return credential.scopes.includes('credential:update');
 }
 
 export const DEFAULT_CHEFS_BASE_URL = 'https://submit.digital.gov.bc.ca/app/api/v1';
@@ -23,16 +36,13 @@ export interface CreateChefsCredentialInput {
   apiKey: string;
 }
 
-export function listChefsCredentials(params: {
-  tenantId: string;
-  signal?: AbortSignal;
-}): Promise<ChefsCredentialSummary[]> {
+export function listChefsCredentials(params: { tenantId: string; signal?: AbortSignal }): Promise<ChefsCredentialList> {
   return instance
-    .get<{ data: ChefsCredentialSummary[] }>('/ui-api/wil/chefs-credentials', {
+    .get<{ data: ChefsCredentialSummary[]; canCreate: boolean }>('/ui-api/wil/chefs-credentials', {
       headers: { 'X-TENANT-ID': params.tenantId },
       signal: params.signal,
     })
-    .then((res) => res.data.data);
+    .then((res) => ({ credentials: res.data.data, canCreate: res.data.canCreate }));
 }
 
 export function createChefsCredential(params: {

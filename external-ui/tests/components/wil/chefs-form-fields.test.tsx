@@ -37,15 +37,19 @@ describe('ChefsFormFields', () => {
   beforeEach(() => {
     listMock.mockReset();
     updateMock.mockReset();
-    listMock.mockResolvedValue([
-      {
-        id: 'cred-1',
-        name: 'Intake credential',
-        formName: 'Intake',
-        formId: 'form-123',
-        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-      },
-    ]);
+    listMock.mockResolvedValue({
+      canCreate: true,
+      credentials: [
+        {
+          id: 'cred-1',
+          name: 'Intake credential',
+          formName: 'Intake',
+          formId: 'form-123',
+          baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+          scopes: ['credential:read', 'credential:update'],
+        },
+      ],
+    });
   });
 
   it('lists CHEFS credentials and selects one without asking for an API key', async () => {
@@ -76,6 +80,7 @@ describe('ChefsFormFields', () => {
       formName: 'Intake',
       formId: 'form-123',
       baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+      scopes: ['credential:read', 'credential:update'],
     });
     renderFields();
 
@@ -97,5 +102,29 @@ describe('ChefsFormFields', () => {
         input: expect.objectContaining({ name: 'Intake credential (renamed)', apiKey: undefined }),
       }),
     );
+  });
+
+  it('hides Edit and Add for a read-only n8n user', async () => {
+    listMock.mockResolvedValue({
+      canCreate: false,
+      credentials: [
+        {
+          id: 'cred-1',
+          name: 'Intake credential',
+          formName: 'Intake',
+          formId: 'form-123',
+          baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+          scopes: ['credential:read'],
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderFields();
+
+    await user.click(screen.getByLabelText(/CHEFS credential/i));
+    await screen.findByRole('button', { name: /Intake credential.*Intake/ });
+
+    expect(screen.queryByRole('button', { name: /Edit Intake credential/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add CHEFS credential/ })).not.toBeInTheDocument();
   });
 });

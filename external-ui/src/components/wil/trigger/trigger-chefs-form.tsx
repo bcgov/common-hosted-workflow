@@ -82,7 +82,8 @@ export function ChefsFormFields({
     onChange({ ...value, [key]: val });
   }
 
-  const credentials = credentialsQuery.data ?? [];
+  const credentials = credentialsQuery.data?.credentials ?? [];
+  const canCreate = credentialsQuery.data?.canCreate ?? false;
   const selected = credentials.find((credential) => credential.id === value.n8nCredentialId);
   const savedCredentialMissing = Boolean(value.n8nCredentialId) && !selected && !credentialsQuery.isPending;
   const usesLegacyKey = !value.n8nCredentialId && value.apiKey.trim().length > 0;
@@ -120,6 +121,7 @@ export function ChefsFormFields({
             setDialogOpen(true);
           }}
           isLoading={credentialsQuery.isPending}
+          canCreate={canCreate}
           savedCredentialMissing={savedCredentialMissing}
           missingLabel={value.formName || 'Saved credential'}
         />

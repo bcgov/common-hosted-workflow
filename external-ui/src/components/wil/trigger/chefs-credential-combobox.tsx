@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { IconCheck, IconChevronDown, IconKey, IconPencil, IconPlus } from '@tabler/icons-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { ChefsCredentialSummary } from '../../../services/backend/chefs-credentials';
+import { canEditCredential, type ChefsCredentialSummary } from '../../../services/backend/chefs-credentials';
 
 export interface ChefsCredentialComboboxProps {
   id?: string;
@@ -12,6 +12,8 @@ export interface ChefsCredentialComboboxProps {
   onAddNew: () => void;
   onEdit: (credential: ChefsCredentialSummary) => void;
   isLoading: boolean;
+  /** From n8n: may the caller create credentials in this project? */
+  canCreate: boolean;
   /** True when `value` names a credential that is no longer in `credentials`. */
   savedCredentialMissing?: boolean;
   /** Label to show for a missing saved credential (usually the trigger's last-known form name). */
@@ -30,6 +32,7 @@ export function ChefsCredentialCombobox({
   onAddNew,
   onEdit,
   isLoading,
+  canCreate,
   savedCredentialMissing = false,
   missingLabel = 'Saved credential',
 }: Readonly<ChefsCredentialComboboxProps>) {
@@ -69,7 +72,7 @@ export function ChefsCredentialCombobox({
           )}
           {!isLoading && credentials.length === 0 && !savedCredentialMissing && (
             <p className="px-3 py-2 text-sm text-muted-foreground">
-              No CHEFS Form Authentication credentials are shared with this project.
+              No CHEFS Form Authentication credentials you can use in this project.
             </p>
           )}
           {credentials.map((credential) => {
@@ -99,34 +102,38 @@ export function ChefsCredentialCombobox({
                   </span>
                   {isSelected && <IconCheck size={16} className="shrink-0 text-primary" aria-hidden="true" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onEdit(credential);
-                    setOpen(false);
-                  }}
-                  aria-label={`Edit ${credential.name}`}
-                  className="shrink-0 rounded p-1 text-muted-foreground opacity-0 hover:bg-surface hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                >
-                  <IconPencil size={15} aria-hidden="true" />
-                </button>
+                {canEditCredential(credential) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEdit(credential);
+                      setOpen(false);
+                    }}
+                    aria-label={`Edit ${credential.name}`}
+                    className="shrink-0 rounded p-1 text-muted-foreground opacity-0 hover:bg-surface hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    <IconPencil size={15} aria-hidden="true" />
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
-        <div className="border-t border-border-strong p-1">
-          <button
-            type="button"
-            onClick={() => {
-              onAddNew();
-              setOpen(false);
-            }}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-primary hover:bg-surface-subtle"
-          >
-            <IconPlus size={16} aria-hidden="true" />
-            Add CHEFS credential
-          </button>
-        </div>
+        {canCreate && (
+          <div className="border-t border-border-strong p-1">
+            <button
+              type="button"
+              onClick={() => {
+                onAddNew();
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-primary hover:bg-surface-subtle"
+            >
+              <IconPlus size={16} aria-hidden="true" />
+              Add CHEFS credential
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

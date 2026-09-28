@@ -49,7 +49,7 @@ function createService(overrides?: {
   } as any;
   const credentialDecrypt = { decryptData } as any;
 
-  const service = new ChefsService(n8nRepositories, credentialDecrypt);
+  const service = new ChefsService(n8nRepositories, credentialDecrypt, {} as any);
   return { service, findCredential, findProjectIds, decryptData };
 }
 

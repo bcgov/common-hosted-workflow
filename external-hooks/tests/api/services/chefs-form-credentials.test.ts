@@ -1,277 +1,207 @@
 /**
- * List, create, and trigger-metadata binding for n8n `chefsFormAuth` credentials.
- * The API key may be decrypted inside the service, but it must not leave these methods.
+ * CHEFS credential list/create/update/bind go through n8n's credential
+ * services; ChefsService only adds the CHEFS type and tenant filters.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChefsService } from '../../../src/api/services/chefs.service';
-import { CREDENTIAL_ROLE_OWNER } from '../../../src/api/constants/enum';
 
-const PROJECT_IDS = ['proj-1'];
-const ENCRYPTED = 'encrypted-blob';
-const DECRYPTED = {
-  formId: 'form-123',
-  formName: 'Intake',
-  baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-  apiKey: 'decrypted-key', // pragma: allowlist secret
-};
+const USER = { id: 'user-1', role: { slug: 'global:member' } };
+const BLANK = '__n8n_BLANK_VALUE_test';
+const TENANT_PROJECTS = ['proj-1', 'proj-2'];
 
-function createService() {
-  const listByTypeSharedWithProjects = vi
-    .fn()
-    .mockResolvedValue([{ id: 'cred-1', name: 'Intake credential', type: 'chefsFormAuth', data: ENCRYPTED }]);
-  const findOneBy = vi.fn().mockResolvedValue({
-    id: 'cred-1',
-    name: 'Intake credential',
-    type: 'chefsFormAuth',
-    data: ENCRYPTED,
-  });
-  const findProjectIds = vi.fn().mockResolvedValue(PROJECT_IDS);
-  const create = vi.fn().mockImplementation((value) => value);
-  const save = vi.fn().mockImplementation(async (value) => ({ ...value, id: value.id ?? 'cred-new' }));
-  const shareCreate = vi.fn().mockImplementation((value) => value);
-  const shareSave = vi.fn().mockResolvedValue(undefined);
-  const decryptData = vi.fn().mockResolvedValue(DECRYPTED);
-  const encryptData = vi.fn().mockResolvedValue(ENCRYPTED);
-
-  const service = new ChefsService(
-    {
-      credential: { listByTypeSharedWithProjects, findOneBy, create, save },
-      sharedCredential: {
-        metadata: { tableName: 'shared_credentials' },
-        findProjectIds,
-        create: shareCreate,
-        save: shareSave,
-      },
-    } as any,
-    { decryptData, encryptData } as any,
-  );
-
-  return {
-    service,
-    listByTypeSharedWithProjects,
-    findOneBy,
-    findProjectIds,
-    decryptData,
-    encryptData,
-    create,
-    save,
-    shareCreate,
-    shareSave,
-  };
+function credential(id: string, projectId: string, type = 'chefsFormAuth') {
+  return { id, name: `Cred ${id}`, type, data: 'enc', shared: [{ projectId, role: 'credential:owner' }] };
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+function createService() {
+  const n8nCredentials = {
+    blankingValue: BLANK,
+    listForUser: vi
+      .fn()
+      .mockResolvedValue([
+        credential('cred-1', 'proj-1'),
+        credential('cred-other-tenant', 'proj-9'),
+        credential('cred-wrong-type', 'proj-1', 'httpBasicAuth'),
+      ]),
+    findForUser: vi.fn().mockResolvedValue(credential('cred-1', 'proj-1')),
+    canInProject: vi.fn().mockResolvedValue(true),
+    create: vi.fn().mockResolvedValue({ id: 'cred-new', scopes: ['credential:read', 'credential:update'] }),
+    update: vi.fn().mockResolvedValue(undefined),
+    decryptRedacted: vi.fn().mockResolvedValue({
+      formId: 'form-123',
+      formName: 'Intake',
+      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+      apiKey: BLANK,
+    }),
+    scopesFor: vi.fn().mockResolvedValue(['credential:read']),
+  };
+  const service = new ChefsService({} as any, {} as any, n8nCredentials as any);
+  return { service, n8nCredentials };
+}
 
 describe('ChefsService.listFormCredentials', () => {
-  it('returns display fields and omits the API key', async () => {
-    const { service, decryptData } = createService();
+  it('lists readable CHEFS credentials in the tenant with scopes and no API key', async () => {
+    const { service, n8nCredentials } = createService();
 
-    const result = await service.listFormCredentials(PROJECT_IDS);
+    const result = await service.listFormCredentials(USER, TENANT_PROJECTS);
 
-    expect(result).toEqual([
+    expect(n8nCredentials.listForUser).toHaveBeenCalledWith(USER, ['credential:read']);
+    expect(result.credentials).toEqual([
       {
         id: 'cred-1',
-        name: 'Intake credential',
+        name: 'Cred cred-1',
         formName: 'Intake',
         formId: 'form-123',
         baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+        scopes: ['credential:read'],
       },
     ]);
-    expect(result[0]).not.toHaveProperty('apiKey');
-    expect(decryptData).toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain(BLANK);
   });
 
-  it('skips a credential that cannot be decrypted', async () => {
-    const { service, decryptData } = createService();
-    decryptData.mockRejectedValueOnce(new Error('bad cipher'));
+  it('excludes credentials outside the tenant and of other types', async () => {
+    const { service } = createService();
+    const result = await service.listFormCredentials(USER, TENANT_PROJECTS);
+    expect(result.credentials.map((c) => c.id)).toEqual(['cred-1']);
+  });
 
-    const result = await service.listFormCredentials(PROJECT_IDS);
+  it('reports canCreate from n8n credential:create on the tenant project', async () => {
+    const { service, n8nCredentials } = createService();
+    n8nCredentials.canInProject.mockResolvedValueOnce(false);
 
-    expect(result).toEqual([]);
+    const result = await service.listFormCredentials(USER, TENANT_PROJECTS);
+
+    expect(n8nCredentials.canInProject).toHaveBeenCalledWith(USER, 'proj-1', 'credential:create');
+    expect(result.canCreate).toBe(false);
   });
 });
 
 describe('ChefsService.createFormCredential', () => {
-  it('encrypts the key, saves a chefsFormAuth credential, and shares it with the tenant projects', async () => {
-    const { service, encryptData, save, shareCreate, shareSave } = createService();
+  const input = {
+    name: '  Intake credential ',
+    formName: 'Intake',
+    baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+    formId: 'form-123',
+    apiKey: 'secret', // pragma: allowlist secret
+    projectId: 'proj-1',
+  };
 
-    const result = await service.createFormCredential({
+  it('creates with a single owner project through n8n and returns no API key', async () => {
+    const { service, n8nCredentials } = createService();
+
+    const created = await service.createFormCredential(USER, input);
+
+    expect(n8nCredentials.create).toHaveBeenCalledWith(USER, {
       name: 'Intake credential',
-      formName: 'Intake',
-      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-      formId: 'form-123',
-      apiKey: 'plain-key', // pragma: allowlist secret
-      projectIds: ['proj-1', 'proj-1'],
+      type: 'chefsFormAuth',
+      projectId: 'proj-1',
+      data: {
+        formName: 'Intake',
+        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+        formId: 'form-123',
+        apiKey: 'secret', // pragma: allowlist secret
+      },
     });
-
-    expect(result).toEqual({
+    expect(created).toEqual({
       id: 'cred-new',
       name: 'Intake credential',
       formName: 'Intake',
       formId: 'form-123',
       baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
+      scopes: ['credential:read', 'credential:update'],
     });
-    expect(result).not.toHaveProperty('apiKey');
-    expect(encryptData).toHaveBeenCalledWith(
-      { id: null, name: 'Intake credential', type: 'chefsFormAuth' },
-      {
-        formName: 'Intake',
-        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-        formId: 'form-123',
-        apiKey: 'plain-key', // pragma: allowlist secret
-      },
-    );
-    expect(save).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'chefsFormAuth', data: ENCRYPTED, usageScope: 'project' }),
-    );
-    expect(shareCreate).toHaveBeenCalledTimes(1);
-    expect(shareCreate).toHaveBeenCalledWith({
-      credentialsId: 'cred-new',
-      projectId: 'proj-1',
-      role: CREDENTIAL_ROLE_OWNER,
-    });
-    expect(shareSave).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(created)).not.toContain('secret');
   });
 
-  it('rejects a credential name shorter than 3 characters', async () => {
-    const { service, encryptData } = createService();
-
-    await expect(
-      service.createFormCredential({
-        name: 'ab',
-        formName: 'Intake',
-        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-        formId: 'form-123',
-        apiKey: 'plain-key', // pragma: allowlist secret
-        projectIds: PROJECT_IDS,
-      }),
-    ).rejects.toMatchObject({ statusCode: 400 });
-    expect(encryptData).not.toHaveBeenCalled();
+  it('rejects a missing API key before calling n8n', async () => {
+    const { service, n8nCredentials } = createService();
+    await expect(service.createFormCredential(USER, { ...input, apiKey: '  ' })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(n8nCredentials.create).not.toHaveBeenCalled();
   });
 });
 
 describe('ChefsService.updateFormCredential', () => {
-  it('keeps the existing API key when none is supplied', async () => {
-    const { service, decryptData, encryptData, save } = createService();
+  const input = {
+    credentialId: 'cred-1',
+    allowedProjectIds: TENANT_PROJECTS,
+    name: 'Intake credential',
+    formName: 'Intake v2',
+    baseUrl: 'https://chefs-dev.example/app/api/v1',
+    formId: 'form-123',
+  };
 
-    const result = await service.updateFormCredential({
-      credentialId: 'cred-1',
-      allowedProjectIds: PROJECT_IDS,
-      name: 'Renamed credential',
-      formName: 'Renamed form',
-      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-      formId: 'form-123',
-    });
+  beforeEach(() => vi.clearAllMocks());
 
-    expect(result).toEqual({
-      id: 'cred-1',
-      name: 'Renamed credential',
-      formName: 'Renamed form',
-      formId: 'form-123',
-      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-    });
-    expect(decryptData).toHaveBeenCalled();
-    expect(encryptData).toHaveBeenCalledWith(
-      { id: 'cred-1', name: 'Renamed credential', type: 'chefsFormAuth' },
-      {
-        formName: 'Renamed form',
-        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-        formId: 'form-123',
-        apiKey: DECRYPTED.apiKey,
-      },
-    );
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'cred-1', name: 'Renamed credential' }));
-  });
+  it('requires n8n credential:update and passes the new key through', async () => {
+    const { service, n8nCredentials } = createService();
 
-  it('rotates the API key when a new one is supplied', async () => {
-    const { service, decryptData, encryptData } = createService();
+    await service.updateFormCredential(USER, { ...input, apiKey: 'rotated' }); // pragma: allowlist secret
 
-    await service.updateFormCredential({
-      credentialId: 'cred-1',
-      allowedProjectIds: PROJECT_IDS,
+    expect(n8nCredentials.findForUser).toHaveBeenCalledWith('cred-1', USER, ['credential:update']);
+    expect(n8nCredentials.update).toHaveBeenCalledWith(USER, credential('cred-1', 'proj-1'), {
       name: 'Intake credential',
-      formName: 'Intake',
-      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-      formId: 'form-123',
-      apiKey: 'rotated-key', // pragma: allowlist secret
+      type: 'chefsFormAuth',
+      data: {
+        formName: 'Intake v2',
+        baseUrl: 'https://chefs-dev.example/app/api/v1',
+        formId: 'form-123',
+        apiKey: 'rotated', // pragma: allowlist secret
+      },
     });
-
-    expect(decryptData).not.toHaveBeenCalled();
-    expect(encryptData).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ apiKey: 'rotated-key' }), // pragma: allowlist secret
-    );
   });
 
-  it('throws 404 when the credential does not exist', async () => {
-    const { service, findOneBy } = createService();
-    findOneBy.mockResolvedValueOnce(null);
+  it('keeps the stored API key when none is supplied', async () => {
+    const { service, n8nCredentials } = createService();
 
-    await expect(
-      service.updateFormCredential({
-        credentialId: 'missing',
-        allowedProjectIds: PROJECT_IDS,
-        name: 'Intake credential',
-        formName: 'Intake',
-        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-        formId: 'form-123',
-      }),
-    ).rejects.toMatchObject({ statusCode: 404 });
+    await service.updateFormCredential(USER, input);
+
+    expect(n8nCredentials.update.mock.calls[0][2].data.apiKey).toBe(BLANK);
   });
 
-  it('throws 403 when the credential is not shared with an allowed project', async () => {
-    const { service, findProjectIds } = createService();
-    findProjectIds.mockResolvedValueOnce(['other-proj']);
+  it('returns 404 when the user cannot update the credential', async () => {
+    const { service, n8nCredentials } = createService();
+    n8nCredentials.findForUser.mockResolvedValueOnce(null);
+    await expect(service.updateFormCredential(USER, input)).rejects.toMatchObject({ statusCode: 404 });
+    expect(n8nCredentials.update).not.toHaveBeenCalled();
+  });
 
-    await expect(
-      service.updateFormCredential({
-        credentialId: 'cred-1',
-        allowedProjectIds: PROJECT_IDS,
-        name: 'Intake credential',
-        formName: 'Intake',
-        baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-        formId: 'form-123',
-      }),
-    ).rejects.toMatchObject({ statusCode: 403 });
+  it('rejects update outside the tenant', async () => {
+    const { service, n8nCredentials } = createService();
+    n8nCredentials.findForUser.mockResolvedValueOnce(credential('cred-1', 'proj-9'));
+    await expect(service.updateFormCredential(USER, input)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('rejects a non-CHEFS credential', async () => {
+    const { service, n8nCredentials } = createService();
+    n8nCredentials.findForUser.mockResolvedValueOnce(credential('cred-1', 'proj-1', 'httpBasicAuth'));
+    await expect(service.updateFormCredential(USER, input)).rejects.toMatchObject({ statusCode: 404 });
   });
 });
 
 describe('ChefsService.applyCredentialToTriggerMetadata', () => {
-  it('replaces client form fields with the credential and drops the API key', async () => {
-    const { service } = createService();
+  it('requires n8n credential:read for the saving user', async () => {
+    const { service, n8nCredentials } = createService();
+    n8nCredentials.findForUser.mockResolvedValueOnce(null);
 
-    const result = await service.applyCredentialToTriggerMetadata(
-      {
-        n8nCredentialId: 'cred-1',
-        formId: 'client-form',
-        formName: 'Client name',
-        baseUrl: 'https://evil.example',
-        apiKey: 'client-key', // pragma: allowlist secret
-        postBody: '{}',
-      },
-      PROJECT_IDS,
-    );
-
-    expect(result).toEqual({
-      n8nCredentialId: 'cred-1',
-      formId: 'form-123',
-      formName: 'Intake',
-      baseUrl: 'https://submit.digital.gov.bc.ca/app/api/v1',
-      postBody: '{}',
-    });
-    expect(result).not.toHaveProperty('apiKey');
+    await expect(
+      service.applyCredentialToTriggerMetadata({ n8nCredentialId: 'cred-1' }, TENANT_PROJECTS, USER),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(n8nCredentials.findForUser).toHaveBeenCalledWith('cred-1', USER, ['credential:read']);
   });
 
-  it('leaves metadata unchanged when no credential id is set', async () => {
-    const { service, decryptData } = createService();
-    const metadata = { formId: 'legacy-form', apiKey: 'legacy-key' }; // pragma: allowlist secret
+  it('rejects binding a credential when the session has no n8n user', async () => {
+    const { service } = createService();
+    await expect(
+      service.applyCredentialToTriggerMetadata({ n8nCredentialId: 'cred-1' }, TENANT_PROJECTS, null),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
 
-    const result = await service.applyCredentialToTriggerMetadata(metadata, PROJECT_IDS);
-
-    expect(result).toBe(metadata);
-    expect(decryptData).not.toHaveBeenCalled();
+  it('leaves metadata without a credential id unchanged', async () => {
+    const { service } = createService();
+    const metadata = { formId: 'form-1' };
+    await expect(service.applyCredentialToTriggerMetadata(metadata, TENANT_PROJECTS, null)).resolves.toBe(metadata);
   });
 });

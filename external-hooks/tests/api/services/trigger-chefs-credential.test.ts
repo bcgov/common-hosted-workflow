@@ -43,6 +43,7 @@ const baseUpdate = {
   allowedActors: ['*'],
   authEnabled: false,
   updatedBy: 'user@example.com',
+  n8nUser: null,
 };
 
 describe('TriggerService.update CHEFS credential reference', () => {
@@ -65,5 +66,15 @@ describe('TriggerService.update CHEFS credential reference', () => {
 
     expect(deleteRelation).not.toHaveBeenCalled();
     expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('passes the n8n user to credential binding', async () => {
+    const metadata = { n8nCredentialId: 'cred-1' };
+    const { service, applyCredentialToTriggerMetadata } = createService(metadata);
+    const n8nUser = { id: 'user-1', role: { slug: 'global:member' } };
+
+    await service.update({ ...baseUpdate, metadata, n8nUser });
+
+    expect(applyCredentialToTriggerMetadata).toHaveBeenCalledWith(metadata, ['proj-1'], n8nUser);
   });
 });
