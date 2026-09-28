@@ -16,6 +16,8 @@ import {
 } from './shared/extractor';
 import { getErrorMessage } from './shared/errors';
 import { OcrEngine } from './shared/ocrEngine';
+import { validateExtractionOptions } from './shared/options';
+import { withCleanup, WorkerCleanupError } from './shared/lifecycle';
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
@@ -90,27 +92,34 @@ function buildErrorOutput(item: INodeExecutionData, error: unknown, itemIndex: n
 
 function rethrowAsNodeError(ctx: IExecuteFunctions, error: unknown, itemIndex: number): never {
   if (error instanceof NodeOperationError) throw error;
-  throw new NodeOperationError(ctx.getNode(), getErrorMessage(error), { itemIndex });
+  const nodeError = new NodeOperationError(ctx.getNode(), error instanceof Error ? error : getErrorMessage(error), {
+    itemIndex,
+  });
+  // n8n's ExecutionBaseError initializes its own cause field, clearing native Error causes.
+  if (error instanceof Error) nodeError.cause = error;
+  throw nodeError;
 }
 
 async function processItem(
   ctx: IExecuteFunctions,
   item: INodeExecutionData,
   itemIndex: number,
-  ocrEngine: OcrProvider & { terminate(): Promise<void> },
+  getOcrEngine: (options: ExtractionOptions) => OcrProvider,
 ): Promise<INodeExecutionData> {
   const binaryPropertyName = ctx.getNodeParameter('binaryPropertyName', itemIndex) as string;
   const destinationField = (ctx.getNodeParameter('destinationField', itemIndex) as string).trim();
   validateDestinationField(ctx, destinationField, itemIndex);
 
   const options = getOptions(ctx, itemIndex);
+  validateExtractionOptions(options);
+  validateLanguage(ctx, options.language);
   validatePageSeparator(ctx, options.pageSeparator, itemIndex);
 
   const binary = ctx.helpers.assertBinaryData(itemIndex, binaryPropertyName);
   const buffer = await ctx.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
   validateFileSize(ctx, buffer, itemIndex);
 
-  const result = await extractDocumentText(buffer, binary.mimeType, options, ocrEngine);
+  const result = await extractDocumentText(buffer, binary.mimeType, options, getOcrEngine(options));
   return buildSuccessOutput(item, result, binary, destinationField, itemIndex);
 }
 
@@ -266,39 +275,37 @@ export class DocumentTextExtractor implements INodeType {
     const items = this.getInputData();
     if (items.length === 0) return [[]];
 
-    const language = (this.getNodeParameter('language', 0) as string).trim();
-    validateLanguage(this, language);
-
-    const pageSegmentationMode = this.getNodeParameter('pageSegmentationMode', 0) as PageSegmentationMode;
-    const documentTimeoutMs = this.getNodeParameter('documentTimeoutMs', 0) as number;
-    const ocrEngine: OcrProvider & { terminate(): Promise<void> } = new OcrEngine(
-      language,
-      pageSegmentationMode,
-      documentTimeoutMs,
-    );
+    let ocrEngine: OcrEngine | undefined;
+    const getOcrEngine = (options: ExtractionOptions): OcrEngine => {
+      ocrEngine ??= new OcrEngine(options.language, options.pageSegmentationMode, options.documentTimeoutMs);
+      return ocrEngine;
+    };
     const returnData: INodeExecutionData[] = [];
 
-    try {
-      for (const [itemIndex, item] of items.entries()) {
-        const keepBinary = this.getNodeParameter('keepBinary', itemIndex) as boolean;
-        try {
-          const output = await processItem(this, item, itemIndex, ocrEngine);
-          if (keepBinary) output.binary = item.binary;
-          returnData.push(output);
-        } catch (error) {
-          if (this.continueOnFail()) {
-            const errorItem = buildErrorOutput(item, error, itemIndex);
-            if (keepBinary) errorItem.binary = item.binary;
-            returnData.push(errorItem);
-            continue;
+    return await withCleanup(
+      async () => {
+        for (const [itemIndex, item] of items.entries()) {
+          const keepBinary = this.getNodeParameter('keepBinary', itemIndex) as boolean;
+          try {
+            await ocrEngine?.waitForShutdown();
+            const output = await processItem(this, item, itemIndex, getOcrEngine);
+            if (keepBinary) output.binary = item.binary;
+            returnData.push(output);
+          } catch (error) {
+            // Shutdown rejection leaves worker exit unconfirmed: stop even with Continue On Fail.
+            if (error instanceof WorkerCleanupError) rethrowAsNodeError(this, error, itemIndex);
+            if (this.continueOnFail()) {
+              const errorItem = buildErrorOutput(item, error, itemIndex);
+              if (keepBinary) errorItem.binary = item.binary;
+              returnData.push(errorItem);
+              continue;
+            }
+            rethrowAsNodeError(this, error, itemIndex);
           }
-          rethrowAsNodeError(this, error, itemIndex);
         }
-      }
-    } finally {
-      await ocrEngine.terminate();
-    }
-
-    return [returnData];
+        return [returnData];
+      },
+      async () => await ocrEngine?.terminate(),
+    );
   }
 }

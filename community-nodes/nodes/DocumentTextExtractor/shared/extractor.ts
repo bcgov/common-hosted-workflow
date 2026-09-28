@@ -1,6 +1,8 @@
 import { imageSize } from 'image-size';
 import { PdfEngine } from './pdfEngine';
 import type { PdfProvider, PdfProviderFactory } from './pdfProvider';
+import { validateExtractionOptions } from './options';
+import { withCleanup } from './lifecycle';
 
 export type ExtractionMode = 'auto' | 'text' | 'ocr';
 export type PageSegmentationMode = 'auto' | 'singleBlock' | 'singleColumn' | 'sparseText';
@@ -207,29 +209,30 @@ async function extractPdf(
   const deadline = Date.now() + options.documentTimeoutMs;
   const parser = pdfProviderFactory(buffer, options.password || undefined, options.documentTimeoutMs);
 
-  try {
-    const embedded = await loadEmbeddedText(parser, options, deadline);
-    const plan = await determineOcrPlan(parser, options, embedded.pages, embedded.totalPages, deadline);
+  return await withCleanup(
+    async () => {
+      const embedded = await loadEmbeddedText(parser, options, deadline);
+      const plan = await determineOcrPlan(parser, options, embedded.pages, embedded.totalPages, deadline);
 
-    let pages = embedded.pages;
-    const totalPages = plan.totalPages;
+      let pages = embedded.pages;
+      const totalPages = plan.totalPages;
 
-    if (plan.pagesToOcr.length > 0) {
-      const pageDimensions = await resolvePageDimensions(
-        parser,
-        plan.pagesToOcr,
-        plan.pageDimensions,
-        options,
-        deadline,
-      );
-      const ocrPages = await runOcrForPages(parser, ocrProvider, plan.pagesToOcr, pageDimensions, options, deadline);
-      pages = mergeExtractedPages(pages, ocrPages, options.mode);
-    }
+      if (plan.pagesToOcr.length > 0) {
+        const pageDimensions = await resolvePageDimensions(
+          parser,
+          plan.pagesToOcr,
+          plan.pageDimensions,
+          options,
+          deadline,
+        );
+        const ocrPages = await runOcrForPages(parser, ocrProvider, plan.pagesToOcr, pageDimensions, options, deadline);
+        pages = mergeExtractedPages(pages, ocrPages, options.mode);
+      }
 
-    return finalizePdfResult(pages, totalPages, options);
-  } finally {
-    await parser.terminate();
-  }
+      return finalizePdfResult(pages, totalPages, options);
+    },
+    async () => await parser.terminate(),
+  );
 }
 
 export async function extractDocumentText(
@@ -239,6 +242,7 @@ export async function extractDocumentText(
   ocrProvider: OcrProvider,
   pdfProviderFactory: PdfProviderFactory = (data, password, timeoutMs) => new PdfEngine(data, password, timeoutMs),
 ): Promise<ExtractionResult> {
+  validateExtractionOptions(options);
   if (isPdf(buffer, mimeType)) {
     return await extractPdf(buffer, options, ocrProvider, pdfProviderFactory);
   }

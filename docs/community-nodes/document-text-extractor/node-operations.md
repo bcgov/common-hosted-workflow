@@ -18,6 +18,24 @@
 | Destination Field            | `documentText` | Contains all extraction output without overwriting common input fields |
 | Keep Input Binary            | `false`        | Preserves the source binary on the output item                         |
 
+### Runtime-enforced limits
+
+These bounds are inclusive and enforced before binary retrieval and provider creation, including expression results and imported workflow settings. Values are rejected, never clamped or rounded; errors identify the serialized parameter name.
+
+| Parameter              | Accepted value                                         |
+| ---------------------- | ------------------------------------------------------ |
+| `maxPages`             | Integer 1–100                                          |
+| `renderScale`          | Finite number 1–4; fractions are supported             |
+| `minimumTextLength`    | Integer 0–10,000                                       |
+| `maxCharacters`        | Integer 1,000–10,000,000                               |
+| `documentTimeoutMs`    | Integer 1,000–300,000 milliseconds                     |
+| `mode`                 | `auto`, `text`, or `ocr`                               |
+| `pageSegmentationMode` | `auto`, `singleBlock`, `singleColumn`, or `sparseText` |
+
+Numeric strings, nonnumeric values, NaN and Infinity are rejected. All limits are validated even when the selected mode or file type does not use a setting. Mode, OCR language, segmentation and timeout remain execution-wide settings; expression-enabled limits are evaluated for each item. The page separator remains limited to 1,000 characters.
+
+The processing timeout includes worker initialization. Worker shutdown is awaited afterward, so total wall-clock time can exceed the processing timeout while the worker exits.
+
 ## PDF Modes
 
 ### Automatic
@@ -34,4 +52,6 @@ Renders every selected page and processes it with OCR. Use this when the PDF tex
 
 ## Errors
 
-Unsupported file types, missing binary fields, oversized files or rendered pages, invalid PDFs, encrypted PDFs without the correct password, timeouts, PDF rendering failures, and OCR initialization failures produce node operation errors. With n8n's **Continue On Fail** setting enabled, the failed input produces an error item and subsequent inputs continue.
+Invalid settings, unsupported file types, missing binary fields, oversized files or rendered pages, invalid PDFs, encrypted PDFs without the correct password, timeouts, PDF rendering failures, and OCR initialization failures produce errors. With n8n's **Continue On Fail** setting enabled, the failed input produces an error item paired to its input and subsequent inputs continue after required worker shutdown completes. An invalid per-item limit does not retrieve that item's binary and does not prevent a later item with valid limits from succeeding.
+
+If worker shutdown itself rejects, execution stops even with **Continue On Fail**: worker exit is unconfirmed, so starting another document could overlap resource use. Cleanup errors are reported alongside the original extraction error when both occur. Successful results are returned only after final OCR cleanup succeeds.
