@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { defaultOutputEntries, executeWith, manualDiscountParams } from './helpers';
 import { DmnDecisionTable } from '../../nodes/DmnDecisionTable/DmnDecisionTable.node';
 import { SAMPLE_DMN_XML } from './fixtures';
-import { defaultOutputEntries, executeWith, manualDiscountParams } from './helpers';
 
 describe('DmnDecisionTable node (manual source)', () => {
   it('keeps rule descriptions without affecting matching', async () => {

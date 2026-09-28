@@ -43,14 +43,19 @@ Input cells support the following expression subset. Use only these forms; this 
 - Wildcards: empty, `-`, `any`
 - Equality: `"quoted"`, barewords, numbers, `true`/`false` (string `'true'`/`'false'` inputs match boolean cells)
 - Explicit null: `null` matches only null/undefined input
-- Comparisons: `>`, `<`, `>=`, `<=`, `=`, `==`, `!=`, `<>` — numbers with numbers, ISO dates with dates, `HH:MM` times with times; mixing domains never matches
+- Ordered comparisons: `>`, `<`, `>=`, `<=` — numbers with numbers, ISO dates with dates, `HH:MM` times with times; mixing domains never matches
+- Equality operators: `=`, `==`, `!=`, `<>` use the equality/coercion rules above; `!=` and `<>` negate equality
 - Ranges: `[a..b]`, `(a..b)`, `[a..b)`, `(a..b]`
 - Lists: `"a","b"` or `["a","b"]` — each option is a full test (`>5, <1` works); comma means OR
 - Negation: `not(...)` around any of the above
-- FEEL constructors: `date("2026-01-01")`, `time("09:00")`, `date and time("...")` unwrap to their literal
+- FEEL constructors: `date("2026-01-01")`, `time("09:00")`, `date and time("...")` (alias `datetime("...")`) unwrap one quoted or bare scalar literal
 - Escapes: `\"`, `\'`, `\\` inside quoted strings
 
 Unquoted FEEL boolean logic (`and`/`or`/`in`/`between`/...) is rejected loudly — quote such text to match it literally. Output values follow the declared output type: parsed as JSON, except `string`/`date` outputs also accept bare text (`premium` needs no quotes). `null` works for any type; anything else that does not fit the type throws.
+
+Comparison operands, both range bounds, and constructor arguments use the same literal grammar as standalone equality: one complete quoted string, or bare text using letters/numbers, spaces and `_ . @ + / : -` (without FEEL keywords). Constructors accept a single scalar literal, including existing bare forms such as `date(2026-01-01)`; nested calls, lists, multiple arguments and computed arguments are unsupported. They remain literal wrappers, not full temporal validators.
+
+Unsupported syntax such as `!= foo(bar)`, `not(> foo(bar))`, `[1..foo(bar)]` or `date(foo(bar))` raises an error when evaluated. All alternatives within an evaluated list are checked, even if an earlier alternative matches. To match function-like text literally, quote it: `"foo(bar)"` or `!= "foo(bar)"`. Syntactically valid but incomparable literals remain ordinary nonmatches for ordered comparisons/ranges; for example, `> "not-a-time"` and a number compared to `time("09:00")` return false. `not()` still negates that false result.
 
 ## No Match Behavior
 
@@ -59,6 +64,12 @@ Unquoted FEEL boolean logic (`and`/`or`/`in`/`between`/...) is rejected loudly �
 - **Throw Error**: fails the item (recoverable per item with **Continue On Fail**).
 
 The node-level default is resolved independently for each item. An empty object uses the JSON table's embedded default, if present. Every default key must name a declared output. An empty default on a later item never inherits an earlier item's node-level default.
+
+Leaving Default Output Entries untouched (`{}`), omitted, or with an empty `definitions` array is supported for every source. Collections must otherwise contain the expected row array and object rows; malformed containers, unexpected collection options and nonstring text fields raise contextual errors when read. Well-formed foreign entries that do not fit the selected table still follow the source-switch fallback policy above.
+
+## Errors and Item Pairing
+
+Expression errors identify the one-based rule number and input name, for example `Rule 2 input "spend": Unsupported cell expression...`. Per-item expression, input-value and default errors stop execution unless **Continue On Fail** is enabled; with it, the failed item emits `{ "error": "..." }` and later items continue. Both errors and successful outputs retain input-item pairing. Invalid shared table structure (including malformed manual rule collections) fails before the item loop, even with Continue On Fail.
 
 ## Output Modes
 
@@ -83,9 +94,10 @@ Multi-hit output uses one array per declared output, e.g. `{ "grade": ["A", "B"]
 - XML: at most 5,000,000 characters; DOCTYPE declarations are rejected before parsing.
 - Input cell expressions: at most 100,000 characters and 64 nesting levels.
 - JSON output numbers must be finite; SUM overflow raises an error.
-- FIRST stops after the first matching rule; later output expressions are not evaluated. Structural validation still runs on the whole table.
+- FIRST stops after the first matching rule; later input and output expressions are not evaluated. Input tests within a rule stop on the first nonmatch, and outputs are parsed only for matching rules. Structural validation still runs on the whole table.
 
 ## More Information
 
 - [Table source examples](table-source-examples.md)
 - [Node operations](node-operations.md)
+- [Release notes](release-notes.md)

@@ -479,7 +479,7 @@ export class DmnDecisionTable implements INodeType {
         // constants from the table definition. DMN XML declares no values.
         const candidates =
           tableSource === 'manual'
-            ? readCollection<ManualInputParam>(this, itemIndex, 'inputs', 'definitions')
+            ? readCollection<ManualInputParam>(this, itemIndex, 'inputs', 'definitions', ['name'])
             : table.inputs;
         const values = applyInputValues(table, itemJson, candidates);
         const { output, matchedRuleIndexes } = evaluate({ ...table, defaultOutput }, values);
@@ -567,7 +567,10 @@ function tryForeignDefaultEntries(
   itemIndex: number,
   table: DecisionTable,
 ): Record<string, unknown> | undefined {
-  const defs = readCollection<ManualResultParam>(context, itemIndex, 'defaultOutputs', 'definitions');
+  const defs = readCollection<ManualResultParam>(context, itemIndex, 'defaultOutputs', 'definitions', [
+    'outputName',
+    'value',
+  ]);
   if (defs.length === 0) return undefined;
   try {
     return buildDefaultEntries(defs, table);
@@ -583,7 +586,10 @@ function resolveEffectiveDefault(
   tableSource: TableSource,
 ): Record<string, unknown> {
   if (tableSource === 'manual') {
-    const defs = readCollection<ManualResultParam>(context, itemIndex, 'defaultOutputs', 'definitions');
+    const defs = readCollection<ManualResultParam>(context, itemIndex, 'defaultOutputs', 'definitions', [
+      'outputName',
+      'value',
+    ]);
     if (defs.length > 0) return buildDefaultEntries(defs, table);
     const legacy = parseJsonParameter(context, itemIndex, 'defaultOutput', {});
     if (Object.keys(legacy).length > 0) return legacy;
@@ -643,16 +649,44 @@ function parseJsonParameter(
 }
 
 /**
- * Reads a fixedCollection parameter, tolerating both the real n8n shape
- * (getNodeParameter(name) -> { optionName: rows }) and flat dotted access.
+ * Read the collection object with a defined fallback: n8n throws for a
+ * missing dotted path when its fallback is undefined (including empty UI
+ * collections). Validate before unwrapping so malformed rules cannot turn
+ * into wildcards or silently lose configured defaults.
  */
-function readCollection<T>(context: IExecuteFunctions, itemIndex: number, name: string, option: string): T[] {
-  const direct = context.getNodeParameter(`${name}.${option}`, itemIndex, undefined) as T[] | undefined;
-  if (Array.isArray(direct)) return direct;
-  const collection = context.getNodeParameter(name, itemIndex, {}) as Record<string, unknown>;
-  const rows = collection?.[option];
-  if (Array.isArray(rows)) return rows as T[];
-  return [];
+function readCollection<T>(
+  context: IExecuteFunctions,
+  itemIndex: number,
+  name: string,
+  option: string,
+  stringFields: string[],
+): T[] {
+  return unwrapCollection<T>(context.getNodeParameter(name, itemIndex, {}), name, option, stringFields);
+}
+
+function unwrapCollection<T>(raw: unknown, name: string, option: string, stringFields: string[]): T[] {
+  if (raw === undefined) return [];
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`Collection "${name}" must be an object containing "${option}" rows`);
+  }
+  if (Object.keys(raw).some((key) => key !== option)) {
+    throw new Error(`Collection "${name}" only supports the "${option}" option`);
+  }
+  const rows = (raw as Record<string, unknown>)[option];
+  if (rows === undefined) return [];
+  if (!Array.isArray(rows)) throw new Error(`Collection "${name}.${option}" must be an array`);
+  for (const [index, row] of rows.entries()) {
+    const label = `Collection "${name}.${option}" row ${index + 1}`;
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error(`${label} must be an object`);
+    }
+    for (const field of stringFields) {
+      if (row[field] !== undefined && typeof row[field] !== 'string') {
+        throw new Error(`${label} field "${field}" must be a string`);
+      }
+    }
+  }
+  return rows as T[];
 }
 
 /**
@@ -718,13 +752,6 @@ function applyInputValues(
   return values;
 }
 
-/** Reject malformed lists; silently replacing input tests with [] would make a wildcard. */
-function asRowArray<T>(value: T[] | undefined): T[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new Error('Rule entry values must be an array');
-  return value;
-}
-
 function buildTable(context: IExecuteFunctions): DecisionTable {
   const source = context.getNodeParameter('tableSource', 0, 'manual') as TableSource;
   const decisionId = (context.getNodeParameter('decisionId', 0, '') as string).trim() || undefined;
@@ -779,12 +806,9 @@ function buildTable(context: IExecuteFunctions): DecisionTable {
 
   const hitPolicy = context.getNodeParameter('hitPolicy', 0, 'FIRST') as HitPolicy;
   const aggregation = context.getNodeParameter('collectAggregation', 0, 'NONE') as CollectAggregation;
-  // fixedCollection params arrive as { <optionName>: [...] }; unwrap defensively
-  // so both real n8n (getNodeParameter('inputs') -> object) and flat test
-  // contexts (getNodeParameter('inputs.definitions') -> array) work.
-  const rawInputs = readCollection<ManualInputParam>(context, 0, 'inputs', 'definitions');
-  const rawOutputs = readCollection<ManualOutputParam>(context, 0, 'outputs', 'definitions');
-  const rawRules = readCollection<ManualRuleRow>(context, 0, 'rules', 'entries');
+  const rawInputs = readCollection<ManualInputParam>(context, 0, 'inputs', 'definitions', ['name']);
+  const rawOutputs = readCollection<ManualOutputParam>(context, 0, 'outputs', 'definitions', ['name']);
+  const rawRules = readCollection<ManualRuleRow>(context, 0, 'rules', 'entries', ['description']);
 
   const inputs = rawInputs.map((entry) => {
     const row = entry ?? {};
@@ -801,14 +825,23 @@ function buildTable(context: IExecuteFunctions): DecisionTable {
     };
   });
 
-  // Fixed-collection rows arrive as arrays of row objects; map them directly.
-  // Malformed rows degrade to empty entries so validateTable reports them
-  // loudly instead of throwing TypeErrors here.
-  const mappedRules = rawRules.map((rule: ManualRuleRow) => {
+  // Validate nested collections before mapping: malformed input entries
+  // must never be mistaken for intentionally empty wildcard entries.
+  const mappedRules = rawRules.map((rule: ManualRuleRow, ruleIndex) => {
     const row = rule ?? {};
     const descriptionText = typeof row.description === 'string' ? row.description.trim() : '';
-    const inputRows = asRowArray<ManualCellParam>(row.inputEntries?.values);
-    const outputRows = asRowArray<ManualResultParam>(row.outputEntries?.values);
+    const inputRows = unwrapCollection<ManualCellParam>(
+      row.inputEntries,
+      `Rule ${ruleIndex + 1} inputEntries`,
+      'values',
+      ['inputName', 'expression'],
+    );
+    const outputRows = unwrapCollection<ManualResultParam>(
+      row.outputEntries,
+      `Rule ${ruleIndex + 1} outputEntries`,
+      'values',
+      ['outputName', 'value'],
+    );
     return {
       ...(descriptionText ? { description: descriptionText } : {}),
       inputEntries: inputRows.map((cell) => {

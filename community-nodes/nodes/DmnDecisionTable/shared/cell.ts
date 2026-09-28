@@ -25,7 +25,8 @@ const UNSUPPORTED_HINT =
 
 const FEEL_KEYWORDS = /\b(and|or|in|between|some|every|if|then|else|for|return)\b|\binstance\s+of\b/i;
 
-const FEEL_CONSTRUCTOR = /^(?:date\s+and\s+time|datetime|date|time)\s*\(.*\)$/is;
+const QUOTED_LITERAL = /^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')$/s;
+const BARE_LITERAL = /^[\p{L}\p{N}_.@+/: -]+$/u;
 
 function unquotedSyntax(text: string): string {
   return text
@@ -48,18 +49,23 @@ function stripQuotes(raw: string): { quoted: boolean; value: string } {
 }
 
 /**
- * Unwraps FEEL date/time constructors emitted by BPMN tools
- * (e.g. Camunda writes `date("2026-01-01")` in cells).
- * Returns the inner literal, or the input unchanged.
+ * Validates exactly one literal before any comparison or negation can turn
+ * invalid syntax into a match. Constructors are literal wrappers, not FEEL
+ * function evaluation: one quoted or bare scalar argument, no nested calls.
+ * Domain comparability is deliberately separate from syntax validation.
  */
-function unwrapFeelConstructor(raw: string): string {
-  const match = /^(?:date\s+and\s+time|datetime|date|time)\s*\((.*)\)$/is.exec(raw.trim());
-  if (!match) return raw;
-  return match[1].trim();
+function parseCellLiteral(raw: string): { quoted: boolean; value: string } {
+  const text = raw.trim();
+  const constructor = /^(?:date\s+and\s+time|datetime|date|time)\s*\((.*)\)$/is.exec(text);
+  const literal = constructor ? constructor[1].trim() : text;
+  if (QUOTED_LITERAL.test(literal) || (BARE_LITERAL.test(literal) && !FEEL_KEYWORDS.test(literal))) {
+    return stripQuotes(literal);
+  }
+  throw new Error(`${UNSUPPORTED_HINT} Got "${raw}".`);
 }
 
 /**
- * Splits on a delimiter, ignoring delimiters inside quotes or brackets.
+ * Splits on a delimiter (including '..'), ignoring it inside quotes or brackets.
  * Backslash-escaped quotes do not toggle quoting, so values like "a\"b"
  * survive as one unit. Exported for reuse (e.g. parsing `<outputValues>`).
  */
@@ -69,7 +75,8 @@ export function splitTopLevel(text: string, delimiter: string): string[] {
   let quote: string | null = null;
   let escaped = false;
   let current = '';
-  for (const char of text) {
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
     if (escaped) {
       current += char;
       escaped = false;
@@ -93,9 +100,10 @@ export function splitTopLevel(text: string, delimiter: string): string[] {
     if (char === '[' || char === '(') depth += 1;
     if (char === ']' || char === ')') depth -= 1;
     if (depth < 0) throw new Error('Unbalanced cell expression brackets');
-    if (char === delimiter && depth === 0) {
+    if (delimiter !== '' && text.startsWith(delimiter, index) && depth === 0) {
       parts.push(current);
       current = '';
+      index += delimiter.length - 1;
       continue;
     }
     current += char;
@@ -157,7 +165,7 @@ function toComparable(value: unknown): Comparable | null {
  * across domains or fall back to lexicographic comparison).
  */
 function compareValues(actual: unknown, expectedRaw: string): number | null {
-  const expected = stripQuotes(unwrapFeelConstructor(expectedRaw)).value;
+  const expected = parseCellLiteral(expectedRaw).value;
   const actualComp = toComparable(actual);
   const expectedComp = toComparable(expected);
   if (actualComp !== null && expectedComp !== null && actualComp.domain === expectedComp.domain) {
@@ -169,7 +177,7 @@ function compareValues(actual: unknown, expectedRaw: string): number | null {
 }
 
 function equalsValue(actual: unknown, expectedRaw: string): boolean {
-  const { quoted, value: expected } = stripQuotes(unwrapFeelConstructor(expectedRaw));
+  const { quoted, value: expected } = parseCellLiteral(expectedRaw);
   if (!quoted) {
     const lowered = expected.toLowerCase();
     // Webhook/form inputs commonly arrive as strings; accept the canonical
@@ -214,11 +222,10 @@ function matchesRange(actual: unknown, expression: string): boolean {
 }
 
 function splitOnRange(inner: string): string[] {
-  const match = /^(.*)\.\.(.*)$/s.exec(inner);
-  if (!match) throw new Error(`Invalid range expression "${inner}". Expected a..b bounds.`);
-  const bounds = [match[1].trim(), match[2].trim()];
-  // Reject 'a..b..c': bounds themselves must not contain a range separator.
-  if (bounds.some((bound) => bound === '' || bound.includes('..'))) {
+  const bounds = splitTopLevel(inner, '..').map((bound) => bound.trim());
+  // Quoted '..' is literal data, including inside constructor arguments.
+  // Keep rejecting extra unquoted separators, even within a wrapper.
+  if (bounds.length !== 2 || bounds.some((bound) => bound === '' || unquotedSyntax(bound).includes('..'))) {
     throw new Error(`Invalid range expression "[${inner}]". Expected [a..b] form.`);
   }
   return bounds;
@@ -246,10 +253,6 @@ function matchesComparison(actual: unknown, expression: string): boolean {
   // Equality operators reuse equalsValue (handles booleans/null/numbers).
   if (operator === '=' || operator === '==') return equalsValue(actual, operand);
   if (operator === '!=' || operator === '<>') {
-    const { value } = stripQuotes(operand);
-    if (value.toLowerCase() === 'null' && !stripQuotes(operand).quoted) {
-      return actual !== null && actual !== undefined;
-    }
     return !equalsValue(actual, operand);
   }
   const comparison = compareValues(actual, operand);
@@ -309,25 +312,16 @@ function matchesCellAtDepth(actual: unknown, expression: string, depth: number):
   if (comparisonMatch) return matchesComparison(actual, text);
 
   // Bracketed: '["a", "b"]' is membership, '[a..b]' is a range.
-  // Any '(' opener or '..' content means a range attempt (validated inside).
+  // Any '(' opener or top-level '..' means a range attempt (validated inside).
   if (text.startsWith('(')) return matchesRange(actual, text);
   if (text.startsWith('[') && text.endsWith(']')) {
     const inner = text.slice(1, -1).trim();
-    if (!unquotedSyntax(inner).includes('..')) return matchesList(actual, inner, depth);
+    if (splitTopLevel(inner, '..').length === 1) return matchesList(actual, inner, depth);
     return matchesRange(actual, text);
   }
   if (text.startsWith('[')) return matchesRange(actual, text);
 
-  // A lone FEEL constructor (e.g. date("2026-01-01")) is an equality test
-  // on the unwrapped literal; comparisons/ranges unwrap their operands too.
-  if (FEEL_CONSTRUCTOR.test(text)) {
-    return equalsValue(actual, text);
-  }
-
-  // Quoted values compare textually (numbers/booleans stringify for
-  // webhook-style inputs); barewords may use any language's letters.
-  if (/^".*"$/.test(text) || /^'.*'$/.test(text) || /^[\p{L}\p{N}_.@+/: -]+$/u.test(text)) {
-    return equalsValue(actual, text);
-  }
-  throw new Error(`${UNSUPPORTED_HINT} Got "${expression}".`);
+  // Standalone equality, comparison operands and range bounds share the
+  // same literal grammar (including the supported date/time wrappers).
+  return equalsValue(actual, text);
 }

@@ -24,13 +24,16 @@ export function createExecutionContext(opts: CreateContextOptions) {
   const ctx = {
     getInputData: vi.fn(() => inputItems),
     getNodeParameter: vi.fn((name: string, index: number, fallback?: unknown) => {
-      if (name in params) {
-        const value = params[name];
-        // Function values resolve per item index (simulates expressions).
-        if (typeof value === 'function') return (value as (itemIndex: number) => unknown)(index);
-        return value;
+      // n8n looks up the path before resolving expressions, and throws when
+      // both the stored parameter and its fallback are undefined.
+      let value: unknown = params;
+      for (const key of name.split('.')) {
+        value = value !== null && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
       }
-      return fallback;
+      if (value === undefined) value = fallback;
+      if (value === undefined) throw new Error(`Could not get parameter: ${name}`);
+      // Function values resolve per item index (simulates expressions).
+      return typeof value === 'function' ? (value as (itemIndex: number) => unknown)(index) : value;
     }),
     getNode: vi.fn(() => ({ name: 'DMN Decision Table Test' })),
     continueOnFail: vi.fn(() => continueOnFail),
