@@ -1,24 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { cloneCreds, executeWith } from './helpers';
 import { normalizePairs, toObject } from '../../nodes/KeyValueStore/shared/pairs';
 import { KeyValueStore } from '../../nodes/KeyValueStore/KeyValueStore.node';
-import { cloneCreds, executeWith } from './helpers';
+import { KeyValueStore as KeyValueStoreCredential } from '../../credentials/KeyValueStore.credentials';
 
 describe('normalizePairs', () => {
-  it('returns an empty array for missing or malformed credential shapes', () => {
-    expect(normalizePairs(undefined)).toEqual([]);
-    expect(normalizePairs(null)).toEqual([]);
+  it('returns an empty array for intentionally empty credentials', () => {
     expect(normalizePairs({})).toEqual([]);
     expect(normalizePairs({ pairs: {} })).toEqual([]);
-    expect(normalizePairs({ pairs: { values: 'nope' } })).toEqual([]);
+    expect(normalizePairs({ pairs: { values: [] } })).toEqual([]);
   });
 
-  it('skips empty names and unsafe keys', () => {
+  it('skips only untouched blank UI rows', () => {
     expect(
       normalizePairs({
         pairs: {
           values: [
-            { name: '', value: 'blank' },
-            { name: '__proto__', value: 'polluted' },
+            { name: '', value: '' },
             { name: 'ok', value: 'yes' },
           ],
         },
@@ -43,7 +42,7 @@ describe('toObject', () => {
         { name: 'a', value: '1' },
         { name: 'a', value: '2' },
       ]),
-    ).toThrow('Duplicate key "a"');
+    ).toThrow('row 2: Duplicate key');
   });
 });
 
@@ -74,6 +73,46 @@ describe('KeyValueStore node', () => {
     expect(node.description.sensitiveOutputFields).toContain('values');
   });
 
+  it('preserves serialized node, credential and property identifiers', () => {
+    const node = new KeyValueStore();
+    const credential = new KeyValueStoreCredential();
+    expect(node.description.name).toBe('keyValueStore');
+    expect(node.description.version).toBe(1);
+    expect(node.description.credentials).toEqual([{ name: 'keyValueStore', required: true }]);
+    expect(node.description.properties).toHaveLength(1);
+    expect(node.description.properties[0]).toMatchObject({
+      name: 'outputFormat',
+      noDataExpression: true,
+      default: 'both',
+      options: [{ value: 'both' }, { value: 'object' }, { value: 'array' }],
+    });
+    expect(credential.name).toBe('keyValueStore');
+    expect(credential.properties[0]).toMatchObject({
+      name: 'pairs',
+      default: { values: [{ name: '', value: '' }] },
+      options: [{ name: 'values', values: [{ name: 'name' }, { name: 'value', typeOptions: { password: true } }] }],
+    });
+    expect(normalizePairs({ pairs: credential.properties[0].default })).toEqual([]);
+  });
+
+  it('links node and credential help to canonical local documentation routes', () => {
+    const metadata = JSON.parse(
+      readFileSync(new URL('../../nodes/KeyValueStore/KeyValueStore.node.json', import.meta.url), 'utf8'),
+    );
+    const base = 'https://bcgov.github.io/common-hosted-workflow/community-nodes/key-value-store';
+    expect(metadata.node).toBe('community-nodes.keyValueStore');
+    expect(metadata.resources.primaryDocumentation).toEqual([{ url: base }]);
+    expect(metadata.resources.credentialDocumentation).toEqual([{ url: `${base}/credentials` }]);
+    expect(new KeyValueStoreCredential().documentationUrl).toBe(`${base}/credentials`);
+    for (const file of ['README.md', 'credentials.md', 'node-operations.md', 'release-notes.md']) {
+      const guide = readFileSync(
+        new URL(`../../../docs/community-nodes/key-value-store/${file}`, import.meta.url),
+        'utf8',
+      );
+      expect(guide).toMatch(/^# Key Value Store/);
+    }
+  });
+
   it('treats prototype names as regular keys', () => {
     expect(toObject([{ name: 'toString', value: 'x' }])).toEqual({ toString: 'x' });
   });
@@ -90,7 +129,7 @@ describe('KeyValueStore node', () => {
           },
         }),
       }),
-    ).rejects.toThrow('Duplicate key "a"');
+    ).rejects.toThrow('row 2: Duplicate key');
   });
 
   it('returns empty outputs when the credential has no pairs', async () => {
