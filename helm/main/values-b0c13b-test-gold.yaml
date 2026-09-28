@@ -14,6 +14,7 @@ n8n:
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:test:"
     AUTHZ_ENVIRONMENT: test
     CHEFS_BASE_URL: https://chefs-test.apps.silver.devops.gov.bc.ca
+    CHEFS_ALLOWED_ORIGINS: "https://chefs-dev.apps.silver.devops.gov.bc.ca,https://chefs-test.apps.silver.devops.gov.bc.ca,https://submit.digital.gov.bc.ca"
     FEATURES_ENABLED: "workflow-share"
     N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
     N8N_EXECUTION_DATA_STORAGE_MODE: "default"
