@@ -71,6 +71,7 @@ describe('OcrEngine', () => {
 
     const secondRecognition = engine.recognize(Buffer.from([2]));
     firstWorker.emit('message', { type: 'fatal', error: 'late failure' });
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
     secondWorker.emit('message', { type: 'ready' });
     await vi.waitFor(() => expect(secondWorker.postMessage).toHaveBeenCalledOnce());
     const request = secondWorker.postMessage.mock.calls[0][0] as { id: number };

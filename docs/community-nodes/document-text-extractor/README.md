@@ -18,6 +18,8 @@ Images always use OCR. In Automatic mode, each PDF page with fewer than the conf
 - Maximum input size: 25 MB
 - Maximum configurable PDF page count: 100
 
+Numeric limits and mode/layout selections are [validated at runtime](node-operations.md#runtime-enforced-limits), before binary retrieval. Imported workflows and expression results must satisfy the same limits as the editor.
+
 OCR language data may be downloaded by Tesseract.js when a language is first used, so workers require outbound access unless language data is already cached.
 
 ## Output
@@ -57,3 +59,4 @@ Existing input JSON fields are preserved outside the configurable destination fi
 
 - [Architecture](architecture.md)
 - [Node operations](node-operations.md)
+- [Release notes](release-notes.md)

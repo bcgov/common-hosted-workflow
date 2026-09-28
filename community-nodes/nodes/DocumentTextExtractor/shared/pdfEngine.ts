@@ -2,6 +2,7 @@ import path from 'node:path';
 import { Worker as NodeWorker, type WorkerOptions } from 'node:worker_threads';
 import { getErrorMessage } from './errors';
 import type { PdfInspectionResult, PdfProvider, PdfTextResult } from './pdfProvider';
+import { rethrowAfterCleanup, WorkerShutdown } from './lifecycle';
 
 interface PendingRequest {
   resolve: (result: unknown) => void;
@@ -26,6 +27,7 @@ export class PdfEngine implements PdfProvider {
   private readonly pending = new Map<number, PendingRequest>();
   private nextRequestId = 1;
   private terminated = false;
+  private readonly shutdown = new WorkerShutdown();
 
   constructor(
     buffer: Buffer,
@@ -69,6 +71,8 @@ export class PdfEngine implements PdfProvider {
         if (!this.terminated) this.fail(new Error(`PDF worker exited with code ${code}`));
       });
     });
+    // Initialization can fail before the first request is made.
+    void this.readyPromise.catch(() => undefined);
   }
 
   private fail(error: Error): void {
@@ -83,15 +87,31 @@ export class PdfEngine implements PdfProvider {
       pending.reject(error);
     }
     this.pending.clear();
-    void this.worker.terminate();
+    this.shutdown.start(this.worker);
   }
 
   private async request<T>(request: Record<string, unknown>, timeoutMs: number, operation: string): Promise<T> {
+    try {
+      return await this.requestWithWorker<T>(request, timeoutMs, operation);
+    } catch (error) {
+      return await rethrowAfterCleanup(error, async () => await this.shutdown.wait());
+    }
+  }
+
+  private async requestWithWorker<T>(
+    request: Record<string, unknown>,
+    timeoutMs: number,
+    operation: string,
+  ): Promise<T> {
     const startedAt = Date.now();
     await this.readyPromise;
     if (this.terminated) throw new Error('PDF worker is unavailable');
     const operationTimeoutMs = timeoutMs - (Date.now() - startedAt);
-    if (operationTimeoutMs <= 0) throw new Error(`${operation} timed out after ${timeoutMs} ms`);
+    if (operationTimeoutMs <= 0) {
+      const error = new Error(`${operation} timed out after ${timeoutMs} ms`);
+      this.fail(error);
+      throw error;
+    }
 
     const id = this.nextRequestId++;
     return await new Promise<T>((resolve, reject) => {
@@ -124,17 +144,7 @@ export class PdfEngine implements PdfProvider {
   }
 
   async terminate(): Promise<void> {
-    if (this.terminated) return;
-    this.terminated = true;
-    if (this.readyTimer) clearTimeout(this.readyTimer);
-    this.readyTimer = undefined;
-    this.rejectReady?.(new Error('PDF worker terminated'));
-    this.rejectReady = undefined;
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error('PDF worker terminated'));
-    }
-    this.pending.clear();
-    await this.worker.terminate();
+    this.fail(new Error('PDF worker terminated'));
+    await this.shutdown.wait();
   }
 }

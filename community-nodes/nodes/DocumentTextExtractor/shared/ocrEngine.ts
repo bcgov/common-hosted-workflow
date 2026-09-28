@@ -3,6 +3,7 @@ import { Worker as NodeWorker, type WorkerOptions } from 'node:worker_threads';
 import { PSM } from 'tesseract.js';
 import { getErrorMessage } from './errors';
 import type { OcrProvider, PageSegmentationMode } from './extractor';
+import { rethrowAfterCleanup, WorkerCleanupError, WorkerShutdown } from './lifecycle';
 
 interface PendingRecognition {
   resolve: (result: { text: string; confidence: number }) => void;
@@ -34,6 +35,7 @@ export class OcrEngine implements OcrProvider {
   private readyTimer?: NodeJS.Timeout;
   private readonly pending = new Map<number, PendingRecognition>();
   private nextRequestId = 1;
+  private shutdown?: WorkerShutdown;
 
   constructor(
     private readonly language: string,
@@ -43,6 +45,10 @@ export class OcrEngine implements OcrProvider {
   ) {}
 
   private async ensureWorker(timeoutMs = this.timeoutMs): Promise<void> {
+    if (this.shutdown) {
+      await this.shutdown.wait();
+      this.shutdown = undefined;
+    }
     if (this.readyPromise) return await this.readyPromise;
 
     const worker = this.workerFactory(path.join(__dirname, 'ocrWorker.js'), {
@@ -119,19 +125,37 @@ export class OcrEngine implements OcrProvider {
       pending.reject(error);
     }
     this.pending.clear();
-    if (worker) void worker.terminate();
+    if (worker) {
+      this.shutdown = new WorkerShutdown();
+      this.shutdown.start(worker);
+    }
   }
 
   async recognize(
     image: Buffer | Uint8Array,
     timeoutMs = this.timeoutMs,
   ): Promise<{ text: string; confidence: number }> {
+    try {
+      return await this.recognizeWithWorker(image, timeoutMs);
+    } catch (error) {
+      return await rethrowAfterCleanup(error, async () => await this.shutdown?.wait());
+    }
+  }
+
+  private async recognizeWithWorker(
+    image: Buffer | Uint8Array,
+    timeoutMs: number,
+  ): Promise<{ text: string; confidence: number }> {
     const startedAt = Date.now();
     await this.ensureWorker(timeoutMs);
     const worker = this.worker;
     if (!worker) throw new Error('OCR worker is unavailable');
     const recognitionTimeoutMs = timeoutMs - (Date.now() - startedAt);
-    if (recognitionTimeoutMs <= 0) throw new Error(`OCR recognition timed out after ${timeoutMs} ms`);
+    if (recognitionTimeoutMs <= 0) {
+      const error = new Error(`OCR recognition timed out after ${timeoutMs} ms`);
+      this.resetWorker(error);
+      throw error;
+    }
 
     const requestId = this.nextRequestId++;
     const imageCopy = Uint8Array.from(image);
@@ -149,19 +173,17 @@ export class OcrEngine implements OcrProvider {
     });
   }
 
-  async terminate(): Promise<void> {
-    const worker = this.worker;
-    this.worker = undefined;
-    this.readyPromise = undefined;
-    if (this.readyTimer) clearTimeout(this.readyTimer);
-    this.readyTimer = undefined;
-    this.rejectReady = undefined;
-
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error('OCR worker terminated'));
+  /** Also observe failures while idle, before the node starts another document. */
+  async waitForShutdown(): Promise<void> {
+    try {
+      await this.shutdown?.wait();
+    } catch (error) {
+      throw new WorkerCleanupError(error);
     }
-    this.pending.clear();
-    if (worker) await worker.terminate();
+  }
+
+  async terminate(): Promise<void> {
+    this.resetWorker(new Error('OCR worker terminated'));
+    await this.shutdown?.wait();
   }
 }

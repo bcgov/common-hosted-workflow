@@ -8,12 +8,14 @@ const mocks = vi.hoisted(() => ({
   pdfConstructor: vi.fn(),
   recognize: vi.fn(),
   terminateOcr: vi.fn(),
+  waitForShutdown: vi.fn(),
 }));
 
 vi.mock('../../nodes/DocumentTextExtractor/shared/ocrEngine', () => ({
   OcrEngine: class OcrEngine {
     recognize = mocks.recognize;
     terminate = mocks.terminateOcr;
+    waitForShutdown = mocks.waitForShutdown;
   },
 }));
 
@@ -67,6 +69,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.destroyParser.mockResolvedValue(undefined);
   mocks.terminateOcr.mockResolvedValue(undefined);
+  mocks.waitForShutdown.mockResolvedValue(undefined);
 });
 
 describe('document extraction', () => {
@@ -142,12 +145,12 @@ describe('document extraction', () => {
     const result = await extractDocumentText(
       validPng(),
       'image/png',
-      { ...defaultOptions, maxCharacters: 5 },
-      mockOcr([{ text: '123456789', confidence: 90 }]),
+      { ...defaultOptions, maxCharacters: 1000 },
+      mockOcr([{ text: 'x'.repeat(1001), confidence: 90 }]),
     );
 
-    expect(result.text).toBe('12345');
-    expect(result.pages[0].text).toBe('12345');
+    expect(result.text).toBe('x'.repeat(1000));
+    expect(result.pages[0].text).toBe('x'.repeat(1000));
     expect(result.textTruncated).toBe(true);
   });
 });
