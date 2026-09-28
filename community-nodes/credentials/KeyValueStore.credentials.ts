@@ -4,7 +4,7 @@ export class KeyValueStore implements ICredentialType {
   name = 'keyValueStore';
   icon: Icon = { light: 'file:../icons/shield-lock.svg', dark: 'file:../icons/shield-lock.dark.svg' };
   displayName = 'Key Value Store';
-  documentationUrl = 'https://github.com/bcgov/common-hosted-workflow';
+  documentationUrl = 'https://bcgov.github.io/common-hosted-workflow/community-nodes/key-value-store/credentials';
   properties: INodeProperties[] = [
     {
       displayName: 'Pairs',
@@ -13,7 +13,8 @@ export class KeyValueStore implements ICredentialType {
       default: { values: [{ name: '', value: '' }] },
       typeOptions: { multipleValues: true },
       placeholder: 'Add Pair',
-      description: 'Dynamic list of key-value pairs stored as a credential',
+      description:
+        'String pairs projected into downstream data. Only rows with both fields empty are ignored; invalid rows fail execution.',
       options: [
         {
           displayName: 'Pair',
@@ -24,7 +25,8 @@ export class KeyValueStore implements ICredentialType {
               name: 'name',
               type: 'string',
               default: '',
-              description: 'Key name used in the output object',
+              description:
+                'Unique, nonblank key; __proto__, constructor and prototype are reserved. Whitespace is preserved.',
             },
             {
               displayName: 'Value',
@@ -32,7 +34,8 @@ export class KeyValueStore implements ICredentialType {
               type: 'string',
               typeOptions: { password: true },
               default: '',
-              description: 'Value stored for the key',
+              description:
+                'String value; empty strings and whitespace are preserved. Masking here does not hide downstream output.',
             },
           ],
         },

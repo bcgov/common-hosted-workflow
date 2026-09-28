@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { INodeExecutionData } from 'n8n-workflow';
 
 vi.mock('n8n-workflow', () => ({
   NodeConnectionTypes: { Main: 'main' },
@@ -32,23 +33,23 @@ export function cloneCreds(overrides: Record<string, unknown> = {}): typeof MOCK
 }
 
 export interface CreateContextOptions {
-  credentials?: Record<string, unknown>;
+  credentials?: unknown;
   params?: Record<string, unknown>;
-  inputItems?: Array<{ json: Record<string, unknown> }>;
+  inputItems?: INodeExecutionData[];
   continueOnFail?: boolean;
 }
 
 export function createExecutionContext(opts: CreateContextOptions) {
-  const { credentials = MOCK_CREDENTIALS, params = {}, inputItems = [{ json: {} }], continueOnFail = false } = opts;
-
-  const allParams: Record<string, unknown> = { outputFormat: 'both', ...params };
+  const { params = {}, inputItems = [{ json: {} }], continueOnFail = false } = opts;
+  const credentials = Object.prototype.hasOwnProperty.call(opts, 'credentials') ? opts.credentials : MOCK_CREDENTIALS;
 
   const ctx = {
     getInputData: vi.fn(() => inputItems),
     getCredentials: vi.fn().mockResolvedValue(credentials),
     getNodeParameter: vi.fn((name: string, _index: number, fallback?: unknown) => {
-      if (name in allParams) return allParams[name];
-      return fallback;
+      if (Object.prototype.hasOwnProperty.call(params, name) && params[name] !== undefined) return params[name];
+      if (fallback !== undefined) return fallback;
+      throw new Error(`Could not get parameter: ${name}`);
     }),
     getNode: vi.fn(() => ({ name: 'KeyValueStore Test' })),
     continueOnFail: vi.fn(() => continueOnFail),
