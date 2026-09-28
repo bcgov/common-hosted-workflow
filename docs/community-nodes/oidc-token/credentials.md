@@ -14,7 +14,7 @@ The node uses the `oidcToken` credential type. Configure it in n8n under **Setti
 | Resource Owner Username | string            | Conditional\*\* | —       | The resource owner username. Required for Password grant; ignored for Client Credentials.                         |
 | Resource Owner Password | string (password) | Conditional\*\* | —       | The resource owner password. Required for Password grant; ignored for Client Credentials.                         |
 
-> \***Conditional (discovery):** Exactly one of **OIDC Issuer** or **OIDC Token Endpoint** must be provided. If both are empty, the node throws a configuration error at execution time. If both are set, the Issuer takes precedence (discovery is used).
+> \***Conditional (discovery):** At least one of **OIDC Issuer** or **OIDC Token Endpoint** must be provided. If both are empty, the node reports a configuration error at execution time. If both are set, the Issuer takes precedence (discovery is used).
 
 > \*\***Conditional (grant-type-aware):** `OIDC Client Secret`, `Resource Owner Username`, and `Resource Owner Password` are **all optional at the credential level** so a single credential can support both grant types. Which fields are actually required is enforced at execution time based on the node's **Grant Type** selection:
 
@@ -52,7 +52,7 @@ In this mode you must also supply **OIDC JWKS URI** yourself if you want to use 
 When a **Client Secret** is configured, the node authenticates to the token endpoint using **HTTP Basic Auth** per [RFC 6749 §2.3.1](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1):
 
 ```
-Authorization: Basic base64(client_id:client_secret)
+Authorization: Basic base64(form_encode(client_id):form_encode(client_secret))
 ```
 
 For **public clients** (no secret — only valid on the Password grant), the secret is omitted and the `client_id` is sent in the form body instead:
@@ -61,7 +61,9 @@ For **public clients** (no secret — only valid on the Password grant), the sec
 grant_type=password&username=...&password=...&client_id=...
 ```
 
-The appropriate behaviour is chosen automatically based on whether `OIDC Client Secret` is filled in.
+Each Basic component is independently UTF-8 form-encoded, with spaces encoded as `+`, before adding the colon separator and applying Base64. Configure the original client ID and secret, not pre-encoded strings. They are never duplicated in the form body when Basic authentication is used.
+
+The appropriate behaviour is chosen automatically based on whether `OIDC Client Secret` is filled in. Setup failures cause no token POSTs; with Continue On Fail, each input receives a paired error. See [batch processing](./node-operations.md#batch-processing-and-failures).
 
 ## Example: Keycloak
 

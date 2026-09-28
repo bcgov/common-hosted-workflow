@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { INodeExecutionData } from 'n8n-workflow';
 
 vi.mock('n8n-workflow', () => ({
   NodeConnectionTypes: { Main: 'main' },
@@ -57,6 +58,9 @@ export interface RequestOptions {
 export interface CreateContextOptions {
   credentials?: Record<string, unknown>;
   params?: Record<string, unknown>;
+  items?: INodeExecutionData[];
+  /** Per-item expression evaluation, including errors, just like getNodeParameter. */
+  parameterForItem?: (name: string, index: number) => unknown;
   /** single response → every httpRequest call returns it */
   httpResponse?: unknown;
   /** array of responses, returned in order across successive calls */
@@ -70,6 +74,8 @@ export function createExecutionContext(opts: CreateContextOptions) {
   const {
     credentials = MOCK_CREDENTIALS,
     params = {},
+    items = [{ json: {} }],
+    parameterForItem,
     httpResponse = {},
     httpResponses,
     httpResponseByUrl,
@@ -95,11 +101,14 @@ export function createExecutionContext(opts: CreateContextOptions) {
   const allParams: Record<string, unknown> = { grantType: 'client_credentials', processingMode: 'none', ...params };
 
   const ctx = {
-    getInputData: vi.fn(() => [{ json: {} }]),
+    getInputData: vi.fn(() => items),
     getCredentials: vi.fn().mockResolvedValue(credentials),
-    getNodeParameter: vi.fn((name: string, _index: number, fallback?: unknown) => {
+    getNodeParameter: vi.fn((name: string, index: number, fallback?: unknown) => {
+      const evaluated = parameterForItem?.(name, index);
+      if (evaluated !== undefined) return evaluated;
       if (name in allParams) return allParams[name];
-      return fallback;
+      if (fallback !== undefined) return fallback;
+      throw new Error(`Could not get parameter "${name}"`);
     }),
     getNode: vi.fn(() => ({ name: 'OidcToken Test' })),
     continueOnFail: vi.fn(() => continueOnFail),

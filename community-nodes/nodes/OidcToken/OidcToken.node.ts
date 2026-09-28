@@ -14,6 +14,7 @@ import {
   resolveEndpoints,
   validateCredentials,
   decodeJwt,
+  createJwksResolver,
   verifyJwt,
   type OidcCredentials,
   type DecodedJwt,
@@ -107,7 +108,7 @@ export class OidcToken implements INodeType {
             processingMode: ['verify'],
           },
         },
-        description: 'Amount of leeway (in seconds) applied when validating the exp and iat claims',
+        description: 'Finite nonnegative leeway (in seconds) applied when validating the exp, nbf and iat claims',
       },
       {
         displayName: 'Expected Issuer',
@@ -142,18 +143,35 @@ export class OidcToken implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    const credentials = (await this.getCredentials('oidcToken')) as unknown as OidcCredentials;
-
-    const grantType = this.getNodeParameter('grantType', 0) as GrantType;
-    const processingMode = this.getNodeParameter('processingMode', 0) as ProcessingMode;
-    const scope = this.getNodeParameter('scope', 0, '') as string;
-
-    validateCredentials(credentials, grantType);
-
-    const { tokenEndpoint, jwksUri } = await resolveEndpoints(this, credentials);
+    const prepareExecution = async () => {
+      const credentials = (await this.getCredentials('oidcToken')) as unknown as OidcCredentials;
+      const grantType = this.getNodeParameter('grantType', 0) as GrantType;
+      const processingMode = this.getNodeParameter('processingMode', 0) as ProcessingMode;
+      validateCredentials(credentials, grantType);
+      const { tokenEndpoint, jwksUri } = await resolveEndpoints(this, credentials);
+      if (processingMode === 'verify' && !jwksUri) {
+        throw new Error(
+          'Token Processing Mode is "Verify" but no JWKS URI could be resolved. Configure OIDC JWKS URI in the credentials or enable discovery.',
+        );
+      }
+      return {
+        credentials,
+        grantType,
+        processingMode,
+        tokenEndpoint,
+        jwksUri,
+        resolveJwk: jwksUri ? createJwksResolver(this, jwksUri) : undefined,
+      };
+    };
+    // Memoize setup, including rejection: discovery runs once and a failed setup
+    // produces a paired error for every input under Continue On Fail, with no POST.
+    let setup: ReturnType<typeof prepareExecution> | undefined;
 
     for (const [i] of items.entries()) {
       try {
+        const { credentials, grantType, processingMode, tokenEndpoint, jwksUri, resolveJwk } = await (setup ??=
+          prepareExecution());
+        const scope = this.getNodeParameter('scope', i, '') as string;
         const tokenResponse = await fetchToken(this, tokenEndpoint, credentials, grantType, scope || undefined);
 
         const enriched: IDataObject = { ...(tokenResponse as IDataObject) };
@@ -166,20 +184,20 @@ export class OidcToken implements INodeType {
 
           let decoded: DecodedJwt;
           if (processingMode === 'verify') {
-            if (!jwksUri) {
-              throw new Error(
-                'Token Processing Mode is "Verify" but no JWKS URI could be resolved. Configure OIDC JWKS URI in the credentials or enable discovery.',
-              );
-            }
             const clockTolerance = this.getNodeParameter('clockTolerance', i, 0) as number;
             const expectedIssuer = this.getNodeParameter('expectedIssuer', i, '') as string;
             const expectedAudience = this.getNodeParameter('expectedAudience', i, '') as string;
-            decoded = await verifyJwt(this, accessToken, {
-              jwksUri,
-              clockTolerance,
-              expectedIssuer: expectedIssuer || undefined,
-              expectedAudience: expectedAudience || undefined,
-            });
+            decoded = await verifyJwt(
+              this,
+              accessToken,
+              {
+                jwksUri: jwksUri!, // Verify mode requires this during execution setup.
+                clockTolerance,
+                expectedIssuer: expectedIssuer || undefined,
+                expectedAudience: expectedAudience || undefined,
+              },
+              resolveJwk,
+            );
           } else {
             decoded = decodeJwt(accessToken);
           }

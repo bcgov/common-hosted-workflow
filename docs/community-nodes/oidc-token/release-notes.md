@@ -1,0 +1,11 @@
+# OIDC Token Release Notes
+
+## 2026-09-26 — Verification and batch correctness (NODE-01)
+
+- **Stricter temporal verification:** `exp` must be a finite number and expires at exact `now >= exp + tolerance` equality. Optional `nbf` and `iat` must be finite numbers; future not-before or issuance times beyond tolerance are rejected. `iat` remains optional and does not impose maximum token age. Clock Tolerance must be finite and nonnegative. Previously accepted not-yet-valid tokens, future-issued tokens, malformed claims, and invalid tolerance settings now fail Verify mode. Correct claim types/provider clock settings rather than relying on the old behaviour.
+- **Per-item scope expressions:** each item now requests its own evaluated scope instead of reusing item zero's scope. Grant and processing selections remain execution-wide. Workflows needing a shared scope should configure a constant or an explicit reference to the desired item.
+- **OAuth Basic authentication:** client ID and secret are independently form-encoded before joining with `:` and Base64 encoding, as required by RFC 6749. Punctuation, spaces and Unicode now produce standards-compliant headers. Use original credential values, not pre-encoded values. Normal unreserved ASCII values and public-client form-body authentication retain their behaviour; Basic credentials are not duplicated in the body.
+- **Consistent setup failures:** credential/configuration/discovery errors honour Continue On Fail and emit one paired error per input; without continuation they stop execution. A missing JWKS URI in Verify mode is detected during setup. Failed setup produces zero token POSTs, and discovery is attempted at most once per execution.
+- **Bounded execution-local JWKS reuse:** known keys require one JWKS GET per batch. One additional refresh is allowed for an unknown `kid`, for at most two GETs per execution. Still-unknown keys fail without fallback; failed requests are retained during the execution. There is no global key or token cache. If keys rotate again after the refresh budget is spent, start a new execution.
+
+Serialized node, credential, grant and property identifiers and successful output shapes remain unchanged. None and Decode modes do not apply temporal verification. See [Node Operations](./node-operations.md) and [Architecture](./architecture.md) for the complete policy.

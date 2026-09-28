@@ -4,14 +4,14 @@ This document describes every property available in the OIDC Token node as seen 
 
 ## Node Properties
 
-| Property                  | Type    | Required | Default              | Description                                                                    |
-| ------------------------- | ------- | -------- | -------------------- | ------------------------------------------------------------------------------ |
-| Grant Type                | options | Yes      | `Client Credentials` | The OAuth2 grant type used to request an access token                          |
-| Token Processing Mode     | options | Yes      | `None`               | How to process the retrieved JWT access token                                  |
-| Scope                     | string  | No       | —                    | Optional space-separated OAuth2 scope(s)                                       |
-| Clock Tolerance (seconds) | number  | No       | `0`                  | Leeway applied to `exp`/`iat` checks. Shown only when Processing Mode = Verify |
-| Expected Issuer           | string  | No       | —                    | Validates the JWT `iss` claim. Shown only when Processing Mode = Verify        |
-| Expected Audience         | string  | No       | —                    | Validates the JWT `aud` claim. Shown only when Processing Mode = Verify        |
+| Property                  | Type    | Required | Default              | Description                                                                                             |
+| ------------------------- | ------- | -------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
+| Grant Type                | options | Yes      | `Client Credentials` | The OAuth2 grant type used to request an access token                                                   |
+| Token Processing Mode     | options | Yes      | `None`               | How to process the retrieved JWT access token                                                           |
+| Scope                     | string  | No       | —                    | Optional space-separated OAuth2 scope(s); expressions resolve for each input item                       |
+| Clock Tolerance (seconds) | number  | No       | `0`                  | Finite nonnegative leeway applied to `exp`/`nbf`/`iat` checks. Shown only when Processing Mode = Verify |
+| Expected Issuer           | string  | No       | —                    | Validates the JWT `iss` claim. Shown only when Processing Mode = Verify                                 |
+| Expected Audience         | string  | No       | —                    | Validates the JWT `aud` claim. Shown only when Processing Mode = Verify                                 |
 
 The resource owner's **Username** and **Password** for the Password grant are configured on the **OIDC credential**, not on the node — see [Credentials](./credentials.md).
 
@@ -32,7 +32,7 @@ grant_type=client_credentials
 &scope=<scope>
 ```
 
-Client id/secret are sent via HTTP Basic Auth. No user is involved. Use this for service-to-service access where the workflow itself is the resource owner.
+Client id/secret are independently form-encoded, joined with `:`, and Base64-encoded for HTTP Basic Auth; neither is duplicated in the body. No user is involved. Use this for service-to-service access where the workflow itself is the resource owner.
 
 Reference: [RFC 6749 §4.4](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)
 
@@ -109,10 +109,10 @@ Performs full cryptographic verification of the JWT signature against the JWKS, 
 
 1. Decodes the JWT header and payload.
 2. Resolves the signing algorithm from the header `alg` (RS*/PS*/ES\*).
-3. Fetches the JWKS from `OIDC JWKS URI` (or from the discovery `jwks_uri`).
-4. Selects the matching key by `kid` (strict — rejects if no match).
+3. Fetches the JWKS from `OIDC JWKS URI` (or from the discovery `jwks_uri`), reusing keys within this execution.
+4. Selects the matching key by `kid` (strict — one refresh per execution is allowed for an unknown key, then rejects if no match).
 5. Asserts the key type matches the algorithm family.
-6. Validates the `exp` claim (required; honoured against Clock Tolerance).
+6. Validates finite numeric `exp` (required), `nbf` and `iat` (optional), using finite nonnegative Clock Tolerance.
 7. Optionally validates `iss` against Expected Issuer.
 8. Optionally validates `aud` against Expected Audience.
 9. Cryptographically verifies the signature with `crypto.createVerify()`.
@@ -120,6 +120,23 @@ Performs full cryptographic verification of the JWT signature against the JWKS, 
 On success, the output is identical to Decode mode (raw token + `tokenClaims` + `decodedToken`). On failure, the node throws (or, with `continueOnFail`, emits `{ error: message }`).
 
 Use this when downstream decisions depend on the token being authentic and fresh — e.g. before calling a protected API that honours the same JWT, or when routing based on claims.
+
+### Temporal validation policy
+
+With `now` as current Unix time in whole seconds and `tolerance` as Clock Tolerance:
+
+- `exp` is required and must be a finite number. A token is expired at `now >= exp + tolerance`, including exact equality.
+- If present, `nbf` and `iat` must be finite numbers. Reject `nbf > now + tolerance` (not yet valid) or `iat > now + tolerance` (future issuance). Equality is accepted.
+- Missing `iat` and `nbf` are allowed. `iat` is not used to enforce a maximum age.
+- Numeric strings and `null` are rejected; fractional numeric claims and fractional tolerance are allowed. Negative, nonnumeric and nonfinite tolerance is rejected at runtime.
+
+### Batch processing and failures
+
+Grant Type and Token Processing Mode apply to the whole execution. Scope, Clock Tolerance, Expected Issuer and Expected Audience expressions resolve per input item. Successful setup is followed by one token request per item whose scope evaluates successfully; tokens are never cached globally.
+
+Discovery runs once per execution. Credential/configuration/discovery failures, including a missing JWKS URI in Verify mode, prevent **all token requests**. With **Continue On Fail**, each input receives `{ error: message }` paired to its original index. Otherwise the first error stops execution. Item-specific scope, token-request or verification errors use the same paired-error behaviour, while later items may succeed when continuation is enabled.
+
+JWKS keys are reused within the execution: normally one JWKS GET for the batch, at most two if an unknown `kid` triggers the single rotation refresh. Failed JWKS requests are retained for that execution; starting a new execution retries with a fresh cache.
 
 ---
 
