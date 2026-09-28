@@ -510,7 +510,7 @@ describe('BPMN compatibility: node behavior', () => {
     const params = manualDiscountParams();
     (params.rules as { entries: unknown[] }).entries = [null];
     await expect(executeWith({ params, inputItems: [{ json: {} }] })).rejects.toThrow(
-      /must define at least one output entry/,
+      /Collection "rules.entries" row 1 must be an object/,
     );
   });
 

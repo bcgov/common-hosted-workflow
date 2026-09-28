@@ -84,12 +84,16 @@ export function stableStringify(value: unknown): string {
   return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(',')}}`;
 }
 
-function ruleMatches(rule: DecisionRule, values: Record<string, unknown>): boolean {
+function ruleMatches(rule: DecisionRule, ruleIndex: number, values: Record<string, unknown>): boolean {
   // Entries reference validated inputs; a missing entry is a wildcard.
   for (const entry of rule.inputEntries) {
     const value = Object.prototype.hasOwnProperty.call(values, entry.inputName) ? values[entry.inputName] : undefined;
-    if (!matchesCell(value, entry.expression)) {
-      return false;
+    try {
+      if (!matchesCell(value, entry.expression)) return false;
+    } catch (error) {
+      throw new Error(`Rule ${ruleIndex + 1} input "${entry.inputName}": ${(error as Error).message}`, {
+        cause: error,
+      });
     }
   }
   return true;
@@ -208,7 +212,7 @@ export function evaluate(table: DecisionTable, values: Record<string, unknown>):
   }
   const hits: Array<{ index: number; output: Record<string, unknown> }> = [];
   for (const [index, rule] of table.rules.entries()) {
-    if (ruleMatches(rule, inputValues)) {
+    if (ruleMatches(rule, index, inputValues)) {
       hits.push({ index, output: buildOutput(rule, index, table) });
       if (table.hitPolicy === 'FIRST') break;
     }
