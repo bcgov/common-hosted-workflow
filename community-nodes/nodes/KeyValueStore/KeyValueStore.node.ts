@@ -7,7 +7,7 @@ import {
   type INodeType,
   type INodeTypeDescription,
 } from 'n8n-workflow';
-import { normalizePairs, toObject } from './shared/pairs';
+import { normalizePairs, toObject, type KeyValuePair } from './shared/pairs';
 
 type OutputFormat = 'both' | 'object' | 'array';
 
@@ -16,7 +16,7 @@ export class KeyValueStore implements INodeType {
     displayName: 'Key Value Store',
     name: 'keyValueStore',
     description:
-      'Read key-value pairs from a Key Value Store credential and output them as an object for downstream nodes',
+      'Read string key-value pairs from a credential into downstream data as an object, pairs array, or both',
     icon: {
       light: 'file:../../icons/shield-lock.svg',
       dark: 'file:../../icons/shield-lock.dark.svg',
@@ -59,7 +59,7 @@ export class KeyValueStore implements INodeType {
           },
         ],
         default: 'both',
-        description: 'Which fields to include in the output item',
+        description: 'Which credential fields replace each input item. Values are included in downstream data.',
       },
     ],
   };
@@ -67,16 +67,21 @@ export class KeyValueStore implements INodeType {
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const items = this.getInputData();
     const credentials = await this.getCredentials('keyValueStore');
-    const pairs = normalizePairs(credentials);
-
+    let pairs: KeyValuePair[];
     let values: Record<string, string>;
+    let outputFormat: OutputFormat;
     try {
+      pairs = normalizePairs(credentials);
       values = toObject(pairs);
+      const format = this.getNodeParameter('outputFormat', 0, 'both');
+      if (format !== 'both' && format !== 'object' && format !== 'array') {
+        throw new Error('Output Format (outputFormat) must be both, object, or array');
+      }
+      outputFormat = format;
     } catch (error) {
       throw new NodeOperationError(this.getNode(), error as Error);
     }
 
-    const outputFormat = this.getNodeParameter('outputFormat', 0, 'both') as OutputFormat;
     const returnData: INodeExecutionData[] = [];
 
     for (const [index] of items.entries()) {
