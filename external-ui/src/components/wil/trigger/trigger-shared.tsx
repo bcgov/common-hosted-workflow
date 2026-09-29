@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { TriggerActorType, TriggerMethod } from '../../../services/backend/trigger-types';
+import { NO_AUTOFILL } from './no-autofill';
 
 export type FormMode = 'idle' | 'view' | 'create' | 'edit';
 
@@ -106,6 +107,7 @@ export function AllowedActorsField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        {...NO_AUTOFILL}
       />
     </div>
   );
@@ -128,6 +130,7 @@ export function PostBodyField({
         onChange={(e) => onChange(e.target.value)}
         rows={3}
         className="font-mono text-xs"
+        {...NO_AUTOFILL}
       />
     </div>
   );
@@ -181,6 +184,7 @@ export function TriggerUrlField({
         onBlur={() => setTouched(true)}
         aria-invalid={invalid}
         className={invalid ? 'border-red-500 focus-visible:ring-red-500' : undefined}
+        {...NO_AUTOFILL}
       />
       {invalid && <p className="text-xs text-red-500">Please enter a valid HTTP or HTTPS URL.</p>}
     </div>

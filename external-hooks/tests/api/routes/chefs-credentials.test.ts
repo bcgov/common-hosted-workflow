@@ -91,3 +91,38 @@ describe('POST /chefs-credentials', () => {
     expect(JSON.stringify(res.json.mock.calls[0][0])).not.toContain('secret');
   });
 });
+
+describe('POST /triggers/:triggerId/chefs-token', () => {
+  it("resolves the credential against the trigger's own project, not every tenant project", async () => {
+    const trigger = {
+      id: 'trig-1',
+      projectId: 'proj-2',
+      triggerType: 'chefs-form',
+      allowedActorsType: 'all',
+      allowedActors: ['*'],
+      metadata: { n8nCredentialId: 'cred-1' },
+    };
+    const chefs = {
+      resolveFormCredential: vi.fn().mockResolvedValue({ formId: 'form-123', formApiKey: 'key', formName: 'Intake' }), // pragma: allowlist secret
+      getFormToken: vi
+        .fn()
+        .mockResolvedValue({ authToken: 'jwt', formId: 'form-123', baseUrl: 'https://submit.digital.gov.bc.ca/app' }),
+    };
+    const router = buildTriggerRouter({
+      services: { chefs, trigger: { getById: vi.fn().mockResolvedValue(trigger) } },
+      customRepositories: { tenantProjectRelation: { getRowByTenantId: vi.fn().mockResolvedValue(null) } },
+      n8nRepositories: {},
+    } as any);
+    const req = createMockRequest({ session: SESSION, params: { triggerId: 'trig-1' } } as any);
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(
+      getRouteHandlers(router, 'post', '/triggers/:triggerId/chefs-token')!,
+      req,
+      res,
+    );
+
+    expect(error).toBeNull();
+    expect(chefs.resolveFormCredential).toHaveBeenCalledWith({ credentialId: 'cred-1', allowedProjectIds: ['proj-2'] });
+  });
+});

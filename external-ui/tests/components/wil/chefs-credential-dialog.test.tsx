@@ -78,6 +78,15 @@ describe('ChefsCredentialDialog', () => {
     });
   });
 
+  it('turns browser autofill off on every field, and asks for no saved password on the API key', () => {
+    renderDialog();
+
+    for (const label of [/Credential name/, /Form name/, /CHEFS base URL/, /Form ID/]) {
+      expect(screen.getByLabelText(label)).toHaveAttribute('autocomplete', 'off');
+    }
+    expect(screen.getByLabelText(/^API key/)).toHaveAttribute('autocomplete', 'new-password');
+  });
+
   it('shows the URL error after leaving an invalid base URL', async () => {
     const user = userEvent.setup();
     renderDialog();

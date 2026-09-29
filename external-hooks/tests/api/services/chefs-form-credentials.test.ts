@@ -4,6 +4,16 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@config', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../src/config')>();
+  return {
+    ...original,
+    CHEFS_BASE_URL: 'https://submit.digital.gov.bc.ca',
+    CHEFS_GATEWAY_URL: 'https://submit.digital.gov.bc.ca/app/gateway/v1',
+    CHEFS_ALLOWED_ORIGINS: ['https://chefs-dev.example'],
+  };
+});
+
 import { ChefsService } from '../../../src/api/services/chefs.service';
 
 const USER = { id: 'user-1', role: { slug: 'global:member' } };
@@ -121,6 +131,23 @@ describe('ChefsService.createFormCredential', () => {
     });
     expect(n8nCredentials.create).not.toHaveBeenCalled();
   });
+
+  it.each(['https://evil.example/app/api/v1', 'javascript:alert(1)', 'http://submit.digital.gov.bc.ca/app/api/v1'])(
+    'rejects a base URL outside the CHEFS allowlist (%s) with 400 before calling n8n',
+    async (baseUrl) => {
+      const { service, n8nCredentials } = createService();
+      await expect(service.createFormCredential(USER, { ...input, baseUrl })).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(n8nCredentials.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts a base URL on the additional allowed origins list', async () => {
+    const { service, n8nCredentials } = createService();
+    await service.createFormCredential(USER, { ...input, baseUrl: 'https://chefs-dev.example/app/api/v1' });
+    expect(n8nCredentials.create).toHaveBeenCalled();
+  });
 });
 
 describe('ChefsService.updateFormCredential', () => {
@@ -178,6 +205,14 @@ describe('ChefsService.updateFormCredential', () => {
     const { service, n8nCredentials } = createService();
     n8nCredentials.findForUser.mockResolvedValueOnce(credential('cred-1', 'proj-1', 'httpBasicAuth'));
     await expect(service.updateFormCredential(USER, input)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('rejects a base URL outside the CHEFS allowlist with 400 before calling n8n', async () => {
+    const { service, n8nCredentials } = createService();
+    await expect(
+      service.updateFormCredential(USER, { ...input, baseUrl: 'https://evil.example/app/api/v1' }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(n8nCredentials.update).not.toHaveBeenCalled();
   });
 });
 

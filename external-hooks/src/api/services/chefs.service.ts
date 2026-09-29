@@ -11,6 +11,9 @@ import type { N8nCredentialEntity, N8nCredentialsService, N8nUserEntity } from '
 
 const log = createLogger('ChefsService');
 
+const CHEFS_CONNECTION_FAILED_MESSAGE =
+  "Cannot connect to CHEFS with the selected CHEFS credential. Please check the credential's base URL, form ID and API key, then try again.";
+
 export type GetFormTokenParams = {
   formId: string;
   formApiKey: string;
@@ -177,6 +180,7 @@ export class ChefsService {
     params: CreateChefsFormCredentialParams,
   ): Promise<ChefsFormCredentialSummary> {
     const draft = normalizeCreateParams(params);
+    this.assertAllowedBaseUrl(draft.baseUrl);
     const created = await this.n8nCredentials.create(user, {
       name: draft.name,
       type: CHEFS_FORM_AUTH_CREDENTIAL_TYPE,
@@ -215,6 +219,7 @@ export class ChefsService {
     }
 
     const draft = normalizeUpdateParams(params);
+    this.assertAllowedBaseUrl(draft.baseUrl);
     await this.n8nCredentials.update(user, existing, {
       name: draft.name,
       type: CHEFS_FORM_AUTH_CREDENTIAL_TYPE,
@@ -288,6 +293,19 @@ export class ChefsService {
   }
 
   /**
+   * Rejects a credential Base URL whose origin is not on the CHEFS allowlist. The
+   * origin includes the scheme, so this also rules out `javascript:`, `http:` and
+   * other non-allowlisted schemes. Saving fails loudly here instead of the value
+   * being silently ignored at token-exchange time (see `resolveChefsUrls`).
+   */
+  private assertAllowedBaseUrl(baseUrl: string): void {
+    const origin = extractOrigin(baseUrl);
+    if (!origin || !this.allowedOrigins.includes(origin)) {
+      throw new AppError(400, 'CHEFS base URL must be an allowed CHEFS origin');
+    }
+  }
+
+  /**
    * Derives the CHEFS gateway URL (token exchange) and render base URL from a
    * credential's Base URL by keeping only its origin, so a credential pointing at
    * e.g. `https://chefs-dev.example/app/api/v1` resolves to
@@ -356,7 +374,8 @@ export class ChefsService {
           baseUrl,
         });
       }
-      throw new AppError(502, 'CHEFS token exchange failed');
+      // Shown to the person opening the form, so say what to check rather than the raw failure.
+      throw new AppError(502, CHEFS_CONNECTION_FAILED_MESSAGE);
     }
   }
 }

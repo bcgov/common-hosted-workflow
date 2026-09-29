@@ -13,6 +13,7 @@ function createService(metadata: Record<string, unknown>) {
   const upsert = vi.fn();
   const getById = vi.fn().mockResolvedValue({
     id: 'trig-1',
+    projectId: 'proj-1',
     triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
   });
   const update = vi.fn().mockResolvedValue({
@@ -20,11 +21,17 @@ function createService(metadata: Record<string, unknown>) {
     triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
     metadata,
   });
+  const create = vi.fn().mockResolvedValue({
+    id: 'trig-1',
+    projectId: 'proj-1',
+    triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
+    metadata,
+  });
   const applyCredentialToTriggerMetadata = vi.fn(async (value: Record<string, unknown>) => value);
 
   const service = new TriggerService(
     {
-      workflowTrigger: { getById, update },
+      workflowTrigger: { getById, update, create },
       triggerCredentialRelation: { listByTriggerId, deleteByAssociatedTriggerId: deleteRelation, upsert: vi.fn() },
       credentialEntity: { deleteByAssociatedTriggerId: deleteCredentials, upsert },
     } as any,
@@ -36,7 +43,8 @@ function createService(metadata: Record<string, unknown>) {
 
 const baseUpdate = {
   triggerId: 'trig-1',
-  projectIds: ['proj-1'],
+  // Tenant-wide list: the credential must still be resolved against the trigger's own project only.
+  projectIds: ['proj-1', 'proj-2'],
   triggerUrl: 'https://example.com/hook',
   triggerMethod: 'POST',
   allowedActorsType: 'all',
@@ -74,6 +82,25 @@ describe('TriggerService.update CHEFS credential reference', () => {
     const n8nUser = { id: 'user-1', role: { slug: 'global:member' } };
 
     await service.update({ ...baseUpdate, metadata, n8nUser });
+
+    expect(applyCredentialToTriggerMetadata).toHaveBeenCalledWith(metadata, ['proj-1'], n8nUser);
+  });
+
+  it("binds a credential on create against the new trigger's own project only", async () => {
+    const metadata = { n8nCredentialId: 'cred-1' };
+    const { service, applyCredentialToTriggerMetadata } = createService(metadata);
+    const n8nUser = { id: 'user-1', role: { slug: 'global:member' } };
+
+    await service.create({
+      projectId: 'proj-1',
+      triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
+      triggerUrl: 'https://example.com/hook',
+      triggerMethod: 'POST',
+      metadata,
+      allowedActorsType: 'all',
+      allowedActors: ['*'],
+      n8nUser,
+    });
 
     expect(applyCredentialToTriggerMetadata).toHaveBeenCalledWith(metadata, ['proj-1'], n8nUser);
   });

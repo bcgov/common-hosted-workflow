@@ -292,7 +292,6 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       const n8nUser = await loadN8nUser(session, n8nRepositories);
       const row = await services.trigger.create({
         projectId: allowedProjectIds[0],
-        allowedProjectIds,
         triggerType,
         triggerUrl,
         triggerMethod,
@@ -443,14 +442,15 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       const { triggerId } = req.parsed.params;
       const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories, n8nRepositories);
       if (!ctx) return;
-      const { trigger, allowedProjectIds } = ctx;
+      const { trigger } = ctx;
 
       if (trigger.triggerType !== WorkflowTriggerTypeEnum.CHEFS_FORM) {
         throw new AppError(400, 'Trigger is not a CHEFS form trigger');
       }
 
       const meta = trigger.metadata as Record<string, unknown>;
-      const tokenResult = await resolveTriggerChefsToken(services, triggerId, meta, allowedProjectIds);
+      // A credential belongs to one project; only the trigger's own project may use it.
+      const tokenResult = await resolveTriggerChefsToken(services, triggerId, meta, [trigger.projectId]);
       const formName = tokenResult.formName;
 
       OkResponse(

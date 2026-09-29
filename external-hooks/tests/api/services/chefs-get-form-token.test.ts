@@ -118,6 +118,19 @@ describe('ChefsService.getFormToken', () => {
     expect(result.baseUrl).toBe('https://chefs-env.example.gov.bc.ca/app');
   });
 
+  it('fails with a 502 and a message the user can act on when CHEFS cannot be reached', async () => {
+    const service = createService();
+    postMock.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    await expect(
+      service.getFormToken({ formId: 'form-1', formApiKey: 'key' }), // pragma: allowlist secret
+    ).rejects.toMatchObject({
+      statusCode: 502,
+      message:
+        "Cannot connect to CHEFS with the selected CHEFS credential. Please check the credential's base URL, form ID and API key, then try again.",
+    });
+  });
+
   it('falls back to the env-derived URLs when the credential Base URL origin is not allowlisted', async () => {
     const service = createService();
 

@@ -145,9 +145,10 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       let credentialBaseUrl: string | undefined;
 
       if (chefsCredentialId) {
+        // A credential belongs to one project; only the action's own project may use it.
         const resolved = await services.chefs.resolveFormCredential({
           credentialId: chefsCredentialId,
-          allowedProjectIds,
+          allowedProjectIds: [action.projectId],
         });
         formId = resolved.formId;
         formApiKey = resolved.formApiKey;

@@ -24,6 +24,7 @@ import {
   type ChefsCredentialSummary,
   type UpdateChefsCredentialInput,
 } from '../../../services/backend/chefs-credentials';
+import { NO_AUTOFILL, NO_AUTOFILL_SECRET } from './no-autofill';
 import {
   createChefsCredentialFormSchema,
   editChefsCredentialFormSchema,
@@ -173,34 +174,44 @@ function ChefsCredentialForm({
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">
       <div className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="chefs-credential-name">
             Credential name <span className="text-red-500">*</span>
           </Label>
-          <Input id="chefs-credential-name" placeholder="e.g. Intake form" {...register('name')} />
+          <Input id="chefs-credential-name" placeholder="e.g. Intake form" {...NO_AUTOFILL} {...register('name')} />
           <FieldError message={errors.name?.message} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chefs-credential-form-name">
             Form name <span className="text-red-500">*</span>
           </Label>
-          <Input id="chefs-credential-form-name" placeholder="e.g. My CHEFS Form" {...register('formName')} />
+          <Input
+            id="chefs-credential-form-name"
+            placeholder="e.g. My CHEFS Form"
+            {...NO_AUTOFILL}
+            {...register('formName')}
+          />
           <FieldError message={errors.formName?.message} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chefs-credential-base-url">
             CHEFS base URL <span className="text-red-500">*</span>
           </Label>
-          <Input id="chefs-credential-base-url" {...register('baseUrl')} />
+          <Input id="chefs-credential-base-url" {...NO_AUTOFILL} {...register('baseUrl')} />
           <FieldError message={errors.baseUrl?.message} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="chefs-credential-form-id">
             Form ID <span className="text-red-500">*</span>
           </Label>
-          <Input id="chefs-credential-form-id" placeholder="e.g. abc123-def456" {...register('formId')} />
+          <Input
+            id="chefs-credential-form-id"
+            placeholder="e.g. abc123-def456"
+            {...NO_AUTOFILL}
+            {...register('formId')}
+          />
           <FieldError message={errors.formId?.message} />
         </div>
         <div className="space-y-1.5">
@@ -213,6 +224,7 @@ function ChefsCredentialForm({
               type={showApiKey ? 'text' : 'password'}
               placeholder={isEditing ? 'Leave blank to keep the current API key' : 'Form API key'}
               className="pr-10"
+              {...NO_AUTOFILL_SECRET}
               {...register('apiKey')}
             />
             <Button

@@ -10,12 +10,4 @@ export class CredentialRepository {
   async findOneBy(where: { id: string }): Promise<N8nCredentialRecord | null> {
     return await this.credentialRepository.findOneBy(where);
   }
-
-  create(value: Record<string, unknown>): N8nCredentialRecord {
-    return this.credentialRepository.create(value);
-  }
-
-  async save(value: N8nCredentialRecord): Promise<N8nCredentialRecord> {
-    return await this.credentialRepository.save(value);
-  }
 }

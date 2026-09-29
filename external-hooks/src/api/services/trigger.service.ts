@@ -26,8 +26,6 @@ export type GetTriggerByIdParams = {
 
 export type CreateTriggerParams = {
   projectId: string;
-  /** Tenant project ids used to authorize an n8n CHEFS credential reference. */
-  allowedProjectIds: string[];
   triggerType: string;
   triggerUrl: string;
   triggerMethod: string;
@@ -84,7 +82,7 @@ export class TriggerService {
   async create(params: CreateTriggerParams) {
     const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const metadata = isChefsForm
-      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.allowedProjectIds, params.n8nUser)
+      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, [params.projectId], params.n8nUser)
       : params.metadata;
     const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
     if (isChefsForm && apiKey) requireEncryptionKey();
@@ -130,7 +128,7 @@ export class TriggerService {
 
     const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
     const metadata = isChefsForm
-      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, params.projectIds, params.n8nUser)
+      ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, [existing.projectId], params.n8nUser)
       : params.metadata;
     const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
     if (isChefsForm && apiKey) requireEncryptionKey();
