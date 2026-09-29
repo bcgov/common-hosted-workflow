@@ -4,21 +4,17 @@ export class ChefsApi implements ICredentialType {
   name = 'chefsApi';
   icon: Icon = { light: 'file:../icons/file-search.svg', dark: 'file:../icons/file-search.dark.svg' };
   displayName = 'CHEFS API';
-  documentationUrl = 'https://github.com/bcgov/common-hosted-form-service/wiki';
+  documentationUrl = 'https://bcgov.github.io/common-hosted-workflow/community-nodes/chefs/credentials';
   properties: INodeProperties[] = [
-    // {
-    //   displayName: 'Form ID',
-    //   name: 'formId',
-    //   type: 'string',
-    //   typeOptions: { password: false },
-    //   default: '',
-    // },
     {
       displayName: 'Authorization Token',
       name: 'authorizationToken',
       type: 'string',
       typeOptions: { password: true },
       default: '',
+      required: true,
+      description:
+        'Local shared secret checked against the node token exactly, including case and whitespace; not sent to CHEFS',
     },
     {
       displayName: 'API Key',
@@ -26,6 +22,8 @@ export class ChefsApi implements ICredentialType {
       type: 'string',
       typeOptions: { password: true },
       default: '',
+      required: true,
+      description: 'CHEFS API key for the node Form ID, sent as the Basic authentication password',
     },
   ];
 }
