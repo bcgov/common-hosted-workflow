@@ -11,11 +11,15 @@ const log = createLogger('CredentialDecryptService');
  * n8n's own class keeps decryption forward-compatible with future encryption
  * changes rather than reimplementing crypto here.
  */
+type N8nCredentialsInstance = {
+  getData: () => Promise<Record<string, unknown>> | Record<string, unknown>;
+};
+
 type N8nCredentialsClass = new (
   nodeCredentials: { id: string | null; name: string },
   type: string,
   data?: string,
-) => { getData: () => Promise<Record<string, unknown>> };
+) => N8nCredentialsInstance;
 
 /** The encrypted credential row shape we need from n8n's CredentialsRepository. */
 export type EncryptedCredentialRecord = {
@@ -26,7 +30,9 @@ export type EncryptedCredentialRecord = {
 };
 
 /**
- * Decrypts n8n credential records using n8n's own `Credentials` helper.
+ * Decrypts n8n credential records using n8n's own `Credentials` helper, for the
+ * CHEFS token-exchange (use) path. Creating and updating credentials goes
+ * through `N8nCredentialsService`.
  *
  * This service is a thin adapter over the `@n8n/core` `Credentials` class so
  * that any change to n8n's internal decryption API is a single-file fix. It is

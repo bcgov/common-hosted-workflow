@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ButtonTriggerPayload } from '../../../services/backend/trigger-types';
+import { NO_AUTOFILL } from './no-autofill';
 import {
   ActorIdBanner,
   AllowedActorsField,
@@ -58,6 +59,7 @@ export function ButtonTriggerFields({
             placeholder="e.g. Submit Disability Application"
             value={value.buttonText}
             onChange={(e) => set('buttonText', e.target.value)}
+            {...NO_AUTOFILL}
           />
         </div>
         <TriggerMethodField

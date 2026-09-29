@@ -16,6 +16,7 @@ n8n:
     N8N_BASE_URL: https://workflow.apps.golddr.devops.gov.bc.ca
     OIDC_ISSUER: https://loginproxy.gov.bc.ca/auth/realms/standard
     CHEFS_BASE_URL: https://submit.digital.gov.bc.ca
+    CHEFS_ALLOWED_ORIGINS: "https://chefs-dev.apps.silver.devops.gov.bc.ca,https://chefs-test.apps.silver.devops.gov.bc.ca,https://submit.digital.gov.bc.ca"
     CSTAR_BASE_URL: https://connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     AUTHZ_ENVIRONMENT: prod

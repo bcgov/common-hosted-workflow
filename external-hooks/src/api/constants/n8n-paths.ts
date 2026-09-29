@@ -7,3 +7,9 @@ export const N8N_JWT_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/servic
 export const N8N_USER_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/services/user.service.js';
 export const N8N_NODE_MAILER_PATH = '/usr/local/lib/node_modules/n8n/dist/user-management/email/node-mailer.js';
 export const N8N_AUTH_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/auth/auth.service.js';
+export const N8N_CREDENTIALS_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/credentials/credentials.service.js';
+export const N8N_CREDENTIALS_FINDER_SERVICE_PATH =
+  '/usr/local/lib/node_modules/n8n/dist/credentials/credentials-finder.service.js';
+export const N8N_PROJECT_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/services/project.service.ee.js';
+export const N8N_EVENT_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/events/event.service.js';
+export const N8N_WORKFLOW_PATH = '/usr/local/lib/node_modules/n8n/node_modules/n8n-workflow';

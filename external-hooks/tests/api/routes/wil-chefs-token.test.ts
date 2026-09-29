@@ -301,6 +301,9 @@ describe('POST /wil/chefs-token', () => {
 describe('POST /wil/chefs-token — credential ID path', () => {
   const CREDENTIAL_ACTION = {
     ...SHOWFORM_ACTION,
+    // The action's own project — a different project of the same tenant must not
+    // be able to lend its credential.
+    projectId: 'proj-2',
     payload: { chefsCredentialId: 'cred-999' },
   };
 
@@ -317,7 +320,7 @@ describe('POST /wil/chefs-token — credential ID path', () => {
     expect(error).toBeNull();
     expect(chefsService.resolveFormCredential).toHaveBeenCalledWith({
       credentialId: 'cred-999',
-      allowedProjectIds: ALLOWED_PROJECT_IDS,
+      allowedProjectIds: ['proj-2'],
     });
     // Key comes from the resolved credential, never from the payload.
     expect(chefsService.getFormToken).toHaveBeenCalledWith({

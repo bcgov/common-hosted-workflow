@@ -76,6 +76,17 @@ export const CSTAR_API_BASE_URL = CSTAR_BASE_URL ? `${CSTAR_BASE_URL}/api/v1` : 
 // CHEFS – Common Hosted Form Service
 export const CHEFS_BASE_URL = process.env.CHEFS_BASE_URL || '';
 export const CHEFS_GATEWAY_URL = CHEFS_BASE_URL ? `${CHEFS_BASE_URL}/app/gateway/v1` : '';
+/**
+ * Additional CHEFS origins a credential or trigger's Base URL may resolve to,
+ * beyond the configured `CHEFS_BASE_URL` origin. The external UI loads a
+ * `<script>` from this origin and embeds it via `innerHTML`, so any origin not
+ * in this allowlist (or the `CHEFS_BASE_URL` origin) is rejected in favour of
+ * the configured env value — an unvalidated origin here is a stored-XSS hole.
+ */
+export const CHEFS_ALLOWED_ORIGINS = (process.env.CHEFS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // CSS SSO / AuthZ – all required; missing any disables CSS SSO
 export const AUTHZ_SERVICE_URL = process.env.AUTHZ_SERVICE_URL || '';

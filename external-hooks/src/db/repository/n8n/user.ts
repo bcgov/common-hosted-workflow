@@ -1,5 +1,6 @@
 import type { BaseN8nUserRepository, QueryBuilderLike } from '../../../api/types/n8n-adapters';
 import type { N8nUser } from '../../../api/types/user';
+import type { N8nUserEntity } from '../../../api/services/n8n-credentials.service';
 
 const API_KEY_AUDIENCE = 'public-api'; // pragma: allowlist secret
 const ADMIN_ROLE_SLUGS = ['global:owner', 'global:admin'] as const;
@@ -13,6 +14,11 @@ export class UserRepository {
 
   async findByEmail(email: string, relations?: string[]) {
     return await this.userRepository.findOne({ where: { email }, relations });
+  }
+
+  /** Loads an n8n user with its global role, as n8n's credential/project services require. */
+  async findByIdWithRole(id: string): Promise<N8nUserEntity | null> {
+    return (await this.userRepository.findOne({ where: { id }, relations: ['role'] })) as N8nUserEntity | null;
   }
 
   async getUserForApiKey(apiKey: string) {

@@ -142,15 +142,18 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
       let formId: string | undefined;
       let formApiKey: string | undefined;
       let formName = payload.formName as string | undefined;
+      let credentialBaseUrl: string | undefined;
 
       if (chefsCredentialId) {
+        // A credential belongs to one project; only the action's own project may use it.
         const resolved = await services.chefs.resolveFormCredential({
           credentialId: chefsCredentialId,
-          allowedProjectIds,
+          allowedProjectIds: [action.projectId],
         });
         formId = resolved.formId;
         formApiKey = resolved.formApiKey;
         formName = formName ?? resolved.formName;
+        credentialBaseUrl = resolved.baseUrl;
       } else {
         formId = payload.formId as string | undefined;
         formApiKey = payload.formApiKey as string | undefined;
@@ -164,7 +167,7 @@ export function buildWilRouter(routeContext: ApiRouteContext) {
         throw new AppError(400, 'Missing formId');
       }
 
-      const tokenResult = await services.chefs.getFormToken({ formId, formApiKey });
+      const tokenResult = await services.chefs.getFormToken({ formId, formApiKey, credentialBaseUrl });
 
       OkResponse(res, {
         authToken: tokenResult.authToken,
