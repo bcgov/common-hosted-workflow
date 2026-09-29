@@ -1,0 +1,28 @@
+# Test harness: builds on the REAL production image (n8n-replica-scaler:under-test,
+# built from the actual ../Dockerfile by run-tests.sh) rather than a separate
+# reimplementation, so a regression in the real Dockerfile (missing tool,
+# broken oc copy) is caught by these tests too, not just scale.sh's own logic.
+# Adds fake `oc`/`curl` ahead of the real ones on PATH (controllable via env
+# vars, see fake-oc/fake-curl) and the ConfigMap-extracted scale.sh, so the
+# script under test is byte-for-byte what Helm actually renders.
+ARG BASE_IMAGE=n8n-replica-scaler:under-test
+FROM ${BASE_IMAGE}
+
+# Test-only image, never deployed — needs root to set up the fake
+# ServiceAccount files below and, at runtime, to mv the real /usr/bin/jq
+# aside for the "missing tool" scenario. The production image (this one's
+# base) now runs as a non-root UID by default, so this must re-elevate
+# explicitly instead of relying on an implicit root default.
+USER root
+
+RUN mkdir -p /var/run/secrets/kubernetes.io/serviceaccount \
+    && echo -n "test-namespace" > /var/run/secrets/kubernetes.io/serviceaccount/namespace \
+    && mkdir -p /fake-bin
+
+COPY fake-oc /fake-bin/oc
+COPY fake-curl /fake-bin/curl
+COPY scale.sh /scale.sh
+RUN chmod +x /fake-bin/oc /fake-bin/curl /scale.sh
+
+ENV PATH="/fake-bin:${PATH}"
+ENTRYPOINT ["/bin/bash", "/scale.sh"]

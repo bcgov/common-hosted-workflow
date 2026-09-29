@@ -49,6 +49,11 @@ deploymentStrategy:
 route:
   enabled: false
   host:
+  # Cookie-based sticky sessions on the Route. n8n's multi-main setup docs
+  # require this once main.replicaCount > 1 with multi-main enabled — without
+  # it, UI/webhook requests can land on either main pod with no affinity.
+  # Leave false for a single-main deployment (the default everywhere today).
+  sessionAffinity: false
 
 persistence:
   size: 2Gi
@@ -120,6 +125,7 @@ main:
     failureThreshold: 3
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  # Do not enable when global.n8nReplicaScalerEnabled is true.
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -214,6 +220,7 @@ worker:
   #     port: http
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  # Do not enable when global.n8nReplicaScalerEnabled is true.
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -313,6 +320,7 @@ webhook:
   #   failureThreshold: 3
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  # Do not enable when global.n8nReplicaScalerEnabled is true.
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -405,6 +413,7 @@ runner:
   #     port: http
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+  # Do not enable when global.n8nReplicaScalerEnabled is true.
   autoscaling:
     enabled: false
     minReplicas: 1

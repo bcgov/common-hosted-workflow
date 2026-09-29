@@ -52,3 +52,8 @@ jobs:
         pnpm build
       working-directory: ./external-ui
       shell: bash
+
+    - name: Run n8n-replica-scaler tests
+      run: ./tests/run-tests.sh
+      working-directory: ./n8n-replica-scaler
+      shell: bash

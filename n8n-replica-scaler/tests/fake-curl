@@ -1,0 +1,33 @@
+#!/bin/bash
+# Stubs the DNS-probe curl call in scale.sh's fetch_probe_status(). Writes
+# FAKE_CURL_BODY (or FAKE_CURL_BODY_2 on the second and later invocations
+# within one test run, tracked via a call-count file — used to simulate
+# routing changing between the initial check and the pre-scale recheck) to
+# the -o target, and prints FAKE_CURL_HTTP_STATUS (default 200) as this
+# curl's stdout, matching -w "%{http_code}".
+OUTFILE=""
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+  if [ "${args[$i]}" = "-o" ]; then
+    OUTFILE="${args[$((i+1))]}"
+  fi
+done
+
+COUNTFILE="/tmp/fake-curl-call-count"
+COUNT=0
+if [ -f "$COUNTFILE" ]; then
+  COUNT=$(cat "$COUNTFILE")
+fi
+COUNT=$((COUNT + 1))
+echo "$COUNT" > "$COUNTFILE"
+
+BODY="${FAKE_CURL_BODY}"
+if [ "$COUNT" -ge 2 ] && [ -n "${FAKE_CURL_BODY_2}" ]; then
+  BODY="${FAKE_CURL_BODY_2}"
+fi
+
+if [ -n "$OUTFILE" ]; then
+  printf '%s' "${BODY}" > "$OUTFILE"
+fi
+printf '%s' "${FAKE_CURL_HTTP_STATUS:-200}"
+exit "${FAKE_CURL_EXIT:-0}"

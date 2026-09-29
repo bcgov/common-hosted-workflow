@@ -5,7 +5,13 @@ metadata:
   name: {{ include "_.fullname" . }}
   annotations:
     haproxy.router.openshift.io/balance: roundrobin
-    haproxy.router.openshift.io/disable_cookies: 'true'
+    # Disable_cookies is the inverse of sessionAffinity: sessionAffinity: true
+    # means "turn sticky sessions ON", which means cookies must NOT be disabled.
+    {{- if .Values.route.sessionAffinity }}
+    haproxy.router.openshift.io/disable_cookies: "false"
+    {{- else }}
+    haproxy.router.openshift.io/disable_cookies: "true"
+    {{- end }}
     haproxy.router.openshift.io/timeout: 600s
 spec:
   {{- if .Values.route.host }}
