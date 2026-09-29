@@ -138,6 +138,7 @@ export class CHEFS implements INodeType {
         type: 'string',
         default: '',
         required: true,
+        description: 'CHEFS Form ID, used as the Basic authentication username for every operation',
         displayOptions: {
           show: {
             resource: ['submission', 'status'],
@@ -151,6 +152,8 @@ export class CHEFS implements INodeType {
         typeOptions: { password: true },
         default: '',
         required: true,
+        description:
+          'Local shared secret that must exactly match the CHEFS API credential token, including case and whitespace',
         displayOptions: {
           show: {
             resource: ['submission', 'status'],
@@ -166,6 +169,7 @@ export class CHEFS implements INodeType {
         displayOptions: {
           show: {
             resource: ['submission', 'status'],
+            operation: ['get', 'includeAuthorizationHeaderStatuses'],
           },
         },
       },
