@@ -8,11 +8,9 @@
 ARG BASE_IMAGE=n8n-replica-scaler:under-test
 FROM ${BASE_IMAGE}
 
-# Test-only image, never deployed — needs root to set up the fake
-# ServiceAccount files below and, at runtime, to mv the real /usr/bin/jq
-# aside for the "missing tool" scenario. The production image (this one's
-# base) now runs as a non-root UID by default, so this must re-elevate
-# explicitly instead of relying on an implicit root default.
+# Needs root only for these build-time setup steps (writing under /var/run,
+# chmod on root-owned COPYed files). The production image (this one's base)
+# runs as a non-root user by default, so this must re-elevate explicitly.
 USER root
 
 RUN mkdir -p /var/run/secrets/kubernetes.io/serviceaccount \
@@ -23,6 +21,8 @@ COPY fake-oc /fake-bin/oc
 COPY fake-curl /fake-bin/curl
 COPY scale.sh /scale.sh
 RUN chmod +x /fake-bin/oc /fake-bin/curl /scale.sh
+
+USER scaler
 
 ENV PATH="/fake-bin:${PATH}"
 ENTRYPOINT ["/bin/bash", "/scale.sh"]

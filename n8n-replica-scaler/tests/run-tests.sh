@@ -183,7 +183,7 @@ fi
 out=$(docker run --rm "${BASELINE[@]}" \
   -e FAKE_CURL_BODY="${STABLE_SECONDARY_BODY}" \
   --entrypoint bash n8n-replica-scaler-test-harness \
-  -c 'mv /usr/bin/jq /usr/bin/jq.bak; /scale.sh; echo "EXIT_CODE:$?"; mv /usr/bin/jq.bak /usr/bin/jq' 2>&1) || true
+  -c 'PATH=/fake-bin /scale.sh; echo "EXIT_CODE:$?"' 2>&1) || true
 tool_exit=$(echo "$out" | grep -o 'EXIT_CODE:[0-9]*' | cut -d: -f2)
 if [[ "${tool_exit}" = "1" ]]; then
   log "PASS: missing tool (jq) fails fast (exit 1)"
