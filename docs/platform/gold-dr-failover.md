@@ -72,6 +72,7 @@ Because of that:
 - trigger nodes are disabled on DR in current Helm overlays using `n8n.extraExcludedNodes`
 - selected DR overlays enable `pgo.conditionalRestore` to restore from S3-backed backups
 - `dns-probe` is used in some DR environments to support failover-aware restore behavior
+- the same `dns-probe` signal also drives `pgo.n8nReplicaScaler`, which scales GoldDR's n8n replicas up after a stable failover and back down on failback
 
 For the underlying backup and restore pipeline, see [Database Backup Process](./database-backup-process.md).
 
@@ -88,6 +89,7 @@ Examples in `helm/main` include:
 - `backup-storage.enabled: false` on DR overlays because backups are created on Gold
 - `pgo.conditionalRestore.enabled` on selected DR overlays
 - `dns-probe.enabled` on selected DR overlays to support conditional restore logic
+- `pgo.n8nReplicaScaler.enabled` on selected DR overlays to scale n8n replica counts based on DR routing state
 
 So the Gold/GoldDR distinction is not just operational policy. It is encoded in deployment configuration.
 

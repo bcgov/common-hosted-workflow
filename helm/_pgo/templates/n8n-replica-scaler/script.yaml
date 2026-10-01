@@ -63,11 +63,9 @@ data:
       return 0
     }
 
-    # Defense-in-depth: the Helm guard (n8n-replica-scaler-guard.yaml)
-    # already validates standby/active at render time, but this script
-    # shouldn't assume that held — a manual invocation or future refactor
-    # could populate these env vars outside a normal Helm render. Same
-    # ceiling (20) as the guard, kept in sync by convention.
+    # Defense-in-depth: validate replica targets at runtime as well as in
+    # configuration. This protects against invalid values if the script is
+    # invoked outside the normal Helm-rendered configuration.
     validate_replica_target() {
       local NAME="$1"
       local VALUE="$2"
