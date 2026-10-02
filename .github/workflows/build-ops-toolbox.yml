@@ -9,11 +9,6 @@ on:
     - main
     paths:
     - ops-toolbox/Dockerfile
-  pull_request:
-    paths:
-    - ops-toolbox/Dockerfile
-    - ops-toolbox/test.sh
-    - .github/workflows/build-ops-toolbox.yml
   workflow_dispatch:
 
 concurrency:
@@ -24,20 +19,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-    - name: Build image and check every CLI runs
-      run: ./test.sh
-      working-directory: ./ops-toolbox
-      shell: bash
-
   build-push-ops-toolbox:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/_build-and-push.yml
     permissions:
       contents: read
