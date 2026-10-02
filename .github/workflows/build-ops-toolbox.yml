@@ -1,0 +1,49 @@
+name: Build Ops Toolbox
+
+# The ops-toolbox image is versioned independently of the app images: it is only
+# rebuilt when ops-toolbox/Dockerfile changes (e.g. a helm/oc version bump), not
+# on every deploy.
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - ops-toolbox/Dockerfile
+  pull_request:
+    paths:
+    - ops-toolbox/Dockerfile
+    - ops-toolbox/test.sh
+    - .github/workflows/build-ops-toolbox.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+    - name: Build image and check every CLI runs
+      run: ./test.sh
+      working-directory: ./ops-toolbox
+      shell: bash
+
+  build-push-ops-toolbox:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    uses: ./.github/workflows/_build-and-push.yml
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+      security-events: write
+    with:
+      image-name: bcgov/chwf-ops-toolbox
+      docker-path: ops-toolbox
