@@ -5,7 +5,9 @@ on:
     branches:
     - main
     paths-ignore:
+    - .github/workflows/build-ops-toolbox.yml
     - docs/**
+    - ops-toolbox/**
     - scripts/**
     - terraform/**
 
