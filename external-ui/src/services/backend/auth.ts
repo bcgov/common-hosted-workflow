@@ -41,7 +41,8 @@ export type AuthSessionResponse = {
 export type AuthenticatedSession = {
   user: AuthSessionUser;
   oidc: AuthSessionOidc;
-  n8nUser: AuthSessionN8nUser;
+  /** Null until the identity is provisioned in n8n (access-request-only session). */
+  n8nUser: AuthSessionN8nUser | null;
   permissions: Permissions;
   tenantRoles: TenantRole[];
   tenantGroups: TenantGroup[];
