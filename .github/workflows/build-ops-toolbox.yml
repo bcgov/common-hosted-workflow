@@ -1,14 +1,15 @@
 name: Build Ops Toolbox
 
 # The ops-toolbox image is versioned independently of the app images: it is only
-# rebuilt when ops-toolbox/Dockerfile changes (e.g. a helm/oc version bump), not
-# on every deploy.
+# rebuilt when ops-toolbox/Dockerfile or this workflow changes (e.g. a helm/oc
+# version bump), not on every deploy.
 on:
   push:
     branches:
     - main
     paths:
     - ops-toolbox/Dockerfile
+    - .github/workflows/build-ops-toolbox.yml
   workflow_dispatch:
 
 concurrency:
@@ -20,7 +21,6 @@ permissions:
 
 jobs:
   build-push-ops-toolbox:
-    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/_build-and-push.yml
     permissions:
       contents: read
