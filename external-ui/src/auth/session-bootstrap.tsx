@@ -13,7 +13,9 @@ import { sessionState } from '../state/session';
 const sessionExchangeRequests = new Map<string, Promise<AuthExchangeResponse>>();
 
 function toAuthenticatedSession(response: AuthSessionResponse): AuthenticatedSession | null {
-  if (!response.authenticated || !response.user || !response.oidc || !response.n8nUser || !response.permissions) {
+  // `n8nUser` is intentionally nullable: first-time / unprovisioned identities hold a
+  // valid UI session with access-request capabilities only (see ui-api session route).
+  if (!response.authenticated || !response.user || !response.oidc || !response.permissions) {
     return null;
   }
 
