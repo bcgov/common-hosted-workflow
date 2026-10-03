@@ -37,7 +37,8 @@
       "dist/credentials/DevXConnector.credentials.js",
       "dist/credentials/OidcToken.credentials.js",
       "dist/credentials/WorkflowInteractionLayerApi.credentials.js",
-      "dist/credentials/KeyValueStore.credentials.js"
+      "dist/credentials/KeyValueStore.credentials.js",
+      "dist/credentials/NotifyApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/SiteSelectedSharepoint/SiteSelectedSharepoint.node.js",
@@ -51,7 +52,8 @@
       "dist/nodes/OidcToken/OidcToken.node.js",
       "dist/nodes/MultiWebhookWait/MultiWebhookWait.node.js",
       "dist/nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node.js",
-      "dist/nodes/KeyValueStore/KeyValueStore.node.js"
+      "dist/nodes/KeyValueStore/KeyValueStore.node.js",
+      "dist/nodes/Notify/Notify.node.js"
     ]
   },
   "devDependencies": {
