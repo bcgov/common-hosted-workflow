@@ -1,0 +1,229 @@
+{{- if .Values.global.n8nReplicaScalerEnabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-replica-scaler-script
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  scale.sh: |
+    #!/bin/bash
+    set -eo pipefail
+
+    log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
+
+    # Catches a broken *running* container, not just a broken image (the
+    # Dockerfile's own build-time check only covers the latter).
+    for cmd in oc curl jq; do
+      if ! command -v "${cmd}" >/dev/null 2>&1; then
+        log "ERROR: required command '${cmd}' is not available in this image."
+        exit 1
+      fi
+    done
+
+    # oc auto-detects in-cluster auth from the mounted ServiceAccount.
+    KUBE_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+
+    # Fetches dns-probe's /status and sets ROUTING/DURATION.
+    # Returns 1 on anything that makes the response untrustworthy
+    # (unreachable, malformed, non-numeric) rather than letting a bad value
+    # silently pass the later stabilization comparisons. Called twice: once
+    # up front, once again right before scaling (step 3).
+    fetch_probe_status() {
+      local HTTP_STATUS CURL_EXIT
+
+      # Exit code captured separately from the -w status, not via
+      # `|| echo "000"` — verified directly that pattern silently
+      # concatenates into a corrupted value (e.g. "503000") whenever curl
+      # exits non-zero. `-f` is deliberately omitted so a real 4xx/5xx and
+      # a connection failure get distinguishable signals below.
+      set +e
+      HTTP_STATUS=$(curl -sS --max-time 10 \
+        -o /tmp/probe_response.json \
+        -w "%{http_code}" \
+        "${DNS_PROBE_STATUS_URL}" 2>/dev/null)
+      CURL_EXIT=$?
+      set -e
+
+      if [ "${CURL_EXIT}" -ne 0 ] || [ "${HTTP_STATUS}" != "200" ]; then
+        log "WARNING: DNS probe request failed (curl exit ${CURL_EXIT}, HTTP status ${HTTP_STATUS:-none})."
+        return 1
+      fi
+
+      ROUTING=$(jq -r '.current_routing // "unknown"' /tmp/probe_response.json 2>/dev/null || echo "unknown")
+      DURATION=$(jq -r '.duration_seconds // 0' /tmp/probe_response.json 2>/dev/null || echo "0")
+      rm -f /tmp/probe_response.json
+
+      if ! [[ "${DURATION}" =~ ^[0-9]+$ ]]; then
+        log "WARNING: duration_seconds is not a valid non-negative integer (got '${DURATION}')."
+        return 1
+      fi
+
+      return 0
+    }
+
+    # Defense-in-depth: validate replica targets at runtime as well as in
+    # configuration. This protects against invalid values if the script is
+    # invoked outside the normal Helm-rendered configuration.
+    validate_replica_target() {
+      local NAME="$1"
+      local VALUE="$2"
+
+      if ! [[ "${VALUE}" =~ ^[0-9]+$ ]]; then
+        log "ERROR: ${NAME} is not a non-negative integer: '${VALUE}'"
+        return 1
+      fi
+      if [ "${VALUE}" -gt 20 ]; then
+        log "ERROR: ${NAME} exceeds the sanity ceiling of 20: ${VALUE}"
+        return 1
+      fi
+      return 0
+    }
+
+    log "n8n-replica-scaler starting..."
+
+    # 1. Check DR routing status. A non-zero exit here is "couldn't safely
+    #    decide" (probe unreachable/stale/malformed) as opposed to exit 0,
+    #    "decided there's nothing to do" — a Failed Job is already visible
+    #    to standard Job-failure monitoring.
+    log "Querying DNS probe: ${DNS_PROBE_STATUS_URL}"
+
+    if ! fetch_probe_status; then
+      log "Could not safely determine DR routing state. No scaling action."
+      exit 1
+    fi
+
+    log "current_routing=${ROUTING} duration_seconds=${DURATION}"
+
+    if [ "${ROUTING}" != "primary" ] && [ "${ROUTING}" != "secondary" ]; then
+      log "WARNING: current_routing=${ROUTING} is not a recognized routing state. No scaling action."
+      exit 1
+    fi
+
+    # Asymmetric on purpose: scale-up reacts quickly since real traffic may
+    # already be arriving; scale-down waits longer so a flapping failback
+    # doesn't strip capacity while GoldDR might still be serving.
+    if [ "${ROUTING}" = "primary" ]; then
+      REQUIRED_STABILIZATION="${SCALE_DOWN_STABILIZATION_SECONDS}"
+    else
+      REQUIRED_STABILIZATION="${SCALE_UP_STABILIZATION_SECONDS}"
+    fi
+
+    if [ "${DURATION}" -lt "${REQUIRED_STABILIZATION}" ]; then
+      log "Routing has only been stable for ${DURATION}s (< ${REQUIRED_STABILIZATION}s required for this direction). No scaling action until stable."
+      exit 0
+    fi
+
+    DECIDED_ROUTING="${ROUTING}"
+
+    if [ "${DECIDED_ROUTING}" = "primary" ]; then
+      log "Gold is primary (routing stable). Scaling GoldDR to standby targets."
+      TARGET_MAIN="${STANDBY_MAIN}"; TARGET_WORKER="${STANDBY_WORKER}"
+      TARGET_WEBHOOK="${STANDBY_WEBHOOK}"; TARGET_RUNNER="${STANDBY_RUNNER}"
+    else
+      log "GoldDR is primary (routing stable). Scaling GoldDR to active targets."
+      TARGET_MAIN="${ACTIVE_MAIN}"; TARGET_WORKER="${ACTIVE_WORKER}"
+      TARGET_WEBHOOK="${ACTIVE_WEBHOOK}"; TARGET_RUNNER="${ACTIVE_RUNNER}"
+    fi
+
+    TARGETS_OK=1
+    validate_replica_target "TARGET_MAIN" "${TARGET_MAIN}" || TARGETS_OK=0
+    validate_replica_target "TARGET_WORKER" "${TARGET_WORKER}" || TARGETS_OK=0
+    validate_replica_target "TARGET_WEBHOOK" "${TARGET_WEBHOOK}" || TARGETS_OK=0
+    validate_replica_target "TARGET_RUNNER" "${TARGET_RUNNER}" || TARGETS_OK=0
+    if [ "${TARGETS_OK}" -ne 1 ]; then
+      log "One or more target replica values failed validation. No scaling action."
+      exit 1
+    fi
+
+    # 2. Pre-flight: confirm every target Deployment is readable before
+    #    changing any of them. Kubernetes has no cross-resource transaction
+    #    across four independent scale calls, so this can't make step 4
+    #    fully atomic — deliberately no rollback on a partial failure either;
+    #    the CronJob just re-evaluates and converges every 5 minutes instead.
+    declare -A CURRENT
+    PREFLIGHT_OK=1
+    for entry in "main:${DEPLOY_MAIN}" "worker:${DEPLOY_WORKER}" "webhook:${DEPLOY_WEBHOOK}" "runner:${DEPLOY_RUNNER}"; do
+      COMPONENT="${entry%%:*}"
+      NAME="${entry#*:}"
+      VALUE=$(oc get deployment "${NAME}" -n "${KUBE_NS}" --subresource=scale \
+        -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "")
+      if [ -z "${VALUE}" ]; then
+        log "[${NAME}] WARNING: Could not read current replica count during pre-flight."
+        PREFLIGHT_OK=0
+      fi
+      CURRENT["${COMPONENT}"]="${VALUE}"
+    done
+
+    if [ "${PREFLIGHT_OK}" -ne 1 ]; then
+      log "Pre-flight check failed for one or more Deployments. No scaling action taken for any component."
+      exit 1
+    fi
+
+    # 3. Re-check routing immediately before scaling — steps 1-2 take a few
+    #    seconds of oc/curl calls, enough for routing to have changed
+    #    underneath the decision already made. This narrows the race but
+    #    doesn't eliminate it (routing can still change during step 4's own
+    #    calls); closing it fully would need dns-probe and the scaler to be
+    #    transactionally coordinated, which they aren't by design.
+    log "Re-checking DNS probe status before applying scale..."
+
+    if ! fetch_probe_status; then
+      log "Could not re-verify DR routing state before scaling. Aborting without changes."
+      exit 1
+    fi
+
+    if [ "${ROUTING}" != "${DECIDED_ROUTING}" ]; then
+      log "current_routing changed from ${DECIDED_ROUTING} to ${ROUTING} since the initial check. Aborting this run without applying a possibly-stale decision — the next scheduled run will re-evaluate."
+      exit 0
+    fi
+
+    # dns-probe resets duration_seconds on any IP change, even between two
+    # IPs that classify the same way — so re-checking DURATION here (not
+    # just ROUTING) is what makes this a genuine revalidation.
+    if [ "${DURATION}" -lt "${REQUIRED_STABILIZATION}" ]; then
+      log "Routing no longer satisfies the stabilization requirement on recheck (duration_seconds=${DURATION}, required=${REQUIRED_STABILIZATION}s) — likely reset by an IP change within the same routing category. Aborting without changes."
+      exit 0
+    fi
+
+    # 4. Scale each Deployment via the scale subresource only (get and
+    #    patch), never the full Deployment — keeps RBAC narrow. `oc patch
+    #    --subresource=scale` rather than `oc scale`: verified live that `oc
+    #    scale` internally needs a `get` on the full deployments resource
+    #    too, which `oc patch --subresource=scale` doesn't. Not wrapped in
+    #    `set +e` — a failed scale call stops the run immediately rather
+    #    than continuing to scale the rest on top of a partial failure (see
+    #    step 2 for why no rollback).
+    scale_deployment() {
+      local COMPONENT="$1"
+      local NAME="$2"
+      local TARGET="$3"
+      local CURRENT_VALUE="${CURRENT[${COMPONENT}]}"
+
+      if [ "${CURRENT_VALUE}" = "${TARGET}" ]; then
+        log "[${NAME}] Already at ${TARGET} replicas. No action."
+        return
+      fi
+
+      log "[${NAME}] Requesting scale from ${CURRENT_VALUE} to ${TARGET} replicas..."
+      if ! oc patch deployment "${NAME}" -n "${KUBE_NS}" --subresource=scale --type=merge \
+        -p "{\"spec\":{\"replicas\":${TARGET}}}" > /dev/null; then
+        log "[${NAME}] ERROR: scale call failed. Remaining components in this run will not be scaled."
+        exit 1
+      fi
+      # "Accepted", not "scaled" — confirms the API call succeeded, not that
+      # the Deployment reached that replica count. Deliberately not waiting
+      # on status.availableReplicas: that's already visible via normal
+      # rollout monitoring, and waiting here would make this CronJob's
+      # runtime much less predictable.
+      log "[${NAME}] Scale request accepted: desired replicas=${TARGET}."
+    }
+
+    scale_deployment "main" "${DEPLOY_MAIN}" "${TARGET_MAIN}"
+    scale_deployment "worker" "${DEPLOY_WORKER}" "${TARGET_WORKER}"
+    scale_deployment "webhook" "${DEPLOY_WEBHOOK}" "${TARGET_WEBHOOK}"
+    scale_deployment "runner" "${DEPLOY_RUNNER}" "${TARGET_RUNNER}"
+
+    log "n8n-replica-scaler done."
+{{- end }}

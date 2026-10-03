@@ -3,6 +3,13 @@ global:
   security:
     allowInsecureImages: true
   serviceAccountName:
+  # Single switch for the GoldDR replica scaler, read directly by both the
+  # _pgo subchart (the scaler CronJob/RBAC/script) and the _n8n subchart
+  # (whose Deployments need to omit spec.replicas so the CronJob is the
+  # sole owner of replica counts and Helm upgrades don't reset them).
+  #
+  # Do not enable alongside n8n.<component>.autoscaling.enabled.
+  n8nReplicaScalerEnabled: false
 
 nameOverride: chwf
 fullnameOverride: chwf

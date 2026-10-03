@@ -12,7 +12,7 @@ metadata:
     {{- include "_.labels" . | nindent 4 }}
     app.kubernetes.io/component: main
 spec:
-  {{- if not .Values.main.autoscaling.enabled }}
+  {{- if and (not .Values.main.autoscaling.enabled) (not .Values.global.n8nReplicaScalerEnabled) }}
   replicas: {{ .Values.main.replicaCount }}
   {{- end }}
   strategy:

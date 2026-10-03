@@ -10,7 +10,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "_.fullname" . }}
+    name: {{ include "_.fullname" . }}-runner
   minReplicas: {{ .Values.runner.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.runner.autoscaling.maxReplicas }}
   metrics:

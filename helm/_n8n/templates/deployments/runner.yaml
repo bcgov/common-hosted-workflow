@@ -13,7 +13,7 @@ metadata:
     {{- include "_.labels" . | nindent 4 }}
     app.kubernetes.io/component: runner
 spec:
-  {{- if not .Values.runner.autoscaling.enabled }}
+  {{- if and (not .Values.runner.autoscaling.enabled) (not .Values.global.n8nReplicaScalerEnabled) }}
   replicas: {{ .Values.runner.replicaCount }}
   {{- end }}
   strategy:

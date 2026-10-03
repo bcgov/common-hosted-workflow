@@ -1,3 +1,10 @@
+global:
+  # The single switch for the GoldDR replica scaler — read directly by both
+  # _pgo (the scaler CronJob) and _n8n (to know whether to omit
+  # spec.replicas). See helm/main/values.yaml's comment on
+  # global.n8nReplicaScalerEnabled for why this lives under global.
+  n8nReplicaScalerEnabled: true
+
 n8n:
   enabled: true
   env:
@@ -35,6 +42,14 @@ n8n:
   route:
     enabled: true
     host: dev-workflow.apps.golddr.devops.gov.bc.ca
+    # Required when main runs multiple replicas with multi-main enabled.
+    # Sticky sessions keep requests from switching between main pods.
+    sessionAffinity: true
+
+  main:
+    # Multi-main allows main to run multiple replicas.
+    env:
+      N8N_MULTI_MAIN_SETUP_ENABLED: "true"
 
   worker:
     enabled: true

@@ -39,6 +39,8 @@ spec:
                   value: {{ include "_.fullname" . }}-restore-state
                 - name: DNS_PROBE_STATUS_URL
                   value: {{ .Values.conditionalRestore.dnsProbStatusUrl | quote }}
+                - name: STABILIZATION_SECONDS
+                  value: {{ .Values.conditionalRestore.stabilizationSeconds | quote }}
                 - name: S3_ENDPOINT
                   value: {{ .Values.conditionalRestore.s3.endpoint | quote }}
                 - name: S3_BUCKET

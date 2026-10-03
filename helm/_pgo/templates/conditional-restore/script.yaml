@@ -23,13 +23,18 @@ data:
     # --- 1. Check DR failover status ---
     log "Querying DNS probe: ${DNS_PROBE_STATUS_URL}"
 
-    HTTP_STATUS=$(curl -sf --max-time 10 \
+    # Keep HTTP errors separate from connection failures so we can report
+    # the probe failure accurately.
+    set +e
+    HTTP_STATUS=$(curl -sS --max-time 10 \
       -o /tmp/probe_response.json \
       -w "%{http_code}" \
-      "${DNS_PROBE_STATUS_URL}" 2>/dev/null || echo "000")
+      "${DNS_PROBE_STATUS_URL}" 2>/dev/null)
+    CURL_EXIT=$?
+    set -e
 
-    if [ "${HTTP_STATUS}" != "200" ]; then
-      log "WARNING: DNS probe returned HTTP ${HTTP_STATUS}. Assuming DR_FAILOVER=true (safe default). Exiting."
+    if [ "${CURL_EXIT}" -ne 0 ] || [ "${HTTP_STATUS}" != "200" ]; then
+      log "WARNING: DNS probe request failed (curl exit ${CURL_EXIT}, HTTP status ${HTTP_STATUS:-none}). Assuming DR_FAILOVER=true (safe default). Exiting."
       exit 0
     fi
 
@@ -50,6 +55,12 @@ data:
     DURATION=$(grep -o '"duration_seconds": *[0-9]*' /tmp/probe_response.json | grep -o '[0-9]*$' || echo "0")
     log "current_routing=${ROUTING} duration_seconds=${DURATION}"
 
+    # Validate the value before using it in numeric comparisons.
+    if ! [[ "${DURATION}" =~ ^[0-9]+$ ]]; then
+      log "WARNING: duration_seconds is not a valid non-negative integer (got '${DURATION}'). Skipping restore."
+      exit 0
+    fi
+
     # --- 2. Condition A: GoldDR is the active primary (DNS failover) — skip restore ---
     if [ "${ROUTING}" = "secondary" ]; then
       log "GoldDR is the active primary (current_routing=secondary). Skipping restore."
@@ -58,8 +69,14 @@ data:
 
     # --- 2b. Condition B: Gold routing is too recent — skip restore until stable ---
     # Avoids restoring mid-failover when Gold may not yet be fully recovered.
-    if [ "${DURATION}" -lt 600 ]; then
-      log "Gold routing has only been stable for ${DURATION}s (< 600s). Skipping restore until stable for 10 minutes."
+    # Validate the value before comparing it so an invalid setting cannot
+    # accidentally bypass the stabilization check.
+    if ! [[ "${STABILIZATION_SECONDS}" =~ ^[0-9]+$ ]]; then
+      log "WARNING: STABILIZATION_SECONDS is not a valid non-negative integer (got '${STABILIZATION_SECONDS}'). Skipping restore."
+      exit 0
+    fi
+    if [ "${DURATION}" -lt "${STABILIZATION_SECONDS}" ]; then
+      log "Gold routing has only been stable for ${DURATION}s (< ${STABILIZATION_SECONDS}s). Skipping restore until stable."
       exit 0
     fi
 
@@ -70,10 +87,53 @@ data:
     S3_BUCKET_NAME=$(echo "${S3_BUCKET}" | cut -d'/' -f1)
     S3_PREFIX=$(echo "${S3_BUCKET}" | cut -d'/' -f2- | sed 's:/*$:/:')
 
-    # Fetch full S3 listing once (all databases share the same prefix)
-    S3_LIST=$(curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
-      -u "${S3_USER}:${S3_PASSWORD}" \
-      "${S3_ENDPOINT}/${S3_BUCKET_NAME}?list-type=2&prefix=${S3_PREFIX}" 2>&1 || true)
+    # Percent-encode a string for use in a URL query parameter — needed for
+    # the continuation token below, which can contain +, /, = and isn't safe
+    # to pass unencoded in a query string.
+    urlencode() {
+      local string="$1" strlen encoded pos c
+      strlen=${#string}
+      encoded=""
+      for (( pos=0; pos<strlen; pos++ )); do
+        c="${string:$pos:1}"
+        case "$c" in
+          [-_.~a-zA-Z0-9]) encoded+="$c" ;;
+          *) encoded+=$(printf '%%%02X' "'$c") ;;
+        esac
+      done
+      echo "${encoded}"
+    }
+
+    # Fetch every page of an S3 listing for the given query string
+    # (e.g. "prefix=X" or "prefix=X&start-after=Y"), following pagination
+    # via continuation-token. S3 returns up to 1000 keys per request, so a
+    # single request may not include everything the query matches.
+    fetch_s3_list() {
+      local query="$1"
+      local list="" continuation_token="" page url is_truncated
+      while :; do
+        if [ -n "${continuation_token}" ]; then
+          url="${S3_ENDPOINT}/${S3_BUCKET_NAME}?list-type=2&${query}&continuation-token=$(urlencode "${continuation_token}")"
+        else
+          url="${S3_ENDPOINT}/${S3_BUCKET_NAME}?list-type=2&${query}"
+        fi
+        page=$(curl -sf --aws-sigv4 "aws:amz:us-east-1:s3" \
+          -u "${S3_USER}:${S3_PASSWORD}" \
+          "${url}" 2>&1 || true)
+        list="${list}${page}"
+
+        is_truncated=$(echo "${page}" | grep -o '<IsTruncated>[^<]*</IsTruncated>' | sed 's/<[^>]*>//g')
+        if [ "${is_truncated}" != "true" ]; then
+          break
+        fi
+        continuation_token=$(echo "${page}" | grep -o '<NextContinuationToken>[^<]*</NextContinuationToken>' | sed 's/<[^>]*>//g')
+        if [ -z "${continuation_token}" ]; then
+          log "WARNING: S3 listing reported IsTruncated=true but no NextContinuationToken was found. Stopping pagination early - results may be incomplete."
+          break
+        fi
+      done
+      echo "${list}"
+    }
 
     rm -f /tmp/probe_response.json
 
@@ -84,33 +144,56 @@ data:
 
       log "[${DB_NAME}] Checking for latest backup..."
 
-      # Find the latest S3 key whose filename contains the database name
-      LATEST_KEY=$(echo "${S3_LIST}" \
-        | grep -o '<Key>[^<]*</Key>' \
-        | sed 's/<Key>//;s/<\/Key>//' \
-        | grep -v '/$' \
-        | grep "${DB_NAME}" \
-        | sort \
-        | tail -1 || true)
-
-      if [ -z "${LATEST_KEY}" ]; then
-        log "[${DB_NAME}] WARNING: No backup files found matching '${DB_NAME}' at ${S3_ENDPOINT}/${S3_BUCKET_NAME}/${S3_PREFIX}. Skipping."
-        continue
-      fi
-
-      log "[${DB_NAME}] Latest backup on S3: ${LATEST_KEY}"
-
-      # Read the last restored key for this specific database from the state ConfigMap
+      # Read the last restored key for this database BEFORE listing, since
+      # it determines whether we can do a cheap, scoped listing or need a
+      # full scan.
       STATE_KEY="${DB_NAME}.last-restored-key"
+      # Tolerate optional whitespace around the colon (e.g. "key": "value"
+      # vs "key":"value") — the K8s API server's JSON formatting isn't
+      # guaranteed to be compact, and a strict "\":\"" match silently finds
+      # nothing if it's not, making every run look like a first-ever run.
       LAST_KEY=$(curl -sf --cacert "${KUBE_CACERT}" \
         -H "Authorization: Bearer ${KUBE_TOKEN}" \
         "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
         2>/dev/null \
-        | grep -o "\"${STATE_KEY}\":\"[^\"]*\"" \
+        | grep -o "\"${STATE_KEY}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
         | head -1 \
         | cut -d'"' -f4 || echo "")
 
       log "[${DB_NAME}] Last restored key: ${LAST_KEY:-<none>}"
+
+      if [ -n "${LAST_KEY}" ]; then
+        # Fast path: use the last restored key to scope the listing to this
+        # database and only look for backups created after it.
+        # LAST_KEY is already a full S3 key, so do not prepend S3_PREFIX again.
+        DB_PREFIX="${LAST_KEY%%-${DB_NAME}_*}-${DB_NAME}_"
+        log "[${DB_NAME}] Using scoped listing (prefix=${DB_PREFIX}, after last restored key)."
+        DB_LIST=$(fetch_s3_list "prefix=${DB_PREFIX}&start-after=$(urlencode "${LAST_KEY}")")
+      else
+        # First run: no previous key is available, so scan the shared prefix.
+        log "[${DB_NAME}] No prior restored key - falling back to a full listing."
+        DB_LIST=$(fetch_s3_list "prefix=${S3_PREFIX}")
+      fi
+
+      # Match the database name exactly so "n8n" does not match "n8n-custom".
+      LATEST_KEY=$(echo "${DB_LIST}" \
+        | grep -o '<Key>[^<]*</Key>' \
+        | sed 's/<Key>//;s/<\/Key>//' \
+        | grep -v '/$' \
+        | grep -F -- "-${DB_NAME}_" \
+        | sort \
+        | tail -1 || true)
+
+      if [ -z "${LATEST_KEY}" ]; then
+        if [ -n "${LAST_KEY}" ]; then
+          log "[${DB_NAME}] No new backup since last restore (${LAST_KEY}). Skipping."
+        else
+          log "[${DB_NAME}] WARNING: No backup files found matching '${DB_NAME}' at ${S3_ENDPOINT}/${S3_BUCKET_NAME}/${S3_PREFIX}. Skipping."
+        fi
+        continue
+      fi
+
+      log "[${DB_NAME}] Latest backup on S3: ${LATEST_KEY}"
 
       if [ "${LATEST_KEY}" = "${LAST_KEY}" ]; then
         log "[${DB_NAME}] Latest backup already restored. Skipping."
