@@ -1,12 +1,13 @@
 # Small, generic Kubernetes/OpenShift ops-toolbox image: bash, curl, jq,
-# helm, make, and oc. Shared across CronJobs/Jobs in this repo that need a
+# helm, make, oc, gzip, tar, and the PostgreSQL client (psql). Shared across CronJobs/Jobs in this repo that need a
 # lightweight shell environment with these CLIs — add new tools here rather
 # than duplicating a similar image elsewhere. No application-specific logic
 # or scripts are baked in; scripts are supplied by the Helm chart or Job
 # that uses this image.
 
 # Images are pinned by digest only, for reproducible builds.
-# Versions at time of pinning: helm 4.2.0, origin-cli 4.22, UBI 9.8.
+# Versions at time of pinning: helm 4.2.0, origin-cli 4.22, UBI 9.8,
+# PostgreSQL client 17 (PGDG).
 
 # Helm and oc are supplied as upstream CLI binaries rather than installed
 # from the UBI repositories; jq and make are installed from UBI packages.
@@ -22,8 +23,23 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:8ebe2ad8fdf3cab3e5a53c1e
 COPY --from=helm /usr/bin/helm /usr/local/bin/helm
 COPY --from=oc /usr/bin/oc /usr/local/bin/oc
 
-RUN microdnf install -y jq make shadow-utils \
+# PostgreSQL client major version. Keep it in step with the PostgreSQL
+# servers (bump when the clusters are upgraded).
+ARG PG_MAJOR=17
+
+RUN curl -fsSL -o /tmp/pgdg.rpm \
+    "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-42.0-70.rhel9PGDG.noarch.rpm" \
+    && rpm -i /tmp/pgdg.rpm \
+    && rm -f /tmp/pgdg.rpm \
+    && microdnf install -y --setopt=install_weak_deps=0 \
+        jq \
+        make \
+        shadow-utils \
+        gzip \
+        tar \
+        "postgresql${PG_MAJOR}" \
     && microdnf clean all \
+    && ln -s "/usr/pgsql-${PG_MAJOR}/bin/psql" /usr/local/bin/psql \
     # Verify all required tools are available during the build.
     && bash --version \
     && curl --version \
@@ -31,6 +47,9 @@ RUN microdnf install -y jq make shadow-utils \
     && helm version \
     && make --version \
     && oc version --client \
+    && gunzip --version \
+    && tar --version \
+    && psql --version \
     # Helm and oc may write configuration/cache data under $HOME.
     # OpenShift can run containers with an arbitrary UID in group 0, so
     # the home directory must be writable by group 0.
