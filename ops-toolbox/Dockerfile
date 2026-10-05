@@ -27,9 +27,11 @@ COPY --from=oc /usr/bin/oc /usr/local/bin/oc
 # servers (bump when the clusters are upgraded).
 ARG PG_MAJOR=17
 
-RUN curl -fsSL -o /tmp/pgdg.rpm \
-    "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-42.0-70.rhel9PGDG.noarch.rpm" \
-    && rpm -i /tmp/pgdg.rpm \
+ADD --checksum=sha256:a15b05a745c6a94637522113863f95690576316195ce29d925e494028663c9fd \
+    https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-42.0-70.rhel9PGDG.noarch.rpm \
+    /tmp/pgdg.rpm
+
+RUN rpm -i /tmp/pgdg.rpm \
     && rm -f /tmp/pgdg.rpm \
     && microdnf install -y --setopt=install_weak_deps=0 \
         jq \
