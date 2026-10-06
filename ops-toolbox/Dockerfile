@@ -6,7 +6,7 @@
 # that uses this image.
 
 # Images are pinned by digest only, for reproducible builds.
-# Versions at time of pinning: helm 4.2.0, origin-cli 4.22, UBI 9.8,
+# Versions at time of pinning: helm 4.2.0, origin-cli 4.22, UBI 10.2,
 # PostgreSQL client 17 (PGDG).
 
 # Helm and oc are supplied as upstream CLI binaries rather than installed
@@ -14,11 +14,11 @@
 # Helm is copied as a standalone binary from the Alpine-based Helm image;
 # the Alpine userspace is not included in the final UBI-based image.
 # Copy only the oc client binary from the OpenShift CLI image; the final
-# runtime remains UBI 9.
+# runtime remains UBI 10.
 FROM alpine/helm@sha256:af08f75a3130d666a50b9fc150f40987ef20b885cf67659aabf4b83a5f2c5501 AS helm
 FROM quay.io/openshift/origin-cli@sha256:64ecbe0b472c5a311ce0a5f1606fdac1842aeaf1523c69e02ff7d15cf43cb5b9 AS oc
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:8ebe2ad8fdf3cab3e5a53c1edc69194c98209cfadab24b884f4ad9ebcf7bbbfc
+FROM registry.access.redhat.com/ubi10/ubi-minimal@sha256:204e1531cee54562b107fb31e0b327062fc3d5d67af7cc0d2e66b2c572b9044f
 
 COPY --from=helm /usr/bin/helm /usr/local/bin/helm
 COPY --from=oc /usr/bin/oc /usr/local/bin/oc
@@ -27,8 +27,8 @@ COPY --from=oc /usr/bin/oc /usr/local/bin/oc
 # servers (bump when the clusters are upgraded).
 ARG PG_MAJOR=17
 
-ADD --checksum=sha256:a15b05a745c6a94637522113863f95690576316195ce29d925e494028663c9fd \
-    https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-42.0-70.rhel9PGDG.noarch.rpm \
+ADD --checksum=sha256:6f6272b26ec3a26f2701ed47c69c580691affdf59ef26fa5a9c5a78f94f40a5d \
+    https://download.postgresql.org/pub/repos/yum/reporpms/EL-10-x86_64/pgdg-redhat-repo-42.0-69.rhel10PGDG.noarch.rpm \
     /tmp/pgdg.rpm
 
 RUN rpm -i /tmp/pgdg.rpm \
