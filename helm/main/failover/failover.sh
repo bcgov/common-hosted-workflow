@@ -159,13 +159,6 @@ if [ ! -f "${CHART_DIR}/Makefile" ]; then
   exit 1
 fi
 
-# Register remote Helm repositories required by Chart.yaml.
-log "Adding the chart's remote dependency repos..."
-grep -oE "https://[^'\" ]+" "${CHART_DIR}/Chart.yaml" | sort -u | while read -r REPO_URL; do
-  REPO_NAME="dep-$(echo -n "${REPO_URL}" | sha256sum | cut -c1-8)"
-  helm repo add "${REPO_NAME}" "${REPO_URL}" --force-update > /dev/null
-done
-
 # ==============================================================================
 # Failover upgrade
 # ==============================================================================
