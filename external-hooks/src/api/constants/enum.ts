@@ -54,6 +54,9 @@ export const WorkflowTriggerTypeEnum = {
  */
 export const CHEFS_FORM_AUTH_CREDENTIAL_TYPE = 'chefsFormAuth' as const;
 
+/** Trigger metadata key that points at an n8n `chefsFormAuth` credential. */
+export const N8N_CREDENTIAL_ID_METADATA_KEY = 'n8nCredentialId' as const;
+
 /** Allowed HTTP methods for workflow trigger invocation. */
 export const TRIGGER_HTTP_METHODS = ['GET', 'POST'] as const;
 export type TriggerHttpMethod = (typeof TRIGGER_HTTP_METHODS)[number];

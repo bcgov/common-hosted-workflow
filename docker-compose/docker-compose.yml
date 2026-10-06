@@ -75,6 +75,7 @@ x-n8n-env: &n8n-env
   AUTHZ_CLIENT_SECRET: ${AUTHZ_CLIENT_SECRET}
   # CHEFS – Common Hosted Form Service
   CHEFS_BASE_URL: ${CHEFS_BASE_URL}
+  CHEFS_ALLOWED_ORIGINS: ${CHEFS_ALLOWED_ORIGINS:-}
   # CSTAR tenant management service
   CSTAR_BASE_URL: ${CSTAR_BASE_URL}
   # Feature flags

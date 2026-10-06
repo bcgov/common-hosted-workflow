@@ -130,14 +130,14 @@ Exchanges a FormAPIKey (stored in the action record) for a short-lived CHEFS JWT
 
 **Error Responses:**
 
-| Condition                       | Status | Message                       |
-| ------------------------------- | ------ | ----------------------------- |
-| Missing/empty `actionId`        | 400    | "actionId is required"        |
-| Action not found                | 404    | "Action not found"            |
-| `actionType` ≠ `showform`       | 400    | "Invalid action type"         |
-| Missing `formApiKey` in payload | 400    | "Missing formApiKey"          |
-| Missing `formId` in payload     | 400    | "Missing formId"              |
-| CHEFS Gateway exchange failure  | 502    | "CHEFS token exchange failed" |
+| Condition                       | Status | Message                                                                                                                                    |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Missing/empty `actionId`        | 400    | "actionId is required"                                                                                                                     |
+| Action not found                | 404    | "Action not found"                                                                                                                         |
+| `actionType` ≠ `showform`       | 400    | "Invalid action type"                                                                                                                      |
+| Missing `formApiKey` in payload | 400    | "Missing formApiKey"                                                                                                                       |
+| Missing `formId` in payload     | 400    | "Missing formId"                                                                                                                           |
+| CHEFS Gateway exchange failure  | 502    | "Cannot connect to CHEFS with the selected CHEFS credential. Please check the credential's base URL, form ID and API key, then try again." |
 
 **Implementation Details:**
 

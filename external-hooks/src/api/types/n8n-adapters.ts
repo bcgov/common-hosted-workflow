@@ -38,7 +38,8 @@ export type BaseN8nUserRepository = BaseN8nRepository & {
             audience: string;
           };
         }
-      | { email: string };
+      | { email: string }
+      | { id: string };
     relations?: string[];
   }) => Promise<N8nUser | null>;
   findOneBy: (where: { email: string }) => Promise<N8nUserRecord | null>;

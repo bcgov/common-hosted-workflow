@@ -1,0 +1,107 @@
+/**
+ * A CHEFS trigger that references an n8n credential must not keep the legacy private API key.
+ */
+import { describe, expect, it, vi } from 'vitest';
+
+import { TriggerService } from '../../../src/api/services/trigger.service';
+import { WorkflowTriggerTypeEnum } from '../../../src/api/constants/enum';
+
+function createService(metadata: Record<string, unknown>) {
+  const listByTriggerId = vi.fn().mockResolvedValue([{ credentialId: 'private-cred' }]);
+  const deleteRelation = vi.fn().mockResolvedValue(undefined);
+  const deleteCredentials = vi.fn().mockResolvedValue(undefined);
+  const upsert = vi.fn();
+  const getById = vi.fn().mockResolvedValue({
+    id: 'trig-1',
+    projectId: 'proj-1',
+    triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
+  });
+  const update = vi.fn().mockResolvedValue({
+    id: 'trig-1',
+    triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
+    metadata,
+  });
+  const create = vi.fn().mockResolvedValue({
+    id: 'trig-1',
+    projectId: 'proj-1',
+    triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
+    metadata,
+  });
+  const applyCredentialToTriggerMetadata = vi.fn(async (value: Record<string, unknown>) => value);
+
+  const service = new TriggerService(
+    {
+      workflowTrigger: { getById, update, create },
+      triggerCredentialRelation: { listByTriggerId, deleteByAssociatedTriggerId: deleteRelation, upsert: vi.fn() },
+      credentialEntity: { deleteByAssociatedTriggerId: deleteCredentials, upsert },
+    } as any,
+    { applyCredentialToTriggerMetadata } as any,
+  );
+
+  return { service, deleteRelation, deleteCredentials, upsert, applyCredentialToTriggerMetadata };
+}
+
+const baseUpdate = {
+  triggerId: 'trig-1',
+  // Tenant-wide list: the credential must still be resolved against the trigger's own project only.
+  projectIds: ['proj-1', 'proj-2'],
+  triggerUrl: 'https://example.com/hook',
+  triggerMethod: 'POST',
+  allowedActorsType: 'all',
+  allowedActors: ['*'],
+  authEnabled: false,
+  updatedBy: 'user@example.com',
+  n8nUser: null,
+};
+
+describe('TriggerService.update CHEFS credential reference', () => {
+  it('deletes the legacy private key when the trigger selects an n8n credential', async () => {
+    const metadata = { n8nCredentialId: 'cred-1', formId: 'form-123', formName: 'Intake' };
+    const { service, deleteRelation, deleteCredentials, upsert } = createService(metadata);
+
+    await service.update({ ...baseUpdate, metadata });
+
+    expect(deleteRelation).toHaveBeenCalledWith('trig-1');
+    expect(deleteCredentials).toHaveBeenCalledWith(['private-cred']);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps the legacy private key when no n8n credential is selected', async () => {
+    const metadata = { formId: 'form-123', formName: 'Intake', apiKey: '__CHWF_BLANK_VALUE_chefs-api-key__' }; // pragma: allowlist secret
+    const { service, deleteRelation, upsert } = createService(metadata);
+
+    await service.update({ ...baseUpdate, metadata });
+
+    expect(deleteRelation).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('passes the n8n user to credential binding', async () => {
+    const metadata = { n8nCredentialId: 'cred-1' };
+    const { service, applyCredentialToTriggerMetadata } = createService(metadata);
+    const n8nUser = { id: 'user-1', role: { slug: 'global:member' } };
+
+    await service.update({ ...baseUpdate, metadata, n8nUser });
+
+    expect(applyCredentialToTriggerMetadata).toHaveBeenCalledWith(metadata, ['proj-1'], n8nUser);
+  });
+
+  it("binds a credential on create against the new trigger's own project only", async () => {
+    const metadata = { n8nCredentialId: 'cred-1' };
+    const { service, applyCredentialToTriggerMetadata } = createService(metadata);
+    const n8nUser = { id: 'user-1', role: { slug: 'global:member' } };
+
+    await service.create({
+      projectId: 'proj-1',
+      triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
+      triggerUrl: 'https://example.com/hook',
+      triggerMethod: 'POST',
+      metadata,
+      allowedActorsType: 'all',
+      allowedActors: ['*'],
+      n8nUser,
+    });
+
+    expect(applyCredentialToTriggerMetadata).toHaveBeenCalledWith(metadata, ['proj-1'], n8nUser);
+  });
+});

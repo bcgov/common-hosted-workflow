@@ -14,6 +14,7 @@ n8n:
     OIDC_ISSUER: https://dev.loginproxy.gov.bc.ca/auth/realms/standard
     UI_OIDC_REDIS_PREFIX: "chwf:ui-oidc:dev:"
     CHEFS_BASE_URL: https://chefs-dev.apps.silver.devops.gov.bc.ca
+    CHEFS_ALLOWED_ORIGINS: "https://chefs-dev.apps.silver.devops.gov.bc.ca,https://chefs-test.apps.silver.devops.gov.bc.ca,https://submit.digital.gov.bc.ca"
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
     AUTHZ_ENVIRONMENT: dev

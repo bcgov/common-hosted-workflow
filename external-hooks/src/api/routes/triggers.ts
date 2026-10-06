@@ -20,6 +20,16 @@ import {
   updateTriggerResponseSchema,
   callbackTriggerResponseSchema,
 } from '../schemas/trigger';
+import {
+  createChefsCredentialResponseSchema,
+  createChefsCredentialSchema,
+  listChefsCredentialsResponseSchema,
+  listChefsCredentialsSchema,
+  updateChefsCredentialResponseSchema,
+  updateChefsCredentialSchema,
+} from '../schemas/chefs-credential';
+import { readN8nCredentialId } from '../services/chefs.service';
+import type { N8nUserEntity } from '../services/n8n-credentials.service';
 import { OkResponse, CreatedResponse, ForbiddenResponse, NoContentResponse } from './responses';
 import { AppError } from '../utils/errors';
 import { WorkflowTriggerTypeEnum } from '../constants/enum';
@@ -143,7 +153,70 @@ async function resolveTriggerAccess(
     return null;
   }
 
-  return { session, tenantId, trigger };
+  return { session, tenantId, allowedProjectIds, trigger };
+}
+
+/**
+ * Mints a CHEFS gateway token for a form trigger.
+ * An n8n credential id is resolved server-side. Triggers saved before that
+ * reference still use the private API key stored for the trigger.
+ */
+async function resolveTriggerChefsToken(
+  services: ApiRouteContext['services'],
+  triggerId: string,
+  meta: Record<string, unknown>,
+  allowedProjectIds: string[],
+) {
+  const n8nCredentialId = readN8nCredentialId(meta);
+  if (n8nCredentialId) {
+    const resolved = await services.chefs.resolveFormCredential({
+      credentialId: n8nCredentialId,
+      allowedProjectIds,
+    });
+    const tokenResult = await services.chefs.getFormToken({
+      formId: resolved.formId,
+      formApiKey: resolved.formApiKey,
+      credentialBaseUrl: resolved.baseUrl,
+    });
+    const formName = resolved.formName ?? (typeof meta.formName === 'string' ? meta.formName : '');
+    return { ...tokenResult, formName };
+  }
+
+  const formId = typeof meta.formId === 'string' ? meta.formId : '';
+  const formName = typeof meta.formName === 'string' ? meta.formName : '';
+  const credentialBaseUrl = typeof meta.baseUrl === 'string' && meta.baseUrl.trim() ? meta.baseUrl.trim() : undefined;
+  if (!formId) {
+    throw new AppError(400, 'Missing formId in trigger metadata');
+  }
+  const formApiKey = await services.trigger.getChefsApiKeyForTrigger(triggerId);
+  const tokenResult = await services.chefs.getFormToken({ formId, formApiKey, credentialBaseUrl });
+  return { ...tokenResult, formName };
+}
+
+/** Loads the session's n8n user (with role) so n8n's credential permissions apply. */
+async function loadN8nUser(
+  session: UiResolvedSession,
+  n8nRepositories: ApiRouteContext['n8nRepositories'],
+): Promise<N8nUserEntity | null> {
+  if (!session.n8nUser) return null;
+  return await n8nRepositories.user.findByIdWithRole(session.n8nUser.id);
+}
+
+/** Tenant scope plus the caller's n8n user; sends 403 when there is no n8n user. */
+async function requireCredentialActor(
+  req: Request,
+  res: Response,
+  customRepositories: ApiRouteContext['customRepositories'],
+  n8nRepositories: ApiRouteContext['n8nRepositories'],
+) {
+  const session = (req as unknown as { session: UiResolvedSession }).session;
+  const scope = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
+  const user = await loadN8nUser(session, n8nRepositories);
+  if (!user) {
+    ForbiddenResponse(res);
+    return null;
+  }
+  return { user, ...scope };
 }
 
 export function buildTriggerRouter(routeContext: ApiRouteContext) {
@@ -216,6 +289,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         createdBy,
       } = req.parsed.body;
 
+      const n8nUser = await loadN8nUser(session, n8nRepositories);
       const row = await services.trigger.create({
         projectId: allowedProjectIds[0],
         triggerType,
@@ -226,6 +300,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         allowedActors,
         authEnabled,
         createdBy: createdBy ?? session.email ?? null,
+        n8nUser,
       });
 
       const triggerIdsWithCreds =
@@ -258,6 +333,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       const { triggerUrl, triggerMethod, metadata, allowedActorsType, allowedActors, authEnabled, updatedBy } =
         req.parsed.body;
 
+      const n8nUser = await loadN8nUser(session, n8nRepositories);
       const row = await services.trigger.update({
         triggerId,
         projectIds: allowedProjectIds,
@@ -268,6 +344,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         allowedActors,
         authEnabled,
         updatedBy: updatedBy ?? session.email ?? '',
+        n8nUser,
       });
 
       const triggerIdsWithCreds =
@@ -303,6 +380,58 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
   );
 
   /**
+   * GET /wil/chefs-credentials — chefsFormAuth credentials the caller may read in n8n,
+   * limited to this tenant's projects, plus whether they may create one. No API keys.
+   */
+  router.get(
+    '/chefs-credentials',
+    createRequestParser(listChefsCredentialsSchema),
+    async (req: Request, res: Response) => {
+      const actor = await requireCredentialActor(req, res, customRepositories, n8nRepositories);
+      if (!actor) return;
+      const { credentials, canCreate } = await services.chefs.listFormCredentials(actor.user, actor.projectIds);
+      OkResponse(res, { data: credentials, canCreate }, listChefsCredentialsResponseSchema);
+    },
+  );
+
+  /**
+   * POST /wil/chefs-credentials — creates a chefsFormAuth credential through n8n, owned by
+   * the tenant's first project (n8n checks credential:create). The API key is not returned.
+   */
+  router.post(
+    '/chefs-credentials',
+    createRequestParser(createChefsCredentialSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof createChefsCredentialSchema>>, res: Response) => {
+      const actor = await requireCredentialActor(req, res, customRepositories, n8nRepositories);
+      if (!actor) return;
+      const created = await services.chefs.createFormCredential(actor.user, {
+        ...req.parsed.body,
+        projectId: actor.projectIds[0],
+      });
+      CreatedResponse(res, created, createChefsCredentialResponseSchema);
+    },
+  );
+
+  /**
+   * PATCH /wil/chefs-credentials/:credentialId — updates a chefsFormAuth credential through
+   * n8n (requires credential:update); an omitted API key keeps the stored one.
+   */
+  router.patch(
+    '/chefs-credentials/:credentialId',
+    createRequestParser(updateChefsCredentialSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof updateChefsCredentialSchema>>, res: Response) => {
+      const actor = await requireCredentialActor(req, res, customRepositories, n8nRepositories);
+      if (!actor) return;
+      const updated = await services.chefs.updateFormCredential(actor.user, {
+        credentialId: req.parsed.params.credentialId,
+        allowedProjectIds: actor.projectIds,
+        ...req.parsed.body,
+      });
+      OkResponse(res, updated, updateChefsCredentialResponseSchema);
+    },
+  );
+
+  /**
    * POST /wil/triggers/:triggerId/chefs-token — returns a CHEFS auth token for the trigger's form.
    * Requires the actor to be allowed to fire the trigger (same permission as the fire endpoint).
    */
@@ -320,15 +449,9 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       }
 
       const meta = trigger.metadata as Record<string, unknown>;
-      const formId = meta.formId as string | undefined;
-      const formName = (meta.formName as string) ?? '';
-
-      if (!formId) {
-        throw new AppError(400, 'Missing formId in trigger metadata');
-      }
-
-      const formApiKey = await services.trigger.getChefsApiKeyForTrigger(triggerId);
-      const tokenResult = await services.chefs.getFormToken({ formId, formApiKey });
+      // A credential belongs to one project; only the trigger's own project may use it.
+      const tokenResult = await resolveTriggerChefsToken(services, triggerId, meta, [trigger.projectId]);
+      const formName = tokenResult.formName;
 
       OkResponse(
         res,
