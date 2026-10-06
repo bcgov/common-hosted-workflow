@@ -43,7 +43,7 @@ retention:
 
 rulesSync:
   enabled: true
-  image: curlimages/curl:8.7.1
+  image: curlimages/curl:8.22.0
 
 envSecretName: ""
 
