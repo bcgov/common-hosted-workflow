@@ -164,7 +164,6 @@ for i in $(seq 0 $((DATABASE_COUNT-1))); do
   # full scan.
   STATE_KEY="${DB_NAME}.last-restored-key"
 
-  # The key contains dots, so escape them for the jsonpath expression.
   LAST_KEY=$(oc get configmap "${STATE_CONFIGMAP_NAME}" -n "${NAMESPACE}" \
     -o "jsonpath={.data.${STATE_KEY//./\\.}}" 2>/dev/null || true)
 
