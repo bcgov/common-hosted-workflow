@@ -1,0 +1,26 @@
+{{- if .Values.failover.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "_.fullname" . }}-failover
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+---
+# Bind the failover ServiceAccount to the pre-provisioned namespace-scoped
+# Role used to run Helm upgrades for this release.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "_.fullname" . }}-failover
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "_.fullname" . }}-failover
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Values.failover.roleName | quote }}
+{{- end }}

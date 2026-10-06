@@ -1,3 +1,0 @@
-# Extracted at test time by extract-script.sh — the source of truth is
-# ../../helm/_pgo/templates/n8n-replica-scaler/script.yaml, not this file.
-scale.sh

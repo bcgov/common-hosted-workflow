@@ -40,16 +40,10 @@ jobs:
       image-name: bcgov/chwf-dns-probe
       docker-path: dns-probe
 
-  build-push-n8n-replica-scaler:
-    uses: ./.github/workflows/_build-and-push.yml
-    with:
-      image-name: bcgov/chwf-n8n-replica-scaler
-      docker-path: n8n-replica-scaler
-
   deploy-devx-dev:
     name: Deploys DevX (Dev)
     uses: ./.github/workflows/deploy-devx.yml
-    needs: [build-push-n8n, build-push-dns-probe, build-push-n8n-replica-scaler]
+    needs: [build-push-n8n, build-push-dns-probe]
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
@@ -60,7 +54,7 @@ jobs:
   deploy-standard-dev:
     name: Deploys Standard (Dev)
     uses: ./.github/workflows/deploy-standard.yml
-    needs: [build-push-n8n, build-push-dns-probe, build-push-sdg-mock-app, build-push-n8n-replica-scaler]
+    needs: [build-push-n8n, build-push-dns-probe, build-push-sdg-mock-app]
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}

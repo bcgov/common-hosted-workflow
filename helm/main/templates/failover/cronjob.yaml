@@ -1,0 +1,71 @@
+{{- if .Values.failover.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "_.fullname" . }}-failover
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.failover.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Allows time for chart download, dependency resolution, and Helm upgrade.
+      activeDeadlineSeconds: 900
+      # A failed run is retried on the next scheduled execution.
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            {{- include "_.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: failover
+        spec:
+          serviceAccountName: {{ include "_.fullname" . }}-failover
+          restartPolicy: Never
+          volumes:
+            - name: failover-script
+              configMap:
+                name: {{ include "_.fullname" . }}-failover-script
+                defaultMode: 0755
+            # Writable space for the chart source and Helm configuration.
+            # The container runs as a non-root UID, so HOME is set to /tmp below.
+            - name: tmp
+              emptyDir: {}
+          containers:
+            - name: failover
+              image: "{{ .Values.failover.image.repository }}:{{ .Values.failover.image.tag }}"
+              imagePullPolicy: {{ .Values.failover.image.pullPolicy }}
+              command: ["/bin/bash", "/scripts/failover.sh"]
+              volumeMounts:
+                - name: failover-script
+                  mountPath: /scripts
+                - name: tmp
+                  mountPath: /tmp
+              env:
+                - name: HOME
+                  value: /tmp
+                - name: DNS_PROBE_STATUS_URL
+                  value: {{ .Values.failover.dnsProbStatusUrl | quote }}
+                - name: STABILIZATION_SECONDS
+                  value: {{ .Values.failover.stabilizationSeconds | quote }}
+                - name: RELEASE_NAME
+                  value: {{ .Release.Name | quote }}
+                - name: NAMESPACE
+                  value: {{ .Release.Namespace | quote }}
+                - name: CLUSTER
+                  value: {{ .Values.failover.cluster | quote }}
+                - name: CHART_REPO
+                  value: {{ .Values.failover.chartRepo | quote }}
+                - name: CHART_REF
+                  value: {{ .Values.failover.chartRef | quote }}
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+{{- end }}

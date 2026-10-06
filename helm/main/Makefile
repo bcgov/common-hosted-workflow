@@ -4,6 +4,7 @@ NAME := chwf
 NAMESPACE ?=
 IMAGE_TAG ?=
 CLUSTER ?=
+FAILOVER ?= false
 
 ifeq ($(strip $(NAMESPACE)),)
     $(error NAMESPACE is not set)
@@ -13,18 +14,26 @@ ifeq ($(strip $(CLUSTER)),)
     $(error CLUSTER is not set, should be one of silver,gold,golddr)
 endif
 
+ifeq ($(strip $(FAILOVER)),true)
+    ifeq ($(wildcard values-${NAMESPACE}-failover.yaml),)
+        $(error FAILOVER=true but values-${NAMESPACE}-failover.yaml does not exist)
+    endif
+
+    FAILOVER_VALUES := -f "values-${NAMESPACE}-failover.yaml"
+endif
+
 define arguments
     "${NAME}" . \
     -n "${NAMESPACE}" \
     -f values.yaml \
     -f "values-${NAMESPACE}-${CLUSTER}.yaml" \
+    ${FAILOVER_VALUES} \
 	--set n8n.image.tag="${IMAGE_TAG}" \
 	--set sdg-mock-app.image.tag="${IMAGE_TAG}" \
-	--set dns-probe.image.tag="${IMAGE_TAG}" \
-	--set pgo.n8nReplicaScaler.image.tag="${IMAGE_TAG}"
+	--set dns-probe.image.tag="${IMAGE_TAG}"
 endef
 
-.PHONY: helm-dep install upgrade lint uninstall template force-install help delete-successful-jobs
+.PHONY: helm-dep install upgrade failover-upgrade lint uninstall template force-install help delete-successful-jobs
 
 delete-successful-jobs:
 	oc delete jobs --field-selector status.successful=1 -n "${NAMESPACE}"
@@ -37,6 +46,10 @@ install: helm-dep
 
 upgrade: helm-dep delete-successful-jobs
 	@helm upgrade --install $(call arguments)
+
+# Upgrade-only target used by the DR failover CronJob.
+failover-upgrade: helm-dep
+	@helm upgrade $(call arguments)
 
 lint: helm-dep
 	@helm upgrade --dry-run --install $(call arguments)
@@ -53,6 +66,7 @@ help:
 	@echo "Available targets:"
 	@echo "  install        Install the Helm chart"
 	@echo "  upgrade        Upgrade or install the Helm chart"
+	@echo "  failover-upgrade  Upgrade-only (never installs); used by the DR failover CronJob"
 	@echo "  lint           Dry-run install for validation"
 	@echo "  uninstall      Remove the release"
 	@echo "  template       Render template to file"

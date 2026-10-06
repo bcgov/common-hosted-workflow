@@ -125,7 +125,8 @@ main:
     failureThreshold: 3
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
-  # Do not enable when global.n8nReplicaScalerEnabled is true.
+  # When enabled, spec.replicas is omitted and the HPA owns the replica count, so
+  # replicaCount (including the failover overlay's override) has no effect.
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -220,7 +221,8 @@ worker:
   #     port: http
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
-  # Do not enable when global.n8nReplicaScalerEnabled is true.
+  # When enabled, spec.replicas is omitted and the HPA owns the replica count, so
+  # replicaCount (including the failover overlay's override) has no effect.
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -320,7 +322,8 @@ webhook:
   #   failureThreshold: 3
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
-  # Do not enable when global.n8nReplicaScalerEnabled is true.
+  # When enabled, spec.replicas is omitted and the HPA owns the replica count, so
+  # replicaCount (including the failover overlay's override) has no effect.
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -413,7 +416,8 @@ runner:
   #     port: http
 
   # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
-  # Do not enable when global.n8nReplicaScalerEnabled is true.
+  # When enabled, spec.replicas is omitted and the HPA owns the replica count, so
+  # replicaCount (including the failover overlay's override) has no effect.
   autoscaling:
     enabled: false
     minReplicas: 1

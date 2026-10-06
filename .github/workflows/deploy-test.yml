@@ -49,20 +49,10 @@ jobs:
         type=semver,pattern={{major}}.{{minor}}
         type=semver,pattern={{major}}
 
-  build-push-n8n-replica-scaler:
-    uses: ./.github/workflows/_build-and-push.yml
-    with:
-      image-name: bcgov/chwf-n8n-replica-scaler
-      docker-path: n8n-replica-scaler
-      metadata-tags: |
-        type=semver,pattern={{version}}
-        type=semver,pattern={{major}}.{{minor}}
-        type=semver,pattern={{major}}
-
   deploy-standard-test:
     name: Deploys Standard (Test)
     uses: ./.github/workflows/deploy-standard.yml
-    needs: [build-push-n8n, build-push-dns-probe, build-push-n8n-replica-scaler, prepare-tag]
+    needs: [build-push-n8n, build-push-dns-probe, prepare-tag]
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}

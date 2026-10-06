@@ -42,9 +42,7 @@ n8n:
     sessionAffinity: true
 
   main:
-    # Multi-main allows main to run multiple replicas. Requires an Enterprise
-    # self-hosted license. Replica count is managed by the DR replica scaler
-    # when global.n8nReplicaScalerEnabled is enabled.
+    # Multi-main allows main to run multiple replicas.
     env:
       N8N_MULTI_MAIN_SETUP_ENABLED: "true"
 

@@ -1,0 +1,31 @@
+# Failover-time overrides for c89a45-dev.
+#
+# NOT a standalone values file. It is layered on top of values.yaml and
+# values-c89a45-dev-golddr.yaml only when the failover CronJob runs
+# `make failover-upgrade FAILOVER=true`, after dns-probe confirms GoldDR
+# is active and routing has been stable.
+#
+# On failback, the CronJob runs the Helm upgrade without this overlay,
+# returning these settings to the normal GoldDR (standby) values.
+#
+# Add settings here only when they need to differ while GoldDR is active.
+
+failover:
+  # Read by failover.sh via `helm get values` to determine whether this
+  # failover overlay is currently applied.
+  applied: true
+
+n8n:
+  # Replica counts used while GoldDR is active.
+  #
+  # These currently remain at 1 for all components. Increase a component's
+  # count here when additional capacity is required. Ignored when autoscaling
+  # is enabled for the component.
+  main:
+    replicaCount: 1
+  worker:
+    replicaCount: 1
+  webhook:
+    replicaCount: 1
+  runner:
+    replicaCount: 1

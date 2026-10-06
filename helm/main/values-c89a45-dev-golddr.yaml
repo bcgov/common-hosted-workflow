@@ -1,9 +1,8 @@
-global:
-  # The single switch for the GoldDR replica scaler — read directly by both
-  # _pgo (the scaler CronJob) and _n8n (to know whether to omit
-  # spec.replicas). See helm/main/values.yaml's comment on
-  # global.n8nReplicaScalerEnabled for why this lives under global.
-  n8nReplicaScalerEnabled: true
+# Enables the DR-failover CronJob (templates/failover/). See the failover:
+# block in values.yaml, and values-c89a45-dev-failover.yaml for what changes
+# while GoldDR is the active site.
+failover:
+  enabled: true
 
 n8n:
   enabled: true

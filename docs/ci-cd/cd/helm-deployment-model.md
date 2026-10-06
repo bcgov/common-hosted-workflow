@@ -50,8 +50,7 @@ helm upgrade --install chwf . \
   -f values-<namespace>-<cluster>.yaml \
   --set n8n.image.tag=<tag> \
   --set sdg-mock-app.image.tag=<tag> \
-  --set dns-probe.image.tag=<tag> \
-  --set pgo.n8nReplicaScaler.image.tag=<tag>
+  --set dns-probe.image.tag=<tag>
 ```
 
 This creates a clean separation between:

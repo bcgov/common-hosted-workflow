@@ -3,16 +3,48 @@ global:
   security:
     allowInsecureImages: true
   serviceAccountName:
-  # Single switch for the GoldDR replica scaler, read directly by both the
-  # _pgo subchart (the scaler CronJob/RBAC/script) and the _n8n subchart
-  # (whose Deployments need to omit spec.replicas so the CronJob is the
-  # sole owner of replica counts and Helm upgrades don't reset them).
-  #
-  # Do not enable alongside n8n.<component>.autoscaling.enabled.
-  n8nReplicaScalerEnabled: false
 
 nameOverride: chwf
 fullnameOverride: chwf
+
+# --- DR Failover ---
+# Runs on GoldDR to switch between active/standby replica configurations
+# after routing has remained stable for the configured period.
+# The failover values overlay controls the replica counts.
+#
+# Enabled per overlay (values-*-golddr.yaml). Requires dns-probe.
+# Do not enable n8n.<component>.autoscaling alongside it, as HPA and the
+# failover controller would both manage replica counts.
+failover:
+  enabled: false
+
+   # Runs on the ops-toolbox image.
+  image:
+    repository: ghcr.io/bcgov/chwf-ops-toolbox
+    tag: main
+    pullPolicy: Always
+
+  schedule: "*/5 * * * *"
+
+  # How long DNS routing must have been stable (per dns-probe's duration_seconds)
+  # before a restore is allowed to run.
+  stabilizationSeconds: 600
+  dnsProbStatusUrl: "http://chwf-dns-probe:8000/status"  # NOSONAR - internal k8s service, safe within cluster
+
+  # Selects values-${NAMESPACE}-${CLUSTER}.yaml for the upgrade.
+  cluster: golddr
+
+  # Chart source repository and default Git ref. CI sets chartRef to the
+  # ref deployed to the live release.
+  chartRepo: bcgov/common-hosted-workflow
+  chartRef: main
+
+  # Pre-provisioned Role shared with the CI deployment ServiceAccount.
+  roleName: oc-deployer
+
+  # Tracks whether the failover configuration is currently applied.
+  # Set to true by the failover overlay.
+  applied: false
 
 # See https://github.com/8gears/n8n-helm-chart/blob/main/charts/n8n/values.yaml
 n8n:
