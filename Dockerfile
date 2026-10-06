@@ -76,6 +76,6 @@ ENV N8N_PORT=5678 \
     N8N_ADDITIONAL_NON_UI_ROUTES="ui:assets" \
     EXTERNAL_HOOK_FILES=/external-hooks/api/hooks.cjs \
     EXTERNAL_HOOK_ASSETS_PATH=/external-hooks/api/assets \
-    EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js \
+    EXTERNAL_FRONTEND_HOOKS_URLS=/assets/oidc-frontend-hook.js;/assets/sidebar-menu-frontend-hook.js \
     EXTERNAL_UI_PATH=/external-ui/dist \
     SSO_RESTRICT_NO_ROLE=true
