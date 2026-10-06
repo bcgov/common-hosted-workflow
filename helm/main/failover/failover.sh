@@ -19,7 +19,7 @@ for cmd in curl jq helm make tar; do
 done
 
 for var in DNS_PROBE_STATUS_URL RELEASE_NAME NAMESPACE CLUSTER CHART_REPO CHART_REF; do
-  [ -n "${!var}" ] || {
+  [[ -n "${!var}" ]] || {
     log "ERROR: required environment variable ${var} is not set."
     exit 1
   }
@@ -37,19 +37,19 @@ fi
 # Fetch dns-probe's /status and set ROUTING/DURATION.
 # Return 1 if the response cannot be trusted.
 fetch_probe_status() {
-  local HTTP_STATUS CURL_EXIT
+  local http_status curl_exit
 
   # Capture curl's exit code separately from the HTTP status.
   set +e
-  HTTP_STATUS=$(curl -sS --max-time 10 \
+  http_status=$(curl -sS --max-time 10 \
     -o /tmp/probe_response.json \
     -w "%{http_code}" \
     "${DNS_PROBE_STATUS_URL}" 2>/dev/null)
-  CURL_EXIT=$?
+  curl_exit=$?
   set -e
 
-  if [ "${CURL_EXIT}" -ne 0 ] || [ "${HTTP_STATUS}" != "200" ]; then
-    log "ERROR: DNS probe request failed (curl exit ${CURL_EXIT}, HTTP status ${HTTP_STATUS:-none})."
+  if [[ "${curl_exit}" -ne 0 ]] || [[ "${http_status}" != "200" ]]; then
+    log "ERROR: DNS probe request failed (curl exit ${curl_exit}, HTTP status ${http_status:-none})."
     return 1
   fi
 
@@ -91,7 +91,7 @@ case "${ROUTING}" in
     ;;
 esac
 
-if [ "${DURATION}" -lt "${STABILIZATION_SECONDS}" ]; then
+if [[ "${DURATION}" -lt "${STABILIZATION_SECONDS}" ]]; then
   log "Routing has only been stable for ${DURATION}s (< ${STABILIZATION_SECONDS}s required). No action until stable."
   exit 0
 fi
@@ -120,12 +120,12 @@ if ! [[ "${IMAGE_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 
 APPLIED=$(echo "${RELEASE_VALUES}" | jq -r '.failover.applied // false')
-if [ "${APPLIED}" != "true" ] && [ "${APPLIED}" != "false" ]; then
+if [[ "${APPLIED}" != "true" && "${APPLIED}" != "false" ]]; then
   log "ERROR: unexpected failover.applied value in the release: '${APPLIED}'. No action."
   exit 1
 fi
 
-if [ "${APPLIED}" = "${DESIRED_FAILOVER}" ]; then
+if [[ "${APPLIED}" == "${DESIRED_FAILOVER}" ]]; then
   log "Release is already in the desired state (failover.applied=${APPLIED}). No action."
   exit 0
 fi
@@ -154,7 +154,7 @@ if ! tar -xzf "${WORKDIR}/chart.tar.gz" -C "${WORKDIR}/src" --strip-components=1
 fi
 
 CHART_DIR="${WORKDIR}/src/helm/main"
-if [ ! -f "${CHART_DIR}/Makefile" ]; then
+if [[ ! -f "${CHART_DIR}/Makefile" ]]; then
   log "ERROR: ${CHART_DIR}/Makefile not found in the downloaded source. No changes made."
   exit 1
 fi
