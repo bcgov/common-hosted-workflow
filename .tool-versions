@@ -2,6 +2,6 @@ nodejs 26.7.0
 python 3.14.7
 pnpm 11.22.0
 oc 4.22.10
-kubectl 1.36.3
+kubectl 1.37.1
 helm 4.3.0
 terraform 1.15.9
