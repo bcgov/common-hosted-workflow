@@ -10,8 +10,12 @@ export const workflowTrigger = pgTable(
       .notNull()
       .references(() => tenantProjectRelation.projectId),
     triggerType: varchar('trigger_type', { length: 100 }).notNull(),
-    triggerUrl: text('trigger_url').notNull(),
-    triggerMethod: varchar('trigger_method', { length: 50 }).notNull(),
+    /** 'url' = legacy outbound webhook; 'n8n-node' = WIL Trigger node run in-process. */
+    targetKind: varchar('target_kind', { length: 20 }).notNull().default('url'),
+    targetWorkflowId: varchar('target_workflow_id', { length: 36 }),
+    targetNodeId: varchar('target_node_id', { length: 36 }),
+    triggerUrl: text('trigger_url'),
+    triggerMethod: varchar('trigger_method', { length: 50 }),
     metadata: jsonb('metadata').notNull(),
     allowedActorsType: varchar('allowed_actors_type', { length: 100 }).notNull(),
     allowedActors: varchar('allowed_actors', { length: 50 }).array().notNull(),
@@ -23,7 +27,14 @@ export const workflowTrigger = pgTable(
   },
   (table) => [
     check('chk_wt_trigger_type', sql`${table.triggerType} IN ('chefs-form', 'button')`),
+    check('chk_wt_target_kind', sql`${table.targetKind} IN ('url', 'n8n-node')`),
+    check(
+      'chk_wt_target_shape',
+      sql`(${table.targetKind} = 'url' AND ${table.triggerUrl} IS NOT NULL AND ${table.triggerMethod} IS NOT NULL)
+        OR (${table.targetKind} = 'n8n-node' AND ${table.targetWorkflowId} IS NOT NULL AND ${table.targetNodeId} IS NOT NULL)`,
+    ),
     index('idx_wt_project_id').on(table.projectId),
+    index('idx_wt_target_workflow').on(table.targetWorkflowId),
   ],
 );
 

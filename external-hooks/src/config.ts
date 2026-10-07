@@ -108,3 +108,22 @@ export const GRAFANA_PROJECTS_SECRET = process.env.GRAFANA_PROJECTS_SECRET ?? ''
 export const WIL_ENCRYPTION_KEY = process.env.WIL_ENCRYPTION_KEY ?? '';
 export const WIL_ENCRYPTION_KEY_ACTIVE = Number.parseInt(process.env.WIL_ENCRYPTION_KEY_ACTIVE ?? '1', 10);
 export const CHEFS_API_KEY_PLACEHOLDER = process.env.CHEFS_API_KEY_PLACEHOLDER ?? '__CHWF_BLANK_VALUE_chefs-api-key__';
+
+// --- WIL Trigger node (n8n-node trigger targets) ---------------------------------------------
+/** Kill switch for starting workflows through the WIL Trigger node. Enabled unless set to "false". */
+export const WIL_N8N_NODE_TRIGGERS_ENABLED = (process.env.WIL_N8N_NODE_TRIGGERS_ENABLED ?? 'true') !== 'false';
+/**
+ * Node type string of the WIL Trigger community node as saved in n8n workflows
+ * (`<package name>.<node name>`). Override only if the installed package name differs.
+ */
+/**
+ * Node type strings that identify the WIL Trigger node in saved workflow JSON. n8n prefixes a node with its
+ * package name: `CUSTOM` for nodes loaded from a custom extensions folder (this deployment) and
+ * `community-nodes` for the installed package, so both are accepted. Override with a comma-separated list.
+ */
+export const WIL_TRIGGER_NODE_TYPES: readonly string[] = (
+  process.env.WIL_TRIGGER_NODE_TYPES || 'CUSTOM.wilTrigger,community-nodes.wilTrigger'
+)
+  .split(',')
+  .map((type) => type.trim())
+  .filter(Boolean);

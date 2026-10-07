@@ -25,6 +25,7 @@ WIL is implemented across two packages:
 | [CHEFS Integration](./chefs-integration.md)               | ChefsFormViewer component, script loading, prefill & submission |
 | [Action Handlers](./action-handlers.md)                   | GetApproval, ShowForm, WaitOnEvent — behavior and design        |
 | [Backend API](./backend-api.md)                           | WIL router endpoints, callback proxy, response shaping          |
+| [Trigger Targets](./trigger-targets.md)                   | Button/CHEFS triggers that run a WIL Trigger node in n8n        |
 | [Future Work](./future-work.md)                           | Workflow triggers, claim/unclaim, auto-expiry, and more         |
 
 ## Quick Reference

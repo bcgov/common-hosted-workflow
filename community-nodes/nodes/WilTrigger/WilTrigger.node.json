@@ -1,0 +1,15 @@
+{
+  "node": "community-nodes.wilTrigger",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Common Hosted Workflow", "Core Nodes"],
+  "subcategories": { "Core Nodes": ["Helpers"] },
+  "alias": ["Common Hosted Workflow", "CHW", "WIL", "BC Gov", "CITZ", "CUSTOM", "trigger", "button", "CHEFS"],
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://bcgov.github.io/common-hosted-workflow/community-nodes/wil-trigger"
+      }
+    ]
+  }
+}

@@ -53,7 +53,8 @@
       "dist/nodes/MultiWebhookWait/MultiWebhookWait.node.js",
       "dist/nodes/WorkflowInteractionLayer/WorkflowInteractionLayer.node.js",
       "dist/nodes/KeyValueStore/KeyValueStore.node.js",
-      "dist/nodes/Notify/Notify.node.js"
+      "dist/nodes/Notify/Notify.node.js",
+      "dist/nodes/WilTrigger/WilTrigger.node.js"
     ]
   },
   "devDependencies": {

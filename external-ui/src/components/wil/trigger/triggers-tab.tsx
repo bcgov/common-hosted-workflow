@@ -35,6 +35,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
     pendingDeleteTrigger,
     buttonCallbackStatus,
     buttonCallbackError,
+    buttonCallbackResponse,
     formPaneTitle,
     hasPendingNav,
     openCreate,
@@ -91,6 +92,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
               tenantId={tenantId}
               buttonCallbackStatus={buttonCallbackStatus}
               buttonCallbackError={buttonCallbackError}
+              buttonCallbackResponse={buttonCallbackResponse}
             />
           </div>
         </MobileDetailView>
@@ -198,6 +200,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
             tenantId={tenantId}
             buttonCallbackStatus={buttonCallbackStatus}
             buttonCallbackError={buttonCallbackError}
+            buttonCallbackResponse={buttonCallbackResponse}
           />
         </div>
       </div>

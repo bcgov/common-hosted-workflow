@@ -2,6 +2,12 @@ import { Button } from '@/components/ui/button';
 import type { Trigger } from '../../../services/backend/trigger-types';
 import { TRIGGER_TYPES } from '../../../constants/constants';
 
+/** Only broken node targets get a badge; `live` and URL triggers show nothing. */
+const TARGET_STATUS_BADGES: Record<string, string | undefined> = {
+  unpublished: 'Unpublished',
+  'missing-node': 'Node removed',
+};
+
 interface TriggerListItemProps {
   trigger: Trigger;
   isSelected: boolean;
@@ -31,6 +37,7 @@ export function TriggerListItem({
       : trigger.config.buttonText || 'Button Trigger';
   const typeLabel = trigger.config.type === TRIGGER_TYPES.CHEFS_FORM ? 'CHEFS Form' : 'Button';
   const runLabel = 'Run';
+  const statusBadge = TARGET_STATUS_BADGES[trigger.targetStatus ?? 'live'] ?? null;
 
   return (
     <button
@@ -49,6 +56,14 @@ export function TriggerListItem({
         <span className="mt-1.5 inline-block rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-0.5 text-xs text-[#64748b]">
           {typeLabel}
         </span>
+        {statusBadge && (
+          <span
+            className="mt-1.5 ml-1.5 inline-block rounded-full border border-[#ce3e39] bg-[#fdf2f2] px-2.5 py-0.5 text-xs text-[#a2312d]"
+            title="This trigger's workflow can no longer be started. Edit the trigger to choose another workflow."
+          >
+            {statusBadge}
+          </span>
+        )}
       </div>
 
       {/* Action buttons row */}

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Trigger, TriggerPayload } from '../../../services/backend/trigger-types';
+import type { Trigger, TriggerCallbackResponse, TriggerPayload } from '../../../services/backend/trigger-types';
 import { createTrigger, updateTrigger, callbackTrigger, deleteTrigger } from '../../../services/backend/triggers';
 
 interface UseTriggerMutationsParams {
@@ -7,7 +7,7 @@ interface UseTriggerMutationsParams {
   userEmail: string;
   onCreated: (trigger: Trigger) => void;
   onUpdated: (trigger: Trigger) => void;
-  onCallbackSuccess: () => void;
+  onCallbackSuccess: (response: TriggerCallbackResponse) => void;
   onCallbackError: (err: Error) => void;
   onCallbackSettled: () => void;
   onDeleted: (triggerId: string) => void;

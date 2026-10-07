@@ -6,6 +6,7 @@ import type {
   ButtonTriggerPayload,
   TriggerType,
   Trigger,
+  TriggerCallbackResponse,
 } from '../../../services/backend/trigger-types';
 import { TRIGGER_TYPES } from '../../../constants/constants';
 import { Select } from './trigger-shared';
@@ -32,6 +33,7 @@ interface TriggerFormPaneProps {
   tenantId: string;
   buttonCallbackStatus: ButtonCallbackStatus;
   buttonCallbackError: Error | null;
+  buttonCallbackResponse?: TriggerCallbackResponse | null;
 }
 
 export function TriggerFormPane({
@@ -50,6 +52,7 @@ export function TriggerFormPane({
   tenantId,
   buttonCallbackStatus,
   buttonCallbackError,
+  buttonCallbackResponse = null,
 }: Readonly<TriggerFormPaneProps>) {
   if (mode === 'idle') {
     return (
@@ -67,7 +70,13 @@ export function TriggerFormPane({
   }
 
   if (mode === 'view' && selectedTrigger?.config.type === TRIGGER_TYPES.BUTTON) {
-    return <TriggerButtonResult status={buttonCallbackStatus} error={buttonCallbackError} />;
+    return (
+      <TriggerButtonResult
+        status={buttonCallbackStatus}
+        error={buttonCallbackError}
+        response={buttonCallbackResponse}
+      />
+    );
   }
 
   return (
@@ -92,6 +101,7 @@ export function TriggerFormPane({
       {triggerType === TRIGGER_TYPES.CHEFS_FORM && (
         <ChefsFormFields
           tenantId={tenantId}
+          savedStatus={mode === 'edit' ? selectedTrigger?.targetStatus : null}
           value={chefsForm}
           onChange={onChefsFormChange}
           onSave={onSave}
@@ -102,6 +112,8 @@ export function TriggerFormPane({
       )}
       {triggerType === TRIGGER_TYPES.BUTTON && (
         <ButtonTriggerFields
+          tenantId={tenantId}
+          savedStatus={mode === 'edit' ? selectedTrigger?.targetStatus : null}
           value={buttonForm}
           onChange={onButtonFormChange}
           onSave={onSave}

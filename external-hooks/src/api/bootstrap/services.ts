@@ -2,6 +2,8 @@ import { AccessRequestService } from '../services/access-request';
 import { ActionService } from '../services/action.service';
 import { ClaimService } from '../services/claim.service';
 import { TriggerService } from '../services/trigger.service';
+import { TriggerTargetService } from '../services/trigger-target.service';
+import type { N8nWorkflowRunnerService } from '../services/n8n-workflow-runner.service';
 import { AuthService, type BaseAuthService } from '../services/auth';
 import { ChefsService } from '../services/chefs.service';
 import { CstarService } from '../services/cstar.service';
@@ -90,6 +92,7 @@ export async function buildApiServices(
   customRepositories: CustomRepositories,
   n8nServices: N8nServices,
   globalOwnerRoleSlug: string,
+  workflowRunner: N8nWorkflowRunnerService,
 ): Promise<ApiServices> {
   const cssSsoConfig = getCssSsoConfig();
   const cssSsoService = cssSsoConfig ? new CssSsoService(cssSsoConfig) : null;
@@ -97,12 +100,15 @@ export async function buildApiServices(
   const featureFlag = new FeatureFlagService();
   const tenantService = new TenantService(customRepositories, n8nRepositories, cstarService);
   const chefs = new ChefsService(n8nRepositories, n8nServices.credentialDecrypt, n8nServices.n8nCredentials);
+  const triggerTarget = new TriggerTargetService(n8nRepositories, workflowRunner);
 
   return {
     uiApi: new UiApiService(n8nRepositories),
     action: new ActionService(n8nRepositories, customRepositories),
     claim: new ClaimService(customRepositories.actionRequest),
-    trigger: new TriggerService(customRepositories, chefs),
+    trigger: new TriggerService(customRepositories, chefs, triggerTarget),
+    triggerTarget,
+    workflowRunner,
     chefs,
     cstar: cstarService,
     featureFlag,

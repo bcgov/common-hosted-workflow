@@ -85,6 +85,8 @@ x-n8n-env: &n8n-env
   WIL_ENCRYPTION_KEY: ${WIL_ENCRYPTION_KEY}
   WIL_ENCRYPTION_KEY_ACTIVE: ${WIL_ENCRYPTION_KEY_ACTIVE:-1}
   CHEFS_API_KEY_PLACEHOLDER: ${CHEFS_API_KEY_PLACEHOLDER}
+  # Run WIL triggers as in-process n8n runs of the WIL Trigger node (set to "false" to disable)
+  WIL_N8N_NODE_TRIGGERS_ENABLED: ${WIL_N8N_NODE_TRIGGERS_ENABLED:-true}
   # Shared secret validated by the /obs/projects endpoint — must match the value set in Grafana.
   GRAFANA_PROJECTS_SECRET: ${GRAFANA_PROJECTS_SECRET}
   # Prometheus metrics — exposed at :5678/metrics, scraped by Alloy when observability stack is running

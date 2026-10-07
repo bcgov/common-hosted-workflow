@@ -217,3 +217,69 @@ describe('mapTriggerRowToResponse', () => {
     expect(result.updatedBy).toBeNull();
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  n8n-node targets                                                    */
+/* ------------------------------------------------------------------ */
+
+describe('trigger target kinds', () => {
+  const common = {
+    metadata: { buttonText: 'Run' },
+    allowedActorsType: 'all',
+    allowedActors: ['*'],
+  };
+
+  it('defaults a body without targetKind to the legacy url variant', () => {
+    const { body } = createTriggerSchema.parse({
+      body: { ...common, triggerType: 'button', triggerUrl: 'https://example.com/hook', triggerMethod: 'POST' },
+    });
+    expect(body.targetKind).toBe('url');
+  });
+
+  it('accepts an n8n-node target without url fields', () => {
+    const { body } = createTriggerSchema.parse({
+      body: { ...common, triggerType: 'button', targetKind: 'n8n-node', targetWorkflowId: 'wf1', targetNodeId: 'n1' },
+    });
+    expect(body).toMatchObject({ targetKind: 'n8n-node', targetWorkflowId: 'wf1', targetNodeId: 'n1' });
+  });
+
+  it('rejects an n8n-node target missing the node id', () => {
+    expect(() =>
+      createTriggerSchema.parse({
+        body: { ...common, triggerType: 'button', targetKind: 'n8n-node', targetWorkflowId: 'wf1' },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects mixing url fields into an n8n-node target', () => {
+    expect(() =>
+      createTriggerSchema.parse({
+        body: {
+          ...common,
+          triggerType: 'button',
+          targetKind: 'n8n-node',
+          targetWorkflowId: 'wf1',
+          targetNodeId: 'n1',
+          triggerUrl: 'https://example.com/hook',
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('maps target columns and status onto the response', () => {
+    const row = makeWorkflowTriggerRow({
+      targetKind: 'n8n-node',
+      targetWorkflowId: 'wf1',
+      targetNodeId: 'n1',
+      triggerUrl: null,
+      triggerMethod: null,
+    });
+    const result = mapTriggerRowToResponse(row as any, false, 'live');
+    expect(result).toMatchObject({
+      targetKind: 'n8n-node',
+      targetWorkflowId: 'wf1',
+      targetStatus: 'live',
+      triggerUrl: null,
+    });
+  });
+});

@@ -1,5 +1,6 @@
 import type {
   ApiTriggerItem,
+  ButtonTriggerPayload,
   ChefsFormTriggerPayload,
   LimitedApiTriggerItem,
   Trigger,
@@ -24,7 +25,13 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
   const isAllActors = item.allowedActors.includes('*');
   const allowedActors = isAllActors ? '*' : item.allowedActors.join(',');
   const allowedActorsType: TriggerActorType = isAllActors ? 'all' : (item.allowedActorsType as TriggerActorType);
-  const triggerMethod = item.triggerMethod as TriggerMethod;
+  const triggerMethod = (item.triggerMethod ?? 'POST') as TriggerMethod;
+  const triggerUrl = item.triggerUrl ?? '';
+  const target = {
+    targetKind: item.targetKind ?? 'url',
+    targetWorkflowId: item.targetWorkflowId ?? '',
+    targetNodeId: item.targetNodeId ?? '',
+  } as const;
   const includeActorId = (meta.includeActorId as boolean) ?? false;
 
   let config: TriggerPayload;
@@ -42,24 +49,34 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
       postBody: (meta.postBody as string) ?? '',
       allowedActors,
       allowedActorsType,
-      callbackWebhookUrl: item.triggerUrl,
+      callbackWebhookUrl: triggerUrl,
       triggerMethod,
       includeActorId,
+      ...target,
     };
   } else {
     config = {
       type: TRIGGER_TYPES.BUTTON,
       buttonText: (meta.buttonText as string) ?? '',
-      webhookUrl: item.triggerUrl,
+      webhookUrl: triggerUrl,
       postBody: (meta.postBody as string) ?? '',
       allowedActors,
       allowedActorsType,
       triggerMethod,
       includeActorId,
+      inputValues: (meta.inputValues as Record<string, unknown> | undefined) ?? {},
+      ...target,
     };
   }
 
-  return { id: item.id, tenantId, createdAt: item.createdAt, updatedAt: item.updatedAt, config };
+  return {
+    id: item.id,
+    tenantId,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    config,
+    targetStatus: item.targetStatus ?? null,
+  };
 }
 
 /** Converts a limited API response (non-editor users) to a Trigger with minimal config for display. */
@@ -95,7 +112,7 @@ export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: s
           includeActorId: true,
         };
 
-  return { id: item.id, tenantId, createdAt: '', updatedAt: '', config };
+  return { id: item.id, tenantId, createdAt: '', updatedAt: '', config, targetStatus: item.targetStatus ?? null };
 }
 
 /**
@@ -110,64 +127,56 @@ function chefsFormMetadata(config: ChefsFormTriggerPayload): Record<string, unkn
     formName: config.formName,
     baseUrl: config.baseUrl,
     includeActorId: config.includeActorId,
-    postBody: config.postBody,
   };
+  if (config.targetKind !== 'n8n-node') metadata.postBody = config.postBody;
   if (!config.n8nCredentialId) {
     metadata.apiKey = config.apiKey;
   }
   return metadata;
 }
 
-/** Builds the POST /triggers request body from the FE payload. */
-export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
-  if (config.type === TRIGGER_TYPES.CHEFS_FORM) {
+/** Target fields of a request body: workflow + node for node targets, URL + method otherwise. */
+function targetBody(config: TriggerPayload, url: string) {
+  if (config.targetKind === 'n8n-node') {
     return {
-      triggerType: TRIGGER_TYPES.CHEFS_FORM,
-      triggerUrl: config.callbackWebhookUrl,
-      triggerMethod: config.triggerMethod,
-      metadata: chefsFormMetadata(config),
-      allowedActorsType: config.allowedActorsType,
-      allowedActors: splitActors(config.allowedActors),
-      createdBy: actorId,
+      targetKind: 'n8n-node' as const,
+      targetWorkflowId: config.targetWorkflowId ?? '',
+      targetNodeId: config.targetNodeId ?? '',
     };
   }
+  return { triggerUrl: url, triggerMethod: config.triggerMethod };
+}
+
+function buttonMetadata(config: ButtonTriggerPayload): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    buttonText: config.buttonText,
+    postBody: config.postBody,
+    includeActorId: config.includeActorId,
+  };
+  if (config.targetKind === 'n8n-node') {
+    metadata.inputValues = config.inputValues ?? {};
+    delete metadata.postBody; // legacy URL-only field
+  }
+  return metadata;
+}
+
+/** Fields common to create and update bodies. */
+function commonBody(config: TriggerPayload) {
+  const isChefs = config.type === TRIGGER_TYPES.CHEFS_FORM;
   return {
-    triggerType: TRIGGER_TYPES.BUTTON,
-    triggerUrl: config.webhookUrl,
-    triggerMethod: config.triggerMethod,
-    metadata: {
-      buttonText: config.buttonText,
-      postBody: config.postBody,
-      includeActorId: config.includeActorId,
-    },
+    ...(isChefs ? targetBody(config, config.callbackWebhookUrl) : targetBody(config, config.webhookUrl)),
+    metadata: isChefs ? chefsFormMetadata(config) : buttonMetadata(config),
     allowedActorsType: config.allowedActorsType,
     allowedActors: splitActors(config.allowedActors),
-    createdBy: actorId,
   };
+}
+
+/** Builds the POST /triggers request body from the FE payload. */
+export function payloadToCreateBody(config: TriggerPayload, actorId: string) {
+  return { triggerType: config.type, ...commonBody(config), createdBy: actorId };
 }
 
 /** Builds the PUT /triggers/:id request body from the FE payload. */
 export function payloadToUpdateBody(config: TriggerPayload, actorId: string) {
-  if (config.type === TRIGGER_TYPES.CHEFS_FORM) {
-    return {
-      triggerUrl: config.callbackWebhookUrl,
-      triggerMethod: config.triggerMethod,
-      metadata: chefsFormMetadata(config),
-      allowedActorsType: config.allowedActorsType,
-      allowedActors: splitActors(config.allowedActors),
-      updatedBy: actorId,
-    };
-  }
-  return {
-    triggerUrl: config.webhookUrl,
-    triggerMethod: config.triggerMethod,
-    metadata: {
-      buttonText: config.buttonText,
-      postBody: config.postBody,
-      includeActorId: config.includeActorId,
-    },
-    allowedActorsType: config.allowedActorsType,
-    allowedActors: splitActors(config.allowedActors),
-    updatedBy: actorId,
-  };
+  return { ...commonBody(config), updatedBy: actorId };
 }

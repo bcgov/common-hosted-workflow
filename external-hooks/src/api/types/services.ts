@@ -4,6 +4,8 @@ import type { UiApiContext, UiWorkflowSummary } from './ui-api';
 import type { AccessRequestService } from '../services/access-request';
 import type { ActionService } from '../services/action.service';
 import type { TriggerService } from '../services/trigger.service';
+import type { TriggerTargetService } from '../services/trigger-target.service';
+import type { N8nWorkflowRunnerService } from '../services/n8n-workflow-runner.service';
 import type { ChefsService } from '../services/chefs.service';
 import type { CstarService } from '../services/cstar.service';
 import type { FeatureFlagService } from '../services/feature-flag.service';
@@ -43,6 +45,8 @@ export type ApiServices = {
   action: ActionService;
   claim: ClaimService;
   trigger: TriggerService;
+  triggerTarget: TriggerTargetService;
+  workflowRunner: N8nWorkflowRunnerService;
   chefs: ChefsService;
   cstar: CstarService;
   featureFlag: FeatureFlagService;

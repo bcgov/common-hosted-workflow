@@ -9,6 +9,7 @@ import { buildN8nRuntimeContext, type N8nRepositories } from './bootstrap/n8n-re
 import { mountOidc } from './bootstrap/oidc';
 import { buildRouteContext } from './bootstrap/route-context';
 import { buildApiServices, buildN8nServices } from './bootstrap/services';
+import { createN8nWorkflowRunnerService } from './services/n8n-workflow-runner.service';
 import { mountUi } from './bootstrap/ui';
 import type { IWorkflowBase } from './types/hooks';
 import type { UiApiServiceContract } from './types/services';
@@ -37,11 +38,13 @@ function createHookConfig() {
 
           const n8nServices = buildN8nServices(n8nRuntime.container);
           const customRepositories = buildCustomRepositories(CUSTOM_DATABASE_URL);
+          const workflowRunner = createN8nWorkflowRunnerService(n8nRuntime.container, n8nRuntime.n8nRepositories);
           const services = await buildApiServices(
             n8nRuntime.n8nRepositories,
             customRepositories,
             n8nServices,
             n8nRuntime.globalOwnerRoleSlug,
+            workflowRunner,
           );
           uiApiService = services.uiApi;
 

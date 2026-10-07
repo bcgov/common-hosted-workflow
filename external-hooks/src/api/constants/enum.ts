@@ -66,3 +66,34 @@ export const triggerHttpMethodZodEnum = z.enum(TRIGGER_HTTP_METHODS);
 export const TRIGGER_ACTOR_TYPES = ['all', 'role', 'user', 'group', 'other'] as const;
 export type TriggerActorType = (typeof TRIGGER_ACTOR_TYPES)[number];
 export const triggerActorTypeZodEnum = z.enum(TRIGGER_ACTOR_TYPES);
+
+/** How a workflow trigger reaches its n8n workflow. `url` = legacy webhook URL, `n8n-node` = WIL Trigger node. */
+export const TRIGGER_TARGET_KINDS = ['url', 'n8n-node'] as const;
+export type TriggerTargetKind = (typeof TRIGGER_TARGET_KINDS)[number];
+export const triggerTargetKindZodEnum = z.enum(TRIGGER_TARGET_KINDS);
+
+export const TriggerTargetKindEnum = {
+  URL: 'url' as TriggerTargetKind,
+  N8N_NODE: 'n8n-node' as TriggerTargetKind,
+} as const;
+
+/** Sources a WIL Trigger node can accept (matches `WORKFLOW_TRIGGER_TYPES`). */
+export const WIL_TRIGGER_SOURCES = WORKFLOW_TRIGGER_TYPES;
+export type WilTriggerSource = WorkflowTriggerType;
+
+/** How the WIL Trigger node answers the caller. */
+export const WIL_TRIGGER_RESPOND_MODES = ['immediately', 'lastNode'] as const;
+export type WilTriggerRespondMode = (typeof WIL_TRIGGER_RESPOND_MODES)[number];
+
+/** `input` handling modes of the WIL Trigger node. */
+export const WIL_TRIGGER_INPUT_SOURCES = ['passthrough', 'workflowInputs', 'jsonExample'] as const;
+export type WilTriggerInputSource = (typeof WIL_TRIGGER_INPUT_SOURCES)[number];
+
+/** Field types selectable in the WIL Trigger node's input schema. */
+export const WIL_TRIGGER_INPUT_FIELD_TYPES = ['string', 'number', 'boolean', 'object', 'array'] as const;
+export type WilTriggerInputFieldType = (typeof WIL_TRIGGER_INPUT_FIELD_TYPES)[number];
+
+/** `targetStatus` of a trigger whose target is an n8n workflow node. */
+export const TRIGGER_TARGET_STATUSES = ['live', 'unpublished', 'missing-node'] as const;
+export type TriggerTargetStatus = (typeof TRIGGER_TARGET_STATUSES)[number];
+export const triggerTargetStatusZodEnum = z.enum(TRIGGER_TARGET_STATUSES);

@@ -2,6 +2,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ButtonTriggerPayload } from '../../../services/backend/trigger-types';
 import { NO_AUTOFILL } from './no-autofill';
+import { TriggerTargetSection } from './trigger-target-section';
+import { pruneInputValues } from './workflow-input-utils';
+import type { TriggerTargetStatus } from '../../../services/backend/trigger-types';
 import {
   ActorIdBanner,
   AllowedActorsField,
@@ -14,6 +17,10 @@ import {
 
 export const DEFAULT_BUTTON: ButtonTriggerPayload = {
   type: 'button',
+  targetKind: 'n8n-node',
+  targetWorkflowId: '',
+  targetNodeId: '',
+  inputValues: {},
   buttonText: '',
   webhookUrl: '',
   postBody: '',
@@ -24,6 +31,9 @@ export const DEFAULT_BUTTON: ButtonTriggerPayload = {
 };
 
 interface ButtonTriggerFieldsProps {
+  tenantId: string;
+  /** Live status of the saved target (edit mode only). */
+  savedStatus?: TriggerTargetStatus | null;
   value: ButtonTriggerPayload;
   onChange: (v: ButtonTriggerPayload) => void;
   onSave: () => void;
@@ -34,6 +44,8 @@ interface ButtonTriggerFieldsProps {
 }
 
 export function ButtonTriggerFields({
+  tenantId,
+  savedStatus,
   value,
   onChange,
   onSave,
@@ -45,7 +57,11 @@ export function ButtonTriggerFields({
     onChange({ ...value, [key]: val });
   }
 
-  const isValid = value.buttonText.trim() && value.webhookUrl.trim() && value.allowedActorsType !== '';
+  const isNodeTarget = value.targetKind === 'n8n-node';
+  const hasTarget = isNodeTarget
+    ? Boolean(value.targetWorkflowId?.trim() && value.targetNodeId?.trim())
+    : Boolean(value.webhookUrl.trim());
+  const isValid = value.buttonText.trim() && hasTarget && value.allowedActorsType !== '';
 
   return (
     <div className="space-y-5">
@@ -62,24 +78,51 @@ export function ButtonTriggerFields({
             {...NO_AUTOFILL}
           />
         </div>
-        <TriggerMethodField
-          id="btn-trigger-method"
-          value={value.triggerMethod}
-          onChange={(v) => set('triggerMethod', v)}
-        />
+        {!isNodeTarget && (
+          <TriggerMethodField
+            id="btn-trigger-method"
+            value={value.triggerMethod}
+            onChange={(v) => set('triggerMethod', v)}
+          />
+        )}
       </div>
-      <TriggerUrlField
-        id="btn-webhook-url"
-        label="Webhook URL"
-        value={value.webhookUrl}
-        onChange={(v) => set('webhookUrl', v)}
-        placeholder="e.g. http://n8n:5678/webhook/my-trigger"
-      />
-      <PostBodyField
-        id="btn-post-body"
-        value={value.postBody}
-        onChange={(v) => set('postBody', v)}
-        method={value.triggerMethod}
+      <TriggerTargetSection
+        idPrefix="btn"
+        tenantId={tenantId}
+        source="button"
+        kind={value.targetKind ?? 'url'}
+        workflowId={value.targetWorkflowId ?? ''}
+        nodeId={value.targetNodeId ?? ''}
+        inputValues={value.inputValues}
+        savedStatus={savedStatus}
+        onKindChange={(targetKind) => set('targetKind', targetKind)}
+        onTargetChange={(targetWorkflowId, targetNodeId, schema) =>
+          // Single update: values for fields the new node doesn't declare must not leak into the save.
+          onChange({
+            ...value,
+            targetWorkflowId,
+            targetNodeId,
+            inputValues: pruneInputValues(schema, value.inputValues ?? {}),
+          })
+        }
+        onInputValuesChange={(inputValues) => set('inputValues', inputValues)}
+        urlFields={
+          <>
+            <TriggerUrlField
+              id="btn-webhook-url"
+              label="Webhook URL"
+              value={value.webhookUrl}
+              onChange={(v) => set('webhookUrl', v)}
+              placeholder="e.g. http://n8n:5678/webhook/my-trigger"
+            />
+            <PostBodyField
+              id="btn-post-body"
+              value={value.postBody}
+              onChange={(v) => set('postBody', v)}
+              method={value.triggerMethod}
+            />
+          </>
+        }
       />
       <div className="grid grid-cols-2 gap-4">
         <AllowedActorsTypeField
@@ -106,7 +149,7 @@ export function ButtonTriggerFields({
           disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
       </div>
-      <ActorIdBanner method={value.triggerMethod} />
+      {!isNodeTarget && <ActorIdBanner method={value.triggerMethod} />}
       <TriggerFormActions onSave={onSave} onCancel={onCancel} isSaving={isSaving} isValid={!!isValid} />
     </div>
   );

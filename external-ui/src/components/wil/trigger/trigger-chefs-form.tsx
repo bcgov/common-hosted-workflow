@@ -12,6 +12,8 @@ import {
 import type { ChefsFormTriggerPayload } from '../../../services/backend/trigger-types';
 import { ChefsCredentialCombobox } from './chefs-credential-combobox';
 import { ChefsCredentialDialog } from './chefs-credential-dialog';
+import { TriggerTargetSection } from './trigger-target-section';
+import type { TriggerTargetStatus } from '../../../services/backend/trigger-types';
 import {
   ActorIdBanner,
   AllowedActorsField,
@@ -24,6 +26,9 @@ import {
 
 export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   type: 'chefs-form',
+  targetKind: 'n8n-node',
+  targetWorkflowId: '',
+  targetNodeId: '',
   n8nCredentialId: '',
   formId: '',
   formName: '',
@@ -39,6 +44,8 @@ export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
 
 interface ChefsFormFieldsProps {
   tenantId: string;
+  /** Live status of the saved target (edit mode only). */
+  savedStatus?: TriggerTargetStatus | null;
   value: ChefsFormTriggerPayload;
   onChange: (v: ChefsFormTriggerPayload) => void;
   onSave: () => void;
@@ -64,6 +71,7 @@ function withSelectedCredential(
 
 export function ChefsFormFields({
   tenantId,
+  savedStatus,
   value,
   onChange,
   onSave,
@@ -88,9 +96,11 @@ export function ChefsFormFields({
   const savedCredentialMissing = Boolean(value.n8nCredentialId) && !selected && !credentialsQuery.isPending;
   const usesLegacyKey = !value.n8nCredentialId && value.apiKey.trim().length > 0;
 
-  const isValid = Boolean(
-    value.n8nCredentialId.trim() && value.callbackWebhookUrl.trim() && value.allowedActorsType !== '',
-  );
+  const isNodeTarget = value.targetKind === 'n8n-node';
+  const hasTarget = isNodeTarget
+    ? Boolean(value.targetWorkflowId?.trim() && value.targetNodeId?.trim())
+    : Boolean(value.callbackWebhookUrl.trim());
+  const isValid = Boolean(value.n8nCredentialId.trim() && hasTarget && value.allowedActorsType !== '');
 
   function selectCredential(credentialId: string) {
     const match = credentials.find((credential) => credential.id === credentialId);
@@ -173,11 +183,13 @@ export function ChefsFormFields({
           }
         }}
       />
-      <TriggerMethodField
-        id="chefs-trigger-method"
-        value={value.triggerMethod}
-        onChange={(v) => set('triggerMethod', v)}
-      />
+      {!isNodeTarget && (
+        <TriggerMethodField
+          id="chefs-trigger-method"
+          value={value.triggerMethod}
+          onChange={(v) => set('triggerMethod', v)}
+        />
+      )}
       <div className="grid grid-cols-2 gap-4">
         <AllowedActorsTypeField
           id="chefs-actors-type"
@@ -203,19 +215,34 @@ export function ChefsFormFields({
           disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
       </div>
-      <TriggerUrlField
-        id="chefs-callback-url"
-        label="Callback Webhook URL"
-        value={value.callbackWebhookUrl}
-        onChange={(v) => set('callbackWebhookUrl', v)}
+      <TriggerTargetSection
+        idPrefix="chefs"
+        tenantId={tenantId}
+        source="chefs-form"
+        kind={value.targetKind ?? 'url'}
+        workflowId={value.targetWorkflowId ?? ''}
+        nodeId={value.targetNodeId ?? ''}
+        savedStatus={savedStatus}
+        onKindChange={(targetKind) => set('targetKind', targetKind)}
+        onTargetChange={(targetWorkflowId, targetNodeId) => onChange({ ...value, targetWorkflowId, targetNodeId })}
+        urlFields={
+          <>
+            <TriggerUrlField
+              id="chefs-callback-url"
+              label="Callback Webhook URL"
+              value={value.callbackWebhookUrl}
+              onChange={(v) => set('callbackWebhookUrl', v)}
+            />
+            <PostBodyField
+              id="chefs-post-body"
+              value={value.postBody}
+              onChange={(v) => set('postBody', v)}
+              method={value.triggerMethod}
+            />
+          </>
+        }
       />
-      <PostBodyField
-        id="chefs-post-body"
-        value={value.postBody}
-        onChange={(v) => set('postBody', v)}
-        method={value.triggerMethod}
-      />
-      <ActorIdBanner method={value.triggerMethod} />
+      {!isNodeTarget && <ActorIdBanner method={value.triggerMethod} />}
       <TriggerFormActions onSave={onSave} onCancel={onCancel} isSaving={isSaving} isValid={!!isValid} />
     </div>
   );

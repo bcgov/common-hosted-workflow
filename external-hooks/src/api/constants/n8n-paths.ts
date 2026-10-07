@@ -13,3 +13,9 @@ export const N8N_CREDENTIALS_FINDER_SERVICE_PATH =
 export const N8N_PROJECT_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/services/project.service.ee.js';
 export const N8N_EVENT_SERVICE_PATH = '/usr/local/lib/node_modules/n8n/dist/events/event.service.js';
 export const N8N_WORKFLOW_PATH = '/usr/local/lib/node_modules/n8n/node_modules/n8n-workflow';
+// Config (`WorkflowsConfig`) and the execution classes used to start a published workflow in-process.
+export const N8N_CONFIG_PATH = '/usr/local/lib/node_modules/n8n/node_modules/@n8n/config';
+export const N8N_WORKFLOW_RUNNER_PATH = '/usr/local/lib/node_modules/n8n/dist/workflow-runner.js';
+export const N8N_ACTIVE_EXECUTIONS_PATH = '/usr/local/lib/node_modules/n8n/dist/active-executions.js';
+export const N8N_WORKFLOW_PUBLISHED_DATA_PATH =
+  '/usr/local/lib/node_modules/n8n/dist/workflows/workflow-published-data.service.js';

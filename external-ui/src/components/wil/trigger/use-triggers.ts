@@ -45,7 +45,11 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     },
     onUpdated: (updated) => {
       setLocalTriggers((prev) =>
-        prev.map((t) => (t.id === updated.id ? { ...t, updatedAt: updated.updatedAt, config: updated.config } : t)),
+        prev.map((t) =>
+          t.id === updated.id
+            ? { ...t, updatedAt: updated.updatedAt, config: updated.config, targetStatus: updated.targetStatus }
+            : t,
+        ),
       );
     },
     onCallbackSuccess: callbackStatus.succeed,
@@ -210,6 +214,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     pendingDeleteTrigger: pendingDelete ? (triggers.find((t: Trigger) => t.id === pendingDelete) ?? null) : null,
     buttonCallbackStatus: callbackStatus.buttonCallbackStatus,
     buttonCallbackError: callbackStatus.buttonCallbackError,
+    buttonCallbackResponse: callbackStatus.buttonCallbackResponse,
     formPaneTitle: getFormPaneTitle(),
     hasPendingNav: pendingNav !== null,
     openCreate,
