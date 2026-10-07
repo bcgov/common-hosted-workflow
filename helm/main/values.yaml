@@ -341,14 +341,6 @@ pgo:
     #       endpoint: commonservices.objectstore.gov.bc.ca
     #       region: ca-central-1
 
-  # Conditional restore (GoldDR only; enabled per environment). Runs on the
-  # ops-toolbox image;
-  conditionalRestore:
-    image:
-      repository: ghcr.io/bcgov/chwf-ops-toolbox
-      tag: main
-      pullPolicy: Always
-
 # backup-storage — disabled by default, enabled only for gold deployments
 backup-storage:
   enabled: false
