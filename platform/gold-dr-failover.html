@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Gold/GoldDR Failover | Common Hosted Workflow</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://bcgov.github.io/common-hosted-workflow/platform/gold-dr-failover"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Gold/GoldDR Failover | Common Hosted Workflow"><meta data-rh="true" name="description" content="This repository deploys to the BC Gov Private Cloud Gold tier, which consists of a primary Gold cluster and a warm-standby GoldDR cluster."><meta data-rh="true" property="og:description" content="This repository deploys to the BC Gov Private Cloud Gold tier, which consists of a primary Gold cluster and a warm-standby GoldDR cluster."><link data-rh="true" rel="icon" href="/common-hosted-workflow/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://bcgov.github.io/common-hosted-workflow/platform/gold-dr-failover"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/platform/gold-dr-failover" hreflang="en"><link data-rh="true" rel="alternate" href="https://bcgov.github.io/common-hosted-workflow/platform/gold-dr-failover" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Gold/GoldDR Failover","item":"https://bcgov.github.io/common-hosted-workflow/platform/gold-dr-failover"}]}</script><link rel="stylesheet" href="/common-hosted-workflow/assets/css/styles.dd79eb43.css">
-<script src="/common-hosted-workflow/assets/js/runtime~main.345d9479.js" defer="defer"></script>
-<script src="/common-hosted-workflow/assets/js/main.1ad2d1d3.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/runtime~main.b9e3a89e.js" defer="defer"></script>
+<script src="/common-hosted-workflow/assets/js/main.91b79276.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -56,6 +56,7 @@
 <li class="">trigger nodes are disabled on DR in current Helm overlays using <code>n8n.extraExcludedNodes</code></li>
 <li class="">selected DR overlays enable <code>pgo.conditionalRestore</code> to restore from S3-backed backups</li>
 <li class=""><code>dns-probe</code> is used in some DR environments to support failover-aware restore behavior</li>
+<li class="">the same <code>dns-probe</code> signal also drives the <code>failover</code> CronJob (<code>helm/main/templates/failover/</code>). After a stable failover it re-runs <code>helm upgrade</code> with the <code>values-&lt;namespace&gt;-golddr-failover.yaml</code> overlay (for example, higher n8n replica counts), and after a stable failback it re-runs it without the overlay</li>
 </ul>
 <p>For the underlying backup and restore pipeline, see <a class="" href="/common-hosted-workflow/platform/database-backup-process">Database Backup Process</a>.</p>
 <p>If a trigger or inbound integration created side effects while running on DR, those side effects would persist in external systems even though the related DR execution records could later disappear during failback. The ISA treats that divergence as unacceptable.</p>
@@ -68,6 +69,7 @@
 <li class=""><code>backup-storage.enabled: false</code> on DR overlays because backups are created on Gold</li>
 <li class=""><code>pgo.conditionalRestore.enabled</code> on selected DR overlays</li>
 <li class=""><code>dns-probe.enabled</code> on selected DR overlays to support conditional restore logic</li>
+<li class=""><code>failover.enabled</code> on selected DR overlays, plus a <code>values-&lt;namespace&gt;-golddr-failover.yaml</code> overlay holding what changes during a failover (such as n8n replica counts)</li>
 </ul>
 <p>So the Gold/GoldDR distinction is not just operational policy. It is encoded in deployment configuration.</p>
 <h2 class="anchor anchorTargetStickyNavbar_lel1" id="how-user-traffic-reaches-dr">How User Traffic Reaches DR<a href="#how-user-traffic-reaches-dr" class="hash-link" aria-label="Direct link to How User Traffic Reaches DR" title="Direct link to How User Traffic Reaches DR" translate="no">​</a></h2>
