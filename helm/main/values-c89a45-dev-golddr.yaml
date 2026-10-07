@@ -1,8 +1,13 @@
 # Enables the DR-failover CronJob (templates/failover/). See the failover:
-# block in values.yaml, and values-c89a45-dev-failover.yaml for what changes
+# block in values.yaml, and values-c89a45-dev-golddr-failover.yaml for what changes
 # while GoldDR is the active site.
 failover:
   enabled: true
+
+  image:
+    # ops-toolbox build (commit SHA tag); bump to roll out a new toolbox image
+    tag: bc2d16e12908f39869708e182712f56c5e863fa9  # pragma: allowlist secret
+    pullPolicy: IfNotPresent
 
 n8n:
   enabled: true

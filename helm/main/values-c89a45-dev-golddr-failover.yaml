@@ -1,4 +1,6 @@
-# Failover-time overrides for c89a45-dev.
+# Failover-time overrides for c89a45-dev, GoldDR ONLY.
+# The Makefile refuses FAILOVER=true for any other CLUSTER, so this file can
+# never be layered onto Gold.
 #
 # NOT a standalone values file. It is layered on top of values.yaml and
 # values-c89a45-dev-golddr.yaml only when the failover CronJob runs

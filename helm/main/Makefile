@@ -5,6 +5,7 @@ NAMESPACE ?=
 IMAGE_TAG ?=
 CLUSTER ?=
 FAILOVER ?= false
+FAILOVER_VALUES :=
 
 ifeq ($(strip $(NAMESPACE)),)
     $(error NAMESPACE is not set)
@@ -15,11 +16,15 @@ ifeq ($(strip $(CLUSTER)),)
 endif
 
 ifeq ($(strip $(FAILOVER)),true)
-    ifeq ($(wildcard values-${NAMESPACE}-failover.yaml),)
-        $(error FAILOVER=true but values-${NAMESPACE}-failover.yaml does not exist)
+    ifneq ($(strip $(CLUSTER)),golddr)
+        $(error FAILOVER=true is only supported for CLUSTER=golddr, got '$(CLUSTER)')
     endif
 
-    FAILOVER_VALUES := -f "values-${NAMESPACE}-failover.yaml"
+    ifeq ($(wildcard values-${NAMESPACE}-${CLUSTER}-failover.yaml),)
+        $(error FAILOVER=true but values-${NAMESPACE}-${CLUSTER}-failover.yaml does not exist)
+    endif
+
+    FAILOVER_VALUES := -f "values-${NAMESPACE}-${CLUSTER}-failover.yaml"
 endif
 
 define arguments
