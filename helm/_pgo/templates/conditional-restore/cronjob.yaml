@@ -35,6 +35,8 @@ spec:
                 - name: restore-script
                   mountPath: /scripts
               env:
+                - name: NAMESPACE
+                  value: {{ .Release.Namespace | quote }}
                 - name: STATE_CONFIGMAP_NAME
                   value: {{ include "_.fullname" . }}-restore-state
                 - name: DNS_PROBE_STATUS_URL

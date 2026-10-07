@@ -57,6 +57,10 @@ pgo:
   pgBackRest:
   conditionalRestore:
     enabled: true
+    image:
+      # ops-toolbox build (commit SHA tag); bump to roll out a new toolbox image
+      tag: bc2d16e12908f39869708e182712f56c5e863fa9  # pragma: allowlist secret
+      pullPolicy: IfNotPresent
     s3:
       bucket: workflow-dev/backups/pgdump
 
