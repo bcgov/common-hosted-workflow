@@ -1,0 +1,12 @@
+{{- if .Values.failover.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "_.fullname" . }}-failover-script
+  labels:
+    {{- include "_.labels" . | nindent 4 }}
+data:
+  failover.sh: |
+    {{- .Files.Get "failover/failover.sh" | replace "\r" "" | nindent 4 }}
+{{- end }}

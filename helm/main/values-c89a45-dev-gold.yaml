@@ -37,6 +37,14 @@ n8n:
   route:
     enabled: true
     host: dev-workflow.apps.gold.devops.gov.bc.ca
+    # Required when main runs multiple replicas with multi-main enabled.
+    # Sticky sessions keep requests from switching between main pods.
+    sessionAffinity: true
+
+  main:
+    # Multi-main allows main to run multiple replicas.
+    env:
+      N8N_MULTI_MAIN_SETUP_ENABLED: "true"
 
   worker:
     enabled: true

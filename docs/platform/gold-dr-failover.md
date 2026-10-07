@@ -72,6 +72,7 @@ Because of that:
 - trigger nodes are disabled on DR in current Helm overlays using `n8n.extraExcludedNodes`
 - selected DR overlays enable `pgo.conditionalRestore` to restore from S3-backed backups
 - `dns-probe` is used in some DR environments to support failover-aware restore behavior
+- the same `dns-probe` signal also drives the `failover` CronJob (`helm/main/templates/failover/`). After a stable failover it re-runs `helm upgrade` with the `values-<namespace>-golddr-failover.yaml` overlay (for example, higher n8n replica counts), and after a stable failback it re-runs it without the overlay
 
 For the underlying backup and restore pipeline, see [Database Backup Process](./database-backup-process.md).
 
@@ -88,6 +89,7 @@ Examples in `helm/main` include:
 - `backup-storage.enabled: false` on DR overlays because backups are created on Gold
 - `pgo.conditionalRestore.enabled` on selected DR overlays
 - `dns-probe.enabled` on selected DR overlays to support conditional restore logic
+- `failover.enabled` on selected DR overlays, plus a `values-<namespace>-golddr-failover.yaml` overlay holding what changes during a failover (such as n8n replica counts)
 
 So the Gold/GoldDR distinction is not just operational policy. It is encoded in deployment configuration.
 

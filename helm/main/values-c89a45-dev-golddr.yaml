@@ -1,3 +1,14 @@
+# Enables the DR-failover CronJob (templates/failover/). See the failover:
+# block in values.yaml, and values-c89a45-dev-golddr-failover.yaml for what changes
+# while GoldDR is the active site.
+failover:
+  enabled: true
+
+  image:
+    # ops-toolbox build (commit SHA tag); bump to roll out a new toolbox image
+    tag: bc2d16e12908f39869708e182712f56c5e863fa9  # pragma: allowlist secret
+    pullPolicy: IfNotPresent
+
 n8n:
   enabled: true
   env:
@@ -35,6 +46,14 @@ n8n:
   route:
     enabled: true
     host: dev-workflow.apps.golddr.devops.gov.bc.ca
+    # Required when main runs multiple replicas with multi-main enabled.
+    # Sticky sessions keep requests from switching between main pods.
+    sessionAffinity: true
+
+  main:
+    # Multi-main allows main to run multiple replicas.
+    env:
+      N8N_MULTI_MAIN_SETUP_ENABLED: "true"
 
   worker:
     enabled: true
