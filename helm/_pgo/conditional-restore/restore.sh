@@ -7,17 +7,6 @@ set -eo pipefail
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
-# ==============================================================================
-# Kubernetes API configuration
-# ==============================================================================
-#
-# backup-container has curl but no oc/kubectl, so use the ServiceAccount
-# credentials and CA certificate mounted by Kubernetes to call the API directly.
-KUBE_API="https://kubernetes.default.svc"
-KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-KUBE_NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
-KUBE_CACERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-
 log "pg-conditional-restore starting..."
 
 # ==============================================================================
@@ -175,13 +164,8 @@ for i in $(seq 0 $((DATABASE_COUNT-1))); do
   # full scan.
   STATE_KEY="${DB_NAME}.last-restored-key"
 
-  LAST_KEY=$(curl -sf --cacert "${KUBE_CACERT}" \
-    -H "Authorization: Bearer ${KUBE_TOKEN}" \
-    "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
-    2>/dev/null \
-    | grep -o "\"${STATE_KEY}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
-    | head -1 \
-    | cut -d'"' -f4 || echo "")
+  LAST_KEY=$(oc get configmap "${STATE_CONFIGMAP_NAME}" -n "${NAMESPACE}" \
+    -o "jsonpath={.data.${STATE_KEY//./\\.}}" 2>/dev/null || true)
 
   log "[${DB_NAME}] Last restored key: ${LAST_KEY:-<none>}"
 
@@ -279,12 +263,8 @@ for i in $(seq 0 $((DATABASE_COUNT-1))); do
 
   # Update per-database state key
   log "[${DB_NAME}] Updating restore state (${STATE_KEY}=${LATEST_KEY})..."
-  curl -sf --cacert "${KUBE_CACERT}" \
-    -X PATCH \
-    -H "Authorization: Bearer ${KUBE_TOKEN}" \
-    -H "Content-Type: application/merge-patch+json" \
-    "${KUBE_API}/api/v1/namespaces/${KUBE_NS}/configmaps/${STATE_CONFIGMAP_NAME}" \
-    -d "{\"data\":{\"${STATE_KEY}\":\"${LATEST_KEY}\"}}" \
+  oc patch configmap "${STATE_CONFIGMAP_NAME}" -n "${NAMESPACE}" --type merge \
+    -p "{\"data\":{\"${STATE_KEY}\":\"${LATEST_KEY}\"}}" \
     > /dev/null
 done
 
