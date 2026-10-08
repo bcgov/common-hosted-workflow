@@ -242,10 +242,11 @@ export class ChefsService {
   }
 
   /**
-   * When trigger metadata names an n8n credential, checks the saving user may
-   * read it in n8n, then replaces client-supplied form fields with the
-   * credential's values and removes any API key. Metadata without a credential
-   * id is returned unchanged so legacy triggers still work.
+   * Resolves the n8n credential a chefs-form trigger must reference, checks the
+   * saving user may read it in n8n, then replaces client-supplied form fields
+   * with the credential's values. A raw API key is never persisted: it is
+   * stripped from the metadata unconditionally, and the trigger is rejected with
+   * a 400 when it does not name a credential.
    */
   async applyCredentialToTriggerMetadata(
     metadata: Record<string, unknown>,
@@ -253,7 +254,9 @@ export class ChefsService {
     user: N8nUserEntity | null,
   ): Promise<Record<string, unknown>> {
     const credentialId = readN8nCredentialId(metadata);
-    if (!credentialId) return metadata;
+    if (!credentialId) {
+      throw new AppError(400, 'Select a CHEFS credential for this trigger');
+    }
 
     const readable = user ? await this.n8nCredentials.findForUser(credentialId, user, ['credential:read']) : null;
     if (!readable) {
