@@ -3,11 +3,9 @@ import { ActionRequestRepository } from '../../db/repository/custom/action-reque
 import { AccessRequestRepository } from '../../db/repository/custom/access-request';
 import { AuditLogRepository } from '../../db/repository/custom/audit-log';
 import { ChefsSubmissionWebhookRepository } from '../../db/repository/custom/chefs-submission-webhook';
-import { CredentialEntityRepository } from '../../db/repository/custom/credential-entity';
 import { MessageRepository } from '../../db/repository/custom/message';
 import { MultiWebhookWaitRepository } from '../../db/repository/custom/multi-webhook-wait';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
-import { TriggerCredentialRelationRepository } from '../../db/repository/custom/trigger-credential-relation';
 import { WorkflowTriggerRepository } from '../../db/repository/custom/workflow-trigger';
 
 export type CustomRepositories = {
@@ -17,8 +15,6 @@ export type CustomRepositories = {
   readonly auditLog: AuditLogRepository;
   readonly accessRequest: AccessRequestRepository;
   readonly workflowTrigger: WorkflowTriggerRepository;
-  readonly credentialEntity: CredentialEntityRepository;
-  readonly triggerCredentialRelation: TriggerCredentialRelationRepository;
   readonly chefsSubmissionWebhook: ChefsSubmissionWebhookRepository;
   readonly multiWebhookWait: MultiWebhookWaitRepository;
 };
@@ -33,8 +29,6 @@ export function buildCustomRepositories(databaseUrl: string): CustomRepositories
     auditLog: new AuditLogRepository(db),
     accessRequest: new AccessRequestRepository(db),
     workflowTrigger: new WorkflowTriggerRepository(db),
-    credentialEntity: new CredentialEntityRepository(db),
-    triggerCredentialRelation: new TriggerCredentialRelationRepository(db),
     chefsSubmissionWebhook: new ChefsSubmissionWebhookRepository(db),
     multiWebhookWait: new MultiWebhookWaitRepository(db),
   };

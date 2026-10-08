@@ -157,39 +157,29 @@ async function resolveTriggerAccess(
 }
 
 /**
- * Mints a CHEFS gateway token for a form trigger.
- * An n8n credential id is resolved server-side. Triggers saved before that
- * reference still use the private API key stored for the trigger.
+ * Mints a CHEFS gateway token for a form trigger. The form's API key is resolved
+ * server-side from the n8n `chefsFormAuth` credential named in the trigger metadata.
  */
 async function resolveTriggerChefsToken(
   services: ApiRouteContext['services'],
-  triggerId: string,
   meta: Record<string, unknown>,
   allowedProjectIds: string[],
 ) {
   const n8nCredentialId = readN8nCredentialId(meta);
-  if (n8nCredentialId) {
-    const resolved = await services.chefs.resolveFormCredential({
-      credentialId: n8nCredentialId,
-      allowedProjectIds,
-    });
-    const tokenResult = await services.chefs.getFormToken({
-      formId: resolved.formId,
-      formApiKey: resolved.formApiKey,
-      credentialBaseUrl: resolved.baseUrl,
-    });
-    const formName = resolved.formName ?? (typeof meta.formName === 'string' ? meta.formName : '');
-    return { ...tokenResult, formName };
+  if (!n8nCredentialId) {
+    throw new AppError(400, 'Select a CHEFS credential for this trigger');
   }
 
-  const formId = typeof meta.formId === 'string' ? meta.formId : '';
-  const formName = typeof meta.formName === 'string' ? meta.formName : '';
-  const credentialBaseUrl = typeof meta.baseUrl === 'string' && meta.baseUrl.trim() ? meta.baseUrl.trim() : undefined;
-  if (!formId) {
-    throw new AppError(400, 'Missing formId in trigger metadata');
-  }
-  const formApiKey = await services.trigger.getChefsApiKeyForTrigger(triggerId);
-  const tokenResult = await services.chefs.getFormToken({ formId, formApiKey, credentialBaseUrl });
+  const resolved = await services.chefs.resolveFormCredential({
+    credentialId: n8nCredentialId,
+    allowedProjectIds,
+  });
+  const tokenResult = await services.chefs.getFormToken({
+    formId: resolved.formId,
+    formApiKey: resolved.formApiKey,
+    credentialBaseUrl: resolved.baseUrl,
+  });
+  const formName = resolved.formName ?? (typeof meta.formName === 'string' ? meta.formName : '');
   return { ...tokenResult, formName };
 }
 
@@ -240,17 +230,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
 
     if (isManager) {
-      const chefsFormIds = rows.filter((r) => r.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM).map((r) => r.id);
-      const triggerIdsWithCreds =
-        chefsFormIds.length > 0
-          ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials(chefsFormIds)
-          : new Set<string>();
-
-      OkResponse(
-        res,
-        { data: rows.map((r) => mapTriggerRowToResponse(r, triggerIdsWithCreds.has(r.id))) },
-        listTriggersResponseSchema,
-      );
+      OkResponse(res, { data: rows.map((r) => mapTriggerRowToResponse(r)) }, listTriggersResponseSchema);
     } else {
       const visibleRows = rows.filter((r) => isActorAllowed(r, session, tenantId));
       OkResponse(
@@ -303,12 +283,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         n8nUser,
       });
 
-      const triggerIdsWithCreds =
-        row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM
-          ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials([row.id])
-          : new Set<string>();
-
-      CreatedResponse(res, mapTriggerRowToResponse(row, triggerIdsWithCreds.has(row.id)), createTriggerResponseSchema);
+      CreatedResponse(res, mapTriggerRowToResponse(row), createTriggerResponseSchema);
     },
   );
 
@@ -347,12 +322,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         n8nUser,
       });
 
-      const triggerIdsWithCreds =
-        row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM
-          ? await customRepositories.triggerCredentialRelation.listTriggerIdsWithCredentials([row.id])
-          : new Set<string>();
-
-      OkResponse(res, mapTriggerRowToResponse(row, triggerIdsWithCreds.has(row.id)), updateTriggerResponseSchema);
+      OkResponse(res, mapTriggerRowToResponse(row), updateTriggerResponseSchema);
     },
   );
 
@@ -450,7 +420,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
 
       const meta = trigger.metadata as Record<string, unknown>;
       // A credential belongs to one project; only the trigger's own project may use it.
-      const tokenResult = await resolveTriggerChefsToken(services, triggerId, meta, [trigger.projectId]);
+      const tokenResult = await resolveTriggerChefsToken(services, meta, [trigger.projectId]);
       const formName = tokenResult.formName;
 
       OkResponse(

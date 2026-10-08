@@ -6,7 +6,6 @@ import {
   triggerActorTypeZodEnum,
   WorkflowTriggerTypeEnum,
 } from '../constants/enum';
-import { CHEFS_API_KEY_PLACEHOLDER } from '@config';
 
 /** Shape of a trigger as returned by the API (no raw credentials). */
 export const triggerItemSchema = z.object({
@@ -144,12 +143,11 @@ export function mapTriggerRowToLimitedResponse(row: typeof workflowTrigger.$infe
 /**
  * Maps a DB trigger row to the wire response shape.
  *
- * - Strips any raw apiKey that somehow survived to the metadata column (defensive).
- * - For chefs-form triggers with a linked credential (`hasCredential = true`), sets
- *   `metadata.apiKey` to `CHEFS_API_KEY_PLACEHOLDER` so the FE knows a key exists
- *   without receiving the plaintext value.
+ * Strips any raw apiKey that somehow survived to the metadata column (defensive);
+ * CHEFS form triggers resolve their API key from an n8n credential, so no key is
+ * ever returned to the client.
  */
-export function mapTriggerRowToResponse(row: typeof workflowTrigger.$inferSelect, hasCredential = false): TriggerItem {
+export function mapTriggerRowToResponse(row: typeof workflowTrigger.$inferSelect): TriggerItem {
   const metadata = { ...(row.metadata as Record<string, unknown>) };
 
   // Remove any raw apiKey from metadata (should already be stripped, but defensive)
@@ -157,11 +155,6 @@ export function mapTriggerRowToResponse(row: typeof workflowTrigger.$inferSelect
     if (key.toLowerCase() === 'apikey') {
       delete metadata[key];
     }
-  }
-
-  // Placeholder for chefs-form when a credential is stored server-side
-  if (row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM && hasCredential) {
-    metadata.apiKey = CHEFS_API_KEY_PLACEHOLDER;
   }
 
   return triggerItemSchema.parse({

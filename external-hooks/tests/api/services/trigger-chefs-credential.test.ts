@@ -1,5 +1,6 @@
 /**
- * A CHEFS trigger that references an n8n credential must not keep the legacy private API key.
+ * A CHEFS trigger resolves its form details from an n8n credential; the private
+ * API key is never stored. These tests pin the credential-binding behaviour.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -7,10 +8,6 @@ import { TriggerService } from '../../../src/api/services/trigger.service';
 import { WorkflowTriggerTypeEnum } from '../../../src/api/constants/enum';
 
 function createService(metadata: Record<string, unknown>) {
-  const listByTriggerId = vi.fn().mockResolvedValue([{ credentialId: 'private-cred' }]);
-  const deleteRelation = vi.fn().mockResolvedValue(undefined);
-  const deleteCredentials = vi.fn().mockResolvedValue(undefined);
-  const upsert = vi.fn();
   const getById = vi.fn().mockResolvedValue({
     id: 'trig-1',
     projectId: 'proj-1',
@@ -32,13 +29,11 @@ function createService(metadata: Record<string, unknown>) {
   const service = new TriggerService(
     {
       workflowTrigger: { getById, update, create },
-      triggerCredentialRelation: { listByTriggerId, deleteByAssociatedTriggerId: deleteRelation, upsert: vi.fn() },
-      credentialEntity: { deleteByAssociatedTriggerId: deleteCredentials, upsert },
     } as any,
     { applyCredentialToTriggerMetadata } as any,
   );
 
-  return { service, deleteRelation, deleteCredentials, upsert, applyCredentialToTriggerMetadata };
+  return { service, applyCredentialToTriggerMetadata };
 }
 
 const baseUpdate = {
@@ -54,29 +49,8 @@ const baseUpdate = {
   n8nUser: null,
 };
 
-describe('TriggerService.update CHEFS credential reference', () => {
-  it('deletes the legacy private key when the trigger selects an n8n credential', async () => {
-    const metadata = { n8nCredentialId: 'cred-1', formId: 'form-123', formName: 'Intake' };
-    const { service, deleteRelation, deleteCredentials, upsert } = createService(metadata);
-
-    await service.update({ ...baseUpdate, metadata });
-
-    expect(deleteRelation).toHaveBeenCalledWith('trig-1');
-    expect(deleteCredentials).toHaveBeenCalledWith(['private-cred']);
-    expect(upsert).not.toHaveBeenCalled();
-  });
-
-  it('keeps the legacy private key when no n8n credential is selected', async () => {
-    const metadata = { formId: 'form-123', formName: 'Intake', apiKey: '__CHWF_BLANK_VALUE_chefs-api-key__' }; // pragma: allowlist secret
-    const { service, deleteRelation, upsert } = createService(metadata);
-
-    await service.update({ ...baseUpdate, metadata });
-
-    expect(deleteRelation).not.toHaveBeenCalled();
-    expect(upsert).not.toHaveBeenCalled();
-  });
-
-  it('passes the n8n user to credential binding', async () => {
+describe('TriggerService CHEFS credential reference', () => {
+  it('passes the n8n user to credential binding on update', async () => {
     const metadata = { n8nCredentialId: 'cred-1' };
     const { service, applyCredentialToTriggerMetadata } = createService(metadata);
     const n8nUser = { id: 'user-1', role: { slug: 'global:member' } };

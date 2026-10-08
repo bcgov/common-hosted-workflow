@@ -71,6 +71,13 @@
       "when": 1784500000000,
       "tag": "0009_multi_webhook_wait",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791478867521,
+      "tag": "0010_drop_credential_entity_tables",
+      "breakpoints": true
     }
   ]
 }

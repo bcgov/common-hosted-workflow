@@ -234,9 +234,11 @@ describe('ChefsService.applyCredentialToTriggerMetadata', () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
-  it('leaves metadata without a credential id unchanged', async () => {
+  it('rejects metadata without a credential id so no raw API key is ever persisted', async () => {
     const { service } = createService();
-    const metadata = { formId: 'form-1' };
-    await expect(service.applyCredentialToTriggerMetadata(metadata, TENANT_PROJECTS, null)).resolves.toBe(metadata);
+    const metadata = { formId: 'form-1', apiKey: 'raw-key' }; // pragma: allowlist secret
+    await expect(service.applyCredentialToTriggerMetadata(metadata, TENANT_PROJECTS, null)).rejects.toMatchObject({
+      statusCode: 400,
+    });
   });
 });

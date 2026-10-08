@@ -103,8 +103,3 @@ export const OIDC_COOKIE_SECRET_BASE = N8N_ENCRYPTION_KEY || OIDC_CLIENT_SECRET 
 // projects/workflows endpoints. Proves the caller is the configured Grafana instance.
 // The endpoint is disabled (503) when this is empty.
 export const GRAFANA_PROJECTS_SECRET = process.env.GRAFANA_PROJECTS_SECRET ?? '';
-
-// WIL Encryption – used to encrypt credential data (e.g. CHEFS API keys) at rest
-export const WIL_ENCRYPTION_KEY = process.env.WIL_ENCRYPTION_KEY ?? '';
-export const WIL_ENCRYPTION_KEY_ACTIVE = Number.parseInt(process.env.WIL_ENCRYPTION_KEY_ACTIVE ?? '1', 10);
-export const CHEFS_API_KEY_PLACEHOLDER = process.env.CHEFS_API_KEY_PLACEHOLDER ?? '__CHWF_BLANK_VALUE_chefs-api-key__';
