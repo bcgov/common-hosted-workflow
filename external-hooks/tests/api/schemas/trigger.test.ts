@@ -176,22 +176,13 @@ describe('mapTriggerRowToResponse', () => {
     expect(result.updatedBy).toBeNull();
   });
 
-  it('maps a chefs-form row and sets apiKey placeholder when hasCredential is true', () => {
+  it('never exposes an apiKey for a chefs-form row', () => {
     const row = makeWorkflowTriggerRow({
       triggerType: 'chefs-form',
       metadata: { formId: 'form-1', formName: 'My Form' },
     });
-    const result = mapTriggerRowToResponse(row as any, true);
+    const result = mapTriggerRowToResponse(row as any);
     expect(result.triggerType).toBe('chefs-form');
-    expect(result.metadata.apiKey).toBeTruthy();
-  });
-
-  it('does not set apiKey placeholder for chefs-form when hasCredential is false', () => {
-    const row = makeWorkflowTriggerRow({
-      triggerType: 'chefs-form',
-      metadata: { formId: 'form-1', formName: 'My Form' },
-    });
-    const result = mapTriggerRowToResponse(row as any, false);
     expect(result.metadata.apiKey).toBeUndefined();
   });
 
@@ -200,13 +191,7 @@ describe('mapTriggerRowToResponse', () => {
       triggerType: 'chefs-form',
       metadata: { formId: 'form-1', apiKey: 'raw-api-key' }, // pragma: allowlist secret
     });
-    const result = mapTriggerRowToResponse(row as any, false);
-    expect(result.metadata.apiKey).toBeUndefined();
-  });
-
-  it('does not add apiKey placeholder for button triggers even if hasCredential is true', () => {
-    const row = makeWorkflowTriggerRow({ triggerType: 'button' });
-    const result = mapTriggerRowToResponse(row as any, true);
+    const result = mapTriggerRowToResponse(row as any);
     expect(result.metadata.apiKey).toBeUndefined();
   });
 

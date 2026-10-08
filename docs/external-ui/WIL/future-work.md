@@ -47,7 +47,7 @@ An embedded CHEFS form that, on submission, triggers a workflow by calling a web
 
 - Reuses the existing CHEFS token exchange and ChefsFormViewer infrastructure
 - The webhook payload should include form ID, submission ID, and optionally the full submission data
-- Need to decide: does the trigger store a FormAPIKey (like showform actions) or reference a shared credential?
+- **Decided (implemented):** a CHEFS form trigger references an n8n `chefsFormAuth` credential (via `metadata.n8nCredentialId`) rather than storing a FormAPIKey. The key is resolved server-side from the credential at token-exchange time (`POST /ui-api/wil/triggers/:triggerId/chefs-token`) and never persisted in the WIL custom database. The earlier approach of encrypting a per-trigger key in a custom `credential_entity` table has been removed.
 - Prefill data with user context (same pattern as ShowFormHandler)
 - Consider whether the trigger should create an action record for tracking, or be fire-and-forget
 

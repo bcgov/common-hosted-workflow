@@ -82,9 +82,6 @@ x-n8n-env: &n8n-env
   FEATURES_ENABLED: ${FEATURES_ENABLED}
   # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
   IS_TENANT_PROJECT_SYNC_ENABLED: ${IS_TENANT_PROJECT_SYNC_ENABLED:-true}
-  WIL_ENCRYPTION_KEY: ${WIL_ENCRYPTION_KEY}
-  WIL_ENCRYPTION_KEY_ACTIVE: ${WIL_ENCRYPTION_KEY_ACTIVE:-1}
-  CHEFS_API_KEY_PLACEHOLDER: ${CHEFS_API_KEY_PLACEHOLDER}
   # Shared secret validated by the /obs/projects endpoint — must match the value set in Grafana.
   GRAFANA_PROJECTS_SECRET: ${GRAFANA_PROJECTS_SECRET}
   # Prometheus metrics — exposed at :5678/metrics, scraped by Alloy when observability stack is running

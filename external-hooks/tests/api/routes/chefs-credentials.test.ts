@@ -125,4 +125,36 @@ describe('POST /triggers/:triggerId/chefs-token', () => {
     expect(error).toBeNull();
     expect(chefs.resolveFormCredential).toHaveBeenCalledWith({ credentialId: 'cred-1', allowedProjectIds: ['proj-2'] });
   });
+
+  it('returns 400 when a chefs-form trigger has no linked credential', async () => {
+    const trigger = {
+      id: 'trig-1',
+      projectId: 'proj-2',
+      triggerType: 'chefs-form',
+      allowedActorsType: 'all',
+      allowedActors: ['*'],
+      metadata: { formId: 'form-123' },
+    };
+    const chefs = {
+      resolveFormCredential: vi.fn(),
+      getFormToken: vi.fn(),
+    };
+    const router = buildTriggerRouter({
+      services: { chefs, trigger: { getById: vi.fn().mockResolvedValue(trigger) } },
+      customRepositories: { tenantProjectRelation: { getRowByTenantId: vi.fn().mockResolvedValue(null) } },
+      n8nRepositories: {},
+    } as any);
+    const req = createMockRequest({ session: SESSION, params: { triggerId: 'trig-1' } } as any);
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(
+      getRouteHandlers(router, 'post', '/triggers/:triggerId/chefs-token')!,
+      req,
+      res,
+    );
+
+    expect((error as any)?.statusCode).toBe(400);
+    expect(chefs.resolveFormCredential).not.toHaveBeenCalled();
+    expect(chefs.getFormToken).not.toHaveBeenCalled();
+  });
 });

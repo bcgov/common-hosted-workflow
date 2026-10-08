@@ -212,14 +212,6 @@ export function createMockWorkflowTriggerRepository() {
   };
 }
 
-export function createMockTriggerCredentialRelationRepository() {
-  return {
-    listTriggerIdsWithCredentials: vi.fn().mockResolvedValue(new Set<string>()),
-    findLinkedCredentialByTriggerIdAndType: vi.fn().mockResolvedValue(null),
-    upsert: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
 /* ------------------------------------------------------------------ */
 /*  n8n repository mocks                                               */
 /* ------------------------------------------------------------------ */
