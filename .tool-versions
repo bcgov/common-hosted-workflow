@@ -4,4 +4,4 @@ pnpm 11.22.0
 oc 4.22.10
 kubectl 1.37.1
 helm 4.3.0
-terraform 1.15.9
+terraform 1.16.5
