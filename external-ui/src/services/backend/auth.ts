@@ -36,6 +36,8 @@ export type AuthSessionResponse = {
   permissions: Permissions | null;
   tenantRoles: TenantRole[] | null;
   tenantGroups: TenantGroup[] | null;
+  /** True when the backend runs on the GoldDR cluster (maintenance mode). Sent for anonymous sessions too. */
+  goldDr: boolean;
 };
 
 export type AuthenticatedSession = {

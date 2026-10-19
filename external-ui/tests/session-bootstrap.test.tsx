@@ -32,6 +32,7 @@ describe('SessionBootstrap', () => {
     globalThis.localStorage.clear();
     sessionState.session = null;
     sessionState.isLoading = false;
+    sessionState.goldDr = false;
     exchangeSessionMock.mockReset();
     getSessionMock.mockReset();
     vi.restoreAllMocks();
@@ -87,6 +88,110 @@ describe('SessionBootstrap', () => {
     expect(new URL(globalThis.location.href).searchParams.get('session')).toBeNull();
   });
 
+  describe('GoldDR flag', () => {
+    // A fully authenticated response, so `sessionState.session` being set proves the response was processed.
+    function sessionResponse(goldDr?: unknown) {
+      return {
+        authenticated: true,
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: {
+          issuer: 'https://issuer.example.com',
+          subject: 'sub-1',
+          audience: ['ui'],
+          email: 'user@example.com',
+          claims: {},
+        },
+        n8nUser: null,
+        permissions: {
+          isAdmin: false,
+          canViewWorkflows: false,
+          canRequestAccess: true,
+          canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
+          canManageWil: false,
+          canManageProject: false,
+        },
+        tenantRoles: [],
+        tenantGroups: [],
+        goldDr,
+      };
+    }
+
+    async function renderAndWaitForSession() {
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <SessionBootstrap>
+            <div>child</div>
+          </SessionBootstrap>
+        </QueryClientProvider>,
+      );
+      await waitFor(() => {
+        expect(sessionState.session?.user.email).toBe('user@example.com');
+      });
+    }
+
+    beforeEach(() => {
+      exchangeSessionMock.mockResolvedValue({ token: 'app-token-123' });
+    });
+
+    it('stores goldDr from the session response', async () => {
+      getSessionMock.mockResolvedValue(sessionResponse(true));
+
+      await renderAndWaitForSession();
+
+      expect(sessionState.goldDr).toBe(true);
+    });
+
+    describe('before sign-in', () => {
+      function renderAnonymous() {
+        globalThis.history.replaceState({}, '', '/ui');
+        render(
+          <QueryClientProvider client={createQueryClient()}>
+            <SessionBootstrap>
+              <div>child</div>
+            </SessionBootstrap>
+          </QueryClientProvider>,
+        );
+      }
+
+      it('learns the GoldDR flag without a token', async () => {
+        getSessionMock.mockResolvedValue({ authenticated: false, goldDr: true });
+
+        renderAnonymous();
+
+        await waitFor(() => {
+          expect(sessionState.goldDr).toBe(true);
+        });
+        expect(sessionState.session).toBeNull();
+        expect(sessionState.isLoading).toBe(false);
+        expect(exchangeSessionMock).not.toHaveBeenCalled();
+      });
+
+      it('stays on Gold behaviour when the anonymous request fails', async () => {
+        getSessionMock.mockRejectedValue(new Error('network down'));
+
+        renderAnonymous();
+
+        await waitFor(() => {
+          expect(getSessionMock).toHaveBeenCalled();
+        });
+        expect(sessionState.goldDr).toBe(false);
+        expect(sessionState.session).toBeNull();
+        expect(sessionState.isLoading).toBe(false);
+      });
+    });
+
+    it.each([false, undefined, 'true'])('stays false when the session response says %s', async (value) => {
+      sessionState.goldDr = true;
+      getSessionMock.mockResolvedValue(sessionResponse(value));
+
+      await renderAndWaitForSession();
+
+      expect(sessionState.goldDr).toBe(false);
+    });
+  });
+
   it('clears the browser token after coordinated logout', async () => {
     globalThis.localStorage.setItem(APP_AUTH_TOKEN_STORAGE_KEY, 'stale-token');
     globalThis.history.replaceState({}, '', '/ui?signedOut=1');
@@ -103,7 +208,7 @@ describe('SessionBootstrap', () => {
       expect(globalThis.localStorage.getItem(APP_AUTH_TOKEN_STORAGE_KEY)).toBeNull();
     });
     expect(new URL(globalThis.location.href).searchParams.get('signedOut')).toBeNull();
-    expect(getSessionMock).not.toHaveBeenCalled();
+    expect(sessionState.session).toBeNull();
   });
 
   it('removes session, continue, signedOut and logout markers while preserving unrelated query and hash', async () => {

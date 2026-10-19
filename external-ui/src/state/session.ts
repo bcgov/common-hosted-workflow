@@ -4,6 +4,8 @@ import type { AuthenticatedSession, TenantGroup, TenantRole } from '../services/
 type SessionState = {
   session: AuthenticatedSession | null;
   isLoading: boolean;
+  /** True when the backend runs on GoldDR. Stays false until a session response says otherwise. */
+  goldDr: boolean;
 };
 
 /**
@@ -15,6 +17,7 @@ type SessionState = {
 export const sessionState = proxy<SessionState>({
   session: null,
   isLoading: true,
+  goldDr: false,
 });
 
 /**
@@ -124,4 +127,12 @@ export function useHasTenantRoles(tenantId: string, roleNames: string[]): boolea
  */
 export function useSessionLoading() {
   return useSnapshot(sessionState).isLoading;
+}
+
+/**
+ * Hook to check if the backend is running on the GoldDR (disaster-recovery) cluster.
+ * Returns false until a session response has been received.
+ */
+export function useIsGoldDr(): boolean {
+  return useSnapshot(sessionState).goldDr;
 }

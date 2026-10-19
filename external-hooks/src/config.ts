@@ -19,6 +19,11 @@ export const N8N_BASE_URL = (process.env.N8N_BASE_URL || '').trim();
 export const IS_PRODUCTION = NODE_ENV === 'production';
 export const IS_DEVELOPMENT = NODE_ENV === 'development';
 
+// Cluster / disaster recovery
+// Set by Helm from the Makefile's CLUSTER value.
+export const CLUSTER = (process.env.CLUSTER ?? '').trim().toLowerCase();
+export const IS_GOLDDR = CLUSTER === 'golddr';
+
 // Feature flags
 export const ENABLE_SWAGGER_UI = process.env.ENABLE_SWAGGER_UI;
 export const FEATURES_ENABLED = process.env.FEATURES_ENABLED ?? '';
