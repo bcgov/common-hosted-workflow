@@ -78,6 +78,8 @@ x-n8n-env: &n8n-env
   CHEFS_ALLOWED_ORIGINS: ${CHEFS_ALLOWED_ORIGINS:-}
   # CSTAR tenant management service
   CSTAR_BASE_URL: ${CSTAR_BASE_URL}
+  # Deployment cluster ("gold" or "golddr"). golddr switches on the GoldDR restrictions (maintenance mode).
+  CLUSTER: ${CLUSTER:-gold}
   # Feature flags
   FEATURES_ENABLED: ${FEATURES_ENABLED}
   # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login

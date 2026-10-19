@@ -4,6 +4,7 @@ import { useAuthUser, usePermissions, useSession, useSessionLoading } from '../s
 import { ToastContainer } from '../components/toast-container';
 import { AppHeader, type AppNavItem } from '@/components/layout/app-header';
 import { AppFooter } from '@/components/layout/app-footer';
+import { GoldDrBanner } from '@/components/layout/golddr-banner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -45,6 +46,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         onLogout={logout}
         onOpenN8n={openN8n}
       />
+      <GoldDrBanner />
       <main id="main-content" tabIndex={-1} className="flex-1">
         {children}
       </main>

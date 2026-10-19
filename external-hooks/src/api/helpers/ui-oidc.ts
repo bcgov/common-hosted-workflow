@@ -1,3 +1,4 @@
+import { IS_GOLDDR } from '../../config';
 import type { Permissions } from './permissions';
 import type { TenantRole, TenantGroup } from './ui-oidc-store';
 
@@ -104,6 +105,8 @@ export type UiSessionSummary = {
   permissions: Permissions | null;
   tenantRoles: TenantRole[] | null;
   tenantGroups: TenantGroup[] | null;
+  /** True on the GoldDR cluster (maintenance mode). Sent for anonymous sessions too. */
+  goldDr: boolean;
 };
 
 export type WhoamiResponse = {
@@ -125,6 +128,7 @@ export function buildSessionSummary(session: UiResolvedSession | null): UiSessio
       permissions: null,
       tenantRoles: null,
       tenantGroups: null,
+      goldDr: IS_GOLDDR,
     };
   }
 
@@ -150,6 +154,7 @@ export function buildSessionSummary(session: UiResolvedSession | null): UiSessio
     permissions: session.permissions,
     tenantRoles: session.tenantRoles,
     tenantGroups: session.tenantGroups,
+    goldDr: IS_GOLDDR,
   };
 }
 

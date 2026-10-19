@@ -35,7 +35,8 @@ define arguments
     ${FAILOVER_VALUES} \
 	--set n8n.image.tag="${IMAGE_TAG}" \
 	--set sdg-mock-app.image.tag="${IMAGE_TAG}" \
-	--set dns-probe.image.tag="${IMAGE_TAG}"
+	--set dns-probe.image.tag="${IMAGE_TAG}" \
+	--set n8n.env.CLUSTER="${CLUSTER}"
 endef
 
 .PHONY: helm-dep install upgrade failover-upgrade lint uninstall template force-install help delete-successful-jobs

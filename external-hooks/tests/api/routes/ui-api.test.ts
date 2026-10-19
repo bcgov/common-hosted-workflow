@@ -195,6 +195,7 @@ describe('GET /ui-api/session', () => {
           canManageWil: true,
           canManageProject: true,
         },
+        goldDr: false,
       }),
     );
   });

@@ -11,7 +11,9 @@ vi.mock('../src/state/session', () => ({
   sessionState: {
     session: null,
     isLoading: false,
+    goldDr: false,
   },
+  useIsGoldDr: () => sessionState.goldDr,
   useSession: () => sessionState.session,
   useAuthUser: () => sessionState.session?.user ?? null,
   usePermissions: () => sessionState.session?.permissions ?? null,
@@ -50,6 +52,32 @@ describe('Session-driven navigation/gating', () => {
     vi.clearAllMocks();
     sessionState.session = null;
     sessionState.isLoading = false;
+    sessionState.goldDr = false;
+  });
+
+  describe('GoldDR maintenance banner', () => {
+    it('shows the maintenance banner when the backend runs on GoldDR, even when signed out', () => {
+      sessionState.goldDr = true;
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByTestId('golddr-banner')).toHaveTextContent('Maintenance mode');
+      expect(screen.getAllByRole('button', { name: 'Sign in' }).length).toBeGreaterThan(0);
+    });
+
+    it('does not show the maintenance banner on Gold', () => {
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.queryByTestId('golddr-banner')).not.toBeInTheDocument();
+    });
   });
 
   describe('AccessRequestRoute', () => {
