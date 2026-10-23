@@ -7,7 +7,7 @@ import { ActionDetailHeader } from './action-handlers/action-detail-header';
 import { ClaimGate } from './action-handlers/claim-gate';
 import { Badge } from '@/components/ui/badge';
 import { IconAlertTriangle } from '@tabler/icons-react';
-import { useAuthUser } from '../state/session';
+import { useAuthUser, useIsGoldDr } from '../state/session';
 
 const TERMINAL_STATUSES: ReadonlySet<WilActionItem['status']> = new Set([
   'completed',
@@ -70,6 +70,7 @@ export function ActionDetailPane({
 }: Readonly<ActionDetailPaneProps>) {
   const user = useAuthUser();
   const userEmail = user?.email ?? '';
+  const isGoldDr = useIsGoldDr();
 
   if (!action) return <Placeholder />;
   if (isTerminalStatus(action.status)) return <CompletedActionView action={action} />;
@@ -80,15 +81,17 @@ export function ActionDetailPane({
   return (
     <div className="flex h-full flex-col gap-4.5 rounded-card border border-[#e2e8f0] bg-surface p-6">
       <ActionDetailHeader action={action} />
-      <ClaimGate
-        action={action}
-        tenantId={tenantId}
-        userEmail={userEmail}
-        onInteractionSuccess={onInteractionSuccess}
-        onActionUpdated={onActionUpdated}
-      >
-        {handler}
-      </ClaimGate>
+      <fieldset disabled={isGoldDr} className="m-0 flex min-w-0 flex-1 flex-col gap-4.5 border-0 p-0">
+        <ClaimGate
+          action={action}
+          tenantId={tenantId}
+          userEmail={userEmail}
+          onInteractionSuccess={onInteractionSuccess}
+          onActionUpdated={onActionUpdated}
+        >
+          {handler}
+        </ClaimGate>
+      </fieldset>
     </div>
   );
 }

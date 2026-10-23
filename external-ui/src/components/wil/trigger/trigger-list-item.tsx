@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import type { Trigger } from '../../../services/backend/trigger-types';
 import { TRIGGER_TYPES } from '../../../constants/constants';
+import { useIsGoldDr } from '../../../state/session';
 
 interface TriggerListItemProps {
   trigger: Trigger;
@@ -31,6 +32,7 @@ export function TriggerListItem({
       : trigger.config.buttonText || 'Button Trigger';
   const typeLabel = trigger.config.type === TRIGGER_TYPES.CHEFS_FORM ? 'CHEFS Form' : 'Button';
   const runLabel = 'Run';
+  const isGoldDr = useIsGoldDr();
 
   return (
     <button
@@ -60,7 +62,7 @@ export function TriggerListItem({
               variant="outline"
               size="sm"
               className="border-[#013366] text-[#013366] hover:bg-[#013366]/5"
-              disabled={isCallbackPending}
+              disabled={isCallbackPending || isGoldDr}
               onClick={(e) => {
                 e.stopPropagation();
                 onTriggerCallback();
@@ -106,7 +108,7 @@ export function TriggerListItem({
             variant="outline"
             size="sm"
             className="border-[#013366] text-[#013366] hover:bg-[#013366]/5"
-            disabled={isCallbackPending}
+            disabled={isCallbackPending || isGoldDr}
             onClick={(e) => {
               e.stopPropagation();
               onTriggerCallback();
