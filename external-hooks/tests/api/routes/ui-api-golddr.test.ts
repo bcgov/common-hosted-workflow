@@ -58,11 +58,14 @@ function dispatch(method: string, url: string) {
 
 beforeEach(() => {
   getUiSessionMock.mockResolvedValue({
-    subject: 'sub-1',
-    email: 'person@example.com',
-    issuer: 'https://issuer.example.com',
-    audience: ['app'],
-    claims: {},
+    session: {
+      subject: 'sub-1',
+      email: 'person@example.com',
+      issuer: 'https://issuer.example.com',
+      audience: ['app'],
+      claims: {},
+    },
+    upstreamAccessToken: 'upstream-token',
   });
 });
 
