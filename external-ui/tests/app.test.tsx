@@ -65,7 +65,8 @@ describe('Session-driven navigation/gating', () => {
         </MemoryRouter>,
       );
 
-      expect(screen.getByTestId('golddr-banner')).toHaveTextContent('Maintenance mode');
+      expect(screen.getByTestId('golddr-banner')).toHaveTextContent("Changes you make now won't be kept");
+      expect(screen.getByRole('status')).toBe(screen.getByTestId('golddr-banner'));
       expect(screen.getAllByRole('button', { name: 'Sign in' }).length).toBeGreaterThan(0);
     });
 
