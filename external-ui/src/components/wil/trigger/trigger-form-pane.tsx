@@ -8,6 +8,7 @@ import type {
   Trigger,
 } from '../../../services/backend/trigger-types';
 import { TRIGGER_TYPES } from '../../../constants/constants';
+import { useIsGoldDr } from '../../../state/session';
 import { Select } from './trigger-shared';
 import type { FormMode } from './trigger-shared';
 import { ChefsFormFields } from './trigger-chefs-form';
@@ -51,6 +52,8 @@ export function TriggerFormPane({
   buttonCallbackStatus,
   buttonCallbackError,
 }: Readonly<TriggerFormPaneProps>) {
+  const isGoldDr = useIsGoldDr();
+
   if (mode === 'idle') {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center py-16">
@@ -63,6 +66,14 @@ export function TriggerFormPane({
   }
 
   if (mode === 'view' && selectedTrigger?.config.type === TRIGGER_TYPES.CHEFS_FORM) {
+    if (isGoldDr) {
+      return (
+        <p className="py-16 text-center text-sm text-[var(--bc-muted)]">
+          This form cannot be submitted while the service runs on the disaster-recovery site.
+        </p>
+      );
+    }
+
     return <TriggerChefsPreview trigger={selectedTrigger} tenantId={tenantId} />;
   }
 
