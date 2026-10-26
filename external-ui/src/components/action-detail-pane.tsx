@@ -55,6 +55,14 @@ function UnsupportedAction({ action }: Readonly<{ action: WilActionItem }>) {
   );
 }
 
+function FormUnavailable() {
+  return (
+    <p className="py-16 text-center text-sm text-[var(--bc-muted)]">
+      This form cannot be submitted while the service runs on the disaster-recovery site.
+    </p>
+  );
+}
+
 interface ActionDetailPaneProps {
   action: WilActionItem | null;
   tenantId: string;
@@ -76,7 +84,7 @@ export function ActionDetailPane({
   if (isTerminalStatus(action.status)) return <CompletedActionView action={action} />;
 
   const handleRefresh = () => onActionUpdated?.(null);
-  const handler = renderActionHandler(action, tenantId, onInteractionSuccess, handleRefresh, onActionUpdated);
+  const handler = renderActionHandler(action, tenantId, isGoldDr, onInteractionSuccess, handleRefresh, onActionUpdated);
 
   return (
     <div className="flex h-full flex-col gap-4.5 rounded-card border border-[#e2e8f0] bg-surface p-6">
@@ -99,6 +107,7 @@ export function ActionDetailPane({
 function renderActionHandler(
   action: WilActionItem,
   tenantId: string,
+  isGoldDr: boolean,
   onInteractionSuccess?: () => void,
   onRefresh?: () => void,
   onActionUpdated?: (action: WilActionItem | null) => void,
@@ -115,6 +124,7 @@ function renderActionHandler(
         />
       );
     case 'showform':
+      if (isGoldDr) return <FormUnavailable />;
       return (
         <ShowFormHandler
           action={action}
