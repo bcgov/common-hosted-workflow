@@ -78,13 +78,12 @@ x-n8n-env: &n8n-env
   CHEFS_ALLOWED_ORIGINS: ${CHEFS_ALLOWED_ORIGINS:-}
   # CSTAR tenant management service
   CSTAR_BASE_URL: ${CSTAR_BASE_URL}
+  # Deployment cluster ("gold" or "golddr"). golddr switches on the GoldDR restrictions (maintenance mode).
+  CLUSTER: ${CLUSTER:-gold}
   # Feature flags
   FEATURES_ENABLED: ${FEATURES_ENABLED}
   # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
   IS_TENANT_PROJECT_SYNC_ENABLED: ${IS_TENANT_PROJECT_SYNC_ENABLED:-true}
-  WIL_ENCRYPTION_KEY: ${WIL_ENCRYPTION_KEY}
-  WIL_ENCRYPTION_KEY_ACTIVE: ${WIL_ENCRYPTION_KEY_ACTIVE:-1}
-  CHEFS_API_KEY_PLACEHOLDER: ${CHEFS_API_KEY_PLACEHOLDER}
   # Run WIL triggers as in-process n8n runs of the WIL Trigger node (set to "false" to disable)
   WIL_N8N_NODE_TRIGGERS_ENABLED: ${WIL_N8N_NODE_TRIGGERS_ENABLED:-true}
   # Shared secret validated by the /obs/projects endpoint — must match the value set in Grafana.

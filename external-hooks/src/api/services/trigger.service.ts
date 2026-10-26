@@ -1,18 +1,11 @@
 import { inArray } from 'drizzle-orm';
 import { workflowTrigger } from '../../db/schema/workflow-trigger';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
-import { encrypt, decrypt } from '../utils/secret-box';
-import {
-  WIL_ENCRYPTION_KEY,
-  WIL_ENCRYPTION_KEY_ACTIVE,
-  CHEFS_API_KEY_PLACEHOLDER,
-  WIL_N8N_NODE_TRIGGERS_ENABLED,
-} from '@config';
+import { WIL_N8N_NODE_TRIGGERS_ENABLED } from '@config';
 import { TriggerTargetKindEnum, WorkflowTriggerTypeEnum, type WilTriggerSource } from '../constants/enum';
 import { validateWilInput } from '../helpers/wil-trigger-node';
 import type { TriggerTargetService } from './trigger-target.service';
 import type { ChefsService } from './chefs.service';
-import { readN8nCredentialId } from './chefs.service';
 import type { N8nUserEntity } from './n8n-credentials.service';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
@@ -94,12 +87,9 @@ export class TriggerService {
 
   async create(params: CreateTriggerParams) {
     const isChefsForm = params.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
-    const metadata = isChefsForm
+    const cleanMetadata = isChefsForm
       ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, [params.projectId], params.n8nUser)
       : params.metadata;
-    const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
-    if (isChefsForm && apiKey) requireEncryptionKey();
-    const cleanMetadata = isChefsForm ? stripApiKey(metadata) : metadata;
     const target = await this.resolveTargetColumns(
       params,
       params.allowedProjectIds ?? [params.projectId],
@@ -108,7 +98,7 @@ export class TriggerService {
     );
 
     try {
-      const trigger = await this.customRepositories.workflowTrigger.create({
+      return await this.customRepositories.workflowTrigger.create({
         projectId: params.projectId,
         triggerType: params.triggerType,
         ...target,
@@ -118,12 +108,6 @@ export class TriggerService {
         authEnabled: params.authEnabled ?? false,
         createdBy: params.createdBy ?? null,
       });
-
-      if (isChefsForm && apiKey) {
-        await this.persistChefsCredential(trigger.id, apiKey);
-      }
-
-      return trigger;
     } catch (error) {
       if (error instanceof AppError) throw error;
       const dbDetail = formatDbErrorForLog(error);
@@ -145,12 +129,9 @@ export class TriggerService {
     if (!existing) throw new AppError(404, 'Trigger not found');
 
     const isChefsForm = existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM;
-    const metadata = isChefsForm
+    const cleanMetadata = isChefsForm
       ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, [existing.projectId], params.n8nUser)
       : params.metadata;
-    const apiKey = isChefsForm ? extractChefsApiKey(metadata) : null;
-    if (isChefsForm && apiKey) requireEncryptionKey();
-    const cleanMetadata = isChefsForm ? stripApiKey(metadata) : metadata;
     const target = await this.resolveTargetColumns(
       params,
       params.projectIds,
@@ -170,12 +151,6 @@ export class TriggerService {
         where: [inArray(workflowTrigger.projectId, params.projectIds)],
       });
       if (!updated) throw new AppError(404, 'Trigger not found');
-
-      if (isChefsForm && readN8nCredentialId(cleanMetadata)) {
-        await this.deletePrivateChefsCredentials(params.triggerId);
-      } else if (isChefsForm && apiKey) {
-        await this.persistChefsCredential(params.triggerId, apiKey);
-      }
 
       return updated;
     } catch (error) {
@@ -198,10 +173,6 @@ export class TriggerService {
     });
     if (!existing) throw new AppError(404, 'Trigger not found');
 
-    if (existing.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM) {
-      await this.deletePrivateChefsCredentials(params.triggerId);
-    }
-
     try {
       const deleted = await this.customRepositories.workflowTrigger.deleteById({
         triggerId: params.triggerId,
@@ -220,21 +191,6 @@ export class TriggerService {
       });
       throw new AppError(500, 'Internal Server Error');
     }
-  }
-
-  async getChefsApiKeyForTrigger(triggerId: string): Promise<string> {
-    const key = requireEncryptionKey();
-
-    const credential = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
-      triggerId,
-      type: 'chefs_api_key',
-    });
-
-    if (!credential) {
-      throw new AppError(400, 'No CHEFS API key credential found for this trigger');
-    }
-
-    return decrypt(credential.data as string, key);
   }
 
   /**
@@ -276,69 +232,4 @@ export class TriggerService {
       targetNodeId: params.targetNodeId,
     };
   }
-
-  private async deletePrivateChefsCredentials(triggerId: string): Promise<void> {
-    const relations = await this.customRepositories.triggerCredentialRelation.listByTriggerId(triggerId);
-    if (relations.length === 0) return;
-    const credentialIds = relations.map((relation) => relation.credentialId);
-    await this.customRepositories.triggerCredentialRelation.deleteByAssociatedTriggerId(triggerId);
-    await this.customRepositories.credentialEntity.deleteByAssociatedTriggerId(credentialIds);
-  }
-
-  private async persistChefsCredential(triggerId: string, apiKey: string): Promise<void> {
-    const key = requireEncryptionKey();
-
-    const encrypted = encrypt(apiKey, key);
-
-    const existing = await this.customRepositories.triggerCredentialRelation.findLinkedCredentialByTriggerIdAndType({
-      triggerId,
-      type: 'chefs_api_key',
-    });
-
-    const credential = await this.customRepositories.credentialEntity.upsert({
-      id: existing?.id,
-      name: 'CHEFS API Key',
-      type: 'chefs_api_key',
-      data: encrypted,
-      keyVersion: WIL_ENCRYPTION_KEY_ACTIVE,
-    });
-
-    if (!existing) {
-      await this.customRepositories.triggerCredentialRelation.upsert({
-        triggerId,
-        credentialId: credential.id,
-      });
-    }
-  }
-}
-
-function requireEncryptionKey(): string {
-  if (!WIL_ENCRYPTION_KEY) {
-    throw new AppError(500, 'Encryption key not configured');
-  }
-  return WIL_ENCRYPTION_KEY;
-}
-
-function extractChefsApiKey(metadata: Record<string, unknown>): string | null {
-  for (const [key, value] of Object.entries(metadata)) {
-    if (
-      key.toLowerCase() === 'apikey' &&
-      typeof value === 'string' &&
-      value.length > 0 &&
-      value !== CHEFS_API_KEY_PLACEHOLDER
-    ) {
-      return value;
-    }
-  }
-  return null;
-}
-
-function stripApiKey(metadata: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(metadata)) {
-    if (key.toLowerCase() !== 'apikey') {
-      result[key] = value;
-    }
-  }
-  return result;
 }

@@ -1,5 +1,5 @@
 {
-  "id": "61533b68-3110-4f5e-867a-49cd0b28c877",
+  "id": "e6faf541-a145-40a1-8087-fae4c5719af9",
   "prevId": "5d9901b0-f2ad-4412-bcab-f5016aac5ee7",
   "version": "7",
   "dialect": "postgresql",
@@ -1133,24 +1133,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "target_kind": {
-          "name": "target_kind",
-          "type": "varchar(20)",
+        "trigger_url": {
+          "name": "trigger_url",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'n8n-node'"
+          "notNull": true
         },
-        "target_workflow_id": {
-          "name": "target_workflow_id",
-          "type": "varchar(36)",
+        "trigger_method": {
+          "name": "trigger_method",
+          "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": false
-        },
-        "target_node_id": {
-          "name": "target_node_id",
-          "type": "varchar(36)",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "metadata": {
           "name": "metadata",
@@ -1219,21 +1212,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_wt_target_workflow": {
-          "name": "idx_wt_target_workflow",
-          "columns": [
-            {
-              "expression": "target_workflow_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1254,188 +1232,8 @@
         "chk_wt_trigger_type": {
           "name": "chk_wt_trigger_type",
           "value": "\"workflow_trigger\".\"trigger_type\" IN ('chefs-form', 'button')"
-        },
-        "chk_wt_target_kind": {
-          "name": "chk_wt_target_kind",
-          "value": "\"workflow_trigger\".\"target_kind\" IN ('n8n-node')"
-        },
-        "chk_wt_target_shape": {
-          "name": "chk_wt_target_shape",
-          "value": "\"workflow_trigger\".\"target_kind\" = 'n8n-node' AND \"workflow_trigger\".\"target_workflow_id\" IS NOT NULL AND \"workflow_trigger\".\"target_node_id\" IS NOT NULL"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.credential_entity": {
-      "name": "credential_entity",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "data": {
-          "name": "data",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "key_version": {
-          "name": "key_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "idx_ce_type": {
-          "name": "idx_ce_type",
-          "columns": [
-            {
-              "expression": "type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "chk_cred_type": {
-          "name": "chk_cred_type",
-          "value": "\"credential_entity\".\"type\" IN ('chefs_api_key', 'webhook_auth_header')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.trigger_credential_relation": {
-      "name": "trigger_credential_relation",
-      "schema": "",
-      "columns": {
-        "trigger_id": {
-          "name": "trigger_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credential_id": {
-          "name": "credential_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "idx_tcr_trigger_id": {
-          "name": "idx_tcr_trigger_id",
-          "columns": [
-            {
-              "expression": "trigger_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_tcr_credential_id": {
-          "name": "idx_tcr_credential_id",
-          "columns": [
-            {
-              "expression": "credential_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "trigger_credential_relation_trigger_id_workflow_trigger_id_fk": {
-          "name": "trigger_credential_relation_trigger_id_workflow_trigger_id_fk",
-          "tableFrom": "trigger_credential_relation",
-          "tableTo": "workflow_trigger",
-          "columnsFrom": ["trigger_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "trigger_credential_relation_credential_id_credential_entity_id_fk": {
-          "name": "trigger_credential_relation_credential_id_credential_entity_id_fk",
-          "tableFrom": "trigger_credential_relation",
-          "tableTo": "credential_entity",
-          "columnsFrom": ["credential_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "trigger_credential_relation_trigger_id_credential_id_pk": {
-          "name": "trigger_credential_relation_trigger_id_credential_id_pk",
-          "columns": ["trigger_id", "credential_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.chefs_submission_webhook": {

@@ -1,6 +1,6 @@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TRIGGER_MANAGE_ROLE_VALUES } from '../../../lib/trigger-manage-roles';
-import { useHasTenantRoles, useTenantRolesById, useTenantGroupsById } from '../../../state/session';
+import { useHasTenantRoles, useIsGoldDr, useTenantRolesById, useTenantGroupsById } from '../../../state/session';
 import { useTriggers } from './use-triggers';
 import { canUserSeeTrigger } from './trigger-utils';
 import { TRIGGER_TYPES } from '../../../constants/constants';
@@ -18,6 +18,9 @@ interface TriggersTabProps {
 export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = false }: Readonly<TriggersTabProps>) {
   const hasManageRoles = useHasTenantRoles(tenantId, TRIGGER_MANAGE_ROLE_VALUES);
   const canManage = isPersonalTenant || hasManageRoles;
+  // Create, edit and delete are hidden on GoldDR;
+  const isGoldDr = useIsGoldDr();
+  const canConfigure = canManage && !isGoldDr;
   const userTenantRoles = useTenantRolesById(tenantId);
   const userTenantGroups = useTenantGroupsById(tenantId);
 
@@ -128,7 +131,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
       <>
         <div className="space-y-3">
           <TriggerListContent
-            canManage={canManage}
+            canManage={canConfigure}
             visibleTriggers={visibleTriggers}
             selectedTriggerId={selectedTriggerId}
             callbackTriggerId={callbackTriggerId}
@@ -161,7 +164,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
         {/* List pane */}
         <div className="overflow-y-auto border-r border-[var(--bc-border)] p-4 space-y-3">
           <TriggerListContent
-            canManage={canManage}
+            canManage={canConfigure}
             visibleTriggers={visibleTriggers}
             selectedTriggerId={selectedTriggerId}
             callbackTriggerId={callbackTriggerId}

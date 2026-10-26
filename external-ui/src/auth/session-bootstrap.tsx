@@ -133,7 +133,8 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
   const sessionQuery = useQuery({
     queryKey: ['session', hasToken ? 'authenticated' : 'anonymous'],
     queryFn: ({ signal }) => getSession({ signal }),
-    enabled: hasToken,
+    // Allows anonymous responses to expose the GoldDR flag on the sign-in page.
+    enabled: isTokenReady,
     retry: false,
   });
 
@@ -144,6 +145,7 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
     }
 
     if (!hasToken) {
+      sessionState.goldDr = sessionQuery.data?.goldDr === true;
       sessionState.session = null;
       sessionState.isLoading = false;
       return;
@@ -152,6 +154,7 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
     sessionState.isLoading = sessionQuery.isLoading;
 
     if (sessionQuery.data) {
+      sessionState.goldDr = sessionQuery.data.goldDr === true;
       const authenticatedSession = toAuthenticatedSession(sessionQuery.data);
       if (!authenticatedSession) {
         clearStoredAppToken();

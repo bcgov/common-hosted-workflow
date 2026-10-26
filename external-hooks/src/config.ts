@@ -19,6 +19,11 @@ export const N8N_BASE_URL = (process.env.N8N_BASE_URL || '').trim();
 export const IS_PRODUCTION = NODE_ENV === 'production';
 export const IS_DEVELOPMENT = NODE_ENV === 'development';
 
+// Cluster / disaster recovery
+// Set by Helm from the Makefile's CLUSTER value.
+export const CLUSTER = (process.env.CLUSTER ?? '').trim().toLowerCase();
+export const IS_GOLDDR = CLUSTER === 'golddr';
+
 // Feature flags
 export const ENABLE_SWAGGER_UI = process.env.ENABLE_SWAGGER_UI;
 export const FEATURES_ENABLED = process.env.FEATURES_ENABLED ?? '';
@@ -103,11 +108,6 @@ export const OIDC_COOKIE_SECRET_BASE = N8N_ENCRYPTION_KEY || OIDC_CLIENT_SECRET 
 // projects/workflows endpoints. Proves the caller is the configured Grafana instance.
 // The endpoint is disabled (503) when this is empty.
 export const GRAFANA_PROJECTS_SECRET = process.env.GRAFANA_PROJECTS_SECRET ?? '';
-
-// WIL Encryption – used to encrypt credential data (e.g. CHEFS API keys) at rest
-export const WIL_ENCRYPTION_KEY = process.env.WIL_ENCRYPTION_KEY ?? '';
-export const WIL_ENCRYPTION_KEY_ACTIVE = Number.parseInt(process.env.WIL_ENCRYPTION_KEY_ACTIVE ?? '1', 10);
-export const CHEFS_API_KEY_PLACEHOLDER = process.env.CHEFS_API_KEY_PLACEHOLDER ?? '__CHWF_BLANK_VALUE_chefs-api-key__';
 
 // --- WIL Trigger node (n8n-node trigger targets) ---------------------------------------------
 /** Kill switch for starting workflows through the WIL Trigger node. Enabled unless set to "false". */

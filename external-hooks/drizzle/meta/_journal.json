@@ -75,8 +75,15 @@
     {
       "idx": 10,
       "version": "7",
-      "when": 1784600000000,
-      "tag": "0010_workflow_trigger_n8n_target",
+      "when": 1791478867521,
+      "tag": "0010_drop_credential_entity_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791478900000,
+      "tag": "0011_workflow_trigger_n8n_target",
       "breakpoints": true
     }
   ]
