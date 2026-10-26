@@ -14,15 +14,7 @@ import { ChefsCredentialCombobox } from './chefs-credential-combobox';
 import { ChefsCredentialDialog } from './chefs-credential-dialog';
 import { TriggerTargetSection } from './trigger-target-section';
 import type { TriggerTargetStatus } from '../../../services/backend/trigger-types';
-import {
-  ActorIdBanner,
-  AllowedActorsField,
-  AllowedActorsTypeField,
-  PostBodyField,
-  TriggerFormActions,
-  TriggerMethodField,
-  TriggerUrlField,
-} from './trigger-shared';
+import { AllowedActorsField, AllowedActorsTypeField, TriggerFormActions } from './trigger-shared';
 
 export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   type: 'chefs-form',
@@ -36,10 +28,6 @@ export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   apiKey: '',
   allowedActors: '*',
   allowedActorsType: '',
-  callbackWebhookUrl: '',
-  postBody: '',
-  triggerMethod: 'POST',
-  includeActorId: true,
 };
 
 interface ChefsFormFieldsProps {
@@ -96,10 +84,7 @@ export function ChefsFormFields({
   const savedCredentialMissing = Boolean(value.n8nCredentialId) && !selected && !credentialsQuery.isPending;
   const usesLegacyKey = !value.n8nCredentialId && value.apiKey.trim().length > 0;
 
-  const isNodeTarget = value.targetKind === 'n8n-node';
-  const hasTarget = isNodeTarget
-    ? Boolean(value.targetWorkflowId?.trim() && value.targetNodeId?.trim())
-    : Boolean(value.callbackWebhookUrl.trim());
+  const hasTarget = Boolean(value.targetWorkflowId?.trim() && value.targetNodeId?.trim());
   const isValid = Boolean(value.n8nCredentialId.trim() && hasTarget && value.allowedActorsType !== '');
 
   function selectCredential(credentialId: string) {
@@ -183,13 +168,6 @@ export function ChefsFormFields({
           }
         }}
       />
-      {!isNodeTarget && (
-        <TriggerMethodField
-          id="chefs-trigger-method"
-          value={value.triggerMethod}
-          onChange={(v) => set('triggerMethod', v)}
-        />
-      )}
       <div className="grid grid-cols-2 gap-4">
         <AllowedActorsTypeField
           id="chefs-actors-type"
@@ -219,30 +197,11 @@ export function ChefsFormFields({
         idPrefix="chefs"
         tenantId={tenantId}
         source="chefs-form"
-        kind={value.targetKind ?? 'url'}
         workflowId={value.targetWorkflowId ?? ''}
         nodeId={value.targetNodeId ?? ''}
         savedStatus={savedStatus}
-        onKindChange={(targetKind) => set('targetKind', targetKind)}
         onTargetChange={(targetWorkflowId, targetNodeId) => onChange({ ...value, targetWorkflowId, targetNodeId })}
-        urlFields={
-          <>
-            <TriggerUrlField
-              id="chefs-callback-url"
-              label="Callback Webhook URL"
-              value={value.callbackWebhookUrl}
-              onChange={(v) => set('callbackWebhookUrl', v)}
-            />
-            <PostBodyField
-              id="chefs-post-body"
-              value={value.postBody}
-              onChange={(v) => set('postBody', v)}
-              method={value.triggerMethod}
-            />
-          </>
-        }
       />
-      {!isNodeTarget && <ActorIdBanner method={value.triggerMethod} />}
       <TriggerFormActions onSave={onSave} onCancel={onCancel} isSaving={isSaving} isValid={!!isValid} />
     </div>
   );

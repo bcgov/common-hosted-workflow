@@ -12,10 +12,9 @@ const base: ChefsFormTriggerPayload = {
   apiKey: 'should-not-send', // pragma: allowlist secret
   allowedActors: '*',
   allowedActorsType: 'all',
-  callbackWebhookUrl: 'https://example.com/hook',
-  postBody: '',
-  triggerMethod: 'POST',
-  includeActorId: true,
+  targetKind: 'n8n-node',
+  targetWorkflowId: 'wf1',
+  targetNodeId: 'node1',
 };
 
 describe('CHEFS trigger mappers', () => {
@@ -36,20 +35,11 @@ describe('CHEFS trigger mappers', () => {
 });
 
 describe('n8n-node target mappers', () => {
-  const nodeChefs: ChefsFormTriggerPayload = {
-    ...base,
-    callbackWebhookUrl: '',
-    targetKind: 'n8n-node',
-    targetWorkflowId: 'wf1',
-    targetNodeId: 'node1',
-  };
-
-  it('sends workflow and node ids instead of url fields, and no postBody', () => {
-    const body = payloadToCreateBody(nodeChefs, 'user@example.com');
+  it('sends workflow and node ids as the target', () => {
+    const body = payloadToCreateBody(base, 'user@example.com');
     expect(body).toMatchObject({ targetKind: 'n8n-node', targetWorkflowId: 'wf1', targetNodeId: 'node1' });
     expect(body).not.toHaveProperty('triggerUrl');
     expect(body).not.toHaveProperty('triggerMethod');
-    expect(body.metadata).not.toHaveProperty('postBody');
   });
 
   it('sends button inputValues for node targets', () => {
@@ -57,12 +47,8 @@ describe('n8n-node target mappers', () => {
       {
         type: 'button',
         buttonText: 'Go',
-        webhookUrl: '',
-        postBody: '',
         allowedActors: '*',
         allowedActorsType: 'all',
-        triggerMethod: 'POST',
-        includeActorId: true,
         targetKind: 'n8n-node',
         targetWorkflowId: 'wf1',
         targetNodeId: 'node1',
@@ -71,18 +57,11 @@ describe('n8n-node target mappers', () => {
       'user@example.com',
     );
     expect(body.metadata).toMatchObject({ buttonText: 'Go', inputValues: { amount: 5 } });
-    expect(body.metadata).not.toHaveProperty('postBody');
-  });
-
-  it('keeps legacy URL bodies unchanged', () => {
-    const body = payloadToCreateBody(base, 'user@example.com');
-    expect(body).toMatchObject({ triggerUrl: 'https://example.com/hook', triggerMethod: 'POST' });
-    expect(body).not.toHaveProperty('targetKind');
   });
 });
 
 describe('apiItemToTrigger with node targets', () => {
-  it('maps target fields, null url and status', () => {
+  it('maps target fields and status', () => {
     const trigger = apiItemToTrigger(
       {
         id: 't1',
@@ -92,8 +71,6 @@ describe('apiItemToTrigger with node targets', () => {
         targetWorkflowId: 'wf1',
         targetNodeId: 'node1',
         targetStatus: 'unpublished',
-        triggerUrl: null,
-        triggerMethod: null,
         metadata: { buttonText: 'Go', inputValues: { a: 1 } },
         allowedActorsType: 'all',
         allowedActors: ['*'],
@@ -109,7 +86,6 @@ describe('apiItemToTrigger with node targets', () => {
     expect(trigger.config).toMatchObject({
       targetKind: 'n8n-node',
       targetWorkflowId: 'wf1',
-      webhookUrl: '',
       inputValues: { a: 1 },
     });
   });

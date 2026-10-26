@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { workflowTrigger } from '../../db/schema/workflow-trigger';
 import {
   workflowTriggerTypeZodEnum,
-  triggerHttpMethodZodEnum,
   triggerActorTypeZodEnum,
   triggerTargetKindZodEnum,
   triggerTargetStatusZodEnum,
@@ -19,10 +18,8 @@ export const triggerItemSchema = z.object({
   targetKind: triggerTargetKindZodEnum,
   targetWorkflowId: z.string().nullable(),
   targetNodeId: z.string().nullable(),
-  /** Live state of an n8n-node target; null for URL triggers. */
+  /** Live state of an n8n-node target. */
   targetStatus: triggerTargetStatusZodEnum.nullable(),
-  triggerUrl: z.string().nullable(),
-  triggerMethod: z.string().nullable(),
   metadata: z.record(z.string(), z.unknown()),
   allowedActorsType: z.string(),
   allowedActors: z.array(z.string()),
@@ -58,12 +55,7 @@ export const listTriggersLimitedResponseSchema = z.object({
 export const createTriggerResponseSchema = triggerItemSchema;
 export const updateTriggerResponseSchema = triggerItemSchema;
 
-/** Target fields shared by create/update; `targetKind` defaults to the legacy 'url' when omitted. */
-const urlTargetFields = {
-  targetKind: z.literal('url'),
-  triggerUrl: z.string().url('triggerUrl must be a valid URL').trim().min(1),
-  triggerMethod: triggerHttpMethodZodEnum,
-};
+/** Target fields for create/update. Only WIL Trigger node ('n8n-node') targets are supported. */
 const nodeTargetFields = {
   targetKind: z.literal('n8n-node'),
   targetWorkflowId: z.string().trim().min(1).max(36),
@@ -71,17 +63,11 @@ const nodeTargetFields = {
 };
 
 const withDefaultTargetKind = (body: unknown) =>
-  typeof body === 'object' && body !== null && !('targetKind' in body) ? { ...body, targetKind: 'url' } : body;
+  typeof body === 'object' && body !== null && !('targetKind' in body) ? { ...body, targetKind: 'n8n-node' } : body;
 
-/** Builds a request body schema accepting either target variant (backwards compatible with URL-only clients). */
+/** Builds a request body schema for an n8n-node trigger target. */
 const triggerBodySchema = <T extends z.ZodRawShape>(common: T) =>
-  z.preprocess(
-    withDefaultTargetKind,
-    z.discriminatedUnion('targetKind', [
-      z.object({ ...urlTargetFields, ...common }).strict(),
-      z.object({ ...nodeTargetFields, ...common }).strict(),
-    ]),
-  );
+  z.preprocess(withDefaultTargetKind, z.object({ ...nodeTargetFields, ...common }).strict());
 
 /** POST /ui-api/wil/triggers */
 export const createTriggerSchema = z.object({
@@ -211,8 +197,6 @@ export function mapTriggerRowToResponse(
     targetWorkflowId: row.targetWorkflowId,
     targetNodeId: row.targetNodeId,
     targetStatus,
-    triggerUrl: row.triggerUrl,
-    triggerMethod: row.triggerMethod,
     metadata,
     allowedActorsType: row.allowedActorsType,
     allowedActors: row.allowedActors,

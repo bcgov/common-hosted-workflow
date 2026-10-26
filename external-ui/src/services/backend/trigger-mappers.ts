@@ -5,7 +5,6 @@ import type {
   LimitedApiTriggerItem,
   Trigger,
   TriggerActorType,
-  TriggerMethod,
   TriggerPayload,
 } from './trigger-types';
 import { TRIGGER_TYPES } from '../../constants/constants';
@@ -25,14 +24,11 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
   const isAllActors = item.allowedActors.includes('*');
   const allowedActors = isAllActors ? '*' : item.allowedActors.join(',');
   const allowedActorsType: TriggerActorType = isAllActors ? 'all' : (item.allowedActorsType as TriggerActorType);
-  const triggerMethod = (item.triggerMethod ?? 'POST') as TriggerMethod;
-  const triggerUrl = item.triggerUrl ?? '';
   const target = {
-    targetKind: item.targetKind ?? 'url',
+    targetKind: 'n8n-node' as const,
     targetWorkflowId: item.targetWorkflowId ?? '',
     targetNodeId: item.targetNodeId ?? '',
   } as const;
-  const includeActorId = (meta.includeActorId as boolean) ?? false;
 
   let config: TriggerPayload;
 
@@ -46,24 +42,16 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
       // A non-empty placeholder value signals that a legacy private key exists on the server.
       // An empty string means no private key is stored.
       apiKey: (meta.apiKey as string) ?? '',
-      postBody: (meta.postBody as string) ?? '',
       allowedActors,
       allowedActorsType,
-      callbackWebhookUrl: triggerUrl,
-      triggerMethod,
-      includeActorId,
       ...target,
     };
   } else {
     config = {
       type: TRIGGER_TYPES.BUTTON,
       buttonText: (meta.buttonText as string) ?? '',
-      webhookUrl: triggerUrl,
-      postBody: (meta.postBody as string) ?? '',
       allowedActors,
       allowedActorsType,
-      triggerMethod,
-      includeActorId,
       inputValues: (meta.inputValues as Record<string, unknown> | undefined) ?? {},
       ...target,
     };
@@ -94,22 +82,14 @@ export function limitedApiItemToTrigger(item: LimitedApiTriggerItem, tenantId: s
           formName: item.triggerName,
           baseUrl: '',
           apiKey: '',
-          postBody: '',
           allowedActors,
           allowedActorsType,
-          callbackWebhookUrl: '',
-          triggerMethod: 'POST',
-          includeActorId: true,
         }
       : {
           type: TRIGGER_TYPES.BUTTON,
           buttonText: item.triggerName,
-          webhookUrl: '',
-          postBody: '',
           allowedActors,
           allowedActorsType,
-          triggerMethod: 'POST',
-          includeActorId: true,
         };
 
   return { id: item.id, tenantId, createdAt: '', updatedAt: '', config, targetStatus: item.targetStatus ?? null };
@@ -126,45 +106,34 @@ function chefsFormMetadata(config: ChefsFormTriggerPayload): Record<string, unkn
     formId: config.formId,
     formName: config.formName,
     baseUrl: config.baseUrl,
-    includeActorId: config.includeActorId,
   };
-  if (config.targetKind !== 'n8n-node') metadata.postBody = config.postBody;
   if (!config.n8nCredentialId) {
     metadata.apiKey = config.apiKey;
   }
   return metadata;
 }
 
-/** Target fields of a request body: workflow + node for node targets, URL + method otherwise. */
-function targetBody(config: TriggerPayload, url: string) {
-  if (config.targetKind === 'n8n-node') {
-    return {
-      targetKind: 'n8n-node' as const,
-      targetWorkflowId: config.targetWorkflowId ?? '',
-      targetNodeId: config.targetNodeId ?? '',
-    };
-  }
-  return { triggerUrl: url, triggerMethod: config.triggerMethod };
+/** Target fields of a request body: the WIL Trigger node's workflow + node ids. */
+function targetBody(config: TriggerPayload) {
+  return {
+    targetKind: 'n8n-node' as const,
+    targetWorkflowId: config.targetWorkflowId ?? '',
+    targetNodeId: config.targetNodeId ?? '',
+  };
 }
 
 function buttonMetadata(config: ButtonTriggerPayload): Record<string, unknown> {
-  const metadata: Record<string, unknown> = {
+  return {
     buttonText: config.buttonText,
-    postBody: config.postBody,
-    includeActorId: config.includeActorId,
+    inputValues: config.inputValues ?? {},
   };
-  if (config.targetKind === 'n8n-node') {
-    metadata.inputValues = config.inputValues ?? {};
-    delete metadata.postBody; // legacy URL-only field
-  }
-  return metadata;
 }
 
 /** Fields common to create and update bodies. */
 function commonBody(config: TriggerPayload) {
   const isChefs = config.type === TRIGGER_TYPES.CHEFS_FORM;
   return {
-    ...(isChefs ? targetBody(config, config.callbackWebhookUrl) : targetBody(config, config.webhookUrl)),
+    ...targetBody(config),
     metadata: isChefs ? chefsFormMetadata(config) : buttonMetadata(config),
     allowedActorsType: config.allowedActorsType,
     allowedActors: splitActors(config.allowedActors),

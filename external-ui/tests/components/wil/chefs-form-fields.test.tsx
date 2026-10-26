@@ -22,7 +22,7 @@ function renderFields(onChange = vi.fn()) {
     <QueryClientProvider client={client}>
       <ChefsFormFields
         tenantId="717626be-f59f-4e35-ac87-f84c4e11b865"
-        value={{ ...DEFAULT_CHEFS_FORM, allowedActorsType: 'all', callbackWebhookUrl: 'https://example.com/hook' }}
+        value={{ ...DEFAULT_CHEFS_FORM, allowedActorsType: 'all' }}
         onChange={onChange}
         onSave={vi.fn()}
         onCancel={vi.fn()}

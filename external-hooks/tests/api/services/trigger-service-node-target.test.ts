@@ -51,8 +51,6 @@ describe('TriggerService n8n-node targets', () => {
         targetKind: 'n8n-node',
         targetWorkflowId: 'wf1',
         targetNodeId: 'node1',
-        triggerUrl: null,
-        triggerMethod: null,
       }),
     );
   });
@@ -79,24 +77,12 @@ describe('TriggerService n8n-node targets', () => {
     expect(error).toMatchObject({ statusCode: 422 });
   });
 
-  it('requires a URL and method for legacy triggers', async () => {
-    const { service } = setup();
-    const error = await service.create({ ...base, targetKind: 'url' }).catch((e) => e);
-    expect(error).toMatchObject({ statusCode: 422 });
-  });
-
-  it('keeps legacy URL creation working without a target service', async () => {
+  it('rejects creation with 400 when no target service is available', async () => {
     const create = vi.fn().mockImplementation(async (input) => makeWorkflowTriggerRow(input));
     const service = new TriggerService({ workflowTrigger: { create } } as any, {} as any);
-    await service.create({
-      ...base,
-      targetKind: 'url',
-      triggerUrl: 'https://example.com/hook',
-      triggerMethod: 'POST',
-    });
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ targetKind: 'url', triggerUrl: 'https://example.com/hook', targetWorkflowId: null }),
-    );
+    const error = await service.create(base).catch((e) => e);
+    expect(error).toMatchObject({ statusCode: 400 });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('re-validates on update against the existing trigger type', async () => {

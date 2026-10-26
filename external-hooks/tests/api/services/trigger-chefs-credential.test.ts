@@ -29,6 +29,9 @@ function createService(metadata: Record<string, unknown>) {
   });
   const applyCredentialToTriggerMetadata = vi.fn(async (value: Record<string, unknown>) => value);
 
+  const targets = {
+    resolve: vi.fn().mockResolvedValue({ ok: true, target: { inputSchema: [] }, published: {} }),
+  };
   const service = new TriggerService(
     {
       workflowTrigger: { getById, update, create },
@@ -36,6 +39,7 @@ function createService(metadata: Record<string, unknown>) {
       credentialEntity: { deleteByAssociatedTriggerId: deleteCredentials, upsert },
     } as any,
     { applyCredentialToTriggerMetadata } as any,
+    targets as any,
   );
 
   return { service, deleteRelation, deleteCredentials, upsert, applyCredentialToTriggerMetadata };
@@ -45,8 +49,9 @@ const baseUpdate = {
   triggerId: 'trig-1',
   // Tenant-wide list: the credential must still be resolved against the trigger's own project only.
   projectIds: ['proj-1', 'proj-2'],
-  triggerUrl: 'https://example.com/hook',
-  triggerMethod: 'POST',
+  targetKind: 'n8n-node',
+  targetWorkflowId: 'wf1',
+  targetNodeId: 'node1',
   allowedActorsType: 'all',
   allowedActors: ['*'],
   authEnabled: false,
@@ -94,8 +99,9 @@ describe('TriggerService.update CHEFS credential reference', () => {
     await service.create({
       projectId: 'proj-1',
       triggerType: WorkflowTriggerTypeEnum.CHEFS_FORM,
-      triggerUrl: 'https://example.com/hook',
-      triggerMethod: 'POST',
+      targetKind: 'n8n-node',
+      targetWorkflowId: 'wf1',
+      targetNodeId: 'node1',
       metadata,
       allowedActorsType: 'all',
       allowedActors: ['*'],

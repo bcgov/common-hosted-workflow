@@ -6,3 +6,4 @@ node_modules
 .next/
 .vscode/settings.json
 /.vscode
+/.cocoindex_code

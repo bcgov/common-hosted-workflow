@@ -30,17 +30,15 @@ const target: WilTriggerTarget = {
 };
 
 function renderSection(props: Partial<React.ComponentProps<typeof TriggerTargetSection>> = {}) {
-  const handlers = { onKindChange: vi.fn(), onTargetChange: vi.fn(), onInputValuesChange: vi.fn() };
+  const handlers = { onTargetChange: vi.fn(), onInputValuesChange: vi.fn() };
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <TriggerTargetSection
         idPrefix="t"
         tenantId="tenant-1"
         source="button"
-        kind="n8n-node"
         workflowId=""
         nodeId=""
-        urlFields={<div>legacy url fields</div>}
         {...handlers}
         {...props}
       />
@@ -76,17 +74,12 @@ describe('TriggerTargetSection', () => {
     expect(await screen.findByText(/no longer published/i)).toBeInTheDocument();
   });
 
-  it('falls back to URL fields when the backend feature is off', async () => {
+  it('shows a disabled message when the backend feature is off', async () => {
     listMock.mockResolvedValue({ data: [], enabled: false });
     renderSection();
-    await waitFor(() => expect(screen.getByText('legacy url fields')).toBeInTheDocument());
-    expect(screen.queryByText(/Advanced: call a webhook URL/i)).not.toBeInTheDocument();
-  });
-
-  it('toggles to the advanced URL mode', async () => {
-    const user = userEvent.setup();
-    const handlers = renderSection();
-    await user.click(await screen.findByRole('button', { name: /Advanced: call a webhook URL/i }));
-    expect(handlers.onKindChange).toHaveBeenCalledWith('url');
+    await waitFor(() =>
+      expect(screen.getByText(/WIL Trigger node invocation is currently disabled/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText(/workflow/i)).not.toBeInTheDocument();
   });
 });

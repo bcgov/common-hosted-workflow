@@ -5,15 +5,7 @@ import { NO_AUTOFILL } from './no-autofill';
 import { TriggerTargetSection } from './trigger-target-section';
 import { pruneInputValues } from './workflow-input-utils';
 import type { TriggerTargetStatus } from '../../../services/backend/trigger-types';
-import {
-  ActorIdBanner,
-  AllowedActorsField,
-  AllowedActorsTypeField,
-  PostBodyField,
-  TriggerFormActions,
-  TriggerMethodField,
-  TriggerUrlField,
-} from './trigger-shared';
+import { AllowedActorsField, AllowedActorsTypeField, TriggerFormActions } from './trigger-shared';
 
 export const DEFAULT_BUTTON: ButtonTriggerPayload = {
   type: 'button',
@@ -22,12 +14,8 @@ export const DEFAULT_BUTTON: ButtonTriggerPayload = {
   targetNodeId: '',
   inputValues: {},
   buttonText: '',
-  webhookUrl: '',
-  postBody: '',
   allowedActors: '',
   allowedActorsType: '',
-  triggerMethod: 'POST',
-  includeActorId: true,
 };
 
 interface ButtonTriggerFieldsProps {
@@ -57,45 +45,31 @@ export function ButtonTriggerFields({
     onChange({ ...value, [key]: val });
   }
 
-  const isNodeTarget = value.targetKind === 'n8n-node';
-  const hasTarget = isNodeTarget
-    ? Boolean(value.targetWorkflowId?.trim() && value.targetNodeId?.trim())
-    : Boolean(value.webhookUrl.trim());
+  const hasTarget = Boolean(value.targetWorkflowId?.trim() && value.targetNodeId?.trim());
   const isValid = value.buttonText.trim() && hasTarget && value.allowedActorsType !== '';
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="btn-text">
-            Button Text <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="btn-text"
-            placeholder="e.g. Submit Disability Application"
-            value={value.buttonText}
-            onChange={(e) => set('buttonText', e.target.value)}
-            {...NO_AUTOFILL}
-          />
-        </div>
-        {!isNodeTarget && (
-          <TriggerMethodField
-            id="btn-trigger-method"
-            value={value.triggerMethod}
-            onChange={(v) => set('triggerMethod', v)}
-          />
-        )}
+      <div className="space-y-1.5">
+        <Label htmlFor="btn-text">
+          Button Text <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="btn-text"
+          placeholder="e.g. Submit Disability Application"
+          value={value.buttonText}
+          onChange={(e) => set('buttonText', e.target.value)}
+          {...NO_AUTOFILL}
+        />
       </div>
       <TriggerTargetSection
         idPrefix="btn"
         tenantId={tenantId}
         source="button"
-        kind={value.targetKind ?? 'url'}
         workflowId={value.targetWorkflowId ?? ''}
         nodeId={value.targetNodeId ?? ''}
         inputValues={value.inputValues}
         savedStatus={savedStatus}
-        onKindChange={(targetKind) => set('targetKind', targetKind)}
         onTargetChange={(targetWorkflowId, targetNodeId, schema) =>
           // Single update: values for fields the new node doesn't declare must not leak into the save.
           onChange({
@@ -106,23 +80,6 @@ export function ButtonTriggerFields({
           })
         }
         onInputValuesChange={(inputValues) => set('inputValues', inputValues)}
-        urlFields={
-          <>
-            <TriggerUrlField
-              id="btn-webhook-url"
-              label="Webhook URL"
-              value={value.webhookUrl}
-              onChange={(v) => set('webhookUrl', v)}
-              placeholder="e.g. http://n8n:5678/webhook/my-trigger"
-            />
-            <PostBodyField
-              id="btn-post-body"
-              value={value.postBody}
-              onChange={(v) => set('postBody', v)}
-              method={value.triggerMethod}
-            />
-          </>
-        }
       />
       <div className="grid grid-cols-2 gap-4">
         <AllowedActorsTypeField
@@ -149,7 +106,6 @@ export function ButtonTriggerFields({
           disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
       </div>
-      {!isNodeTarget && <ActorIdBanner method={value.triggerMethod} />}
       <TriggerFormActions onSave={onSave} onCancel={onCancel} isSaving={isSaving} isValid={!!isValid} />
     </div>
   );

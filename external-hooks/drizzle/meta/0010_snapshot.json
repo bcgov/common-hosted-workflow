@@ -1138,7 +1138,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'url'"
+          "default": "'n8n-node'"
         },
         "target_workflow_id": {
           "name": "target_workflow_id",
@@ -1149,18 +1149,6 @@
         "target_node_id": {
           "name": "target_node_id",
           "type": "varchar(36)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "trigger_url": {
-          "name": "trigger_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "trigger_method": {
-          "name": "trigger_method",
-          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1269,11 +1257,11 @@
         },
         "chk_wt_target_kind": {
           "name": "chk_wt_target_kind",
-          "value": "\"workflow_trigger\".\"target_kind\" IN ('url', 'n8n-node')"
+          "value": "\"workflow_trigger\".\"target_kind\" IN ('n8n-node')"
         },
         "chk_wt_target_shape": {
           "name": "chk_wt_target_shape",
-          "value": "(\"workflow_trigger\".\"target_kind\" = 'url' AND \"workflow_trigger\".\"trigger_url\" IS NOT NULL AND \"workflow_trigger\".\"trigger_method\" IS NOT NULL)\n        OR (\"workflow_trigger\".\"target_kind\" = 'n8n-node' AND \"workflow_trigger\".\"target_workflow_id\" IS NOT NULL AND \"workflow_trigger\".\"target_node_id\" IS NOT NULL)"
+          "value": "\"workflow_trigger\".\"target_kind\" = 'n8n-node' AND \"workflow_trigger\".\"target_workflow_id\" IS NOT NULL AND \"workflow_trigger\".\"target_node_id\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false

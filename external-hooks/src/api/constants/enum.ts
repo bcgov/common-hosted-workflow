@@ -57,23 +57,17 @@ export const CHEFS_FORM_AUTH_CREDENTIAL_TYPE = 'chefsFormAuth' as const;
 /** Trigger metadata key that points at an n8n `chefsFormAuth` credential. */
 export const N8N_CREDENTIAL_ID_METADATA_KEY = 'n8nCredentialId' as const;
 
-/** Allowed HTTP methods for workflow trigger invocation. */
-export const TRIGGER_HTTP_METHODS = ['GET', 'POST'] as const;
-export type TriggerHttpMethod = (typeof TRIGGER_HTTP_METHODS)[number];
-export const triggerHttpMethodZodEnum = z.enum(TRIGGER_HTTP_METHODS);
-
 /** Actor types for workflow trigger visibility/access control. */
 export const TRIGGER_ACTOR_TYPES = ['all', 'role', 'user', 'group', 'other'] as const;
 export type TriggerActorType = (typeof TRIGGER_ACTOR_TYPES)[number];
 export const triggerActorTypeZodEnum = z.enum(TRIGGER_ACTOR_TYPES);
 
-/** How a workflow trigger reaches its n8n workflow. `url` = legacy webhook URL, `n8n-node` = WIL Trigger node. */
-export const TRIGGER_TARGET_KINDS = ['url', 'n8n-node'] as const;
+/** How a workflow trigger reaches its n8n workflow. `n8n-node` = WIL Trigger node (the only supported kind). */
+export const TRIGGER_TARGET_KINDS = ['n8n-node'] as const;
 export type TriggerTargetKind = (typeof TRIGGER_TARGET_KINDS)[number];
 export const triggerTargetKindZodEnum = z.enum(TRIGGER_TARGET_KINDS);
 
 export const TriggerTargetKindEnum = {
-  URL: 'url' as TriggerTargetKind,
   N8N_NODE: 'n8n-node' as TriggerTargetKind,
 } as const;
 

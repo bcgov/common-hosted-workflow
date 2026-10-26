@@ -20,7 +20,7 @@ export function getTriggers(params: { tenantId: string; signal?: AbortSignal }):
     })
     .then((res) => ({
       data: res.data.data.map((item) =>
-        'triggerUrl' in item
+        'projectId' in item
           ? apiItemToTrigger(item as ApiTriggerItem, params.tenantId)
           : limitedApiItemToTrigger(item as LimitedApiTriggerItem, params.tenantId),
       ),

@@ -43,8 +43,7 @@ import { buildWilTriggerItem } from './helpers/wil-trigger-item';
 import { WIL_TARGET_UNAVAILABLE_CODE } from '../services/n8n-workflow-runner.service';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
-import { callWebhook } from './helpers/webhook-fire';
-import { CALLBACK_TIMEOUT_MS, TRIGGER_MANAGE_ROLE, TRIGGER_FAILED_MESSAGE } from './constants/constants';
+import { TRIGGER_MANAGE_ROLE, TRIGGER_FAILED_MESSAGE } from './constants/constants';
 import { z } from 'zod';
 
 const log = createLogger('TriggerRoutes');
@@ -94,44 +93,6 @@ function isActorAllowed(
   }
 
   return false;
-}
-
-/**
- * Builds the outbound request body for a trigger callback.
- * actorId is always included so downstream workflows can identify the initiating user.
- */
-function buildTriggerOutboundBody(
-  trigger: { triggerType: string; metadata: Record<string, unknown> },
-  requestBody: Record<string, unknown>,
-  actorEmail: string,
-): Record<string, unknown> {
-  const outbound: Record<string, unknown> = {};
-  const meta = trigger.metadata;
-
-  if (trigger.triggerType === WorkflowTriggerTypeEnum.BUTTON && typeof meta.postBody === 'string' && meta.postBody) {
-    try {
-      Object.assign(outbound, JSON.parse(meta.postBody));
-    } catch {
-      outbound.body = meta.postBody;
-    }
-  }
-
-  if (trigger.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM && Object.keys(requestBody).length > 0) {
-    Object.assign(outbound, requestBody);
-  }
-
-  outbound.actorId = actorEmail;
-
-  return outbound;
-}
-
-/** Appends body fields as query params for GET requests; returns the modified URL string. */
-function appendBodyAsQueryParams(baseUrl: string, body: Record<string, unknown>): string {
-  const url = new URL(baseUrl);
-  for (const [key, value] of Object.entries(body)) {
-    url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
-  }
-  return url.toString();
 }
 
 /**
@@ -231,9 +192,7 @@ async function requireCredentialActor(
 function pickTargetParams(
   body: z.infer<typeof createTriggerSchema>['body'] | z.infer<typeof updateTriggerSchema>['body'],
 ) {
-  return body.targetKind === 'n8n-node'
-    ? { targetKind: body.targetKind, targetWorkflowId: body.targetWorkflowId, targetNodeId: body.targetNodeId }
-    : { targetKind: body.targetKind, triggerUrl: body.triggerUrl, triggerMethod: body.triggerMethod };
+  return { targetKind: body.targetKind, targetWorkflowId: body.targetWorkflowId, targetNodeId: body.targetNodeId };
 }
 
 /** GET /wil/trigger-targets query. */
@@ -588,11 +547,10 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
   );
 
   /**
-   * POST /wil/triggers/:triggerId/callback — execute a trigger's webhook URL.
+   * POST /wil/triggers/:triggerId/callback — fire a trigger's WIL Trigger node in the published workflow.
    *
    * Accessible to managers and any actor explicitly listed in allowed_actors.
-   * Always appends the actor's email as actorId so downstream workflows can identify the initiator.
-   * For GET triggers, body fields are forwarded as query params instead.
+   * The actor's email, roles and groups are passed to the WIL Trigger node as data.
    */
   router.post(
     '/triggers/:triggerId/callback',
@@ -603,58 +561,15 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       if (!ctx) return;
       const { session, tenantId, allowedProjectIds, trigger } = ctx;
 
-      if (trigger.targetKind === TriggerTargetKindEnum.N8N_NODE) {
-        await fireN8nNodeTrigger({
-          res,
-          services,
-          trigger,
-          session,
-          tenantId,
-          allowedProjectIds,
-          body: (req.parsed.body ?? {}) as Record<string, unknown>,
-        });
-        return;
-      }
-
-      const outboundBody = buildTriggerOutboundBody(
+      await fireN8nNodeTrigger({
+        res,
+        services,
         trigger,
-        (req.parsed.body ?? {}) as Record<string, unknown>,
-        session.email,
-      );
-
-      const triggerUrl = trigger.triggerUrl ?? '';
-      const method = (trigger.triggerMethod ?? 'POST').toUpperCase();
-      const requestUrl =
-        method === 'GET' && Object.keys(outboundBody).length > 0
-          ? appendBodyAsQueryParams(triggerUrl, outboundBody)
-          : triggerUrl;
-
-      const upstream = await callWebhook({
-        url: requestUrl,
-        method,
-        body: method === 'GET' ? undefined : JSON.stringify(outboundBody),
-        timeoutMs: CALLBACK_TIMEOUT_MS,
-        timeoutMessage: 'Trigger execution timed out',
-        unreachableMessage: 'Trigger URL unreachable',
+        session,
+        tenantId,
+        allowedProjectIds,
+        body: (req.parsed.body ?? {}) as Record<string, unknown>,
       });
-
-      if (!upstream.ok) {
-        const upstreamText = await upstream.text();
-        log.warn('Trigger webhook returned an error response', {
-          triggerId: shortenIdForLog(triggerId),
-          status: upstream.status,
-          upstreamText,
-        });
-        res.status(502).json({
-          error: {
-            message: TRIGGER_FAILED_MESSAGE,
-            upstreamStatus: upstream.status,
-          },
-        });
-        return;
-      }
-
-      OkResponse(res, { success: true }, callbackTriggerResponseSchema);
     },
   );
 

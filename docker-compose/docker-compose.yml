@@ -228,8 +228,11 @@ services:
           rm -f /home/node/.n8n/nodes/package-lock.json;
           cd /home/node/.n8n/nodes && npm install /community-nodes;
 
+          echo 'Verifying n8n runtime internals';
+          cd /external-hooks && node verify-n8n-internals.cjs &&
+
           echo 'Installing external hooks';
-          cd /external-hooks && node migrate.cjs;
+          node migrate.cjs;
 
           echo 'n8n provision completed!';
           "

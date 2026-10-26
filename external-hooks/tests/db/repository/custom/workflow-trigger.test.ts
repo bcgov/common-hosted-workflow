@@ -85,8 +85,9 @@ describe('WorkflowTriggerRepository', () => {
       const input = {
         projectId: VALID_PROJECT_ID,
         triggerType: 'button',
-        triggerUrl: 'https://example.com/webhook',
-        triggerMethod: 'POST',
+        targetKind: 'n8n-node',
+        targetWorkflowId: 'wf1',
+        targetNodeId: 'node1',
         metadata: { buttonText: 'Run' },
         allowedActorsType: 'user',
         allowedActors: ['actor@example.com'],
@@ -114,8 +115,9 @@ describe('WorkflowTriggerRepository', () => {
       await repo.create({
         projectId: VALID_PROJECT_ID,
         triggerType: 'button',
-        triggerUrl: 'https://example.com/hook',
-        triggerMethod: 'POST',
+        targetKind: 'n8n-node',
+        targetWorkflowId: 'wf1',
+        targetNodeId: 'node1',
         metadata: {},
         allowedActorsType: 'user',
         allowedActors: [],
@@ -127,13 +129,14 @@ describe('WorkflowTriggerRepository', () => {
 
   describe('update', () => {
     it('should update mutable fields and return the updated row', async () => {
-      const updatedRow = makeWorkflowTriggerRow({ triggerUrl: 'https://new.example.com/hook' });
+      const updatedRow = makeWorkflowTriggerRow({ targetNodeId: 'node2' });
       db.returning.mockResolvedValue([updatedRow]);
 
       const params = {
         triggerId: VALID_TRIGGER_ID,
-        triggerUrl: 'https://new.example.com/hook',
-        triggerMethod: 'GET',
+        targetKind: 'n8n-node',
+        targetWorkflowId: 'wf2',
+        targetNodeId: 'node2',
         metadata: { buttonText: 'Submit' },
         allowedActorsType: 'role',
         allowedActors: ['editor'],
@@ -146,8 +149,9 @@ describe('WorkflowTriggerRepository', () => {
       expect(db.update).toHaveBeenCalled();
       expect(db.set).toHaveBeenCalledWith(
         expect.objectContaining({
-          triggerUrl: 'https://new.example.com/hook',
-          triggerMethod: 'GET',
+          targetKind: 'n8n-node',
+          targetWorkflowId: 'wf2',
+          targetNodeId: 'node2',
           authEnabled: true,
           updatedBy: 'admin@example.com',
         }),
@@ -160,8 +164,9 @@ describe('WorkflowTriggerRepository', () => {
 
       const result = await repo.update({
         triggerId: 'nonexistent',
-        triggerUrl: 'https://example.com',
-        triggerMethod: 'POST',
+        targetKind: 'n8n-node',
+        targetWorkflowId: 'wf1',
+        targetNodeId: 'node1',
         metadata: {},
         allowedActorsType: 'user',
         allowedActors: [],

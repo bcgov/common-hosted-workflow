@@ -32,8 +32,6 @@ export class WorkflowTriggerRepository {
     targetKind?: string;
     targetWorkflowId?: string | null;
     targetNodeId?: string | null;
-    triggerUrl?: string | null;
-    triggerMethod?: string | null;
     metadata: Record<string, unknown>;
     allowedActorsType: string;
     allowedActors: string[];
@@ -46,11 +44,9 @@ export class WorkflowTriggerRepository {
       .values({
         projectId: input.projectId,
         triggerType: input.triggerType,
-        targetKind: input.targetKind ?? 'url',
+        targetKind: input.targetKind ?? 'n8n-node',
         targetWorkflowId: input.targetWorkflowId ?? null,
         targetNodeId: input.targetNodeId ?? null,
-        triggerUrl: input.triggerUrl ?? null,
-        triggerMethod: input.triggerMethod ?? null,
         metadata: input.metadata,
         allowedActorsType: input.allowedActorsType,
         allowedActors: input.allowedActors,
@@ -69,8 +65,6 @@ export class WorkflowTriggerRepository {
     targetKind?: string;
     targetWorkflowId?: string | null;
     targetNodeId?: string | null;
-    triggerUrl?: string | null;
-    triggerMethod?: string | null;
     metadata: Record<string, unknown>;
     allowedActorsType: string;
     allowedActors: string[];
@@ -82,12 +76,10 @@ export class WorkflowTriggerRepository {
     const [row] = await this.db
       .update(workflowTrigger)
       .set({
-        // Target columns are replaced as a unit so the (kind, url|node) CHECK always holds.
-        targetKind: params.targetKind ?? 'url',
+        // Target columns are replaced as a unit so the node-shape CHECK always holds.
+        targetKind: params.targetKind ?? 'n8n-node',
         targetWorkflowId: params.targetWorkflowId ?? null,
         targetNodeId: params.targetNodeId ?? null,
-        triggerUrl: params.triggerUrl ?? null,
-        triggerMethod: params.triggerMethod ?? null,
         metadata: params.metadata,
         allowedActorsType: params.allowedActorsType,
         allowedActors: params.allowedActors,

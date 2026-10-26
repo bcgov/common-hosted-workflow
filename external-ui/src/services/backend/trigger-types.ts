@@ -1,11 +1,10 @@
 export type TriggerType = 'chefs-form' | 'button';
 export type TriggerActorType = '' | 'all' | 'role' | 'user' | 'group' | 'other';
-export type TriggerMethod = 'POST' | 'GET';
-/** 'n8n-node' runs a WIL Trigger node in a published n8n workflow; 'url' is the legacy outbound webhook. */
-export type TriggerTargetKind = 'url' | 'n8n-node';
+/** 'n8n-node' runs a WIL Trigger node in a published n8n workflow. The only supported target kind. */
+export type TriggerTargetKind = 'n8n-node';
 export type TriggerTargetStatus = 'live' | 'unpublished' | 'missing-node';
 
-/** Fields shared by both trigger payloads. Optional so payloads saved before node targets still type-check. */
+/** Fields identifying a trigger's WIL Trigger node target. */
 export interface TriggerTargetFields {
   targetKind?: TriggerTargetKind;
   targetWorkflowId?: string;
@@ -58,23 +57,15 @@ export interface ChefsFormTriggerPayload extends TriggerTargetFields {
   apiKey: string;
   allowedActors: string;
   allowedActorsType: TriggerActorType;
-  callbackWebhookUrl: string;
-  postBody: string;
-  triggerMethod: TriggerMethod;
-  includeActorId: boolean;
 }
 
 export interface ButtonTriggerPayload extends TriggerTargetFields {
-  /** Values for the target node's declared input fields (node targets only). */
+  /** Values for the target node's declared input fields. */
   inputValues?: Record<string, unknown>;
   type: 'button';
   buttonText: string;
-  webhookUrl: string;
-  postBody: string;
   allowedActors: string;
   allowedActorsType: TriggerActorType;
-  triggerMethod: TriggerMethod;
-  includeActorId: boolean;
 }
 
 export type TriggerPayload = ChefsFormTriggerPayload | ButtonTriggerPayload;
@@ -102,8 +93,6 @@ export type ApiTriggerItem = {
   targetWorkflowId?: string | null;
   targetNodeId?: string | null;
   targetStatus?: TriggerTargetStatus | null;
-  triggerUrl: string | null;
-  triggerMethod: string | null;
   metadata: Record<string, unknown>;
   allowedActorsType: string;
   allowedActors: string[];

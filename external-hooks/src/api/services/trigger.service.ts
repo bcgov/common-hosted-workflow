@@ -31,13 +31,11 @@ export type GetTriggerByIdParams = {
   projectIds: string[];
 };
 
-/** Where a trigger sends its run: a legacy URL (default) or a WIL Trigger node in a published n8n workflow. */
+/** Where a trigger sends its run: a WIL Trigger node in a published n8n workflow. */
 export type TriggerTargetParams = {
   targetKind?: string;
   targetWorkflowId?: string;
   targetNodeId?: string;
-  triggerUrl?: string;
-  triggerMethod?: string;
 };
 
 export type CreateTriggerParams = TriggerTargetParams & {
@@ -249,19 +247,6 @@ export class TriggerService {
     source: WilTriggerSource,
     metadata: Record<string, unknown>,
   ) {
-    if (params.targetKind !== TriggerTargetKindEnum.N8N_NODE) {
-      if (!params.triggerUrl || !params.triggerMethod) {
-        throw new AppError(422, 'triggerUrl and triggerMethod are required for URL triggers');
-      }
-      return {
-        targetKind: TriggerTargetKindEnum.URL,
-        triggerUrl: params.triggerUrl,
-        triggerMethod: params.triggerMethod,
-        targetWorkflowId: null,
-        targetNodeId: null,
-      };
-    }
-
     if (!WIL_N8N_NODE_TRIGGERS_ENABLED || !this.targets) {
       throw new AppError(400, 'n8n node triggers are disabled');
     }
@@ -287,8 +272,6 @@ export class TriggerService {
 
     return {
       targetKind: TriggerTargetKindEnum.N8N_NODE,
-      triggerUrl: null,
-      triggerMethod: null,
       targetWorkflowId: params.targetWorkflowId,
       targetNodeId: params.targetNodeId,
     };
