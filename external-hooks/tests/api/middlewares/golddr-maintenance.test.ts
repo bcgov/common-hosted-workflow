@@ -57,5 +57,24 @@ describe('GoldDR maintenance middleware', () => {
 
       expect((next.mock.calls[0][0] as AppError).statusCode).toBe(503);
     });
+
+    it.each([
+      ['POST', '/multi-webhook-wait/register'],
+      ['POST', '/multi-webhook-wait/callback/exec-1'],
+      ['DELETE', '/multi-webhook-wait/cleanup/exec-1'],
+      ['POST', '/chefs/submissions/register'],
+      ['POST', '/chefs/submissions/callback'],
+    ])('lets %s %s through because running workflows call it', (method, path) => {
+      const { res, next } = run(true, method, path);
+
+      expect(next).toHaveBeenCalledWith();
+      expect(res.setHeader).not.toHaveBeenCalled();
+    });
+
+    it('still blocks other CHEFS submission writes', () => {
+      const { next } = run(true, 'POST', '/chefs/submissions');
+
+      expect((next.mock.calls[0][0] as AppError).statusCode).toBe(503);
+    });
   });
 });

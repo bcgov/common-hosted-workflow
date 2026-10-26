@@ -9,7 +9,11 @@ const RETRY_AFTER_SECONDS = '300';
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 // POST routes that only read.
-const READ_ONLY_POST_PATH = /\/chefs-token$/;
+const READ_ONLY_POST_SUFFIX = '/chefs-token';
+
+// Endpoints the MultiWebhookWait and CHEFS Resubmit Wait nodes call while a workflow runs.
+// Workflows without WIL nodes stay available on GoldDR, so these must keep working.
+const WORKFLOW_RUNTIME_PATH = /^\/(multi-webhook-wait\/|chefs\/submissions\/(register|callback)$)/;
 
 /**
  * On GoldDR, refuses writes to the WIL and custom-integration routes with a 503.
@@ -17,9 +21,12 @@ const READ_ONLY_POST_PATH = /\/chefs-token$/;
  */
 export function createGoldDrMaintenanceMiddleware(isGoldDr = IS_GOLDDR) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const isReadOnly = READ_METHODS.has(req.method) || (req.method === 'POST' && READ_ONLY_POST_PATH.test(req.path));
+    const isAllowed =
+      READ_METHODS.has(req.method) ||
+      (req.method === 'POST' && req.path.endsWith(READ_ONLY_POST_SUFFIX)) ||
+      WORKFLOW_RUNTIME_PATH.test(req.path);
 
-    if (!isGoldDr || isReadOnly) {
+    if (!isGoldDr || isAllowed) {
       return next();
     }
 

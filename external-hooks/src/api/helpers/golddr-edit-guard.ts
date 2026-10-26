@@ -7,7 +7,7 @@ import { AppError } from '../utils/errors';
  * n8n awaits this hook before applying changes.
  */
 export function createGoldDrEditGuard(isGoldDr = IS_GOLDDR) {
-  return async function blockEditsOnGoldDr(): Promise<void> {
+  return function blockEditsOnGoldDr(): void {
     if (!isGoldDr) return;
 
     throw new AppError(503, GOLDDR_EDIT_MESSAGE, {

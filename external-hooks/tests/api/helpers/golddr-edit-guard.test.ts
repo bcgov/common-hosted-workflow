@@ -4,18 +4,20 @@ import { createGoldDrEditGuard } from '../../../src/api/helpers/golddr-edit-guar
 import { AppError } from '../../../src/api/utils/errors';
 
 describe('GoldDR edit guard', () => {
-  it('lets the change through on Gold', async () => {
-    await expect(createGoldDrEditGuard(false)()).resolves.toBeUndefined();
+  it('lets the change through on Gold', () => {
+    expect(createGoldDrEditGuard(false)()).toBeUndefined();
   });
 
-  it('refuses the change on GoldDR with a 503 maintenance error', async () => {
-    const result = createGoldDrEditGuard(true)();
+  it('refuses the change on GoldDR with a 503 maintenance error', () => {
+    const guard = createGoldDrEditGuard(true);
 
-    await expect(result).rejects.toBeInstanceOf(AppError);
-    await expect(result).rejects.toMatchObject({
-      statusCode: 503,
-      message: GOLDDR_EDIT_MESSAGE,
-      details: { code: 'GOLDDR_MAINTENANCE' },
-    });
+    expect(guard).toThrow(AppError);
+    expect(guard).toThrow(
+      expect.objectContaining({
+        statusCode: 503,
+        message: GOLDDR_EDIT_MESSAGE,
+        details: { code: 'GOLDDR_MAINTENANCE' },
+      }),
+    );
   });
 });

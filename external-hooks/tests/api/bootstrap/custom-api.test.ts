@@ -55,8 +55,6 @@ describe('mountCustomApi on GoldDR', () => {
   it.each([
     ['POST', '/admin/associate-workflow'],
     ['POST', '/chefs/submissions'],
-    ['POST', '/multi-webhook-wait/register'],
-    ['DELETE', '/multi-webhook-wait/cleanup/exec-1'],
     ['POST', '/messages/'],
     ['POST', '/actions'],
     ['PATCH', '/actions/action-1'],
@@ -76,6 +74,11 @@ describe('mountCustomApi on GoldDR', () => {
     ['GET', '/actions'],
     ['GET', '/multi-webhook-wait/status'],
     ['GET', '/obs/projects'],
+    ['POST', '/multi-webhook-wait/register'],
+    ['POST', '/multi-webhook-wait/callback/exec-1'],
+    ['DELETE', '/multi-webhook-wait/cleanup/exec-1'],
+    ['POST', '/chefs/submissions/register'],
+    ['POST', '/chefs/submissions/callback'],
   ])('lets %s %s through to the router', async (method, url) => {
     const { error, responded } = await dispatch(method, url);
 

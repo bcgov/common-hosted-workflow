@@ -8,6 +8,7 @@ import {
   applyOidcFrontendSettings,
   type FrontendSettings,
 } from './bootstrap/frontend-settings';
+import { blockN8nEditRoutes } from './bootstrap/golddr-n8n-routes';
 import { createGoldDrEditGuard } from './helpers/golddr-edit-guard';
 import { extractCredentialIds, getWorkflowNodes } from './helpers/workflow';
 import { buildN8nRuntimeContext, type N8nRepositories } from './bootstrap/n8n-repositories';
@@ -74,6 +75,7 @@ function createHookConfig() {
             cstarService: services.cstar,
           });
           mountAssets(app);
+          blockN8nEditRoutes(app);
 
           app.use(handleErrorResponse);
           log.info('Custom Routes Active.');

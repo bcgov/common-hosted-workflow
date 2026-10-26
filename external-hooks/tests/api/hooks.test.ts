@@ -5,7 +5,7 @@ vi.mock('@config', async (importOriginal) => {
   return { ...original, IS_GOLDDR: true };
 });
 
-type HookFn = (...args: unknown[]) => Promise<unknown>;
+type HookFn = (...args: unknown[]) => unknown;
 type HookConfig = Record<string, Record<string, HookFn[]>>;
 
 let hooks: HookConfig;
@@ -24,9 +24,9 @@ describe('n8n hook registration on GoldDR', () => {
     ['credentials', 'create'],
     ['credentials', 'update'],
     ['credentials', 'delete'],
-  ])('blocks %s.%s', async (area, event) => {
+  ])('blocks %s.%s', (area, event) => {
     expect(hooks[area][event]).toHaveLength(1);
-    await expect(hooks[area][event][0]()).rejects.toMatchObject({ statusCode: 503 });
+    expect(() => hooks[area][event][0]()).toThrow(expect.objectContaining({ statusCode: 503 }));
   });
 
   it('leaves activating and deactivating a workflow alone so safe workflows keep starting', async () => {
