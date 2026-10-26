@@ -137,8 +137,13 @@ export class WilTrigger implements INodeType {
         displayName: 'JSON Example',
         name: 'jsonExample',
         type: 'json',
-        default: '{\n  "requestId": "abc-123",\n  "amount": 100\n}',
+        // Each field's type is inferred from its example VALUE, not its name:
+        // "text" → string, 100 → number, true → boolean, [] → array, {} → object.
+        default:
+          '{\n  "requestId": "abc-123",\n  "amount": 100,\n  "approved": true,\n  "tags": ["income"],\n  "applicant": { "name": "Jane" }\n}',
         displayOptions: { show: { inputSource: ['jsonExample'] } },
+        description:
+          'A valid JSON object. Each top-level key becomes a declared field, and its type is inferred from the example value (text → string, number, true/false → boolean, [ ] → array, { } → object). Publish the workflow for changes to appear in the trigger form.',
       },
       {
         displayName: 'Respond',

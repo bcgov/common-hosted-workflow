@@ -32,22 +32,21 @@ export function readInputSchema(
     try {
       const parsed: unknown = JSON.parse(jsonExample);
       if (!isPlainObject(parsed)) return [];
-      return Object.entries(parsed).map(([name, value]) => ({
-        name,
-        type: Array.isArray(value)
-          ? 'array'
-          : typeof value === 'number' || typeof value === 'boolean'
-            ? (typeof value as WilFieldType)
-            : typeof value === 'object' && value !== null
-              ? 'object'
-              : 'string',
-      }));
+      return Object.entries(parsed).map(([name, value]) => ({ name, type: jsonValueToFieldType(value) }));
     } catch {
       return [];
     }
   }
 
   return [];
+}
+
+/** Infers a declared field type from an example JSON value. */
+function jsonValueToFieldType(value: unknown): WilFieldType {
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'number' || typeof value === 'boolean') return typeof value as WilFieldType;
+  if (typeof value === 'object' && value !== null) return 'object';
+  return 'string';
 }
 
 /** Gives every declared field a stable key (null when absent) so downstream expressions never hit undefined. */

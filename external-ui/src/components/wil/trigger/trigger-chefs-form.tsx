@@ -9,11 +9,10 @@ import {
   listChefsCredentials,
   type ChefsCredentialSummary,
 } from '../../../services/backend/chefs-credentials';
-import type { ChefsFormTriggerPayload } from '../../../services/backend/trigger-types';
+import type { ChefsFormTriggerPayload, TriggerTargetStatus } from '../../../services/backend/trigger-types';
 import { ChefsCredentialCombobox } from './chefs-credential-combobox';
 import { ChefsCredentialDialog } from './chefs-credential-dialog';
 import { TriggerTargetSection } from './trigger-target-section';
-import type { TriggerTargetStatus } from '../../../services/backend/trigger-types';
 import { AllowedActorsField, AllowedActorsTypeField, TriggerFormActions } from './trigger-shared';
 
 export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {

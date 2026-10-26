@@ -1,13 +1,12 @@
 # Trigger Targets — WIL Trigger Node
 
-A WIL **Button** or **CHEFS Form** trigger can point at one of two targets:
+A WIL **Button** or **CHEFS Form** trigger runs a single kind of target:
 
-| `targetKind`                          | What runs                                                                | Stored columns                         |
-| ------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------- |
-| `n8n-node` (default for new triggers) | A published n8n workflow, started in-process at its **WIL Trigger** node | `target_workflow_id`, `target_node_id` |
-| `url` (legacy)                        | An outbound HTTP call to a webhook URL                                   | `trigger_url`, `trigger_method`        |
+| `targetKind`      | What runs                                                                | Stored columns                         |
+| ----------------- | ------------------------------------------------------------------------ | -------------------------------------- |
+| `n8n-node` (only) | A published n8n workflow, started in-process at its **WIL Trigger** node | `target_workflow_id`, `target_node_id` |
 
-The database enforces the shape with `chk_wt_target_shape`; existing rows migrate to `url` unchanged. See the node's [documentation](../../community-nodes/wil-trigger/README.md).
+The outbound webhook-URL target that earlier drafts supported has been removed — a trigger can only invoke a WIL Trigger node. The database enforces the node-only shape with `chk_wt_target_shape`. See the node's [documentation](../../community-nodes/wil-trigger/README.md).
 
 ## Flow
 
@@ -23,7 +22,7 @@ Manager-only. Query: `source` (optional). Returns `{ data: Target[], enabled: bo
 
 ### POST/PUT /ui-api/wil/triggers
 
-The body is a union on `targetKind`; omitting it means `url`, so existing clients keep working.
+`targetKind` is always `n8n-node`; it may be omitted and defaults to `n8n-node`.
 
 ```json
 {
@@ -37,9 +36,9 @@ The body is a union on `targetKind`; omitting it means `url`, so existing client
 }
 ```
 
-An unavailable target or invalid input values return `422` with `details.reason` / `details.errors`. Responses and list items add `targetKind`, `targetWorkflowId`, `targetNodeId` and `targetStatus` (`live` | `unpublished` | `missing-node`, null for URL triggers).
+An unavailable target or invalid input values return `422` with `details.reason` / `details.errors`. Responses and list items include `targetKind`, `targetWorkflowId`, `targetNodeId` and `targetStatus` (`live` | `unpublished` | `missing-node`).
 
-### POST /ui-api/wil/triggers/:id/callback (node targets)
+### POST /ui-api/wil/triggers/:id/callback
 
 | Outcome                                                         | Status | Body                                    |
 | --------------------------------------------------------------- | ------ | --------------------------------------- |
@@ -55,7 +54,7 @@ The item given to the node: `{ source: 'wil', trigger: { id, type, name }, actor
 
 | Variable                        | Default                                        | Purpose                                                                                                                                                                                               |
 | ------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WIL_N8N_NODE_TRIGGERS_ENABLED` | `true`                                         | Kill switch. When `false`, the dropdown is empty, saving node targets fails with 400, and firing returns 503; legacy URL triggers are unaffected.                                                     |
+| `WIL_N8N_NODE_TRIGGERS_ENABLED` | `true`                                         | Kill switch for the whole feature. When `false`, the dropdown is empty, saving a trigger fails with 400, and firing returns 503.                                                                      |
 | `WIL_TRIGGER_NODE_TYPES`        | `CUSTOM.wilTrigger,community-nodes.wilTrigger` | Comma-separated node type strings used for discovery. n8n prefixes the node with its package name: `CUSTOM` when loaded from a custom extensions folder, `community-nodes` for the installed package. |
 
 ## Implementation notes

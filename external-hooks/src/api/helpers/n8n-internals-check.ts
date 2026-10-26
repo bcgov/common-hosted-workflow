@@ -36,7 +36,7 @@ export function verifyN8nInternals(
       };
     }
 
-    const missingExports = expectedExports.filter((name) => mod == null || mod[name] === undefined);
+    const missingExports = expectedExports.filter((name) => mod?.[name] === undefined);
     return missingExports.length === 0
       ? { path, ok: true }
       : { path, ok: false, reason: 'exports-missing', missingExports };

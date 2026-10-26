@@ -1,10 +1,9 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { ButtonTriggerPayload } from '../../../services/backend/trigger-types';
+import type { ButtonTriggerPayload, TriggerTargetStatus } from '../../../services/backend/trigger-types';
 import { NO_AUTOFILL } from './no-autofill';
 import { TriggerTargetSection } from './trigger-target-section';
 import { pruneInputValues } from './workflow-input-utils';
-import type { TriggerTargetStatus } from '../../../services/backend/trigger-types';
 import { AllowedActorsField, AllowedActorsTypeField, TriggerFormActions } from './trigger-shared';
 
 export const DEFAULT_BUTTON: ButtonTriggerPayload = {

@@ -14,6 +14,49 @@ interface WorkflowInputFieldsProps {
   onChange: (values: Record<string, unknown>) => void;
 }
 
+interface FieldControlProps {
+  id: string;
+  field: WilInputField;
+  text: string;
+  onChange: (text: string) => void;
+}
+
+/** The editor widget for one field, chosen by its declared type. */
+function FieldControl({ id, field, text, onChange }: Readonly<FieldControlProps>) {
+  if (field.type === 'boolean') {
+    return (
+      <Select id={id} value={text} onChange={onChange}>
+        <option value="">Not set</option>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </Select>
+    );
+  }
+
+  if (field.type === 'object' || field.type === 'array') {
+    return (
+      <Textarea
+        id={id}
+        rows={3}
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        className="font-mono text-xs"
+        {...NO_AUTOFILL}
+      />
+    );
+  }
+
+  return (
+    <Input
+      id={id}
+      type={field.type === 'number' ? 'number' : 'text'}
+      value={text}
+      onChange={(e) => onChange(e.target.value)}
+      {...NO_AUTOFILL}
+    />
+  );
+}
+
 /** One editor per field declared on the selected WIL Trigger node. */
 export function WorkflowInputFields({ idPrefix, schema, values, onChange }: Readonly<WorkflowInputFieldsProps>) {
   // Keep raw text per field so half-typed JSON/numbers aren't clobbered by re-formatting.
@@ -48,30 +91,7 @@ export function WorkflowInputFields({ idPrefix, schema, values, onChange }: Read
             <Label htmlFor={id}>
               {field.name} <span className="text-xs font-normal text-muted-foreground">({field.type})</span>
             </Label>
-            {field.type === 'boolean' ? (
-              <Select id={id} value={text} onChange={(v) => update(field, v)}>
-                <option value="">Not set</option>
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </Select>
-            ) : field.type === 'object' || field.type === 'array' ? (
-              <Textarea
-                id={id}
-                rows={3}
-                value={text}
-                onChange={(e) => update(field, e.target.value)}
-                className="font-mono text-xs"
-                {...NO_AUTOFILL}
-              />
-            ) : (
-              <Input
-                id={id}
-                type={field.type === 'number' ? 'number' : 'text'}
-                value={text}
-                onChange={(e) => update(field, e.target.value)}
-                {...NO_AUTOFILL}
-              />
-            )}
+            <FieldControl id={id} field={field} text={text} onChange={(t) => update(field, t)} />
             {errors[field.name] && <p className="text-sm text-red-600">{errors[field.name]}</p>}
           </div>
         );
