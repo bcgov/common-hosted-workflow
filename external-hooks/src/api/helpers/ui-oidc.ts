@@ -105,7 +105,7 @@ export type UiSessionSummary = {
   permissions: Permissions | null;
   tenantRoles: TenantRole[] | null;
   tenantGroups: TenantGroup[] | null;
-  /** True when the backend is in read-only mode (GoldDR). Sent for anonymous sessions too. */
+  /** True when the backend is in read-only mode. Sent for anonymous sessions too. */
   goldDr: boolean;
 };
 

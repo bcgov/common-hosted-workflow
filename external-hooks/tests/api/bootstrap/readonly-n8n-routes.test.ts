@@ -98,14 +98,14 @@ describe('blockN8nEditRoutes', () => {
       const stack = [n8nLayer];
       const app = { use: vi.fn(), router: { stack } } as unknown as Express;
 
-      expect(() => blockN8nEditRoutes(app, true)).toThrow('last Express layer is not the block');
+      expect(() => blockN8nEditRoutes(app, true)).toThrow('read-only block was not added where expected');
       expect(stack).toEqual([n8nLayer]);
     });
 
-    it('fails at startup when the Express route list is not found', () => {
+    it('fails at startup when the route list is not found', () => {
       const app = { use: vi.fn(), router: {} } as unknown as Express;
 
-      expect(() => blockN8nEditRoutes(app, true)).toThrow('Express route list was not found');
+      expect(() => blockN8nEditRoutes(app, true)).toThrow('route list was not found');
       expect(app.use).not.toHaveBeenCalled();
     });
   });

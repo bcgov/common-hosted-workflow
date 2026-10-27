@@ -40,7 +40,7 @@ function buildEditRouteBlock() {
 }
 
 /**
- * On read only mode, refuses workflow and credential management operations and folder transfers.
+ * Read-only mode, refuses workflow and credential management operations and folder transfers.
  * The Express app only becomes available after n8n has registered its routes, so the block is moved to the front
  * of Express 5's router stack; added at the end it would never be reached.
  * This relies on the internal `app.router.stack`, so it fails at startup if the stack is unavailable or the block
@@ -52,7 +52,7 @@ export function blockN8nEditRoutes(app: Express, isReadOnly = READONLY_MODE) {
   const router = app.router as unknown as { stack?: unknown[] } | undefined;
   const stack = router?.stack;
   if (!Array.isArray(stack)) {
-    throw new TypeError('Cannot put the read-only route block first: the Express route list was not found');
+    throw new TypeError('Read-only mode could not start: the n8n route list was not found.');
   }
 
   const block = buildEditRouteBlock();
@@ -61,7 +61,7 @@ export function blockN8nEditRoutes(app: Express, isReadOnly = READONLY_MODE) {
   // Move only the block; leave n8n's route order unchanged.
   const last = stack.at(-1) as { handle?: unknown } | undefined;
   if (last?.handle !== block) {
-    throw new TypeError('Cannot put the read-only route block first: the last Express layer is not the block');
+    throw new TypeError('Read-only mode could not start: the read-only block was not added where expected.');
   }
 
   stack.unshift(stack.pop());
