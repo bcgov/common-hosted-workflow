@@ -1,3 +1,4 @@
+import { IS_GOLDDR } from '@config';
 import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from '../helpers/n8n-oidc';
 import { createLogger } from '../utils/logger';
 
@@ -26,6 +27,15 @@ export type FrontendSettings = Record<string, unknown> & {
   userManagement?: FrontendSettingsUserManagement;
   enterprise?: FrontendSettingsEnterprise;
 };
+
+/** Disables editor autosave on GoldDR to prevent repeated save failures and error toasts. */
+export function applyGoldDrFrontendSettings(frontendSettings: FrontendSettings, isGoldDr = IS_GOLDDR) {
+  if (!isGoldDr) {
+    return;
+  }
+
+  frontendSettings.workflowsAutosaveDisabled = true;
+}
 
 export function applyOidcFrontendSettings(frontendSettings: FrontendSettings) {
   const config = getN8nOidcConfigFromEnv();
