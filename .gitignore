@@ -7,3 +7,4 @@ node_modules
 .vscode/settings.json
 /.vscode
 /.cocoindex_code
+docs/tasks

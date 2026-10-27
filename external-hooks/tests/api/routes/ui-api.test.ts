@@ -1079,3 +1079,106 @@ describe('GET /ui-api/projects', () => {
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
+
+// ---------------------------------------------------------------------------
+// /ui-api/admin/* mount guards
+//
+// The admin sub-router (projects list, tenant assignment, rate-limit update)
+// is mounted behind requireUiRequestContext + checkPermission('canManageProject')
+// + checkRole('global:owner','global:admin') in buildUiApiRouter. getRouteHandlers
+// cannot traverse `router.use` mounts, so these tests dispatch real HTTP requests
+// against an express app wrapping the real router — proving a non-admin caller is
+// rejected before any admin service runs.
+//
+// Guard order matters: an enabled user with ANY n8n role passes the permission
+// guard (canManageProject is role-gated only via the 'project' feature flag), so
+// the admin gate is the role guard. The role-less case exercises the permission
+// guard instead.
+// ---------------------------------------------------------------------------
+
+describe('/ui-api/admin/* mount guards', () => {
+  async function dispatchAdminRequest(
+    services: Record<string, unknown>,
+    method: 'get' | 'put',
+    path: string,
+    body?: Record<string, unknown>,
+  ) {
+    const express = (await import('express')).default;
+    const app = express();
+    app.use(express.json());
+    app.use(
+      '/ui-api',
+      buildUiApiRouter({
+        services: { tenant: mockTenantService, featureFlag: mockFeatureFlagService, ...services },
+      } as any),
+    );
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    try {
+      const { port } = server.address() as { port: number };
+      return await fetch(`http://127.0.0.1:${port}/ui-api${path}`, {
+        method: method.toUpperCase(),
+        headers: { authorization: 'Bearer ui-test-token', 'content-type': 'application/json' },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }
+
+  function makeContextService(roleSlug: string | null) {
+    return {
+      loadUserContext: vi.fn().mockResolvedValue({
+        n8nUser:
+          roleSlug === null
+            ? { id: 'user-123', email: 'person@example.com', disabled: false, role: null }
+            : {
+                id: 'user-123',
+                email: 'person@example.com',
+                disabled: false,
+                role: { slug: roleSlug, displayName: roleSlug },
+              },
+        accessibleProjectIds: [],
+        projects: [],
+        workflows: [],
+      }),
+    };
+  }
+
+  it('rejects a member (non-admin role) from the projects list before the service runs', async () => {
+    const projectTenant = { listAllProjectsWithTenants: vi.fn() };
+    const response = await dispatchAdminRequest(
+      { uiApi: makeContextService('global:member'), projectTenant },
+      'get',
+      '/admin/projects',
+    );
+
+    expect(response.status).toBe(403);
+    expect(projectTenant.listAllProjectsWithTenants).not.toHaveBeenCalled();
+  });
+
+  it('rejects a member (non-admin role) from the rate-limit update endpoint before the service runs', async () => {
+    const projectRateLimit = { updateRateLimit: vi.fn() };
+    const response = await dispatchAdminRequest(
+      { uiApi: makeContextService('global:member'), projectRateLimit },
+      'put',
+      '/admin/projects/proj-1/rate-limit',
+      { weeklyRateLimit: 10, yearlyRateLimit: null, lastAdminComment: null, stopBehavior: 'hard_stop' },
+    );
+
+    expect(response.status).toBe(403);
+    expect(projectRateLimit.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a role-less identity at the permission guard before the service runs', async () => {
+    const projectTenant = { listAllProjectsWithTenants: vi.fn() };
+    const response = await dispatchAdminRequest(
+      { uiApi: makeContextService(null), projectTenant },
+      'get',
+      '/admin/projects',
+    );
+
+    expect(response.status).toBe(403);
+    expect(projectTenant.listAllProjectsWithTenants).not.toHaveBeenCalled();
+  });
+});

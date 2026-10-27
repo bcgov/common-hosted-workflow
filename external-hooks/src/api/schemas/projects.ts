@@ -31,3 +31,21 @@ export const deleteProjectTenantSchema = z.object({
   body: z.record(z.string(), z.unknown()).optional(),
   query: z.record(z.string(), z.unknown()).optional(),
 });
+
+/**
+ * PUT /rest/admin/projects/:projectId/rate-limit — replaces a project's rate-limit
+ * configuration. All body fields are required (full replace); explicit null clears
+ * a limit or the admin comment.
+ */
+export const updateProjectRateLimitSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+  }),
+  body: z.object({
+    weeklyRateLimit: z.number().int().min(0).max(1_000_000).nullable(),
+    yearlyRateLimit: z.number().int().min(0).max(100_000_000).nullable(),
+    lastAdminComment: z.string().max(2000).nullable(),
+    stopBehavior: z.enum(['hard_stop', 'soft_stop']),
+  }),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
