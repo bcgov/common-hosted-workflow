@@ -38,6 +38,8 @@ Defines the project's own PostgreSQL tables using Drizzle ORM (`drizzle-orm/pg-c
 | `messages`                | In-app messages scoped to a project, with actor info and status               |
 | `action_requests`         | Action requests with callback URLs, priority, due dates, and lifecycle status |
 | `audit_log`               | Schema-only audit trail for messages and action requests                      |
+| `project_rate_limit`      | Per-project weekly/yearly execution limits with hard/soft stop behaviour      |
+| `project_execution_usage` | Per-project execution counters per weekly/yearly period (composite PK)        |
 
 ### Conventions
 
@@ -73,16 +75,16 @@ export class UserRepository {
 
 ### Repositories
 
-| Class                        | Wraps                               | Key Methods                                                |
-| ---------------------------- | ----------------------------------- | ---------------------------------------------------------- |
-| `UserRepository`             | `BaseN8nUserRepository`             | `findByEmail`, `getUserForApiKey`                          |
-| `ProjectRepository`          | `BaseN8nProjectRepository`          | `findOneBy`, `getPersonalProjectForUser`, `create`, `save` |
-| `ProjectRelationRepository`  | `BaseN8nProjectRelationRepository`  | `findAllByUser`, `listUserEmailsByProjectIds`              |
-| `WorkflowRepository`         | `BaseN8nWorkflowRepository`         | `findOneBy`                                                |
-| `SharedWorkflowRepository`   | `BaseN8nSharedWorkflowRepository`   | `findProjectIds`, `findWorkflowRowsByProjectIds`           |
-| `CredentialRepository`       | `BaseN8nCredentialRepository`       | `findOneBy`                                                |
-| `SharedCredentialRepository` | `BaseN8nSharedCredentialRepository` | exposes `manager` for transactions                         |
-| `ExecutionRepository`        | `BaseN8nExecutionRepository`        | `loadMetadataOrNull` (safe wrapper)                        |
+| Class                        | Wraps                               | Key Methods                                                           |
+| ---------------------------- | ----------------------------------- | --------------------------------------------------------------------- |
+| `UserRepository`             | `BaseN8nUserRepository`             | `findByEmail`, `getUserForApiKey`                                     |
+| `ProjectRepository`          | `BaseN8nProjectRepository`          | `findOneBy`, `getPersonalProjectForUser`, `create`, `save`            |
+| `ProjectRelationRepository`  | `BaseN8nProjectRelationRepository`  | `findAllByUser`, `listUserEmailsByProjectIds`                         |
+| `WorkflowRepository`         | `BaseN8nWorkflowRepository`         | `findOneBy`                                                           |
+| `SharedWorkflowRepository`   | `BaseN8nSharedWorkflowRepository`   | `findProjectIds`, `findWorkflowRowsByProjectIds`, `countByProjectIds` |
+| `CredentialRepository`       | `BaseN8nCredentialRepository`       | `findOneBy`                                                           |
+| `SharedCredentialRepository` | `BaseN8nSharedCredentialRepository` | exposes `manager` for transactions                                    |
+| `ExecutionRepository`        | `BaseN8nExecutionRepository`        | `loadMetadataOrNull` (safe wrapper)                                   |
 
 ### Patterns
 
@@ -105,6 +107,8 @@ Standalone repository classes that query the project's own PostgreSQL tables usi
 | `MessageRepository`               | `messages`                | `list`, `create`                                                                       |
 | `ActionRequestRepository`         | `action_requests`         | `list`, `getById`, `create`, `updateStatus`                                            |
 | `TenantProjectRelationRepository` | `tenant_project_relation` | `getProjectIdsByTenantId`, `getTenantIdByProjectId`, `listDistinctTenantIds`, `insert` |
+| `ProjectRateLimitRepository`      | `project_rate_limit`      | `get`, `upsert`, `listByProjectIds`                                                    |
+| `ProjectExecutionUsageRepository` | `project_execution_usage` | `getCounts`, `increment`, `listCountsByProjectIds`                                     |
 
 ### Patterns
 
@@ -127,6 +131,7 @@ Business logic and access control. Services compose both n8n repositories and cu
 | `ActionService`            | CRUD for action requests             | `N8nRepositories`, `CustomRepositories` |
 | `ChefsService`             | CHEFS form token exchange (external) | None (reads env vars)                   |
 | `MessageService`           | CRUD for messages                    | `N8nRepositories`, `CustomRepositories` |
+| `ProjectRateLimitService`  | Per-project execution rate limiting  | `N8nRepositories`, `CustomRepositories` |
 | `UiApiService`             | Facade for UI-facing operations      | `N8nRepositories`                       |
 | `UiWorkflowQueryService`   | User context, workflow lists         | `N8nRepositories`                       |
 | `UiWorkflowSharingService` | Share/unshare workflows              | `N8nRepositories`                       |

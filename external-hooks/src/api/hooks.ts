@@ -10,6 +10,7 @@ import {
 } from './bootstrap/frontend-settings';
 import { blockN8nEditRoutes } from './bootstrap/readonly-n8n-routes';
 import { createReadOnlyEditGuard } from './helpers/readonly-edit-guard';
+import { createRateLimitPreExecuteHandler } from './bootstrap/rate-limit-hook';
 import { extractCredentialIds, getWorkflowNodes } from './helpers/workflow';
 import { buildN8nRuntimeContext, type N8nRepositories } from './bootstrap/n8n-repositories';
 import { mountOidc } from './bootstrap/oidc';
@@ -102,6 +103,13 @@ function createHookConfig() {
       create: [blockEditsInReadOnlyMode],
       update: [blockEditsInReadOnlyMode],
       delete: [blockEditsInReadOnlyMode],
+      /**
+       * Per-project execution rate limiting. Fires on every workflow run
+       * (main, worker and sub-executions); fails open on infrastructure
+       * errors — only RateLimitExceededError aborts the run. See
+       * bootstrap/rate-limit-hook.ts for the policy and its tests.
+       */
+      preExecute: [createRateLimitPreExecuteHandler()],
       afterUpdate: [
         async function (updatedWorkflow: IWorkflowBase) {
           if (!n8nRepositories || !uiApiService) {
