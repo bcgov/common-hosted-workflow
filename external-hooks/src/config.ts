@@ -22,7 +22,7 @@ export const IS_DEVELOPMENT = NODE_ENV === 'development';
 // Cluster / disaster recovery
 // Set by Helm from the Makefile's CLUSTER value.
 export const CLUSTER = (process.env.CLUSTER ?? '').trim().toLowerCase();
-export const IS_GOLDDR = CLUSTER === 'golddr';
+export const READONLY_MODE = CLUSTER === 'golddr';
 
 // Feature flags
 export const ENABLE_SWAGGER_UI = process.env.ENABLE_SWAGGER_UI;

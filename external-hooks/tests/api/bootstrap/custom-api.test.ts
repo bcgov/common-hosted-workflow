@@ -16,7 +16,7 @@ const { stubRouter, reachedHandler } = await vi.hoisted(async () => {
 
 vi.mock('@config', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../src/config')>();
-  return { ...original, IS_GOLDDR: true };
+  return { ...original, READONLY_MODE: true };
 });
 vi.mock('../../../src/api/swagger-ui', () => ({ mountSwaggerUi: vi.fn() }));
 vi.mock('../../../src/api/routes/actions', () => ({ buildActionRouter: () => stubRouter() }));
@@ -51,7 +51,7 @@ beforeEach(() => {
   reachedHandler.mockClear();
 });
 
-describe('mountCustomApi on GoldDR', () => {
+describe('mountCustomApi in read-only mode', () => {
   it.each([
     ['POST', '/admin/associate-workflow'],
     ['POST', '/chefs/submissions'],

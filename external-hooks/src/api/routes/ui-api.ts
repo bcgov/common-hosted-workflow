@@ -39,7 +39,7 @@ import { buildSessionSummary, buildWhoamiResponse, type UiSerializedN8nUser } fr
 import { appendQueryParam } from '../helpers/url';
 import { createReturnTargetPolicy, resolveReturnTarget } from '../helpers/return-target';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
-import { createGoldDrMaintenanceMiddleware } from '../middlewares';
+import { createReadOnlyMiddleware } from '../middlewares';
 import { buildWilRouter } from './wil';
 import { buildAdminProjectRouter } from './admin-projects';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
@@ -504,12 +504,12 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     buildAdminProjectRouter(routeContext),
   );
 
-  // Mount WIL sub-router (protected by requireUiRequestContext + canManageWil; writes are refused on GoldDR)
+  // Mount WIL sub-router (protected by requireUiRequestContext + canManageWil; writes are refused in read-only mode)
   router.use(
     '/wil',
     requireUiRequestContext,
     checkPermission('canManageWil'),
-    createGoldDrMaintenanceMiddleware(),
+    createReadOnlyMiddleware(),
     buildWilRouter(routeContext),
   );
 

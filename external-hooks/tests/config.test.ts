@@ -16,7 +16,7 @@ describe('GoldDR detection from CLUSTER', () => {
     const config = await loadConfig();
 
     expect(config.CLUSTER).toBe('golddr');
-    expect(config.IS_GOLDDR).toBe(true);
+    expect(config.READONLY_MODE).toBe(true);
   });
 
   it.each(['gold', '', 'golddr-test'])('is not GoldDR when CLUSTER is "%s"', async (value) => {
@@ -24,7 +24,7 @@ describe('GoldDR detection from CLUSTER', () => {
 
     const config = await loadConfig();
 
-    expect(config.IS_GOLDDR).toBe(false);
+    expect(config.READONLY_MODE).toBe(false);
   });
 
   it('is not GoldDR when CLUSTER is unset', async () => {
@@ -33,6 +33,6 @@ describe('GoldDR detection from CLUSTER', () => {
     const config = await loadConfig();
 
     expect(config.CLUSTER).toBe('');
-    expect(config.IS_GOLDDR).toBe(false);
+    expect(config.READONLY_MODE).toBe(false);
   });
 });

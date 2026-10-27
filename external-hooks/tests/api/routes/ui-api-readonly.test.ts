@@ -4,7 +4,7 @@ const { getUiSessionMock } = vi.hoisted(() => ({ getUiSessionMock: vi.fn() }));
 
 vi.mock('@config', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../src/config')>();
-  return { ...original, IS_GOLDDR: true };
+  return { ...original, READONLY_MODE: true };
 });
 
 vi.mock('../../../src/api/helpers/ui-oidc-session', async () => {
@@ -69,7 +69,7 @@ beforeEach(() => {
   });
 });
 
-describe('GET/POST /ui-api/wil on GoldDR', () => {
+describe('GET/POST /ui-api/wil in read-only mode', () => {
   it.each([
     ['POST', '/wil/actions/action-1/claim'],
     ['POST', '/wil/actions/action-1/unclaim'],
