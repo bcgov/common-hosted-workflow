@@ -4,6 +4,7 @@ import type { Trigger, TriggerPayload } from '../../../services/backend/trigger-
 import { TRIGGER_TYPES } from '../../../constants/constants';
 import { getTriggers } from '../../../services/backend/triggers';
 import { toast } from '../../../hooks/use-toasts';
+import { extractErrorMessage } from '../../shared/error-utils';
 import type { FormMode } from './trigger-shared';
 import { useTriggerMutations } from './use-trigger-mutations';
 import { useTriggerFormState } from './use-trigger-form-state';
@@ -145,6 +146,8 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
         await updateMutation.mutateAsync({ triggerId: selectedTriggerId, config: payload });
       setFormMode('idle');
       formState.clearUnsavedChanges();
+    } catch (err) {
+      toast.error(extractErrorMessage(err, 'Failed to save trigger. Please try again.'));
     } finally {
       setIsSaving(false);
     }

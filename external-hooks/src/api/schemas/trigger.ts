@@ -68,6 +68,13 @@ const withDefaultTargetKind = (body: unknown) =>
 const triggerBodySchema = <T extends z.ZodRawShape>(common: T) =>
   z.preprocess(withDefaultTargetKind, z.object({ ...nodeTargetFields, ...common }).strict());
 
+/** `*` means "everyone", so it is only valid with the `all` actor type; other types need real identifiers. */
+const wildcardOnlyWithAll = {
+  check: (body: { allowedActorsType: string; allowedActors: string[] }) =>
+    body.allowedActorsType === 'all' || !body.allowedActors.some((actor) => actor.trim() === '*'),
+  params: { message: "invalid: '*' can only be used when allowedActorsType is 'all'", path: ['allowedActors'] },
+};
+
 /** POST /ui-api/wil/triggers */
 export const createTriggerSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
@@ -79,7 +86,7 @@ export const createTriggerSchema = z.object({
     allowedActors: z.array(z.string()),
     authEnabled: z.boolean().optional().default(false),
     createdBy: z.string().trim().min(1).optional(),
-  }),
+  }).refine(wildcardOnlyWithAll.check, wildcardOnlyWithAll.params),
 });
 
 /** PUT /ui-api/wil/triggers/:triggerId */
@@ -92,7 +99,7 @@ export const updateTriggerSchema = z.object({
     allowedActors: z.array(z.string()),
     authEnabled: z.boolean().optional().default(false),
     updatedBy: z.string().trim().min(1).optional(),
-  }),
+  }).refine(wildcardOnlyWithAll.check, wildcardOnlyWithAll.params),
 });
 
 /** DELETE /ui-api/wil/triggers/:triggerId */

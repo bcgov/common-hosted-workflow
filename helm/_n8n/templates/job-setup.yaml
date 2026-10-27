@@ -81,6 +81,8 @@ spec:
             npm install /community-nodes
 
             cd /external-hooks
+            echo "Verifying n8n runtime internals"
+            node verify-n8n-internals.cjs
             node migrate.cjs
           resources:
             requests:

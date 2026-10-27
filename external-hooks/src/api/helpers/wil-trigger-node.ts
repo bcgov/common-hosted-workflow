@@ -44,20 +44,6 @@ function parseSources(value: unknown): WilTriggerSource[] {
   return WIL_TRIGGER_SOURCES.filter((source) => value.includes(source));
 }
 
-function jsonTypeOf(value: unknown): WilTriggerInputFieldType {
-  if (Array.isArray(value)) return 'array';
-  switch (typeof value) {
-    case 'number':
-      return 'number';
-    case 'boolean':
-      return 'boolean';
-    case 'object':
-      return value === null ? 'string' : 'object';
-    default:
-      return 'string';
-  }
-}
-
 function parseInputSchema(inputSource: WilTriggerInputSource, params: Record<string, unknown>): WilInputField[] {
   if (inputSource === 'workflowInputs') {
     const values = asRecord(params.workflowInputs).values;
@@ -67,15 +53,6 @@ function parseInputSchema(inputSource: WilTriggerInputSource, params: Record<str
       const name = typeof field.name === 'string' ? field.name.trim() : '';
       return name ? [{ name, type: pickEnum(WIL_TRIGGER_INPUT_FIELD_TYPES, field.type, 'string') }] : [];
     });
-  }
-
-  if (inputSource === 'jsonExample' && typeof params.jsonExample === 'string') {
-    try {
-      const example = asRecord(JSON.parse(params.jsonExample));
-      return Object.entries(example).map(([name, value]) => ({ name, type: jsonTypeOf(value) }));
-    } catch {
-      return [];
-    }
   }
 
   return [];

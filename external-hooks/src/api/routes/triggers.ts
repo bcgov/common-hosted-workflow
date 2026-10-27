@@ -289,7 +289,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
 
     const isManager = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
-    const statuses = await services.triggerTarget.statuses(rows);
+    const statuses = await services.triggerTarget.statuses(rows, allowedProjectIds);
 
     if (isManager) {
       OkResponse(

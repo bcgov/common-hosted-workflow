@@ -14,14 +14,14 @@ The node does not listen for anything itself. WIL stores only the workflow id an
 
 ## Parameters
 
-| Parameter            | Default            | Description                                                                                                                                                                           |
-| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Display Label        | node name          | Name shown in the WIL dropdown.                                                                                                                                                       |
-| Description          | –                  | Help text shown next to the workflow.                                                                                                                                                 |
-| Accepted Sources     | Button, CHEFS Form | Which WIL trigger types may select this workflow.                                                                                                                                     |
-| Input Source         | Accept Any Input   | `passthrough`, declared `workflowInputs` fields, or fields inferred from a `jsonExample`. Declared fields are shown when configuring a button, and their types are validated on save. |
-| Respond              | Immediately        | `lastNode` waits for the run and returns the last node's output to WIL.                                                                                                               |
-| Response Timeout (s) | 30 (max 120)       | Only for `lastNode`. On timeout WIL answers 202 and the run continues.                                                                                                                |
+| Parameter            | Default            | Description                                                                                                                                    |
+| -------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Display Label        | node name          | Name shown in the WIL dropdown.                                                                                                                |
+| Description          | –                  | Help text shown next to the workflow.                                                                                                          |
+| Accepted Sources     | Button, CHEFS Form | Which WIL trigger types may select this workflow.                                                                                              |
+| Input Source         | Accept Any Input   | `passthrough` or declared `workflowInputs` fields. Declared fields are shown when configuring a button, and their types are validated on save. |
+| Respond              | Immediately        | `lastNode` waits for the run and returns the last node's output to WIL.                                                                        |
+| Response Timeout (s) | 30 (max 120)       | Only for `lastNode`. On timeout WIL answers 202 and the run continues.                                                                         |
 
 Changing the parameter names or defaults requires the same change in external-hooks `helpers/wil-trigger-node.ts`, because n8n omits default-valued parameters from saved workflow JSON.
 

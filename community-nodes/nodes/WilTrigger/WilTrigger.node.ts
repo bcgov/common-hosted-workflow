@@ -86,11 +86,6 @@ export class WilTrigger implements INodeType {
         options: [
           { name: 'Accept Any Input', value: 'passthrough', description: 'Pass whatever WIL sends as `input`' },
           { name: 'Define Using Fields Below', value: 'workflowInputs', description: 'Declare named, typed fields' },
-          {
-            name: 'Define Using JSON Example',
-            value: 'jsonExample',
-            description: 'Infer fields from an example object',
-          },
         ],
         description:
           'How the expected input is described. Declared fields are shown to the person configuring a button.',
@@ -134,18 +129,6 @@ export class WilTrigger implements INodeType {
         ],
       },
       {
-        displayName: 'JSON Example',
-        name: 'jsonExample',
-        type: 'json',
-        // Each field's type is inferred from its example VALUE, not its name:
-        // "text" → string, 100 → number, true → boolean, [] → array, {} → object.
-        default:
-          '{\n  "requestId": "abc-123",\n  "amount": 100,\n  "approved": true,\n  "tags": ["income"],\n  "applicant": { "name": "Jane" }\n}',
-        displayOptions: { show: { inputSource: ['jsonExample'] } },
-        description:
-          'A valid JSON object. Each top-level key becomes a declared field, and its type is inferred from the example value (text → string, number, true/false → boolean, [ ] → array, { } → object). Publish the workflow for changes to appear in the trigger form.',
-      },
-      {
         displayName: 'Respond',
         name: 'respondMode',
         type: 'options',
@@ -180,7 +163,6 @@ export class WilTrigger implements INodeType {
     const schema = readInputSchema(
       this.getNodeParameter('inputSource', 0, 'passthrough') as string,
       this.getNodeParameter('workflowInputs', 0, {}) as { values?: Array<{ name?: string; type?: string }> },
-      this.getNodeParameter('jsonExample', 0, '') as string,
     );
 
     const items = this.getInputData();

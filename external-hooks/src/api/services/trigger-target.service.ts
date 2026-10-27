@@ -17,7 +17,6 @@ export type ResolvedTarget =
 
 export type TriggerTargetRef = {
   id: string;
-  projectId: string;
   targetWorkflowId: string | null;
   targetNodeId: string | null;
 };
@@ -91,14 +90,20 @@ export class TriggerTargetService {
   /**
    * Live status per trigger using ONE discovery query for all of them (no per-row loads).
    * `unpublished` also covers archived/deleted workflows and workflows that no longer contain any WIL node.
+   *
+   * Discovery is scoped to every project in the tenant (`allowedProjectIds`), not the trigger's stored
+   * `projectId`: a target may be owned by any tenant project (create validates against all of them but stores
+   * only the first), so scoping to the stored id alone would report a working cross-project target as
+   * `unpublished`. The adapter still matches on the owning project + `workflow:owner`, so the owner-project
+   * guard is preserved.
    */
-  async statuses(triggers: TriggerTargetRef[]): Promise<Map<string, TriggerTargetStatus>> {
+  async statuses(triggers: TriggerTargetRef[], allowedProjectIds: string[]): Promise<Map<string, TriggerTargetStatus>> {
     const result = new Map<string, TriggerTargetStatus>();
     const withTarget = triggers.filter((trigger) => trigger.targetWorkflowId && trigger.targetNodeId);
     if (withTarget.length === 0) return result;
 
     const rows = await this.n8nRepositories.sharedWorkflow.findPublishedWithNodeType({
-      projectIds: [...new Set(withTarget.map((trigger) => trigger.projectId))],
+      projectIds: allowedProjectIds,
       nodeTypes: WIL_TRIGGER_NODE_TYPES,
       usePublicationService: this.runner.usesPublicationService,
     });

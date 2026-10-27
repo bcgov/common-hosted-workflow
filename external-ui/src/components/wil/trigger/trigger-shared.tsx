@@ -68,11 +68,25 @@ export function AllowedActorsTypeField({
   );
 }
 
+/** Hint for the Allowed Actors input. `*` is not offered: it is only valid (and auto-filled) for the `all` type. */
+export function allowedActorsPlaceholder(type: TriggerActorType): string {
+  switch (type) {
+    case 'role':
+      return 'e.g. a role name';
+    case 'group':
+      return 'e.g. a group name';
+    case 'user':
+      return 'e.g. a user email';
+    default:
+      return '';
+  }
+}
+
 export function AllowedActorsField({
   id,
   value,
   onChange,
-  placeholder = '*',
+  placeholder = '',
   required = false,
   disabled = false,
 }: Readonly<{

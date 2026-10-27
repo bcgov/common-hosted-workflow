@@ -59,18 +59,23 @@ describe('WilTrigger.execute', () => {
   });
 
   it('emits a sample item for editor test runs', async () => {
-    const [[out]] = await run({ displayLabel: 'Approve', inputSource: 'jsonExample', jsonExample: '{"id":"a"}' }, []);
+    const [[out]] = await run(
+      {
+        displayLabel: 'Approve',
+        inputSource: 'workflowInputs',
+        workflowInputs: { values: [{ name: 'id', type: 'string' }] },
+      },
+      [],
+    );
     expect(out.json).toMatchObject({ source: 'wil', trigger: { name: 'Approve' }, input: { id: 'example' } });
   });
 });
 
 describe('helpers', () => {
-  it('ignores unnamed fields and invalid JSON examples', () => {
-    expect(readInputSchema('workflowInputs', { values: [{ name: ' ' }, { name: 'a' }] }, undefined)).toEqual([
+  it('ignores unnamed fields', () => {
+    expect(readInputSchema('workflowInputs', { values: [{ name: ' ' }, { name: 'a' }] })).toEqual([
       { name: 'a', type: 'string' },
     ]);
-    expect(readInputSchema('jsonExample', undefined, '{')).toEqual([]);
-    expect(readInputSchema('jsonExample', undefined, '[1]')).toEqual([]);
   });
 
   it('shapeInput tolerates non-object input', () => {

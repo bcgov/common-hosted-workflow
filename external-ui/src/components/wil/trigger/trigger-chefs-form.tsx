@@ -13,7 +13,12 @@ import type { ChefsFormTriggerPayload, TriggerTargetStatus } from '../../../serv
 import { ChefsCredentialCombobox } from './chefs-credential-combobox';
 import { ChefsCredentialDialog } from './chefs-credential-dialog';
 import { TriggerTargetSection } from './trigger-target-section';
-import { AllowedActorsField, AllowedActorsTypeField, TriggerFormActions } from './trigger-shared';
+import {
+  AllowedActorsField,
+  AllowedActorsTypeField,
+  TriggerFormActions,
+  allowedActorsPlaceholder,
+} from './trigger-shared';
 
 export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   type: 'chefs-form',
@@ -186,6 +191,7 @@ export function ChefsFormFields({
         />
         <AllowedActorsField
           id="chefs-allowed-actors"
+          placeholder={allowedActorsPlaceholder(value.allowedActorsType)}
           value={value.allowedActors}
           onChange={(v) => set('allowedActors', v)}
           required

@@ -54,6 +54,21 @@ describe('createTriggerSchema', () => {
     expect(() => createTriggerSchema.parse({ body: { ...validBody, allowedActorsType: 'admin' } })).toThrow();
   });
 
+  it("rejects '*' unless allowedActorsType is 'all'", () => {
+    expect(() =>
+      createTriggerSchema.parse({
+        body: { ...validBody, allowedActorsType: 'role', allowedActors: ['approver', '*'] },
+      }),
+    ).toThrow(/can only be used when allowedActorsType is 'all'/);
+  });
+
+  it("accepts '*' when allowedActorsType is 'all'", () => {
+    const result = createTriggerSchema.parse({
+      body: { ...validBody, allowedActorsType: 'all', allowedActors: ['*'] },
+    });
+    expect(result.body.allowedActors).toEqual(['*']);
+  });
+
   it('accepts createdBy as optional field', () => {
     const result = createTriggerSchema.parse({ body: { ...validBody, createdBy: 'admin@example.com' } });
     expect(result.body.createdBy).toBe('admin@example.com');

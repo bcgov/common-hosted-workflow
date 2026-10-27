@@ -80,7 +80,7 @@ export const WIL_TRIGGER_RESPOND_MODES = ['immediately', 'lastNode'] as const;
 export type WilTriggerRespondMode = (typeof WIL_TRIGGER_RESPOND_MODES)[number];
 
 /** `input` handling modes of the WIL Trigger node. */
-export const WIL_TRIGGER_INPUT_SOURCES = ['passthrough', 'workflowInputs', 'jsonExample'] as const;
+export const WIL_TRIGGER_INPUT_SOURCES = ['passthrough', 'workflowInputs'] as const;
 export type WilTriggerInputSource = (typeof WIL_TRIGGER_INPUT_SOURCES)[number];
 
 /** Field types selectable in the WIL Trigger node's input schema. */

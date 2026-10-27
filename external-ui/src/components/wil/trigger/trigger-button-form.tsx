@@ -4,7 +4,12 @@ import type { ButtonTriggerPayload, TriggerTargetStatus } from '../../../service
 import { NO_AUTOFILL } from './no-autofill';
 import { TriggerTargetSection } from './trigger-target-section';
 import { pruneInputValues } from './workflow-input-utils';
-import { AllowedActorsField, AllowedActorsTypeField, TriggerFormActions } from './trigger-shared';
+import {
+  AllowedActorsField,
+  AllowedActorsTypeField,
+  TriggerFormActions,
+  allowedActorsPlaceholder,
+} from './trigger-shared';
 
 export const DEFAULT_BUTTON: ButtonTriggerPayload = {
   type: 'button',
@@ -101,7 +106,7 @@ export function ButtonTriggerFields({
           id="btn-allowed-actors"
           value={value.allowedActors}
           onChange={(v) => set('allowedActors', v)}
-          placeholder="e.g. * or specific role/user"
+          placeholder={allowedActorsPlaceholder(value.allowedActorsType)}
           disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
       </div>

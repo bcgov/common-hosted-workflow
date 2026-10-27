@@ -64,19 +64,6 @@ describe('parseWilTriggerNode / extractWilTriggerNodes', () => {
     });
   });
 
-  it('derives the schema from a JSON example and tolerates invalid JSON', () => {
-    const [ok] = extractWilTriggerNodes([
-      node({ parameters: { inputSource: 'jsonExample', jsonExample: '{"a":1,"b":[1],"c":true}' } }),
-    ]);
-    expect(ok.inputSchema).toEqual([
-      { name: 'a', type: 'number' },
-      { name: 'b', type: 'array' },
-      { name: 'c', type: 'boolean' },
-    ]);
-    const [bad] = extractWilTriggerNodes([node({ parameters: { inputSource: 'jsonExample', jsonExample: '{' } })]);
-    expect(bad.inputSchema).toEqual([]);
-  });
-
   it('finds a node by its stable id, not its name', () => {
     expect(findWilTriggerNode([node({ name: 'Renamed' })], 'node-1')?.nodeName).toBe('Renamed');
     expect(findWilTriggerNode([node()], 'other')).toBeNull();
