@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GOLDDR_MAINTENANCE_CODE, GOLDDR_WRITE_MESSAGE } from '../../../src/api/constants/golddr';
-import { createGoldDrMaintenanceMiddleware } from '../../../src/api/middlewares/golddr-maintenance';
+import { READONLY_MAINTENANCE_CODE, READONLY_WRITE_MESSAGE } from '../../../src/api/constants/readonly';
+import { createReadOnlyMiddleware } from '../../../src/api/middlewares/readonly-maintenance';
 import { AppError } from '../../../src/api/utils/errors';
 import { createMockNext, createMockRequest, createMockResponse } from '../../helpers/mocks';
 
-function run(isGoldDr: boolean, method: string, path = '/anything') {
-  const middleware = createGoldDrMaintenanceMiddleware(isGoldDr);
+function run(isReadOnly: boolean, method: string, path = '/anything') {
+  const middleware = createReadOnlyMiddleware(isReadOnly);
   const req = createMockRequest({ method, path } as any);
   const res = createMockResponse() as any;
   res.setHeader = vi.fn();
@@ -16,7 +16,7 @@ function run(isGoldDr: boolean, method: string, path = '/anything') {
   return { res, next };
 }
 
-describe('GoldDR maintenance middleware', () => {
+describe('read-only maintenance middleware', () => {
   describe('on Gold', () => {
     it.each(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])('lets %s through', (method) => {
       const { res, next } = run(false, method);
@@ -26,7 +26,7 @@ describe('GoldDR maintenance middleware', () => {
     });
   });
 
-  describe('on GoldDR', () => {
+  describe('in read-only mode', () => {
     it.each(['GET', 'HEAD', 'OPTIONS'])('lets %s through so reads keep working', (method) => {
       const { res, next } = run(true, method);
 
@@ -41,8 +41,8 @@ describe('GoldDR maintenance middleware', () => {
       const error = next.mock.calls[0][0] as AppError;
       expect(error).toBeInstanceOf(AppError);
       expect(error.statusCode).toBe(503);
-      expect(error.message).toBe(GOLDDR_WRITE_MESSAGE);
-      expect(error.details).toEqual({ code: GOLDDR_MAINTENANCE_CODE });
+      expect(error.message).toBe(READONLY_WRITE_MESSAGE);
+      expect(error.details).toEqual({ code: READONLY_MAINTENANCE_CODE });
       expect(res.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(String));
     });
 

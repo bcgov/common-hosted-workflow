@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@config', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../src/config')>();
-  return { ...original, IS_GOLDDR: true };
+  return { ...original, READONLY_MODE: true };
 });
 
 type HookFn = (...args: unknown[]) => unknown;
@@ -10,7 +10,7 @@ type HookConfig = Record<string, Record<string, HookFn[]>>;
 
 let hooks: HookConfig;
 
-describe('n8n hook registration on GoldDR', () => {
+describe('n8n hook registration in read-only mode', () => {
   // The first import pulls in the whole route tree, which is slow on a cold start.
   beforeAll(async () => {
     const imported = (await import('../../src/api/hooks')) as unknown as { default?: HookConfig } & HookConfig;

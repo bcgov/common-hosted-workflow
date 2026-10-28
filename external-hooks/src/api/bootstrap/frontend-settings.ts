@@ -1,4 +1,4 @@
-import { IS_GOLDDR } from '@config';
+import { READONLY_MODE } from '@config';
 import { getN8nOidcConfigFromEnv, validateN8nOidcConfig } from '../helpers/n8n-oidc';
 import { createLogger } from '../utils/logger';
 
@@ -28,9 +28,9 @@ export type FrontendSettings = Record<string, unknown> & {
   enterprise?: FrontendSettingsEnterprise;
 };
 
-/** Disables editor autosave on GoldDR to prevent repeated save failures and error toasts. */
-export function applyGoldDrFrontendSettings(frontendSettings: FrontendSettings, isGoldDr = IS_GOLDDR) {
-  if (!isGoldDr) {
+/** Disables editor autosave in read-only mode to prevent repeated save failures and error toasts. */
+export function applyReadOnlyFrontendSettings(frontendSettings: FrontendSettings, isReadOnly = READONLY_MODE) {
+  if (!isReadOnly) {
     return;
   }
 

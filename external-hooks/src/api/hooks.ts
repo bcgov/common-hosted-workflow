@@ -4,12 +4,12 @@ import { mountAssets } from './bootstrap/assets';
 import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
 import {
-  applyGoldDrFrontendSettings,
+  applyReadOnlyFrontendSettings,
   applyOidcFrontendSettings,
   type FrontendSettings,
 } from './bootstrap/frontend-settings';
-import { blockN8nEditRoutes } from './bootstrap/golddr-n8n-routes';
-import { createGoldDrEditGuard } from './helpers/golddr-edit-guard';
+import { blockN8nEditRoutes } from './bootstrap/readonly-n8n-routes';
+import { createReadOnlyEditGuard } from './helpers/readonly-edit-guard';
 import { createRateLimitPreExecuteHandler } from './bootstrap/rate-limit-hook';
 import { extractCredentialIds, getWorkflowNodes } from './helpers/workflow';
 import { buildN8nRuntimeContext, type N8nRepositories } from './bootstrap/n8n-repositories';
@@ -28,7 +28,7 @@ function createHookConfig() {
   let n8nRepositories: N8nRepositories | null = null;
   let uiApiService: UiApiServiceContract | null = null;
   // Allows activation so DR-safe workflows can continue running.
-  const blockEditsOnGoldDr = createGoldDrEditGuard();
+  const blockEditsInReadOnlyMode = createReadOnlyEditGuard();
 
   return {
     n8n: {
@@ -85,24 +85,24 @@ function createHookConfig() {
     },
     frontend: {
       /**
-       * Modify frontend settings to configure SSO display, and to turn off editor autosave on GoldDR
+       * Modify frontend settings to configure SSO display, and to turn off editor autosave in read-only mode
        */
       settings: [
         async function (frontendSettings: FrontendSettings) {
           applyOidcFrontendSettings(frontendSettings);
-          applyGoldDrFrontendSettings(frontendSettings);
+          applyReadOnlyFrontendSettings(frontendSettings);
         },
       ],
     },
     credentials: {
-      create: [blockEditsOnGoldDr],
-      update: [blockEditsOnGoldDr],
-      delete: [blockEditsOnGoldDr],
+      create: [blockEditsInReadOnlyMode],
+      update: [blockEditsInReadOnlyMode],
+      delete: [blockEditsInReadOnlyMode],
     },
     workflow: {
-      create: [blockEditsOnGoldDr],
-      update: [blockEditsOnGoldDr],
-      delete: [blockEditsOnGoldDr],
+      create: [blockEditsInReadOnlyMode],
+      update: [blockEditsInReadOnlyMode],
+      delete: [blockEditsInReadOnlyMode],
       /**
        * Per-project execution rate limiting. Fires on every workflow run
        * (main, worker and sub-executions); fails open on infrastructure

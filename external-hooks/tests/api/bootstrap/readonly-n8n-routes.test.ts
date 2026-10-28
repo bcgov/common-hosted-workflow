@@ -2,8 +2,8 @@ import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import express, { Router, type Express } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GOLDDR_EDIT_MESSAGE, GOLDDR_MAINTENANCE_CODE } from '../../../src/api/constants/golddr';
-import { blockN8nEditRoutes } from '../../../src/api/bootstrap/golddr-n8n-routes';
+import { READONLY_EDIT_MESSAGE, READONLY_MAINTENANCE_CODE } from '../../../src/api/constants/readonly';
+import { blockN8nEditRoutes } from '../../../src/api/bootstrap/readonly-n8n-routes';
 
 let server: Server | undefined;
 
@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 // Mirrors n8n: its routes are registered before the ready hook adds the block.
-async function start(isGoldDr: boolean) {
+async function start(isReadOnly: boolean) {
   const app = express();
   const n8nRouter = Router();
   n8nRouter.all('/:id/:action', (_req, res) => {
@@ -25,7 +25,7 @@ async function start(isGoldDr: boolean) {
   app.use('/api/v1/workflows', n8nRouter);
   app.use('/api/v1/credentials', n8nRouter);
 
-  blockN8nEditRoutes(app, isGoldDr);
+  blockN8nEditRoutes(app, isReadOnly);
 
   server = await new Promise<Server>((resolve) => {
     const listening = app.listen(0, () => resolve(listening));
@@ -50,7 +50,7 @@ const BLOCKED = [
 ];
 
 describe('blockN8nEditRoutes', () => {
-  describe('on GoldDR', () => {
+  describe('in read-only mode', () => {
     it.each(BLOCKED)('answers %s %s with a 503 before n8n handles it', async (method, path) => {
       const request = await start(true);
 
@@ -59,8 +59,8 @@ describe('blockN8nEditRoutes', () => {
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({
         code: 503,
-        message: GOLDDR_EDIT_MESSAGE,
-        details: { code: GOLDDR_MAINTENANCE_CODE },
+        message: READONLY_EDIT_MESSAGE,
+        details: { code: READONLY_MAINTENANCE_CODE },
       });
     });
 
@@ -98,14 +98,14 @@ describe('blockN8nEditRoutes', () => {
       const stack = [n8nLayer];
       const app = { use: vi.fn(), router: { stack } } as unknown as Express;
 
-      expect(() => blockN8nEditRoutes(app, true)).toThrow('last Express layer is not the block');
+      expect(() => blockN8nEditRoutes(app, true)).toThrow('read-only block was not added where expected');
       expect(stack).toEqual([n8nLayer]);
     });
 
-    it('fails at startup when the Express route list is not found', () => {
+    it('fails at startup when the route list is not found', () => {
       const app = { use: vi.fn(), router: {} } as unknown as Express;
 
-      expect(() => blockN8nEditRoutes(app, true)).toThrow('Express route list was not found');
+      expect(() => blockN8nEditRoutes(app, true)).toThrow('route list was not found');
       expect(app.use).not.toHaveBeenCalled();
     });
   });
