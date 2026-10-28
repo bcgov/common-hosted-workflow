@@ -15,8 +15,9 @@ import { makeWorkflowTriggerRow } from '../../helpers/mocks';
 describe('createTriggerSchema', () => {
   const validBody = {
     triggerType: 'button',
-    triggerUrl: 'https://example.com/webhook',
-    triggerMethod: 'POST',
+    targetKind: 'n8n-node',
+    targetWorkflowId: 'wf1',
+    targetNodeId: 'node1',
     metadata: { buttonText: 'Run' },
     allowedActorsType: 'user',
     allowedActors: ['user@example.com'],
@@ -49,16 +50,23 @@ describe('createTriggerSchema', () => {
     expect(() => createTriggerSchema.parse({ body: { ...validBody, triggerType: 'unknown' } })).toThrow();
   });
 
-  it('rejects invalid triggerUrl (not a URL)', () => {
-    expect(() => createTriggerSchema.parse({ body: { ...validBody, triggerUrl: 'not-a-url' } })).toThrow();
-  });
-
-  it('rejects invalid triggerMethod', () => {
-    expect(() => createTriggerSchema.parse({ body: { ...validBody, triggerMethod: 'DELETE' } })).toThrow();
-  });
-
   it('rejects invalid allowedActorsType', () => {
     expect(() => createTriggerSchema.parse({ body: { ...validBody, allowedActorsType: 'admin' } })).toThrow();
+  });
+
+  it("rejects '*' unless allowedActorsType is 'all'", () => {
+    expect(() =>
+      createTriggerSchema.parse({
+        body: { ...validBody, allowedActorsType: 'role', allowedActors: ['approver', '*'] },
+      }),
+    ).toThrow(/can only be used when allowedActorsType is 'all'/);
+  });
+
+  it("accepts '*' when allowedActorsType is 'all'", () => {
+    const result = createTriggerSchema.parse({
+      body: { ...validBody, allowedActorsType: 'all', allowedActors: ['*'] },
+    });
+    expect(result.body.allowedActors).toEqual(['*']);
   });
 
   it('accepts createdBy as optional field', () => {
@@ -82,8 +90,9 @@ describe('createTriggerSchema', () => {
 describe('updateTriggerSchema', () => {
   const validParams = { triggerId: 'trigger-001' };
   const validBody = {
-    triggerUrl: 'https://example.com/webhook',
-    triggerMethod: 'POST',
+    targetKind: 'n8n-node',
+    targetWorkflowId: 'wf1',
+    targetNodeId: 'node1',
     metadata: { buttonText: 'Run' },
     allowedActorsType: 'user',
     allowedActors: ['user@example.com'],
@@ -92,17 +101,11 @@ describe('updateTriggerSchema', () => {
   it('accepts valid update body with params', () => {
     const result = updateTriggerSchema.parse({ params: validParams, body: validBody });
     expect(result.params.triggerId).toBe('trigger-001');
-    expect(result.body.triggerUrl).toBe('https://example.com/webhook');
+    expect(result.body.targetWorkflowId).toBe('wf1');
   });
 
   it('rejects empty triggerId', () => {
     expect(() => updateTriggerSchema.parse({ params: { triggerId: '' }, body: validBody })).toThrow();
-  });
-
-  it('rejects invalid triggerUrl', () => {
-    expect(() =>
-      updateTriggerSchema.parse({ params: validParams, body: { ...validBody, triggerUrl: 'bad' } }),
-    ).toThrow();
   });
 
   it('rejects unknown body fields (strict)', () => {
@@ -112,11 +115,6 @@ describe('updateTriggerSchema', () => {
   it('defaults authEnabled to false when omitted', () => {
     const result = updateTriggerSchema.parse({ params: validParams, body: validBody });
     expect(result.body.authEnabled).toBe(false);
-  });
-
-  it('accepts GET triggerMethod', () => {
-    const result = updateTriggerSchema.parse({ params: validParams, body: { ...validBody, triggerMethod: 'GET' } });
-    expect(result.body.triggerMethod).toBe('GET');
   });
 });
 
@@ -169,7 +167,7 @@ describe('mapTriggerRowToResponse', () => {
     const result = mapTriggerRowToResponse(row as any);
     expect(result.id).toBe(row.id);
     expect(result.triggerType).toBe('button');
-    expect(result.triggerUrl).toBe(row.triggerUrl);
+    expect(result.targetKind).toBe('n8n-node');
     expect(result.allowedActors).toEqual(row.allowedActors);
     expect(result.authEnabled).toBe(false);
     expect(result.createdBy).toBe('creator@example.com');
@@ -200,5 +198,67 @@ describe('mapTriggerRowToResponse', () => {
     const result = mapTriggerRowToResponse(row as any);
     expect(result.createdBy).toBeNull();
     expect(result.updatedBy).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  n8n-node targets                                                    */
+/* ------------------------------------------------------------------ */
+
+describe('trigger target kinds', () => {
+  const common = {
+    metadata: { buttonText: 'Run' },
+    allowedActorsType: 'all',
+    allowedActors: ['*'],
+  };
+
+  it('defaults a body without targetKind to the n8n-node variant', () => {
+    const { body } = createTriggerSchema.parse({
+      body: { ...common, triggerType: 'button', targetWorkflowId: 'wf1', targetNodeId: 'n1' },
+    });
+    expect(body.targetKind).toBe('n8n-node');
+  });
+
+  it('accepts an n8n-node target', () => {
+    const { body } = createTriggerSchema.parse({
+      body: { ...common, triggerType: 'button', targetKind: 'n8n-node', targetWorkflowId: 'wf1', targetNodeId: 'n1' },
+    });
+    expect(body).toMatchObject({ targetKind: 'n8n-node', targetWorkflowId: 'wf1', targetNodeId: 'n1' });
+  });
+
+  it('rejects an n8n-node target missing the node id', () => {
+    expect(() =>
+      createTriggerSchema.parse({
+        body: { ...common, triggerType: 'button', targetKind: 'n8n-node', targetWorkflowId: 'wf1' },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects an unsupported target kind', () => {
+    expect(() =>
+      createTriggerSchema.parse({
+        body: {
+          ...common,
+          triggerType: 'button',
+          targetKind: 'url',
+          triggerUrl: 'https://example.com/hook',
+          triggerMethod: 'POST',
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('maps target columns and status onto the response', () => {
+    const row = makeWorkflowTriggerRow({
+      targetKind: 'n8n-node',
+      targetWorkflowId: 'wf1',
+      targetNodeId: 'n1',
+    });
+    const result = mapTriggerRowToResponse(row as any, 'live');
+    expect(result).toMatchObject({
+      targetKind: 'n8n-node',
+      targetWorkflowId: 'wf1',
+      targetStatus: 'live',
+    });
   });
 });

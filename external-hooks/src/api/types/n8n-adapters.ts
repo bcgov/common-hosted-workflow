@@ -83,6 +83,7 @@ export type BaseN8nProjectRelationRepository = BaseN8nRepository & {
 
 export type BaseN8nWorkflowRepository = BaseN8nRepository & {
   findOneBy: (where: { id: string }) => Promise<N8nEntityRecord | null>;
+  findOne: (options: { where: { id: string }; relations?: Record<string, boolean> }) => Promise<N8nEntityRecord | null>;
 };
 
 export type N8nCredentialRecord = N8nEntityRecord & {
@@ -119,7 +120,7 @@ export type BaseN8nExecutionRepository = BaseN8nRepository & {
   findSingleExecution: (
     id: string,
     options?: { includeData?: boolean; unflattenData?: boolean },
-  ) => Promise<{ workflowId: string } | null | undefined>;
+  ) => Promise<{ workflowId: string; status?: string; finished?: boolean; data?: unknown } | null | undefined>;
 };
 
 export type BaseN8nSharedCredentialRepository = BaseN8nRepository & {

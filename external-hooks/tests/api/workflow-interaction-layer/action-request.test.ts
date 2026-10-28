@@ -54,6 +54,8 @@ function createTestRouter() {
       claim: {} as any,
       trigger: {} as any,
       multiWebhookWait: {} as any,
+      triggerTarget: {} as any,
+      workflowRunner: {} as any,
     },
   });
   const router = buildActionRouter(routeContext);

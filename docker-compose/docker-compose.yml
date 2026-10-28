@@ -84,6 +84,8 @@ x-n8n-env: &n8n-env
   FEATURES_ENABLED: ${FEATURES_ENABLED}
   # Tenant project sync — auto-provision n8n team projects from CSTAR tenants at login
   IS_TENANT_PROJECT_SYNC_ENABLED: ${IS_TENANT_PROJECT_SYNC_ENABLED:-true}
+  # Run WIL triggers as in-process n8n runs of the WIL Trigger node (set to "false" to disable)
+  WIL_N8N_NODE_TRIGGERS_ENABLED: ${WIL_N8N_NODE_TRIGGERS_ENABLED:-true}
   # Shared secret validated by the /obs/projects endpoint — must match the value set in Grafana.
   GRAFANA_PROJECTS_SECRET: ${GRAFANA_PROJECTS_SECRET}
   # Prometheus metrics — exposed at :5678/metrics, scraped by Alloy when observability stack is running
@@ -225,8 +227,11 @@ services:
           rm -f /home/node/.n8n/nodes/package-lock.json;
           cd /home/node/.n8n/nodes && npm install /community-nodes;
 
+          echo 'Verifying n8n runtime internals';
+          cd /external-hooks && node verify-n8n-internals.cjs &&
+
           echo 'Installing external hooks';
-          cd /external-hooks && node migrate.cjs;
+          node migrate.cjs;
 
           echo 'n8n provision completed!';
           "

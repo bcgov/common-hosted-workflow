@@ -1,13 +1,11 @@
 /**
  * Shared primitives used across trigger form components.
  */
-import { IconDeviceFloppy, IconInfoCircle, IconX } from '@tabler/icons-react';
-import { useState } from 'react';
+import { IconDeviceFloppy, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import type { TriggerActorType, TriggerMethod } from '../../../services/backend/trigger-types';
+import type { TriggerActorType } from '../../../services/backend/trigger-types';
 import { NO_AUTOFILL } from './no-autofill';
 
 export type FormMode = 'idle' | 'view' | 'create' | 'edit';
@@ -43,19 +41,6 @@ export function Select({ id, value, onChange, children, disabled }: Readonly<Sel
 }
 
 // ---------------------------------------------------------------------------
-// ActorIdBanner — static info strip at the bottom of every trigger form
-// ---------------------------------------------------------------------------
-export function ActorIdBanner({ method }: Readonly<{ method: TriggerMethod }>) {
-  const detail = method === 'POST' ? 'added as actorId field in the JSON body' : 'added as actorId query parameter';
-  return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-[#91c4fa] bg-[#f1f8fe] px-3.5 py-3">
-      <IconInfoCircle size={18} className="mt-0.5 shrink-0 text-[#255a90]" aria-hidden="true" />
-      <p className="text-[13px] text-[#474543]">Actor ID will be included in the request — {detail}.</p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Shared field components — used in both CHEFS Form and Button trigger forms
 // ---------------------------------------------------------------------------
 
@@ -83,11 +68,25 @@ export function AllowedActorsTypeField({
   );
 }
 
+/** Hint for the Allowed Actors input. `*` is not offered: it is only valid (and auto-filled) for the `all` type. */
+export function allowedActorsPlaceholder(type: TriggerActorType): string {
+  switch (type) {
+    case 'role':
+      return 'e.g. a role name';
+    case 'group':
+      return 'e.g. a group name';
+    case 'user':
+      return 'e.g. a user email';
+    default:
+      return '';
+  }
+}
+
 export function AllowedActorsField({
   id,
   value,
   onChange,
-  placeholder = '*',
+  placeholder = '',
   required = false,
   disabled = false,
 }: Readonly<{
@@ -109,84 +108,6 @@ export function AllowedActorsField({
         disabled={disabled}
         {...NO_AUTOFILL}
       />
-    </div>
-  );
-}
-
-export function PostBodyField({
-  id,
-  value,
-  onChange,
-  method,
-}: Readonly<{ id: string; value: string; onChange: (v: string) => void; method: TriggerMethod }>) {
-  if (method !== 'POST') return null;
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>POST Body (optional JSON)</Label>
-      <Textarea
-        id={id}
-        placeholder={'e.g. {"time": "today"}'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={3}
-        className="font-mono text-xs"
-        {...NO_AUTOFILL}
-      />
-    </div>
-  );
-}
-
-export function TriggerMethodField({
-  id,
-  value,
-  onChange,
-}: Readonly<{ id: string; value: TriggerMethod; onChange: (v: TriggerMethod) => void }>) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>Trigger Method</Label>
-      <Select id={id} value={value} onChange={(v) => onChange(v as TriggerMethod)}>
-        <option value="POST">POST</option>
-        <option value="GET">GET</option>
-      </Select>
-    </div>
-  );
-}
-
-function isValidUrl(val: string): boolean {
-  try {
-    const url = new URL(val);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
-export function TriggerUrlField({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder = 'e.g. http://n8n:5678/webhook/...',
-}: Readonly<{ id: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string }>) {
-  const [touched, setTouched] = useState(false);
-  const invalid = touched && value.trim() !== '' && !isValidUrl(value);
-
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>
-        {label} <span className="text-red-500">*</span>
-      </Label>
-      <Input
-        id={id}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => setTouched(true)}
-        aria-invalid={invalid}
-        className={invalid ? 'border-red-500 focus-visible:ring-red-500' : undefined}
-        {...NO_AUTOFILL}
-      />
-      {invalid && <p className="text-xs text-red-500">Please enter a valid HTTP or HTTPS URL.</p>}
     </div>
   );
 }

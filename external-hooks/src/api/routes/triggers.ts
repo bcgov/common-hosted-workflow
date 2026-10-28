@@ -32,12 +32,19 @@ import { readN8nCredentialId } from '../services/chefs.service';
 import type { N8nUserEntity } from '../services/n8n-credentials.service';
 import { OkResponse, CreatedResponse, ForbiddenResponse, NoContentResponse } from './responses';
 import { AppError } from '../utils/errors';
-import { WorkflowTriggerTypeEnum } from '../constants/enum';
+import {
+  TriggerTargetKindEnum,
+  WorkflowTriggerTypeEnum,
+  WIL_TRIGGER_SOURCES,
+  type WilTriggerSource,
+} from '../constants/enum';
+import { WIL_N8N_NODE_TRIGGERS_ENABLED } from '@config';
+import { buildWilTriggerItem } from './helpers/wil-trigger-item';
+import { WIL_TARGET_UNAVAILABLE_CODE } from '../services/n8n-workflow-runner.service';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
-import { callWebhook } from './helpers/webhook-fire';
-import { CALLBACK_TIMEOUT_MS, TRIGGER_MANAGE_ROLE, TRIGGER_FAILED_MESSAGE } from './constants/constants';
-import type { z } from 'zod';
+import { TRIGGER_MANAGE_ROLE, TRIGGER_FAILED_MESSAGE } from './constants/constants';
+import { z } from 'zod';
 
 const log = createLogger('TriggerRoutes');
 
@@ -86,44 +93,6 @@ function isActorAllowed(
   }
 
   return false;
-}
-
-/**
- * Builds the outbound request body for a trigger callback.
- * actorId is always included so downstream workflows can identify the initiating user.
- */
-function buildTriggerOutboundBody(
-  trigger: { triggerType: string; metadata: Record<string, unknown> },
-  requestBody: Record<string, unknown>,
-  actorEmail: string,
-): Record<string, unknown> {
-  const outbound: Record<string, unknown> = {};
-  const meta = trigger.metadata;
-
-  if (trigger.triggerType === WorkflowTriggerTypeEnum.BUTTON && typeof meta.postBody === 'string' && meta.postBody) {
-    try {
-      Object.assign(outbound, JSON.parse(meta.postBody));
-    } catch {
-      outbound.body = meta.postBody;
-    }
-  }
-
-  if (trigger.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM && Object.keys(requestBody).length > 0) {
-    Object.assign(outbound, requestBody);
-  }
-
-  outbound.actorId = actorEmail;
-
-  return outbound;
-}
-
-/** Appends body fields as query params for GET requests; returns the modified URL string. */
-function appendBodyAsQueryParams(baseUrl: string, body: Record<string, unknown>): string {
-  const url = new URL(baseUrl);
-  for (const [key, value] of Object.entries(body)) {
-    url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
-  }
-  return url.toString();
 }
 
 /**
@@ -209,6 +178,98 @@ async function requireCredentialActor(
   return { user, ...scope };
 }
 
+/** Target columns of a create/update body (always an n8n-node target). */
+function pickTargetParams(
+  body: z.infer<typeof createTriggerSchema>['body'] | z.infer<typeof updateTriggerSchema>['body'],
+) {
+  return { targetKind: body.targetKind, targetWorkflowId: body.targetWorkflowId, targetNodeId: body.targetNodeId };
+}
+
+/** GET /wil/trigger-targets query. */
+const listTriggerTargetsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      workflowId: z.string(),
+      workflowName: z.string(),
+      projectId: z.string(),
+      nodeId: z.string(),
+      nodeName: z.string(),
+      label: z.string(),
+      description: z.string(),
+      acceptedSources: z.array(z.enum(WIL_TRIGGER_SOURCES)),
+      inputSource: z.string(),
+      inputSchema: z.array(z.object({ name: z.string(), type: z.string() })),
+      respondMode: z.string(),
+      responseTimeoutSec: z.number(),
+    }),
+  ),
+  enabled: z.boolean(),
+});
+
+const listTriggerTargetsSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  query: z.object({ source: z.enum(WIL_TRIGGER_SOURCES).optional() }).passthrough(),
+  body: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** A just-saved n8n-node target was validated against the live published version, so it is live. */
+function liveStatusFor(row: { targetKind: string }) {
+  return row.targetKind === TriggerTargetKindEnum.N8N_NODE ? ('live' as const) : null;
+}
+
+/**
+ * Runs the trigger's WIL Trigger node in-process. Re-validates the target on every fire so an
+ * unpublished/renamed/removed node fails with 409 instead of running stale configuration.
+ */
+async function fireN8nNodeTrigger(params: {
+  res: Response;
+  services: ApiRouteContext['services'];
+  trigger: Awaited<ReturnType<ApiRouteContext['services']['trigger']['getById']>>;
+  session: UiResolvedSession;
+  tenantId: string;
+  allowedProjectIds: string[];
+  body: Record<string, unknown>;
+}): Promise<void> {
+  const { res, services, trigger, session, tenantId, allowedProjectIds, body } = params;
+  if (!WIL_N8N_NODE_TRIGGERS_ENABLED) throw new AppError(503, 'n8n node triggers are disabled');
+
+  const resolved = await services.triggerTarget.resolve({
+    workflowId: trigger.targetWorkflowId ?? '',
+    nodeId: trigger.targetNodeId ?? '',
+    projectIds: allowedProjectIds,
+    source: trigger.triggerType as WilTriggerSource,
+  });
+  if (!resolved.ok) {
+    throw new AppError(409, 'Target workflow is not available', {
+      code: WIL_TARGET_UNAVAILABLE_CODE,
+      reason: resolved.reason,
+    });
+  }
+
+  const { target, published } = resolved;
+  const started = await services.workflowRunner.start({
+    published,
+    startNodeId: target.nodeId,
+    items: [buildWilTriggerItem({ trigger, session, tenantId, requestBody: body })],
+    wait: target.respondMode === 'lastNode' ? { timeoutMs: target.responseTimeoutSec * 1000 } : undefined,
+  });
+
+  if (started.status === 'failed') {
+    log.warn('WIL trigger run failed', { triggerId: shortenIdForLog(trigger.id), executionId: started.executionId });
+    res.status(502).json({ error: { message: TRIGGER_FAILED_MESSAGE, executionId: started.executionId } });
+    return;
+  }
+
+  const payload = {
+    success: true,
+    executionId: started.executionId,
+    ...(started.status === 'succeeded' ? { result: started.result } : {}),
+  };
+  // 202: accepted and still running (immediate mode, or lastNode timed out).
+  if (started.status === 'dispatched') res.status(202).json(callbackTriggerResponseSchema.parse(payload));
+  else OkResponse(res, payload, callbackTriggerResponseSchema);
+}
+
 export function buildTriggerRouter(routeContext: ApiRouteContext) {
   const { services, customRepositories, n8nRepositories } = routeContext;
   const router = Router();
@@ -228,14 +289,19 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
 
     const isManager = await canManageTriggers(tenantId, session, customRepositories, n8nRepositories);
     const rows = await services.trigger.list({ projectIds: allowedProjectIds });
+    const statuses = await services.triggerTarget.statuses(rows, allowedProjectIds);
 
     if (isManager) {
-      OkResponse(res, { data: rows.map((r) => mapTriggerRowToResponse(r)) }, listTriggersResponseSchema);
+      OkResponse(
+        res,
+        { data: rows.map((r) => mapTriggerRowToResponse(r, statuses.get(r.id) ?? null)) },
+        listTriggersResponseSchema,
+      );
     } else {
       const visibleRows = rows.filter((r) => isActorAllowed(r, session, tenantId));
       OkResponse(
         res,
-        { data: visibleRows.map((r) => mapTriggerRowToLimitedResponse(r)) },
+        { data: visibleRows.map((r) => mapTriggerRowToLimitedResponse(r, statuses.get(r.id) ?? null)) },
         listTriggersLimitedResponseSchema,
       );
     }
@@ -258,23 +324,14 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         return;
       }
 
-      const {
-        triggerType,
-        triggerUrl,
-        triggerMethod,
-        metadata,
-        allowedActorsType,
-        allowedActors,
-        authEnabled,
-        createdBy,
-      } = req.parsed.body;
+      const { triggerType, metadata, allowedActorsType, allowedActors, authEnabled, createdBy } = req.parsed.body;
 
       const n8nUser = await loadN8nUser(session, n8nRepositories);
       const row = await services.trigger.create({
         projectId: allowedProjectIds[0],
+        allowedProjectIds,
         triggerType,
-        triggerUrl,
-        triggerMethod,
+        ...pickTargetParams(req.parsed.body),
         metadata,
         allowedActorsType,
         allowedActors,
@@ -283,7 +340,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         n8nUser,
       });
 
-      CreatedResponse(res, mapTriggerRowToResponse(row), createTriggerResponseSchema);
+      CreatedResponse(res, mapTriggerRowToResponse(row, liveStatusFor(row)), createTriggerResponseSchema);
     },
   );
 
@@ -305,15 +362,13 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       }
 
       const { triggerId } = req.parsed.params;
-      const { triggerUrl, triggerMethod, metadata, allowedActorsType, allowedActors, authEnabled, updatedBy } =
-        req.parsed.body;
+      const { metadata, allowedActorsType, allowedActors, authEnabled, updatedBy } = req.parsed.body;
 
       const n8nUser = await loadN8nUser(session, n8nRepositories);
       const row = await services.trigger.update({
         triggerId,
         projectIds: allowedProjectIds,
-        triggerUrl,
-        triggerMethod,
+        ...pickTargetParams(req.parsed.body),
         metadata,
         allowedActorsType,
         allowedActors,
@@ -322,7 +377,7 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
         n8nUser,
       });
 
-      OkResponse(res, mapTriggerRowToResponse(row), updateTriggerResponseSchema);
+      OkResponse(res, mapTriggerRowToResponse(row, liveStatusFor(row)), updateTriggerResponseSchema);
     },
   );
 
@@ -346,6 +401,30 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       const { triggerId } = req.parsed.params;
       await services.trigger.delete({ triggerId, projectIds: allowedProjectIds });
       NoContentResponse(res);
+    },
+  );
+
+  /**
+   * GET /wil/trigger-targets?source=button|chefs-form — published workflows in the tenant's projects
+   * that contain an enabled WIL Trigger node accepting the source. Manager-only (feeds the editor dropdown).
+   */
+  router.get(
+    '/trigger-targets',
+    createRequestParser(listTriggerTargetsSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof listTriggerTargetsSchema>>, res: Response) => {
+      const session = (req as unknown as { session: UiResolvedSession }).session;
+      const { tenantId, projectIds } = await resolveWilTenantProjectIds(req, customRepositories.tenantProjectRelation);
+      if (!(await canManageTriggers(tenantId, session, customRepositories, n8nRepositories))) {
+        ForbiddenResponse(res);
+        return;
+      }
+      const targets = WIL_N8N_NODE_TRIGGERS_ENABLED
+        ? await services.triggerTarget.list({
+            projectIds,
+            source: req.parsed.query.source as WilTriggerSource | undefined,
+          })
+        : [];
+      OkResponse(res, { data: targets, enabled: WIL_N8N_NODE_TRIGGERS_ENABLED }, listTriggerTargetsResponseSchema);
     },
   );
 
@@ -432,11 +511,10 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
   );
 
   /**
-   * POST /wil/triggers/:triggerId/callback — execute a trigger's webhook URL.
+   * POST /wil/triggers/:triggerId/callback — fire a trigger's WIL Trigger node in the published workflow.
    *
    * Accessible to managers and any actor explicitly listed in allowed_actors.
-   * Always appends the actor's email as actorId so downstream workflows can identify the initiator.
-   * For GET triggers, body fields are forwarded as query params instead.
+   * The actor's email, roles and groups are passed to the WIL Trigger node as data.
    */
   router.post(
     '/triggers/:triggerId/callback',
@@ -445,46 +523,17 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
       const { triggerId } = req.parsed.params;
       const ctx = await resolveTriggerAccess(req, res, triggerId, services, customRepositories, n8nRepositories);
       if (!ctx) return;
-      const { session, trigger } = ctx;
+      const { session, tenantId, allowedProjectIds, trigger } = ctx;
 
-      const outboundBody = buildTriggerOutboundBody(
+      await fireN8nNodeTrigger({
+        res,
+        services,
         trigger,
-        (req.parsed.body ?? {}) as Record<string, unknown>,
-        session.email,
-      );
-
-      const method = trigger.triggerMethod.toUpperCase();
-      const requestUrl =
-        method === 'GET' && Object.keys(outboundBody).length > 0
-          ? appendBodyAsQueryParams(trigger.triggerUrl, outboundBody)
-          : trigger.triggerUrl;
-
-      const upstream = await callWebhook({
-        url: requestUrl,
-        method,
-        body: method === 'GET' ? undefined : JSON.stringify(outboundBody),
-        timeoutMs: CALLBACK_TIMEOUT_MS,
-        timeoutMessage: 'Trigger execution timed out',
-        unreachableMessage: 'Trigger URL unreachable',
+        session,
+        tenantId,
+        allowedProjectIds,
+        body: (req.parsed.body ?? {}) as Record<string, unknown>,
       });
-
-      if (!upstream.ok) {
-        const upstreamText = await upstream.text();
-        log.warn('Trigger webhook returned an error response', {
-          triggerId: shortenIdForLog(triggerId),
-          status: upstream.status,
-          upstreamText,
-        });
-        res.status(502).json({
-          error: {
-            message: TRIGGER_FAILED_MESSAGE,
-            upstreamStatus: upstream.status,
-          },
-        });
-        return;
-      }
-
-      OkResponse(res, { success: true }, callbackTriggerResponseSchema);
     },
   );
 

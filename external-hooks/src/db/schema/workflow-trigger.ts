@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, jsonb, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { tenantProjectRelation } from './workflow-interaction-layer';
 
 export const workflowTrigger = pgTable(
@@ -10,8 +10,10 @@ export const workflowTrigger = pgTable(
       .notNull()
       .references(() => tenantProjectRelation.projectId),
     triggerType: varchar('trigger_type', { length: 100 }).notNull(),
-    triggerUrl: text('trigger_url').notNull(),
-    triggerMethod: varchar('trigger_method', { length: 50 }).notNull(),
+    /** 'n8n-node' = WIL Trigger node run in-process. The only supported target kind. */
+    targetKind: varchar('target_kind', { length: 20 }).notNull().default('n8n-node'),
+    targetWorkflowId: varchar('target_workflow_id', { length: 36 }),
+    targetNodeId: varchar('target_node_id', { length: 36 }),
     metadata: jsonb('metadata').notNull(),
     allowedActorsType: varchar('allowed_actors_type', { length: 100 }).notNull(),
     allowedActors: varchar('allowed_actors', { length: 50 }).array().notNull(),
@@ -23,7 +25,13 @@ export const workflowTrigger = pgTable(
   },
   (table) => [
     check('chk_wt_trigger_type', sql`${table.triggerType} IN ('chefs-form', 'button')`),
+    check('chk_wt_target_kind', sql`${table.targetKind} IN ('n8n-node')`),
+    check(
+      'chk_wt_target_shape',
+      sql`${table.targetKind} = 'n8n-node' AND ${table.targetWorkflowId} IS NOT NULL AND ${table.targetNodeId} IS NOT NULL`,
+    ),
     index('idx_wt_project_id').on(table.projectId),
+    index('idx_wt_target_workflow').on(table.targetWorkflowId),
   ],
 );
 

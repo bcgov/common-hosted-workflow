@@ -4,8 +4,11 @@ import type {
   LimitedApiTriggerItem,
   Trigger,
   TriggerChefsTokenResponse,
+  TriggerCallbackResponse,
   TriggerListResponse,
   TriggerPayload,
+  TriggerTargetsResponse,
+  TriggerType,
 } from './trigger-types';
 import { apiItemToTrigger, limitedApiItemToTrigger, payloadToCreateBody, payloadToUpdateBody } from './trigger-mappers';
 
@@ -17,7 +20,7 @@ export function getTriggers(params: { tenantId: string; signal?: AbortSignal }):
     })
     .then((res) => ({
       data: res.data.data.map((item) =>
-        'triggerUrl' in item
+        'projectId' in item
           ? apiItemToTrigger(item as ApiTriggerItem, params.tenantId)
           : limitedApiItemToTrigger(item as LimitedApiTriggerItem, params.tenantId),
       ),
@@ -72,10 +75,27 @@ export function callbackTrigger(params: {
   tenantId: string;
   triggerId: string;
   body?: Record<string, unknown>;
-}): Promise<{ success: boolean }> {
+}): Promise<TriggerCallbackResponse> {
   return instance
-    .post<{ success: boolean }>(`/ui-api/wil/triggers/${params.triggerId}/callback`, params.body ?? {}, {
+    .post<TriggerCallbackResponse>(`/ui-api/wil/triggers/${params.triggerId}/callback`, params.body ?? {}, {
       headers: { 'X-TENANT-ID': params.tenantId },
+    })
+    .then((res) => res.data);
+}
+
+export const triggerTargetsQueryKey = (tenantId: string, source: TriggerType) => ['trigger-targets', tenantId, source];
+
+/** Published workflows with a WIL Trigger node that accept `source` (editor dropdown). */
+export function listTriggerTargets(params: {
+  tenantId: string;
+  source: TriggerType;
+  signal?: AbortSignal;
+}): Promise<TriggerTargetsResponse> {
+  return instance
+    .get<TriggerTargetsResponse>('/ui-api/wil/trigger-targets', {
+      headers: { 'X-TENANT-ID': params.tenantId },
+      params: { source: params.source },
+      signal: params.signal,
     })
     .then((res) => res.data);
 }

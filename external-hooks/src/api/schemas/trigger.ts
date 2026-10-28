@@ -2,9 +2,11 @@ import { z } from 'zod';
 import { workflowTrigger } from '../../db/schema/workflow-trigger';
 import {
   workflowTriggerTypeZodEnum,
-  triggerHttpMethodZodEnum,
   triggerActorTypeZodEnum,
+  triggerTargetKindZodEnum,
+  triggerTargetStatusZodEnum,
   WorkflowTriggerTypeEnum,
+  type TriggerTargetStatus,
 } from '../constants/enum';
 
 /** Shape of a trigger as returned by the API (no raw credentials). */
@@ -12,8 +14,11 @@ export const triggerItemSchema = z.object({
   id: z.string(),
   projectId: z.string(),
   triggerType: z.string(),
-  triggerUrl: z.string(),
-  triggerMethod: z.string(),
+  targetKind: triggerTargetKindZodEnum,
+  targetWorkflowId: z.string().nullable(),
+  targetNodeId: z.string().nullable(),
+  /** Live state of an n8n-node target. */
+  targetStatus: triggerTargetStatusZodEnum.nullable(),
   metadata: z.record(z.string(), z.unknown()),
   allowedActorsType: z.string(),
   allowedActors: z.array(z.string()),
@@ -31,6 +36,7 @@ export const triggerLimitedItemSchema = z.object({
   id: z.string(),
   triggerType: workflowTriggerTypeZodEnum,
   triggerName: z.string(),
+  targetStatus: triggerTargetStatusZodEnum.nullable(),
   allowedActorsType: z.string(),
   allowedActors: z.array(z.string()),
 });
@@ -48,39 +54,52 @@ export const listTriggersLimitedResponseSchema = z.object({
 export const createTriggerResponseSchema = triggerItemSchema;
 export const updateTriggerResponseSchema = triggerItemSchema;
 
+/** Target fields for create/update. Only WIL Trigger node ('n8n-node') targets are supported. */
+const nodeTargetFields = {
+  targetKind: z.literal('n8n-node'),
+  targetWorkflowId: z.string().trim().min(1).max(36),
+  targetNodeId: z.string().trim().min(1).max(36),
+};
+
+const withDefaultTargetKind = (body: unknown) =>
+  typeof body === 'object' && body !== null && !('targetKind' in body) ? { ...body, targetKind: 'n8n-node' } : body;
+
+/** Builds a request body schema for an n8n-node trigger target. */
+const triggerBodySchema = <T extends z.ZodRawShape>(common: T) =>
+  z.preprocess(withDefaultTargetKind, z.object({ ...nodeTargetFields, ...common }).strict());
+
+/** `*` means "everyone", so it is only valid with the `all` actor type; other types need real identifiers. */
+const wildcardOnlyWithAll = {
+  check: (body: { allowedActorsType: string; allowedActors: string[] }) =>
+    body.allowedActorsType === 'all' || !body.allowedActors.some((actor) => actor.trim() === '*'),
+  params: { message: "invalid: '*' can only be used when allowedActorsType is 'all'", path: ['allowedActors'] },
+};
+
 /** POST /ui-api/wil/triggers */
 export const createTriggerSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   query: z.record(z.string(), z.unknown()).optional(),
-  body: z
-    .object({
-      triggerType: workflowTriggerTypeZodEnum,
-      triggerUrl: z.string().url('triggerUrl must be a valid URL').trim().min(1),
-      triggerMethod: triggerHttpMethodZodEnum,
-      metadata: z.record(z.string(), z.unknown()),
-      allowedActorsType: triggerActorTypeZodEnum,
-      allowedActors: z.array(z.string()),
-      authEnabled: z.boolean().optional().default(false),
-      createdBy: z.string().trim().min(1).optional(),
-    })
-    .strict(),
+  body: triggerBodySchema({
+    triggerType: workflowTriggerTypeZodEnum,
+    metadata: z.record(z.string(), z.unknown()),
+    allowedActorsType: triggerActorTypeZodEnum,
+    allowedActors: z.array(z.string()),
+    authEnabled: z.boolean().optional().default(false),
+    createdBy: z.string().trim().min(1).optional(),
+  }).refine(wildcardOnlyWithAll.check, wildcardOnlyWithAll.params),
 });
 
 /** PUT /ui-api/wil/triggers/:triggerId */
 export const updateTriggerSchema = z.object({
   params: z.object({ triggerId: z.string().trim().min(1) }),
   query: z.record(z.string(), z.unknown()).optional(),
-  body: z
-    .object({
-      triggerUrl: z.string().url('triggerUrl must be a valid URL').trim().min(1),
-      triggerMethod: triggerHttpMethodZodEnum,
-      metadata: z.record(z.string(), z.unknown()),
-      allowedActorsType: triggerActorTypeZodEnum,
-      allowedActors: z.array(z.string()),
-      authEnabled: z.boolean().optional().default(false),
-      updatedBy: z.string().trim().min(1).optional(),
-    })
-    .strict(),
+  body: triggerBodySchema({
+    metadata: z.record(z.string(), z.unknown()),
+    allowedActorsType: triggerActorTypeZodEnum,
+    allowedActors: z.array(z.string()),
+    authEnabled: z.boolean().optional().default(false),
+    updatedBy: z.string().trim().min(1).optional(),
+  }).refine(wildcardOnlyWithAll.check, wildcardOnlyWithAll.params),
 });
 
 /** DELETE /ui-api/wil/triggers/:triggerId */
@@ -104,7 +123,12 @@ export const callbackTriggerSchema = z.object({
   body: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const callbackTriggerResponseSchema = z.object({ success: z.boolean() });
+/** `executionId`/`result` are set for n8n-node targets; `result` only when the node waits for the last node. */
+export const callbackTriggerResponseSchema = z.object({
+  success: z.boolean(),
+  executionId: z.string().optional(),
+  result: z.unknown().optional(),
+});
 
 /** POST /ui-api/wil/triggers/:triggerId/chefs-token */
 export const getTriggerChefsTokenSchema = z.object({
@@ -124,7 +148,10 @@ export const getTriggerChefsTokenResponseSchema = z.object({
  * Maps a DB trigger row to the limited wire response (for non-editor users).
  * Returns only the display name, type, and actor access fields — no URLs, credentials, or metadata.
  */
-export function mapTriggerRowToLimitedResponse(row: typeof workflowTrigger.$inferSelect): TriggerLimitedItem {
+export function mapTriggerRowToLimitedResponse(
+  row: typeof workflowTrigger.$inferSelect,
+  targetStatus: TriggerTargetStatus | null = null,
+): TriggerLimitedItem {
   const metadata = row.metadata as Record<string, unknown>;
   const triggerName =
     row.triggerType === WorkflowTriggerTypeEnum.CHEFS_FORM
@@ -135,6 +162,7 @@ export function mapTriggerRowToLimitedResponse(row: typeof workflowTrigger.$infe
     id: row.id,
     triggerType: row.triggerType,
     triggerName,
+    targetStatus,
     allowedActorsType: row.allowedActorsType,
     allowedActors: row.allowedActors,
   });
@@ -147,7 +175,10 @@ export function mapTriggerRowToLimitedResponse(row: typeof workflowTrigger.$infe
  * CHEFS form triggers resolve their API key from an n8n credential, so no key is
  * ever returned to the client.
  */
-export function mapTriggerRowToResponse(row: typeof workflowTrigger.$inferSelect): TriggerItem {
+export function mapTriggerRowToResponse(
+  row: typeof workflowTrigger.$inferSelect,
+  targetStatus: TriggerTargetStatus | null = null,
+): TriggerItem {
   const metadata = { ...(row.metadata as Record<string, unknown>) };
 
   // Remove any raw apiKey from metadata (should already be stripped, but defensive)
@@ -161,8 +192,10 @@ export function mapTriggerRowToResponse(row: typeof workflowTrigger.$inferSelect
     id: row.id,
     projectId: row.projectId,
     triggerType: row.triggerType,
-    triggerUrl: row.triggerUrl,
-    triggerMethod: row.triggerMethod,
+    targetKind: row.targetKind,
+    targetWorkflowId: row.targetWorkflowId,
+    targetNodeId: row.targetNodeId,
+    targetStatus,
     metadata,
     allowedActorsType: row.allowedActorsType,
     allowedActors: row.allowedActors,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { payloadToCreateBody, payloadToUpdateBody } from '../../src/services/backend/trigger-mappers';
+import { apiItemToTrigger, payloadToCreateBody, payloadToUpdateBody } from '../../src/services/backend/trigger-mappers';
 import type { ChefsFormTriggerPayload } from '../../src/services/backend/trigger-types';
 
 const base: ChefsFormTriggerPayload = {
@@ -12,10 +12,9 @@ const base: ChefsFormTriggerPayload = {
   apiKey: 'should-not-send', // pragma: allowlist secret
   allowedActors: '*',
   allowedActorsType: 'all',
-  callbackWebhookUrl: 'https://example.com/hook',
-  postBody: '',
-  triggerMethod: 'POST',
-  includeActorId: true,
+  targetKind: 'n8n-node',
+  targetWorkflowId: 'wf1',
+  targetNodeId: 'node1',
 };
 
 describe('CHEFS trigger mappers', () => {
@@ -32,5 +31,62 @@ describe('CHEFS trigger mappers', () => {
     const created = payloadToCreateBody({ ...base, n8nCredentialId: '', apiKey: 'legacy-key' }, 'user@example.com'); // pragma: allowlist secret
 
     expect(created.metadata).toMatchObject({ n8nCredentialId: '', apiKey: 'legacy-key' }); // pragma: allowlist secret
+  });
+});
+
+describe('n8n-node target mappers', () => {
+  it('sends workflow and node ids as the target', () => {
+    const body = payloadToCreateBody(base, 'user@example.com');
+    expect(body).toMatchObject({ targetKind: 'n8n-node', targetWorkflowId: 'wf1', targetNodeId: 'node1' });
+    expect(body).not.toHaveProperty('triggerUrl');
+    expect(body).not.toHaveProperty('triggerMethod');
+  });
+
+  it('sends button inputValues for node targets', () => {
+    const body = payloadToUpdateBody(
+      {
+        type: 'button',
+        buttonText: 'Go',
+        allowedActors: '*',
+        allowedActorsType: 'all',
+        targetKind: 'n8n-node',
+        targetWorkflowId: 'wf1',
+        targetNodeId: 'node1',
+        inputValues: { amount: 5 },
+      },
+      'user@example.com',
+    );
+    expect(body.metadata).toMatchObject({ buttonText: 'Go', inputValues: { amount: 5 } });
+  });
+});
+
+describe('apiItemToTrigger with node targets', () => {
+  it('maps target fields and status', () => {
+    const trigger = apiItemToTrigger(
+      {
+        id: 't1',
+        projectId: 'p1',
+        triggerType: 'button',
+        targetKind: 'n8n-node',
+        targetWorkflowId: 'wf1',
+        targetNodeId: 'node1',
+        targetStatus: 'unpublished',
+        metadata: { buttonText: 'Go', inputValues: { a: 1 } },
+        allowedActorsType: 'all',
+        allowedActors: ['*'],
+        authEnabled: false,
+        createdAt: '',
+        updatedAt: '',
+        createdBy: null,
+        updatedBy: null,
+      },
+      'tenant',
+    );
+    expect(trigger.targetStatus).toBe('unpublished');
+    expect(trigger.config).toMatchObject({
+      targetKind: 'n8n-node',
+      targetWorkflowId: 'wf1',
+      inputValues: { a: 1 },
+    });
   });
 });

@@ -11,6 +11,15 @@ export class ExecutionRepository {
     return await this.executionRepository.findSingleExecution(id, options);
   }
 
+  /** Loads an execution with its run data, or `null` if not found / unreadable. */
+  async findWithData(id: string) {
+    try {
+      return (await this.findSingleExecution(id, { includeData: true, unflattenData: true })) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Loads execution metadata, or `null` if not found or if `findSingleExecution` throws
    * (e.g. Postgres `22P02` for malformed ids).

@@ -92,6 +92,17 @@ export class UserRepository {
 - **Dynamic SQL:** `SharedWorkflowRepository` and `ProjectRelationRepository` build raw SQL JOINs from entity metadata at runtime, avoiding hard-coded column names.
 - **`sql.ts` utility:** Shared helpers `getColumnName(metadata, property)` and `quoteIdentifier(id)` for metadata-driven SQL generation.
 
+### Runtime coupling to n8n internals
+
+`external-hooks` has **no npm dependency on n8n**. Beyond the repositories above, it also `require()`s a
+fixed set of n8n's compiled modules by absolute path at runtime (credential decryption, the DI
+container, the execution engine behind the WIL Trigger node). Those paths and exports are private n8n
+internals, so an n8n version bump can break them and silently degrade features. The
+[n8n internals check](./n8n-internals-check.md) guards against this: a manifest in
+`src/api/constants/n8n-paths.ts` declares every required module and export, a unit test keeps the
+manifest complete, and a container smoke check (`verify-n8n-internals.cjs`, run during provisioning)
+fails the build when the installed n8n version no longer matches.
+
 ---
 
 ## 3. Custom DB Repository Layer

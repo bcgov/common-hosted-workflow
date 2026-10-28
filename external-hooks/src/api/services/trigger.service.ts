@@ -1,7 +1,10 @@
 import { inArray } from 'drizzle-orm';
 import { workflowTrigger } from '../../db/schema/workflow-trigger';
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
-import { WorkflowTriggerTypeEnum } from '../constants/enum';
+import { WIL_N8N_NODE_TRIGGERS_ENABLED } from '@config';
+import { TriggerTargetKindEnum, WorkflowTriggerTypeEnum, type WilTriggerSource } from '../constants/enum';
+import { validateWilInput } from '../helpers/wil-trigger-node';
+import type { TriggerTargetService } from './trigger-target.service';
 import type { ChefsService } from './chefs.service';
 import type { N8nUserEntity } from './n8n-credentials.service';
 import { AppError } from '../utils/errors';
@@ -21,11 +24,18 @@ export type GetTriggerByIdParams = {
   projectIds: string[];
 };
 
-export type CreateTriggerParams = {
+/** Where a trigger sends its run: a WIL Trigger node in a published n8n workflow. */
+export type TriggerTargetParams = {
+  targetKind?: string;
+  targetWorkflowId?: string;
+  targetNodeId?: string;
+};
+
+export type CreateTriggerParams = TriggerTargetParams & {
   projectId: string;
+  /** Tenant projects an n8n-node target may live in (defaults to `[projectId]`). */
+  allowedProjectIds?: string[];
   triggerType: string;
-  triggerUrl: string;
-  triggerMethod: string;
   metadata: Record<string, unknown>;
   allowedActorsType: string;
   allowedActors: string[];
@@ -35,11 +45,9 @@ export type CreateTriggerParams = {
   n8nUser: N8nUserEntity | null;
 };
 
-export type UpdateTriggerParams = {
+export type UpdateTriggerParams = TriggerTargetParams & {
   triggerId: string;
   projectIds: string[];
-  triggerUrl: string;
-  triggerMethod: string;
   metadata: Record<string, unknown>;
   allowedActorsType: string;
   allowedActors: string[];
@@ -58,6 +66,7 @@ export class TriggerService {
   constructor(
     private readonly customRepositories: CustomRepositories,
     private readonly chefs: ChefsService,
+    private readonly targets?: TriggerTargetService,
   ) {}
 
   async list(params: ListTriggersParams) {
@@ -81,13 +90,18 @@ export class TriggerService {
     const cleanMetadata = isChefsForm
       ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, [params.projectId], params.n8nUser)
       : params.metadata;
+    const target = await this.resolveTargetColumns(
+      params,
+      params.allowedProjectIds ?? [params.projectId],
+      params.triggerType as WilTriggerSource,
+      cleanMetadata,
+    );
 
     try {
       return await this.customRepositories.workflowTrigger.create({
         projectId: params.projectId,
         triggerType: params.triggerType,
-        triggerUrl: params.triggerUrl,
-        triggerMethod: params.triggerMethod,
+        ...target,
         metadata: cleanMetadata,
         allowedActorsType: params.allowedActorsType,
         allowedActors: params.allowedActors,
@@ -118,12 +132,17 @@ export class TriggerService {
     const cleanMetadata = isChefsForm
       ? await this.chefs.applyCredentialToTriggerMetadata(params.metadata, [existing.projectId], params.n8nUser)
       : params.metadata;
+    const target = await this.resolveTargetColumns(
+      params,
+      params.projectIds,
+      existing.triggerType as WilTriggerSource,
+      cleanMetadata,
+    );
 
     try {
       const updated = await this.customRepositories.workflowTrigger.update({
         triggerId: params.triggerId,
-        triggerUrl: params.triggerUrl,
-        triggerMethod: params.triggerMethod,
+        ...target,
         metadata: cleanMetadata,
         allowedActorsType: params.allowedActorsType,
         allowedActors: params.allowedActors,
@@ -172,5 +191,45 @@ export class TriggerService {
       });
       throw new AppError(500, 'Internal Server Error');
     }
+  }
+
+  /**
+   * Validates the requested target and returns the DB columns for it.
+   * n8n-node targets must be live (published, in a tenant project, node present) and accept this trigger type.
+   */
+  private async resolveTargetColumns(
+    params: TriggerTargetParams,
+    projectIds: string[],
+    source: WilTriggerSource,
+    metadata: Record<string, unknown>,
+  ) {
+    if (!WIL_N8N_NODE_TRIGGERS_ENABLED || !this.targets) {
+      throw new AppError(400, 'n8n node triggers are disabled');
+    }
+    if (!params.targetWorkflowId || !params.targetNodeId) {
+      throw new AppError(422, 'targetWorkflowId and targetNodeId are required for n8n-node triggers');
+    }
+
+    const resolved = await this.targets.resolve({
+      workflowId: params.targetWorkflowId,
+      nodeId: params.targetNodeId,
+      projectIds,
+      source,
+    });
+    if (!resolved.ok) {
+      throw new AppError(422, 'Target workflow node is not available for this trigger', { reason: resolved.reason });
+    }
+
+    // Button input values are checked against the node's declared schema at save time.
+    if (source === WorkflowTriggerTypeEnum.BUTTON) {
+      const errors = validateWilInput(resolved.target.inputSchema, metadata.inputValues);
+      if (errors.length > 0) throw new AppError(422, 'Invalid input values', { errors });
+    }
+
+    return {
+      targetKind: TriggerTargetKindEnum.N8N_NODE,
+      targetWorkflowId: params.targetWorkflowId,
+      targetNodeId: params.targetNodeId,
+    };
   }
 }
