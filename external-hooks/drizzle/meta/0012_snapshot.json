@@ -462,12 +462,8 @@
           "name": "action_request_project_id_tenant_project_relation_project_id_fk",
           "tableFrom": "action_request",
           "tableTo": "tenant_project_relation",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "project_id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["project_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -634,12 +630,8 @@
           "name": "audit_log_project_id_tenant_project_relation_project_id_fk",
           "tableFrom": "audit_log",
           "tableTo": "tenant_project_relation",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "project_id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["project_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -886,12 +878,8 @@
           "name": "message_project_id_tenant_project_relation_project_id_fk",
           "tableFrom": "message",
           "tableTo": "tenant_project_relation",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "project_id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["project_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -970,10 +958,7 @@
       "compositePrimaryKeys": {
         "tenant_project_relation_tenant_id_project_id_pk": {
           "name": "tenant_project_relation_tenant_id_project_id_pk",
-          "columns": [
-            "tenant_id",
-            "project_id"
-          ]
+          "columns": ["tenant_id", "project_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1256,12 +1241,8 @@
           "name": "workflow_trigger_project_id_tenant_project_relation_project_id_fk",
           "tableFrom": "workflow_trigger",
           "tableTo": "tenant_project_relation",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "project_id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["project_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1355,10 +1336,7 @@
       "compositePrimaryKeys": {
         "pk_chefs_submission_webhook": {
           "name": "pk_chefs_submission_webhook",
-          "columns": [
-            "form_id",
-            "submission_id"
-          ]
+          "columns": ["form_id", "submission_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1467,12 +1445,8 @@
           "name": "fk_multi_webhook_wait_call_execution",
           "tableFrom": "multi_webhook_wait_call",
           "tableTo": "multi_webhook_wait",
-          "columnsFrom": [
-            "execution_id"
-          ],
-          "columnsTo": [
-            "execution_id"
-          ],
+          "columnsFrom": ["execution_id"],
+          "columnsTo": ["execution_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1480,10 +1454,7 @@
       "compositePrimaryKeys": {
         "pk_multi_webhook_wait_call": {
           "name": "pk_multi_webhook_wait_call",
-          "columns": [
-            "execution_id",
-            "match_key"
-          ]
+          "columns": ["execution_id", "match_key"]
         }
       },
       "uniqueConstraints": {},
@@ -1603,11 +1574,7 @@
       "compositePrimaryKeys": {
         "pk_project_execution_usage": {
           "name": "pk_project_execution_usage",
-          "columns": [
-            "project_id",
-            "period_type",
-            "period_key"
-          ]
+          "columns": ["project_id", "period_type", "period_key"]
         }
       },
       "uniqueConstraints": {},
