@@ -213,6 +213,22 @@ export function createMockWorkflowTriggerRepository() {
   };
 }
 
+export function createMockProjectRateLimitRepository() {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    upsert: vi.fn().mockResolvedValue(undefined),
+    listByProjectIds: vi.fn().mockResolvedValue(new Map()),
+  };
+}
+
+export function createMockProjectExecutionUsageRepository() {
+  return {
+    getCounts: vi.fn().mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 }),
+    increment: vi.fn().mockResolvedValue(undefined),
+    listCountsByProjectIds: vi.fn().mockResolvedValue(new Map()),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /*  n8n repository mocks                                               */
 /* ------------------------------------------------------------------ */
@@ -297,6 +313,7 @@ export function createMockN8nRepositories() {
     credential: { findOneBy: vi.fn() },
     sharedWorkflow: {
       findProjectIds: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
+      countByProjectIds: vi.fn().mockResolvedValue(new Map()),
       findRowsByWorkflowId: vi
         .fn()
         .mockResolvedValue([

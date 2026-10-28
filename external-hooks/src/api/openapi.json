@@ -115,6 +115,18 @@
         }
       }
     },
+    "responses": {
+      "ReadOnlyMaintenance": {
+        "description": "Read-only mode. Write requests are rejected and not processed while reads remain available. Retry after the interval in the Retry-After header.",
+        "headers": {
+          "Retry-After": {
+            "description": "Suggested wait before retrying, in seconds.",
+            "schema": { "type": "integer" }
+          }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    },
     "schemas": {
       "Message": {
         "type": "object",
@@ -490,7 +502,8 @@
           "500": {
             "description": "Internal Server Error",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          }
+          },
+          "503": { "$ref": "#/components/responses/ReadOnlyMaintenance" }
         }
       }
     },
@@ -571,7 +584,8 @@
           "500": {
             "description": "Internal Server Error (e.g. INTERNAL_AUTH_TOKEN not configured)",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          }
+          },
+          "503": { "$ref": "#/components/responses/ReadOnlyMaintenance" }
         }
       }
     },
@@ -699,7 +713,8 @@
           "500": {
             "description": "Internal Server Error",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          }
+          },
+          "503": { "$ref": "#/components/responses/ReadOnlyMaintenance" }
         }
       }
     },
@@ -790,7 +805,8 @@
           "500": {
             "description": "Internal Server Error",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          }
+          },
+          "503": { "$ref": "#/components/responses/ReadOnlyMaintenance" }
         }
       }
     },
@@ -883,7 +899,8 @@
           "500": {
             "description": "Internal Server Error",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          }
+          },
+          "503": { "$ref": "#/components/responses/ReadOnlyMaintenance" }
         }
       }
     },
@@ -945,7 +962,8 @@
           "409": {
             "description": "Conflict: tenant already has a different project mapping (conflictProjectId), or projectId is mapped to a different tenant (conflictTenantId).",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
-          }
+          },
+          "503": { "$ref": "#/components/responses/ReadOnlyMaintenance" }
         }
       }
     }

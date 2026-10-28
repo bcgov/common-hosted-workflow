@@ -195,4 +195,26 @@ export class SharedWorkflowRepository {
 
     return rows as SharedWorkflowRow[];
   }
+
+  async countByProjectIds(projectIds: string[]): Promise<Map<string, number>> {
+    if (!projectIds.length) {
+      return new Map();
+    }
+
+    const sharedWorkflowMetadata = this.sharedWorkflowRepository.metadata;
+    const sharedWorkflowTable = quoteIdentifier(sharedWorkflowMetadata.tableName);
+    const sharedWorkflowProjectColumn = quoteIdentifier(getColumnName(sharedWorkflowMetadata, 'projectId'));
+
+    const rows = await this.queryWorkflowRows(
+      `
+        SELECT sw.${sharedWorkflowProjectColumn} AS "projectId", COUNT(*) AS "count"
+        FROM ${sharedWorkflowTable} sw
+        WHERE sw.${sharedWorkflowProjectColumn} = ANY($1)
+        GROUP BY sw.${sharedWorkflowProjectColumn}
+      `,
+      [projectIds],
+    );
+
+    return new Map(rows.map((row) => [String(row.projectId), Number(row.count)]));
+  }
 }

@@ -82,8 +82,15 @@
     {
       "idx": 11,
       "version": "7",
-      "when": 1791478900000,
-      "tag": "0011_workflow_trigger_n8n_target",
+      "when": 1793056581449,
+      "tag": "0011_add_project_rate_limit_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793147046744,
+      "tag": "0012_workflow_trigger_n8n_target",
       "breakpoints": true
     }
   ]

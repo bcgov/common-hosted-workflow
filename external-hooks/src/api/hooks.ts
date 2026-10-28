@@ -3,7 +3,14 @@ import { CUSTOM_DATABASE_URL, EXTERNAL_UI_PATH, EXTERNAL_UI_ENABLED } from '@con
 import { mountAssets } from './bootstrap/assets';
 import { buildCustomRepositories } from './bootstrap/custom-repositories';
 import { mountCustomApi } from './bootstrap/custom-api';
-import { applyOidcFrontendSettings, type FrontendSettings } from './bootstrap/frontend-settings';
+import {
+  applyReadOnlyFrontendSettings,
+  applyOidcFrontendSettings,
+  type FrontendSettings,
+} from './bootstrap/frontend-settings';
+import { blockN8nEditRoutes } from './bootstrap/readonly-n8n-routes';
+import { createReadOnlyEditGuard } from './helpers/readonly-edit-guard';
+import { createRateLimitPreExecuteHandler } from './bootstrap/rate-limit-hook';
 import { extractCredentialIds, getWorkflowNodes } from './helpers/workflow';
 import { buildN8nRuntimeContext, type N8nRepositories } from './bootstrap/n8n-repositories';
 import { mountOidc } from './bootstrap/oidc';
@@ -21,6 +28,8 @@ const log = createLogger('CustomAPIs');
 function createHookConfig() {
   let n8nRepositories: N8nRepositories | null = null;
   let uiApiService: UiApiServiceContract | null = null;
+  // Allows activation so DR-safe workflows can continue running.
+  const blockEditsInReadOnlyMode = createReadOnlyEditGuard();
 
   return {
     n8n: {
@@ -70,6 +79,7 @@ function createHookConfig() {
             cstarService: services.cstar,
           });
           mountAssets(app);
+          blockN8nEditRoutes(app);
 
           app.use(handleErrorResponse);
           log.info('Custom Routes Active.');
@@ -78,15 +88,31 @@ function createHookConfig() {
     },
     frontend: {
       /**
-       * Modify frontend settings to configure SSO display
+       * Modify frontend settings to configure SSO display, and to turn off editor autosave in read-only mode
        */
       settings: [
         async function (frontendSettings: FrontendSettings) {
           applyOidcFrontendSettings(frontendSettings);
+          applyReadOnlyFrontendSettings(frontendSettings);
         },
       ],
     },
+    credentials: {
+      create: [blockEditsInReadOnlyMode],
+      update: [blockEditsInReadOnlyMode],
+      delete: [blockEditsInReadOnlyMode],
+    },
     workflow: {
+      create: [blockEditsInReadOnlyMode],
+      update: [blockEditsInReadOnlyMode],
+      delete: [blockEditsInReadOnlyMode],
+      /**
+       * Per-project execution rate limiting. Fires on every workflow run
+       * (main, worker and sub-executions); fails open on infrastructure
+       * errors — only RateLimitExceededError aborts the run. See
+       * bootstrap/rate-limit-hook.ts for the policy and its tests.
+       */
+      preExecute: [createRateLimitPreExecuteHandler()],
       afterUpdate: [
         async function (updatedWorkflow: IWorkflowBase) {
           if (!n8nRepositories || !uiApiService) {

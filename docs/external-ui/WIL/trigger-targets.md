@@ -6,7 +6,7 @@ A WIL **Button** or **CHEFS Form** trigger runs a single kind of target:
 | ----------------- | ------------------------------------------------------------------------ | -------------------------------------- |
 | `n8n-node` (only) | A published n8n workflow, started in-process at its **WIL Trigger** node | `target_workflow_id`, `target_node_id` |
 
-The outbound webhook-URL target that earlier drafts supported has been removed — a trigger can only invoke a WIL Trigger node. **Breaking change:** migration `0011` deletes every existing trigger that has a `trigger_url` (all legacy webhook triggers) and drops the `trigger_url` / `trigger_method` columns. Re-create those triggers against a WIL Trigger node after deploying. The database enforces the node-only shape with `chk_wt_target_shape`. See the node's [documentation](../../community-nodes/wil-trigger/README.md).
+The outbound webhook-URL target that earlier drafts supported has been removed — a trigger can only invoke a WIL Trigger node. **Breaking change:** migration `0012` deletes every existing trigger that has a `trigger_url` (all legacy webhook triggers) and drops the `trigger_url` / `trigger_method` columns. Re-create those triggers against a WIL Trigger node after deploying. The database enforces the node-only shape with `chk_wt_target_shape`. See the node's [documentation](../../community-nodes/wil-trigger/README.md).
 
 ## Flow
 

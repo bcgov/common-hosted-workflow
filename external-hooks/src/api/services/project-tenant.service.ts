@@ -2,6 +2,7 @@ import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { TenantService } from './tenant.service';
 import type { CstarService } from './cstar.service';
+import type { ProjectRateLimitEnrichment, ProjectRateLimitService } from './project-rate-limit.service';
 import { AppError } from '../utils/errors';
 
 export type AdminProjectItem = {
@@ -9,7 +10,7 @@ export type AdminProjectItem = {
   projectName: string;
   projectType: string;
   tenantId: string | null;
-};
+} & Partial<ProjectRateLimitEnrichment>;
 
 export type AdminProjectsPage = {
   data: AdminProjectItem[];
@@ -33,6 +34,7 @@ export class ProjectTenantService {
     private readonly customRepositories: CustomRepositories,
     private readonly tenantService: TenantService,
     private readonly cstarService: CstarService,
+    private readonly projectRateLimitService: ProjectRateLimitService,
   ) {}
 
   /**
@@ -47,11 +49,18 @@ export class ProjectTenantService {
     const { projects, totalCount } = await this.n8nRepositories.project.listPaginated(page, pageSize, filters);
     const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
 
+    // Batched rate-limit enrichment keyed by projectId; falls back to defaults
+    // (null limits, zero counts) when the custom DB is unavailable.
+    const rateLimitEnrichment = await this.projectRateLimitService.enrichAdminProjects(
+      projects.map((p) => ({ projectId: p.id })),
+    );
+
     const data: AdminProjectItem[] = projects.map((p) => ({
       projectId: p.id,
       projectName: p.name,
       projectType: p.type,
       tenantId: tenantMap.get(p.id) ?? null,
+      ...rateLimitEnrichment[p.id],
     }));
 
     return {

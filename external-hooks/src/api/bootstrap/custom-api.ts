@@ -6,11 +6,14 @@ import { buildChefsSubmissionRouter } from '../routes/chefs-submission';
 import { buildGrafanaProjectsRouter } from '../routes/grafana-projects';
 import { buildMessageRouter } from '../routes/messages';
 import { buildMultiWebhookWaitRouter } from '../routes/multi-webhook-wait';
+import { createReadOnlyMiddleware } from '../middlewares';
 import { mountSwaggerUi } from '../swagger-ui';
 import type { ApiRouteContext } from '../types/routes';
 
 export function mountCustomApi(app: Express, routeContext: ApiRouteContext) {
   const v1Router = Router();
+
+  v1Router.use(createReadOnlyMiddleware());
 
   v1Router.use('/admin', buildAdminRouter(routeContext));
   v1Router.use(buildActorRouter(routeContext));

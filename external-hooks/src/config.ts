@@ -22,7 +22,7 @@ export const IS_DEVELOPMENT = NODE_ENV === 'development';
 // Cluster / disaster recovery
 // Set by Helm from the Makefile's CLUSTER value.
 export const CLUSTER = (process.env.CLUSTER ?? '').trim().toLowerCase();
-export const IS_GOLDDR = CLUSTER === 'golddr';
+export const READONLY_MODE = CLUSTER === 'golddr';
 
 // Feature flags
 export const ENABLE_SWAGGER_UI = process.env.ENABLE_SWAGGER_UI;
@@ -109,13 +109,17 @@ export const OIDC_COOKIE_SECRET_BASE = N8N_ENCRYPTION_KEY || OIDC_CLIENT_SECRET 
 // The endpoint is disabled (503) when this is empty.
 export const GRAFANA_PROJECTS_SECRET = process.env.GRAFANA_PROJECTS_SECRET ?? '';
 
+// --- Per-project execution rate limiting ---------------------------------------------------
+// Timezone in which weekly (ISO-8601) and yearly execution period boundaries are computed.
+export const RATE_LIMIT_TIMEZONE = process.env.RATE_LIMIT_TIMEZONE || 'America/Vancouver';
+// Master switch for workflow.preExecute rate-limit enforcement; 'false' disables all enforcement.
+export const RATE_LIMIT_ENFORCEMENT_ENABLED = process.env.RATE_LIMIT_ENFORCEMENT_ENABLED !== 'false';
+// n8n execution mode; in queue mode only worker processes count and enforce usage.
+export const EXECUTIONS_MODE = process.env.EXECUTIONS_MODE ?? 'regular';
+
 // --- WIL Trigger node (n8n-node trigger targets) ---------------------------------------------
 /** Kill switch for starting workflows through the WIL Trigger node. Enabled unless set to "false". */
 export const WIL_N8N_NODE_TRIGGERS_ENABLED = (process.env.WIL_N8N_NODE_TRIGGERS_ENABLED ?? 'true') !== 'false';
-/**
- * Node type string of the WIL Trigger community node as saved in n8n workflows
- * (`<package name>.<node name>`). Override only if the installed package name differs.
- */
 /**
  * Node type strings that identify the WIL Trigger node in saved workflow JSON. n8n prefixes a node with its
  * package name: `CUSTOM` for nodes loaded from a custom extensions folder (this deployment) and

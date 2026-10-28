@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@config', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../src/config')>();
-  return { ...original, IS_GOLDDR: true };
+  return { ...original, READONLY_MODE: true };
 });
 
 import { buildSessionSummary, type UiResolvedSession } from '../../../src/api/helpers/ui-oidc';
@@ -28,7 +28,7 @@ const resolvedSession = {
   tenantGroups: [],
 } as UiResolvedSession;
 
-describe('buildSessionSummary on GoldDR', () => {
+describe('buildSessionSummary in read-only mode', () => {
   it('reports goldDr for an authenticated session', () => {
     expect(buildSessionSummary(resolvedSession).goldDr).toBe(true);
   });

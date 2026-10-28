@@ -1,5 +1,5 @@
 {
-  "id": "bbab6829-906a-4358-8765-9f6c261c93fc",
+  "id": "749cdd14-00b9-4718-b999-de42e5d1b18e",
   "prevId": "e6faf541-a145-40a1-8087-fae4c5719af9",
   "version": "7",
   "dialect": "postgresql",
@@ -1133,24 +1133,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "target_kind": {
-          "name": "target_kind",
-          "type": "varchar(20)",
+        "trigger_url": {
+          "name": "trigger_url",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'n8n-node'"
+          "notNull": true
         },
-        "target_workflow_id": {
-          "name": "target_workflow_id",
-          "type": "varchar(36)",
+        "trigger_method": {
+          "name": "trigger_method",
+          "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": false
-        },
-        "target_node_id": {
-          "name": "target_node_id",
-          "type": "varchar(36)",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "metadata": {
           "name": "metadata",
@@ -1219,21 +1212,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_wt_target_workflow": {
-          "name": "idx_wt_target_workflow",
-          "columns": [
-            {
-              "expression": "target_workflow_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1254,14 +1232,6 @@
         "chk_wt_trigger_type": {
           "name": "chk_wt_trigger_type",
           "value": "\"workflow_trigger\".\"trigger_type\" IN ('chefs-form', 'button')"
-        },
-        "chk_wt_target_kind": {
-          "name": "chk_wt_target_kind",
-          "value": "\"workflow_trigger\".\"target_kind\" IN ('n8n-node')"
-        },
-        "chk_wt_target_shape": {
-          "name": "chk_wt_target_shape",
-          "value": "\"workflow_trigger\".\"target_kind\" = 'n8n-node' AND \"workflow_trigger\".\"target_workflow_id\" IS NOT NULL AND \"workflow_trigger\".\"target_node_id\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false
@@ -1460,6 +1430,131 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_rate_limit": {
+      "name": "project_rate_limit",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "varchar(50)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "weekly_rate_limit": {
+          "name": "weekly_rate_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "yearly_rate_limit": {
+          "name": "yearly_rate_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_admin_comment": {
+          "name": "last_admin_comment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stop_behavior": {
+          "name": "stop_behavior",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'hard_stop'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_prl_stop_behavior": {
+          "name": "chk_prl_stop_behavior",
+          "value": "\"project_rate_limit\".\"stop_behavior\" IN ('hard_stop', 'soft_stop')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.project_execution_usage": {
+      "name": "project_execution_usage",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_type": {
+          "name": "period_type",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_key": {
+          "name": "period_key",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "pk_project_execution_usage": {
+          "name": "pk_project_execution_usage",
+          "columns": ["project_id", "period_type", "period_key"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_peu_period_type": {
+          "name": "chk_peu_period_type",
+          "value": "\"project_execution_usage\".\"period_type\" IN ('weekly', 'yearly')"
+        }
+      },
       "isRLSEnabled": false
     }
   },

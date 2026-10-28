@@ -3,7 +3,12 @@ import { type infer as zInfer } from 'zod';
 import { OkResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestParser } from '../utils/validation';
-import { adminProjectsQuerySchema, updateProjectTenantSchema, deleteProjectTenantSchema } from '../schemas/projects';
+import {
+  adminProjectsQuerySchema,
+  updateProjectTenantSchema,
+  deleteProjectTenantSchema,
+  updateProjectRateLimitSchema,
+} from '../schemas/projects';
 import type { UiApiTypedRequest } from '../types/ui-api';
 
 /**
@@ -44,6 +49,17 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
       const { projectId } = req.parsed.params;
       await services.projectTenant.removeTenantFromProject(projectId);
       res.status(204).end();
+    },
+  );
+
+  router.put(
+    '/projects/:projectId/rate-limit',
+    createRequestParser(updateProjectRateLimitSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof updateProjectRateLimitSchema>>, res) => {
+      const { projectId } = req.parsed.params;
+      const body = req.parsed.body;
+      const result = await services.projectRateLimit.updateRateLimit(projectId, body);
+      OkResponse(res, { success: true, message: 'Rate limit updated', rateLimit: result });
     },
   );
 

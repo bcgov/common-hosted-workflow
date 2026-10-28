@@ -10,6 +10,7 @@ import { CstarService } from '../services/cstar.service';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { MessageService } from '../services/message.service';
 import { MultiWebhookWaitService } from '../services/multi-webhook-wait.service';
+import { ProjectRateLimitService } from '../services/project-rate-limit.service';
 import { ProjectTenantService } from '../services/project-tenant.service';
 import { TenantService } from '../services/tenant.service';
 import { TenantProjectSyncService } from '../services/tenant-project-sync.service';
@@ -101,6 +102,7 @@ export async function buildApiServices(
   const tenantService = new TenantService(customRepositories, n8nRepositories, cstarService);
   const chefs = new ChefsService(n8nRepositories, n8nServices.credentialDecrypt, n8nServices.n8nCredentials);
   const triggerTarget = new TriggerTargetService(n8nRepositories, workflowRunner);
+  const projectRateLimitService = new ProjectRateLimitService(n8nRepositories, customRepositories);
 
   return {
     uiApi: new UiApiService(n8nRepositories),
@@ -128,7 +130,14 @@ export async function buildApiServices(
       featureFlag,
       globalOwnerRoleSlug,
     ),
-    projectTenant: new ProjectTenantService(n8nRepositories, customRepositories, tenantService, cstarService),
+    projectRateLimit: projectRateLimitService,
+    projectTenant: new ProjectTenantService(
+      n8nRepositories,
+      customRepositories,
+      tenantService,
+      cstarService,
+      projectRateLimitService,
+    ),
     multiWebhookWait: new MultiWebhookWaitService(customRepositories),
   };
 }

@@ -39,6 +39,7 @@ import { buildSessionSummary, buildWhoamiResponse, type UiSerializedN8nUser } fr
 import { appendQueryParam } from '../helpers/url';
 import { createReturnTargetPolicy, resolveReturnTarget } from '../helpers/return-target';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
+import { createReadOnlyMiddleware } from '../middlewares';
 import { buildWilRouter } from './wil';
 import { buildAdminProjectRouter } from './admin-projects';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
@@ -503,8 +504,14 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     buildAdminProjectRouter(routeContext),
   );
 
-  // Mount WIL sub-router (protected by requireUiRequestContext + canManageWil)
-  router.use('/wil', requireUiRequestContext, checkPermission('canManageWil'), buildWilRouter(routeContext));
+  // Mount WIL sub-router (protected by requireUiRequestContext + canManageWil; writes are refused in read-only mode)
+  router.use(
+    '/wil',
+    requireUiRequestContext,
+    checkPermission('canManageWil'),
+    createReadOnlyMiddleware(),
+    buildWilRouter(routeContext),
+  );
 
   return router;
 }
