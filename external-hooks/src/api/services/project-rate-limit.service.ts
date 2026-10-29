@@ -21,7 +21,7 @@ export class RateLimitExceededError extends Error {
   }
 }
 
-/** Per-project admin-list enrichment: configured limits, current-period usage, workflow count. */
+/** Per-project admin-list enrichment: configured limits, current-period usage, workflow count, editor stamp. */
 export type ProjectRateLimitEnrichment = {
   weeklyRateLimit: number | null;
   yearlyRateLimit: number | null;
@@ -30,6 +30,9 @@ export type ProjectRateLimitEnrichment = {
   weeklyExecutionCount: number;
   yearlyExecutionCount: number;
   workflowCount: number;
+  membersCount: number;
+  updatedAt: string | null;
+  updatedByName: string | null;
 };
 
 function defaultEnrichment(): ProjectRateLimitEnrichment {
@@ -41,7 +44,24 @@ function defaultEnrichment(): ProjectRateLimitEnrichment {
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
     workflowCount: 0,
+    membersCount: 0,
+    updatedAt: null,
+    updatedByName: null,
   };
+}
+
+/**
+ * Formats a resolved user as "F. Last". Returns the fallback (the raw editor
+ * email, when a user row is missing or the name is incomplete) otherwise.
+ */
+function formatDisplayName(
+  name: { firstName: string; lastName: string } | undefined,
+  fallbackEmail: string | null,
+): string | null {
+  if (name && name.firstName.length > 0 && name.lastName.length > 0) {
+    return `${name.firstName.charAt(0)}. ${name.lastName}`;
+  }
+  return fallbackEmail;
 }
 
 /**
@@ -64,6 +84,21 @@ function describeBreach(projectId: string, breach: LimitBreach): string {
   const label = breach.period === 'weekly' ? 'Weekly' : 'Yearly';
   return `${label} execution limit reached for project '${projectId}' (limit ${breach.limit}, used ${breach.count} in ${breach.periodKey}).`;
 }
+
+/** Per-workflow current-period usage row for a project's workflow-usage read. */
+export type ProjectWorkflowUsageItem = {
+  workflowId: string;
+  workflowName: string;
+  weeklyCount: number;
+  yearlyCount: number;
+};
+
+export type ProjectWorkflowUsage = {
+  projectId: string;
+  weeklyPeriodKey: string;
+  yearlyPeriodKey: string;
+  workflows: ProjectWorkflowUsageItem[];
+};
 
 export class ProjectRateLimitService {
   constructor(
@@ -153,6 +188,18 @@ export class ProjectRateLimitService {
       if (countUsage) {
         await this.customRepositories.projectExecutionUsage.increment(projectId, 'weekly', periodKeys.weekly);
         await this.customRepositories.projectExecutionUsage.increment(projectId, 'yearly', periodKeys.yearly);
+        await this.customRepositories.workflowExecutionUsage.increment(
+          projectId,
+          workflowId,
+          'weekly',
+          periodKeys.weekly,
+        );
+        await this.customRepositories.workflowExecutionUsage.increment(
+          projectId,
+          workflowId,
+          'yearly',
+          periodKeys.yearly,
+        );
       }
     } catch (error) {
       if (error instanceof RateLimitExceededError) {
@@ -168,6 +215,8 @@ export class ProjectRateLimitService {
 
   /**
    * Replaces the rate-limit configuration for a project (full-replace semantics).
+   * `updatedBy` records the acting admin's email (trimmed; an empty value is
+   * stored as null — display names are resolved at read time).
    * Throws AppError 404 when the project does not exist in n8n.
    */
   async updateRateLimit(
@@ -178,13 +227,15 @@ export class ProjectRateLimitService {
       lastAdminComment: string | null;
       stopBehavior: RateLimitStopBehavior;
     },
+    updatedBy: string | null,
   ): Promise<ProjectRateLimit> {
     const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
     if (!project) {
       throw new AppError(404, 'Project not found');
     }
 
-    await this.customRepositories.projectRateLimit.upsert({ projectId, ...body });
+    const trimmedUpdatedBy = updatedBy !== null && updatedBy.trim().length > 0 ? updatedBy.trim() : null;
+    await this.customRepositories.projectRateLimit.upsert({ projectId, ...body, updatedBy: trimmedUpdatedBy });
 
     const stored = await this.customRepositories.projectRateLimit.get(projectId);
     if (!stored) {
@@ -214,7 +265,7 @@ export class ProjectRateLimitService {
 
     try {
       const periodKeys = getCurrentPeriodKeys();
-      const [rateLimitMap, usageMap, workflowCountMap] = await Promise.all([
+      const [rateLimitMap, usageMap, workflowCountMap, memberCountMap] = await Promise.all([
         this.customRepositories.projectRateLimit.listByProjectIds(projectIds),
         this.customRepositories.projectExecutionUsage.listCountsByProjectIds(
           projectIds,
@@ -222,12 +273,38 @@ export class ProjectRateLimitService {
           periodKeys.yearly,
         ),
         this.n8nRepositories.sharedWorkflow.countByProjectIds(projectIds),
+        this.n8nRepositories.projectRelation.countMembersByProjectIds(projectIds),
       ]);
+
+      // A failed name lookup must not discard the enrichment it accompanies,
+      // so resolution degrades to its own catch (updatedByName → null) instead
+      // of joining the outer fail-all catch below.
+      const editorEmails = [
+        ...new Set(
+          projectIds
+            .map((projectId) => rateLimitMap.get(projectId)?.updatedBy)
+            .filter((email): email is string => typeof email === 'string' && email.trim().length > 0)
+            .map((email) => email.trim()),
+        ),
+      ];
+      let nameMap: Map<string, { firstName: string; lastName: string }> | null;
+      try {
+        nameMap = await this.n8nRepositories.user.findUserNamesByEmails(editorEmails);
+      } catch (error) {
+        log.error('Failed to resolve rate-limit editor display names; falling back to emails', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        nameMap = null;
+      }
 
       for (const projectId of projectIds) {
         const config = rateLimitMap.get(projectId);
         const usage = usageMap.get(projectId);
         const workflowCount = workflowCountMap.get(projectId);
+        const memberCount = memberCountMap.get(projectId);
+        const editorEmail =
+          config?.updatedBy != null && config.updatedBy.trim().length > 0 ? config.updatedBy.trim() : null;
+        const editorName = nameMap?.get(editorEmail?.toLowerCase() ?? '');
         enrichment[projectId] = {
           weeklyRateLimit: config?.weeklyRateLimit ?? null,
           yearlyRateLimit: config?.yearlyRateLimit ?? null,
@@ -236,6 +313,9 @@ export class ProjectRateLimitService {
           weeklyExecutionCount: usage?.weeklyCount ?? 0,
           yearlyExecutionCount: usage?.yearlyCount ?? 0,
           workflowCount: workflowCount ?? 0,
+          membersCount: memberCount ?? 0,
+          updatedAt: config?.updatedAt ? config.updatedAt.toISOString() : null,
+          updatedByName: nameMap ? formatDisplayName(editorName, editorEmail) : null,
         };
       }
     } catch (error) {
@@ -245,5 +325,43 @@ export class ProjectRateLimitService {
     }
 
     return enrichment;
+  }
+
+  /**
+   * Returns the current-period per-workflow execution usage for a project.
+   * Workflows come from n8n's shared-workflow table; usage rows for workflows
+   * no longer in the project are excluded. Sorted by workflow name ascending.
+   * Throws AppError 404 when the project does not exist in n8n.
+   */
+  async getProjectWorkflowUsage(projectId: string): Promise<ProjectWorkflowUsage> {
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (!project) {
+      throw new AppError(404, 'Project not found');
+    }
+
+    const workflowRows = await this.n8nRepositories.sharedWorkflow.findWorkflowRowsByProjectIds([projectId]);
+    const periodKeys = getCurrentPeriodKeys();
+    const counts = await this.customRepositories.workflowExecutionUsage.listCountsByWorkflowIds(
+      projectId,
+      workflowRows.map((row) => row.workflowId),
+      periodKeys.weekly,
+      periodKeys.yearly,
+    );
+
+    const workflows = workflowRows
+      .map((row) => ({
+        workflowId: row.workflowId,
+        workflowName: row.workflowName,
+        weeklyCount: counts.get(row.workflowId)?.weeklyCount ?? 0,
+        yearlyCount: counts.get(row.workflowId)?.yearlyCount ?? 0,
+      }))
+      .sort((a, b) => a.workflowName.localeCompare(b.workflowName));
+
+    return {
+      projectId,
+      weeklyPeriodKey: periodKeys.weekly,
+      yearlyPeriodKey: periodKeys.yearly,
+      workflows,
+    };
   }
 }

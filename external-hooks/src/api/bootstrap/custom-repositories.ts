@@ -8,6 +8,7 @@ import { MultiWebhookWaitRepository } from '../../db/repository/custom/multi-web
 import { ProjectExecutionUsageRepository } from '../../db/repository/custom/project-execution-usage';
 import { ProjectRateLimitRepository } from '../../db/repository/custom/project-rate-limit';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
+import { WorkflowExecutionUsageRepository } from '../../db/repository/custom/workflow-execution-usage';
 import { WorkflowTriggerRepository } from '../../db/repository/custom/workflow-trigger';
 
 export type CustomRepositories = {
@@ -21,6 +22,7 @@ export type CustomRepositories = {
   readonly multiWebhookWait: MultiWebhookWaitRepository;
   readonly projectRateLimit: ProjectRateLimitRepository;
   readonly projectExecutionUsage: ProjectExecutionUsageRepository;
+  readonly workflowExecutionUsage: WorkflowExecutionUsageRepository;
 };
 
 export function buildCustomRepositories(databaseUrl: string): CustomRepositories {
@@ -37,5 +39,6 @@ export function buildCustomRepositories(databaseUrl: string): CustomRepositories
     multiWebhookWait: new MultiWebhookWaitRepository(db),
     projectRateLimit: new ProjectRateLimitRepository(db),
     projectExecutionUsage: new ProjectExecutionUsageRepository(db),
+    workflowExecutionUsage: new WorkflowExecutionUsageRepository(db),
   };
 }

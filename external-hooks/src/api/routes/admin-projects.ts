@@ -8,6 +8,8 @@ import {
   updateProjectTenantSchema,
   deleteProjectTenantSchema,
   updateProjectRateLimitSchema,
+  getAdminProjectSchema,
+  getProjectWorkflowUsageSchema,
 } from '../schemas/projects';
 import type { UiApiTypedRequest } from '../types/ui-api';
 
@@ -58,8 +60,29 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
     async (req: UiApiTypedRequest<zInfer<typeof updateProjectRateLimitSchema>>, res) => {
       const { projectId } = req.parsed.params;
       const body = req.parsed.body;
-      const result = await services.projectRateLimit.updateRateLimit(projectId, body);
+      const updatedBy = req.session.n8nUser?.email ?? null;
+      const result = await services.projectRateLimit.updateRateLimit(projectId, body, updatedBy);
       OkResponse(res, { success: true, message: 'Rate limit updated', rateLimit: result });
+    },
+  );
+
+  router.get(
+    '/projects/:projectId',
+    createRequestParser(getAdminProjectSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof getAdminProjectSchema>>, res) => {
+      const { projectId } = req.parsed.params;
+      const result = await services.projectTenant.getAdminProjectById(projectId);
+      OkResponse(res, result);
+    },
+  );
+
+  router.get(
+    '/projects/:projectId/workflow-usage',
+    createRequestParser(getProjectWorkflowUsageSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof getProjectWorkflowUsageSchema>>, res) => {
+      const { projectId } = req.parsed.params;
+      const result = await services.projectRateLimit.getProjectWorkflowUsage(projectId);
+      OkResponse(res, result);
     },
   );
 

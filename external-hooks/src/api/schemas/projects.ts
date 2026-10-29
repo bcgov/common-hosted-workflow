@@ -49,3 +49,21 @@ export const updateProjectRateLimitSchema = z.object({
   }),
   query: z.record(z.string(), z.unknown()).optional(),
 });
+
+/** GET /rest/admin/projects/:projectId — returns one enriched admin project. */
+export const getAdminProjectSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+  }),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** GET /rest/admin/projects/:projectId/workflow-usage — per-workflow current-period usage. */
+export const getProjectWorkflowUsageSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+  }),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});

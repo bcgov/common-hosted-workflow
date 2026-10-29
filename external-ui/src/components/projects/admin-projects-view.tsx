@@ -1,190 +1,202 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import axios from 'axios';
+import { Link, useSearchParams } from 'react-router';
 import { IconChevronLeft, IconChevronRight, IconSearch } from '@tabler/icons-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { toast } from '@/hooks/use-toasts';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { Select } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { fetchAllAdminProjects, type AdminProjectItem } from '../../services/backend/projects';
 import {
-  getAdminProjects,
-  updateProjectTenant,
-  deleteProjectTenant,
-  type AdminProjectItem,
-} from '../../services/backend/projects';
+  ProjectTypeBadge,
+  RateLimitStatusBadge,
+  USAGE_BAR_TONE_CLASSES,
+  USAGE_BAR_TRACK_CLASS,
+} from './project-badges';
+import {
+  formatCompactCount,
+  formatCount,
+  formatWeeklyPeriodLabel,
+  getRateLimitStatus,
+  getUsageBarTone,
+  getUsagePercent,
+  getUsageRatio,
+  type RateLimitStatus,
+  type UsageBarTone,
+} from '@/lib/rate-limit';
 
 const PAGE_SIZE = 25;
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type ProjectTypeFilter = 'all' | 'personal' | 'team';
+type ProjectTab = 'tenants' | 'personal';
+type StatusFilter = 'all' | RateLimitStatus;
 
-interface PendingUpdate {
-  projectId: string;
-  projectName: string;
-  oldTenantId: string | null;
-  newTenantId: string;
+const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
+  all: 'All statuses',
+  within_limit: 'Within limit',
+  limit_reached: 'Limit reached',
+  near_limit: 'Near limit',
+  no_limit: 'No limit',
+};
+
+function getTabLabel(tab: ProjectTab, count: number): string {
+  return tab === 'tenants' ? `Tenants (${count})` : `Personal accounts (${count})`;
 }
 
-interface PendingDelete {
-  projectId: string;
-  projectName: string;
-  tenantId: string;
+function getTabType(tab: ProjectTab): 'team' | 'personal' {
+  return tab === 'tenants' ? 'team' : 'personal';
 }
 
-function getMutationErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error) && error.response) {
-    const status = error.response.status;
-    if (status === 400) return 'Invalid tenant ID format';
-    if (status === 409) return 'Tenant ID already in use';
-  }
-  return 'Network error';
+function getTabSummaryNoun(tab: ProjectTab): string {
+  return tab === 'tenants' ? 'tenants' : 'personal accounts';
 }
 
 export function AdminProjectsView() {
-  const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
-  const [typeFilter, setTypeFilter] = useState<ProjectTypeFilter>('all');
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [page, setPage] = useState(1);
 
   const projectsQuery = useQuery({
-    queryKey: ['admin-projects', page, debouncedSearchQuery, typeFilter],
-    queryFn: ({ signal }) =>
-      getAdminProjects({
-        page,
-        pageSize: PAGE_SIZE,
-        search: debouncedSearchQuery.trim() || undefined,
-        type: typeFilter !== 'all' ? typeFilter : undefined,
-        signal,
-      }),
-    placeholderData: keepPreviousData,
+    queryKey: ['admin-projects', 'all'],
+    queryFn: ({ signal }) => fetchAllAdminProjects(signal),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (params: { projectId: string; tenantId: string }) =>
-      updateProjectTenant(params.projectId, params.tenantId),
-    onSuccess: () => {
-      setEditingProjectId(null);
-      queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
-      toast.success('Tenant ID updated');
-    },
-    onError: (error) => {
-      toast.error(getMutationErrorMessage(error));
-    },
-  });
+  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
 
-  const deleteMutation = useMutation({
-    mutationFn: (projectId: string) => deleteProjectTenant(projectId),
-    onSuccess: () => {
-      setEditingProjectId(null);
-      queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
-      toast.success('Tenant ID removed');
-    },
-    onError: (error) => {
-      toast.error(getMutationErrorMessage(error));
-    },
-  });
+  const tab: ProjectTab = searchParams.get('tab') === 'personal' ? 'personal' : 'tenants';
 
-  const projects = projectsQuery.data?.data ?? [];
-
-  const summaryText = useMemo(() => {
-    if (!projectsQuery.data) return '';
-    const { pagination } = projectsQuery.data;
-    return `${pagination.totalItems} projects`;
-  }, [projectsQuery.data]);
-
-  function startEditing(projectId: string, currentValue: string | null) {
-    setEditingProjectId(projectId);
-    setEditValue(currentValue ?? '');
-    setValidationError(null);
+  function selectTab(nextTab: ProjectTab) {
+    setSearchParams({ tab: nextTab });
+    setPage(1);
   }
 
-  function cancelEditing() {
-    setEditingProjectId(null);
-    setEditValue('');
-    setValidationError(null);
-  }
+  const teamCount = useMemo(() => projects.filter((p) => p.projectType === 'team').length, [projects]);
+  const personalCount = useMemo(() => projects.filter((p) => p.projectType === 'personal').length, [projects]);
 
-  function saveEdit(projectId: string, originalValue: string | null, projectName: string) {
-    const trimmed = editValue.trim();
+  const totalWeeklyRuns = useMemo(() => projects.reduce((sum, p) => sum + p.weeklyExecutionCount, 0), [projects]);
 
-    if (trimmed === '') {
-      if (originalValue !== null) {
-        setPendingDelete({ projectId, projectName, tenantId: originalValue });
-      } else {
-        cancelEditing();
-      }
-      return;
+  const statusCounts = useMemo(() => {
+    const counts: Record<RateLimitStatus, number> = {
+      within_limit: 0,
+      limit_reached: 0,
+      near_limit: 0,
+      no_limit: 0,
+    };
+    for (const project of projects) {
+      counts[getRateLimitStatus(project)] += 1;
     }
+    return counts;
+  }, [projects]);
 
-    if (!UUID_REGEX.test(trimmed)) {
-      setValidationError('Invalid UUID format');
-      return;
+  const filteredProjects = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return projects
+      .filter((p) => p.projectType === getTabType(tab))
+      .filter((p) => {
+        if (query) {
+          const haystack = [p.projectName, p.tenantId ?? '', p.projectId].join(' ').toLowerCase();
+          if (!haystack.includes(query)) {
+            return false;
+          }
+        }
+        if (statusFilter !== 'all' && getRateLimitStatus(p) !== statusFilter) {
+          return false;
+        }
+        return true;
+      });
+  }, [projects, tab, searchQuery, statusFilter]);
+
+  const filteredStatusCounts = useMemo(() => {
+    const counts: Record<RateLimitStatus, number> = {
+      within_limit: 0,
+      limit_reached: 0,
+      near_limit: 0,
+      no_limit: 0,
+    };
+    for (const project of filteredProjects) {
+      counts[getRateLimitStatus(project)] += 1;
     }
+    return counts;
+  }, [filteredProjects]);
 
-    if (trimmed === originalValue) {
-      cancelEditing();
-      return;
-    }
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const rangeStart = filteredProjects.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredProjects.length);
 
-    setValidationError(null);
-    setPendingUpdate({ projectId, projectName, oldTenantId: originalValue, newTenantId: trimmed });
-  }
+  const periodLabel = formatWeeklyPeriodLabel();
 
-  function confirmUpdate() {
-    if (!pendingUpdate) return;
-    updateMutation.mutate({ projectId: pendingUpdate.projectId, tenantId: pendingUpdate.newTenantId });
-    setPendingUpdate(null);
-  }
-
-  function confirmDelete() {
-    if (!pendingDelete) return;
-    deleteMutation.mutate(pendingDelete.projectId);
-    setPendingDelete(null);
-  }
-
-  if (projectsQuery.isLoading) {
+  if (projectsQuery.isPending) {
     return <p className="text-sm text-muted-foreground">Loading projects...</p>;
   }
 
-  if (projectsQuery.error) {
+  if (projectsQuery.isError) {
+    const errorMessage = projectsQuery.error instanceof Error ? projectsQuery.error.message : 'Could not load projects';
     return (
       <Alert variant="destructive">
         <AlertTitle>Error loading projects</AlertTitle>
-        <AlertDescription>
-          {projectsQuery.error instanceof Error ? projectsQuery.error.message : 'Could not load projects'}
-        </AlertDescription>
+        <AlertDescription>{errorMessage}</AlertDescription>
       </Alert>
     );
   }
 
-  const data = projectsQuery.data;
-  if (!data) {
-    return <p className="text-sm text-muted-foreground">No projects found.</p>;
-  }
-
-  const { pagination } = data;
-  const totalPages = pagination.totalPages;
-
   return (
     <div className="space-y-5">
-      {/* Search and Filter Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      {/* Title row */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-[2rem] font-bold leading-10 text-foreground">Projects</h1>
+            <Badge variant="secondary">Admin view</Badge>
+          </div>
+          <p className="max-w-4xl text-base leading-6 text-muted-foreground">
+            Set weekly and annual run limits for tenants, personal accounts and their workflows.
+          </p>
+        </div>
+        {/* Intentionally inert for now: default limits persistence is not built yet. */}
+        <Button type="button">Default limits</Button>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Runs this week"
+          value={formatCompactCount(totalWeeklyRuns)}
+          caption={`${teamCount} tenants, ${personalCount} personal accounts`}
+        />
+        <StatCard label="Limit reached" value={statusCounts.limit_reached} caption="Workflows paused until reset" />
+        <StatCard
+          label="Near limit (80%+)"
+          value={statusCounts.near_limit}
+          caption="Close to a weekly or annual limit"
+        />
+        <StatCard label="No limit set" value={statusCounts.no_limit} caption="Runs are not capped" />
+      </div>
+
+      {/* Tabs */}
+      <div
+        className="inline-flex items-center gap-1 rounded-control bg-surface-muted p-1"
+        role="tablist"
+        aria-label="Project type"
+      >
+        <TabButton
+          active={tab === 'tenants'}
+          label={getTabLabel('tenants', teamCount)}
+          onClick={() => selectTab('tenants')}
+        />
+        <TabButton
+          active={tab === 'personal'}
+          label={getTabLabel('personal', personalCount)}
+          onClick={() => selectTab('personal')}
+        />
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1">
           <IconSearch
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -197,285 +209,193 @@ export function AdminProjectsView() {
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            placeholder="Search by project name, ID, or tenant ID..."
+            placeholder="Search by tenant name or tenant ID"
             className="pl-9"
             aria-label="Search projects"
           />
         </div>
-        <select
-          value={typeFilter}
+        <Select
+          value={statusFilter}
           onChange={(e) => {
-            setTypeFilter(e.target.value as ProjectTypeFilter);
+            setStatusFilter(e.target.value as StatusFilter);
             setPage(1);
           }}
-          className="h-10 rounded-control border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-border-strong"
-          aria-label="Filter by project type"
+          aria-label="Filter by status"
+          className="lg:w-44"
         >
-          <option value="all">All types</option>
-          <option value="personal">Personal</option>
-          <option value="team">Team</option>
-        </select>
+          {(Object.keys(STATUS_FILTER_LABELS) as StatusFilter[]).map((value) => (
+            <option key={value} value={value}>
+              {STATUS_FILTER_LABELS[value]}
+            </option>
+          ))}
+        </Select>
+        <Select value="current" onChange={() => undefined} aria-label="Period" className="lg:w-56">
+          <option value="current">Period: {periodLabel}</option>
+        </Select>
       </div>
 
-      {/* Summary Count */}
-      <p className="text-[0.8125rem] text-muted-foreground">{summaryText}</p>
+      {/* Summary line for the active tab */}
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {filteredProjects.length} {getTabSummaryNoun(tab)} · {filteredStatusCounts.limit_reached} at limit,{' '}
+        {filteredStatusCounts.near_limit} near limit, {filteredStatusCounts.no_limit} with no limit
+      </p>
 
-      {/* Project List */}
-      {projects.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">No projects match your filters.</p>
-      ) : (
-        <div className="space-y-3">
-          {projects.map((project) => (
-            <ProjectRow
-              key={project.projectId}
-              project={project}
-              isEditing={editingProjectId === project.projectId}
-              editValue={editValue}
-              validationError={editingProjectId === project.projectId ? validationError : null}
-              isSaving={
-                (updateMutation.isPending && updateMutation.variables?.projectId === project.projectId) ||
-                (deleteMutation.isPending && deleteMutation.variables === project.projectId)
-              }
-              onStartEdit={() => startEditing(project.projectId, project.tenantId)}
-              onCancelEdit={cancelEditing}
-              onSaveEdit={() => saveEdit(project.projectId, project.tenantId, project.projectName)}
-              onEditValueChange={(val) => {
-                setEditValue(val);
-                if (validationError) setValidationError(null);
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({pagination.totalItems} projects)
+      {/* Table */}
+      <div className="overflow-x-auto rounded-card border border-border bg-surface shadow-card">
+        {pageProjects.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+            {projects.length === 0 ? 'No projects found.' : 'No projects match your filters.'}
           </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page <= 1}
-            >
-              <IconChevronLeft size={16} aria-hidden="true" />
-              Previous
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= totalPages}
-            >
-              Next
-              <IconChevronRight size={16} aria-hidden="true" />
-            </Button>
-          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-surface">
+                <TableHead className="uppercase">Account</TableHead>
+                <TableHead className="uppercase">Weekly runs</TableHead>
+                <TableHead className="uppercase">Annual runs</TableHead>
+                <TableHead className="uppercase">Workflows</TableHead>
+                <TableHead className="uppercase">Status</TableHead>
+                <TableHead className="uppercase">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pageProjects.map((project) => (
+                <ProjectRow key={project.projectId} project={project} />
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {/* Pagination footer */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <p className="text-sm text-muted-foreground">
+          Showing {rangeStart}–{rangeEnd} of {filteredProjects.length} {getTabSummaryNoun(tab)}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <IconChevronLeft size={16} aria-hidden="true" />
+            Previous
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+            <IconChevronRight size={16} aria-hidden="true" />
+          </Button>
         </div>
-      )}
-
-      {/* Update Confirmation Dialog */}
-      <Dialog
-        open={!!pendingUpdate}
-        onOpenChange={(open) => {
-          if (!open) setPendingUpdate(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Tenant Update</DialogTitle>
-            <DialogDescription>
-              You are about to change the tenant mapping for project{' '}
-              <strong className="text-foreground">{pendingUpdate?.projectName}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 text-sm">
-            {pendingUpdate?.oldTenantId ? (
-              <p>
-                <span className="text-muted-foreground">Current tenant:</span>{' '}
-                <code className="font-mono text-xs">{pendingUpdate.oldTenantId}</code>
-              </p>
-            ) : (
-              <p className="text-muted-foreground">No tenant currently assigned.</p>
-            )}
-            <p>
-              <span className="text-muted-foreground">New tenant:</span>{' '}
-              <code className="font-mono text-xs">{pendingUpdate?.newTenantId}</code>
-            </p>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingUpdate(null)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={confirmUpdate}>
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={!!pendingDelete}
-        onOpenChange={(open) => {
-          if (!open) setPendingDelete(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Tenant Removal</DialogTitle>
-            <DialogDescription>
-              You are about to remove the tenant mapping for project{' '}
-              <strong className="text-foreground">{pendingDelete?.projectName}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 text-sm">
-            <p>
-              <span className="text-muted-foreground">Tenant to remove:</span>{' '}
-              <code className="font-mono text-xs">{pendingDelete?.tenantId}</code>
-            </p>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" onClick={confirmDelete}>
-              Remove
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </div>
     </div>
   );
 }
 
-/* ---------- Project Row Component ---------- */
-
-interface ProjectRowProps {
-  project: AdminProjectItem;
-  isEditing: boolean;
-  editValue: string;
-  validationError: string | null;
-  isSaving: boolean;
-  onStartEdit: () => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
-  onEditValueChange: (value: string) => void;
+function StatCard({ label, value, caption }: { label: string; value: number | string; caption: string }) {
+  return (
+    <div className="rounded-card border border-border bg-surface p-5 shadow-card">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-1 text-3xl font-bold text-foreground">{value}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{caption}</p>
+    </div>
+  );
 }
 
-function ProjectRow({
-  project,
-  isEditing,
-  editValue,
-  validationError,
-  isSaving,
-  onStartEdit,
-  onCancelEdit,
-  onSaveEdit,
-  onEditValueChange,
-}: Readonly<ProjectRowProps>) {
-  const isPersonal = project.projectType === 'personal';
-  const typeBadgeClasses = isPersonal
-    ? 'bg-[#f1f8fe] text-[#1e5189] border border-[#c1ddfc]'
-    : 'bg-[#f3f2f1] text-[#605e5c] border border-[#e0dedc]';
-
+function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
-    <div
-      className={`rounded-[12px] bg-white px-5 py-4 ${
-        isEditing ? 'border-[1.5px] border-[#013366]' : 'border border-border'
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`rounded-[8px] px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90] ${
+        active
+          ? 'border border-border bg-surface text-foreground shadow-sm'
+          : 'border border-transparent text-muted-foreground hover:text-foreground'
       }`}
     >
-      {/* Header: Name + Type Badge */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-foreground">
-            <a
-              href={`${globalThis.location.origin}/projects/${encodeURIComponent(project.projectId)}/workflows`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+      {label}
+    </button>
+  );
+}
+
+function ProjectRow({ project }: { project: AdminProjectItem }) {
+  const detailPath = `/projects/${encodeURIComponent(project.projectId)}`;
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="space-y-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={detailPath}
+              className="font-semibold text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
             >
               {project.projectName}
-            </a>
-          </h3>
-          <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">{project.projectId}</p>
+            </Link>
+            <ProjectTypeBadge projectType={project.projectType} />
+          </div>
+          <p className="max-w-[24ch] truncate font-mono text-xs text-muted-foreground">
+            {project.tenantId ?? project.projectId}
+          </p>
         </div>
-        <span className={`shrink-0 rounded-md px-2.5 py-0.5 text-xs font-medium ${typeBadgeClasses}`}>
-          {isPersonal ? 'Personal' : 'Team'}
-        </span>
-      </div>
+      </TableCell>
+      <TableCell>
+        <UsageBarCell used={project.weeklyExecutionCount} limit={project.weeklyRateLimit} />
+      </TableCell>
+      <TableCell>
+        <UsageBarCell used={project.yearlyExecutionCount} limit={project.yearlyRateLimit} />
+      </TableCell>
+      <TableCell className="text-sm">{project.workflowCount}</TableCell>
+      <TableCell>
+        <RateLimitStatusBadge status={getRateLimitStatus(project)} />
+      </TableCell>
+      <TableCell className="text-right">
+        <Link
+          to={detailPath}
+          className="text-sm font-medium text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+        >
+          Manage
+        </Link>
+      </TableCell>
+    </TableRow>
+  );
+}
 
-      {/* Tenant ID Row */}
-      <div className="mt-3">
-        {isEditing ? (
-          <div className="space-y-3">
-            <label className="block text-[0.8125rem] font-bold text-[#2D2D2D]">Tenant ID</label>
-            <Input
-              type="text"
-              value={editValue}
-              onChange={(e) => onEditValueChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  onSaveEdit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  onCancelEdit();
-                }
-              }}
-              placeholder="Enter tenant UUID"
-              aria-label="Tenant ID"
-              aria-invalid={!!validationError}
-              className="font-mono text-sm"
-              autoFocus
-              disabled={isSaving}
-            />
-            {validationError && (
-              <span className="text-xs text-red-600" role="alert">
-                {validationError}
-              </span>
-            )}
-            <div className="flex items-center gap-3">
-              <Button type="button" size="sm" onClick={onSaveEdit} disabled={isSaving}>
-                Save
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={onCancelEdit} disabled={isSaving}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-[0.8125rem] font-medium text-muted-foreground">Tenant ID</span>
-            {project.tenantId ? (
-              <>
-                <span className="font-mono text-[0.8125rem] text-foreground">{project.tenantId}</span>
-                <button
-                  type="button"
-                  onClick={onStartEdit}
-                  className="text-[0.8125rem] font-medium text-[#255a90] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
-                >
-                  Edit
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="text-[0.8125rem] text-muted-foreground">No tenant mapped</span>
-                <button
-                  type="button"
-                  onClick={onStartEdit}
-                  className="text-[0.8125rem] font-medium text-[#255a90] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
-                >
-                  Add tenant ID
-                </button>
-              </>
-            )}
-          </div>
+function UsageBarCell({ used, limit }: { used: number; limit: number | null }) {
+  const ratio = getUsageRatio(used, limit);
+  const percent = getUsagePercent(used, limit);
+  const tone: UsageBarTone | null = ratio === null ? null : getUsageBarTone(ratio);
+
+  return (
+    <div className="min-w-[9rem] space-y-1.5">
+      <p className="text-sm text-foreground">
+        {formatCount(used)} / {limit === null ? 'No limit' : formatCount(limit)}
+      </p>
+      <div
+        data-tone={tone}
+        role="img"
+        aria-label={
+          limit === null
+            ? `${formatCount(used)} runs, no limit set`
+            : `${formatCount(used)} of ${formatCount(limit)} runs used`
+        }
+        className={`h-1 w-full overflow-hidden rounded-full ${USAGE_BAR_TRACK_CLASS}`}
+      >
+        {tone !== null && (
+          <div
+            className={`h-full rounded-full ${USAGE_BAR_TONE_CLASSES[tone]}`}
+            style={{ width: `${Math.min(100, percent ?? 0)}%` }}
+          />
         )}
       </div>
     </div>

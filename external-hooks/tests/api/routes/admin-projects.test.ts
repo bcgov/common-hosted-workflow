@@ -35,10 +35,18 @@ function makeStoredRateLimit(overrides: Record<string, unknown> = {}) {
     yearlyRateLimit: 5000,
     lastAdminComment: 'Approved by the platform team',
     stopBehavior: 'hard_stop',
+    updatedBy: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   };
+}
+
+function makeSession(sessionOverrides: Record<string, unknown> = {}) {
+  return {
+    n8nUser: { email: 'admin@example.com', firstName: 'Admin', lastName: 'User' },
+    ...sessionOverrides,
+  } as any;
 }
 
 function createTestRouter(serviceOverrides: Record<string, any> = {}) {
@@ -46,10 +54,12 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
     listAllProjectsWithTenants: vi.fn(),
     assignTenantToProject: vi.fn(),
     removeTenantFromProject: vi.fn(),
+    getAdminProjectById: vi.fn(),
     ...serviceOverrides.projectTenant,
   };
   const projectRateLimit = {
     updateRateLimit: vi.fn(),
+    getProjectWorkflowUsage: vi.fn(),
     ...serviceOverrides.projectRateLimit,
   };
 
@@ -185,15 +195,41 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
     const { router } = createTestRouter({ projectRateLimit: { updateRateLimit } });
 
     const handlers = getRouteHandlers(router, 'put', RATE_LIMIT_ROUTE);
-    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, body, query: {} });
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body,
+      query: {},
+      session: makeSession(),
+    });
     const res = createMockResponse();
 
     const error = await runHandlerChain(handlers!, req, res);
 
     expect(error).toBeNull();
-    expect(updateRateLimit).toHaveBeenCalledWith(VALID_PROJECT_ID, body);
+    expect(updateRateLimit).toHaveBeenCalledWith(VALID_PROJECT_ID, body, 'admin@example.com');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Rate limit updated', rateLimit: stored });
+  });
+
+  it('passes null as the actor when the session has no n8n user', async () => {
+    const body = makeRateLimitBody();
+    const stored = makeStoredRateLimit();
+    const updateRateLimit = vi.fn().mockResolvedValue(stored);
+    const { router } = createTestRouter({ projectRateLimit: { updateRateLimit } });
+
+    const handlers = getRouteHandlers(router, 'put', RATE_LIMIT_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body,
+      query: {},
+      session: makeSession({ n8nUser: null }),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(updateRateLimit).toHaveBeenCalledWith(VALID_PROJECT_ID, body, null);
   });
 
   it('accepts explicit nulls that clear the limits and the admin comment', async () => {
@@ -208,13 +244,18 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
     const { router } = createTestRouter({ projectRateLimit: { updateRateLimit } });
 
     const handlers = getRouteHandlers(router, 'put', RATE_LIMIT_ROUTE);
-    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, body, query: {} });
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body,
+      query: {},
+      session: makeSession(),
+    });
     const res = createMockResponse();
 
     const error = await runHandlerChain(handlers!, req, res);
 
     expect(error).toBeNull();
-    expect(updateRateLimit).toHaveBeenCalledWith(VALID_PROJECT_ID, body);
+    expect(updateRateLimit).toHaveBeenCalledWith(VALID_PROJECT_ID, body, 'admin@example.com');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Rate limit updated', rateLimit: stored });
   });
@@ -224,7 +265,12 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
     const { router } = createTestRouter({ projectRateLimit: { updateRateLimit } });
 
     const handlers = getRouteHandlers(router, 'put', RATE_LIMIT_ROUTE);
-    const req = createMockRequest({ params: { projectId: 'missing-project' }, body: makeRateLimitBody(), query: {} });
+    const req = createMockRequest({
+      params: { projectId: 'missing-project' },
+      body: makeRateLimitBody(),
+      query: {},
+      session: makeSession(),
+    });
     const res = createMockResponse();
 
     const next = await runHandlerChainCapturingErrors(handlers!, req, res);
@@ -246,13 +292,111 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
     const { router } = createTestRouter({ projectRateLimit: { updateRateLimit } });
 
     const handlers = getRouteHandlers(router, 'put', RATE_LIMIT_ROUTE);
-    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, body: invalidBody, query: {} });
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body: invalidBody,
+      query: {},
+      session: makeSession(),
+    });
     const res = createMockResponse();
 
     const next = await runHandlerChainCapturingErrors(handlers!, req, res);
 
     expectNextAppError(next, 400);
     expect(updateRateLimit).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  GET /projects/:projectId                                           */
+/* ================================================================== */
+
+describe('GET /ui-api/admin/projects/:projectId', () => {
+  it('returns the enriched single-project item', async () => {
+    const item = {
+      projectId: VALID_PROJECT_ID,
+      projectName: 'Configured project',
+      projectType: 'team',
+      tenantId: VALID_TENANT_ID,
+      weeklyRateLimit: 10,
+      yearlyRateLimit: 1000,
+      stopBehavior: 'hard_stop',
+      lastAdminComment: 'Cap for FY',
+      weeklyExecutionCount: 3,
+      yearlyExecutionCount: 30,
+      workflowCount: 5,
+      updatedAt: '2026-03-05T10:00:00.000Z',
+      updatedByName: 'A. Lovelace',
+    };
+    const getAdminProjectById = vi.fn().mockResolvedValue(item);
+    const { router } = createTestRouter({ projectTenant: { getAdminProjectById } });
+
+    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId');
+    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, query: {} });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(getAdminProjectById).toHaveBeenCalledWith(VALID_PROJECT_ID);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(item);
+  });
+
+  it('propagates the service AppError 404 for an unknown project', async () => {
+    const getAdminProjectById = vi.fn().mockRejectedValue(new AppError(404, 'Project not found'));
+    const { router } = createTestRouter({ projectTenant: { getAdminProjectById } });
+
+    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId');
+    const req = createMockRequest({ params: { projectId: 'missing-project' }, query: {} });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 404);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  GET /projects/:projectId/workflow-usage                            */
+/* ================================================================== */
+
+describe('GET /ui-api/admin/projects/:projectId/workflow-usage', () => {
+  it('returns the per-workflow usage payload', async () => {
+    const usage = {
+      projectId: VALID_PROJECT_ID,
+      weeklyPeriodKey: '2026-W44',
+      yearlyPeriodKey: '2026',
+      workflows: [{ workflowId: 'wf-100', workflowName: 'Alpha workflow', weeklyCount: 3, yearlyCount: 30 }],
+    };
+    const getProjectWorkflowUsage = vi.fn().mockResolvedValue(usage);
+    const { router } = createTestRouter({ projectRateLimit: { getProjectWorkflowUsage } });
+
+    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId/workflow-usage');
+    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, query: {} });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(getProjectWorkflowUsage).toHaveBeenCalledWith(VALID_PROJECT_ID);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(usage);
+  });
+
+  it('propagates the service AppError 404 for an unknown project', async () => {
+    const getProjectWorkflowUsage = vi.fn().mockRejectedValue(new AppError(404, 'Project not found'));
+    const { router } = createTestRouter({ projectRateLimit: { getProjectWorkflowUsage } });
+
+    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId/workflow-usage');
+    const req = createMockRequest({ params: { projectId: 'missing-project' }, query: {} });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 404);
     expect(res.json).not.toHaveBeenCalled();
   });
 });

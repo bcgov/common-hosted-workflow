@@ -15,19 +15,22 @@ For the layered architecture these components live in, see [`architecture.md`](.
 
 ## Source layout
 
-| Path                                                                 | Role                                                                                                        |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `external-hooks/src/api/bootstrap/rate-limit-hook.ts`                | `workflow.preExecute` policy: kill switch, exempt modes, counting-process decision, lazy memoized bootstrap |
-| `external-hooks/src/api/services/project-rate-limit.service.ts`      | Enforcement + counting, admin update, admin-list enrichment; `RateLimitExceededError`                       |
-| `external-hooks/src/api/helpers/period.ts`                           | ISO-week / calendar-year period keys (`getWeeklyPeriodKey`, `getYearlyPeriodKey`, `getCurrentPeriodKeys`)   |
-| `external-hooks/src/db/schema/project-rate-limit.ts`                 | Drizzle table `project_rate_limit`                                                                          |
-| `external-hooks/src/db/schema/project-execution-usage.ts`            | Drizzle table `project_execution_usage`                                                                     |
-| `external-hooks/src/db/repository/custom/project-rate-limit.ts`      | Config repository: `get`, `upsert`, `listByProjectIds`                                                      |
-| `external-hooks/src/db/repository/custom/project-execution-usage.ts` | Usage counters: `getCounts`, atomic `increment`, `listCountsByProjectIds`                                   |
-| `external-hooks/src/api/schemas/projects.ts`                         | `updateProjectRateLimitSchema` (zod request validation)                                                     |
-| `external-hooks/src/api/routes/admin-projects.ts`                    | `GET /projects` and `PUT /projects/:projectId/rate-limit` routes                                            |
-| `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`      | Additive-only migration (applied by the existing `node migrate.cjs` step)                                   |
-| `helm/_n8n/templates/deployments/worker.yaml`                        | Worker pods receive the custom-database env block                                                           |
+| Path                                                                  | Role                                                                                                                                    |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `external-hooks/src/api/bootstrap/rate-limit-hook.ts`                 | `workflow.preExecute` policy: kill switch, exempt modes, counting-process decision, lazy memoized bootstrap                             |
+| `external-hooks/src/api/services/project-rate-limit.service.ts`       | Enforcement + counting (project and workflow counters), admin update, admin reads/enrichment; `RateLimitExceededError`                  |
+| `external-hooks/src/api/helpers/period.ts`                            | ISO-week / calendar-year period keys (`getWeeklyPeriodKey`, `getYearlyPeriodKey`, `getCurrentPeriodKeys`)                               |
+| `external-hooks/src/db/schema/project-rate-limit.ts`                  | Drizzle table `project_rate_limit`                                                                                                      |
+| `external-hooks/src/db/schema/project-execution-usage.ts`             | Drizzle table `project_execution_usage`                                                                                                 |
+| `external-hooks/src/db/repository/custom/project-rate-limit.ts`       | Config repository: `get`, `upsert`, `listByProjectIds`                                                                                  |
+| `external-hooks/src/db/repository/custom/project-execution-usage.ts`  | Usage counters: `getCounts`, atomic `increment`, `listCountsByProjectIds`                                                               |
+| `external-hooks/src/db/schema/workflow-execution-usage.ts`            | Drizzle table `workflow_execution_usage`                                                                                                |
+| `external-hooks/src/db/repository/custom/workflow-execution-usage.ts` | Per-workflow usage counters: atomic `increment`, `listCountsByWorkflowIds`                                                              |
+| `external-hooks/src/api/schemas/projects.ts`                          | `updateProjectRateLimitSchema` (zod request validation)                                                                                 |
+| `external-hooks/src/api/routes/admin-projects.ts`                     | `GET /projects`, `GET /projects/:projectId`, `GET /projects/:projectId/workflow-usage` and `PUT /projects/:projectId/rate-limit` routes |
+| `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`       | Additive-only migration: the two rate-limit tables (applied by the existing `node migrate.cjs` step)                                    |
+| `external-hooks/drizzle/0013_add_workflow_usage_and_updated_by.sql`   | Additive-only migration: `workflow_execution_usage` + `project_rate_limit.updated_by`                                                   |
+| `helm/_n8n/templates/deployments/worker.yaml`                         | Worker pods receive the custom-database env block                                                                                       |
 
 ---
 
@@ -50,21 +53,23 @@ Note that `RATE_LIMIT_TIMEZONE` is independent of n8n's own `GENERIC_TIMEZONE` (
 
 ## Data model
 
-Two tables in the custom database, created by the additive-only migration `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`.
+Three tables in the custom database. `0011_add_project_rate_limit_tables.sql` created the rate-limit configuration and the per-project counters; `0013_add_workflow_usage_and_updated_by.sql` added the per-workflow counters and `project_rate_limit.updated_by` (both additive-only migrations, applied by the existing `node migrate.cjs` step; renumbered from 0012 to 0013 during the CCP-6033 merge because main claimed the 0012 slot).
 
 ### `project_rate_limit` — per-project configuration
 
-| Column                    | Type        | Constraints                                                          | Meaning                                                 |
-| ------------------------- | ----------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
-| `project_id`              | varchar(50) | primary key                                                          | n8n project id                                          |
-| `weekly_rate_limit`       | integer     | nullable                                                             | Max executions per ISO week; `NULL` = unlimited         |
-| `yearly_rate_limit`       | integer     | nullable                                                             | Max executions per calendar year; `NULL` = unlimited    |
-| `last_admin_comment`      | text        | nullable                                                             | Free-form admin note (≤ 2000 chars enforced by the API) |
-| `stop_behavior`           | varchar(20) | `NOT NULL DEFAULT 'hard_stop'`, CHECK `IN ('hard_stop','soft_stop')` | What happens when a limit is reached                    |
-| `created_at`/`updated_at` | timestamptz | `NOT NULL DEFAULT now()`                                             | House-convention timestamps                             |
+| Column                    | Type         | Constraints                                                          | Meaning                                                                                           |
+| ------------------------- | ------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `project_id`              | varchar(50)  | primary key                                                          | n8n project id                                                                                    |
+| `weekly_rate_limit`       | integer      | nullable                                                             | Max executions per ISO week; `NULL` = unlimited                                                   |
+| `yearly_rate_limit`       | integer      | nullable                                                             | Max executions per calendar year; `NULL` = unlimited                                              |
+| `last_admin_comment`      | text         | nullable                                                             | Free-form admin note (≤ 2000 chars enforced by the API)                                           |
+| `stop_behavior`           | varchar(20)  | `NOT NULL DEFAULT 'hard_stop'`, CHECK `IN ('hard_stop','soft_stop')` | What happens when a limit is reached                                                              |
+| `updated_by`              | varchar(255) | nullable                                                             | Email of the admin who last changed the configuration; `NULL` until the first API-mediated change |
+| `created_at`/`updated_at` | timestamptz  | `NOT NULL DEFAULT now()`                                             | House-convention timestamps; `updated_at` backs the UI's "Changed <date>" display                 |
 
 - **No row = unconfigured = unlimited.** Nothing is enforced for unconfigured projects — their runs are still counted (always-count, below).
 - **`NULL` limits = unlimited for that period** while the row remains (e.g. only a yearly limit configured).
+- **`updated_by` is an email, resolved to a display name at read time.** The API stamps it with the authenticated admin's email when limits change; the admin endpoints resolve it against n8n's user table ("F. Last", falling back to the raw email, then to `null`), so responses expose `updatedAt` + `updatedByName` instead of a bare address.
 
 ### `project_execution_usage` — per-period counters
 
@@ -79,6 +84,21 @@ Two tables in the custom database, created by the additive-only migration `exter
 The composite PK (`project_id`, `period_type`, `period_key`) means one counter row per project per period. Counters are incremented with an atomic upsert-increment (`INSERT … ON CONFLICT … DO UPDATE SET count = count + 1`), so concurrent workers can never lose an increment or race each other's inserts into an error.
 
 There is no foreign key to `tenant_project_relation`: rate limits apply to **any** n8n project, not only tenant-mapped ones.
+
+### `workflow_execution_usage` — per-workflow counters
+
+Same shape as the project counters, keyed one level deeper:
+
+| Column                    | Type        | Constraints                                                       |
+| ------------------------- | ----------- | ----------------------------------------------------------------- |
+| `project_id`              | varchar(50) | part of the composite primary key `pk_workflow_execution_usage`   |
+| `workflow_id`             | varchar(50) | part of the composite PK                                          |
+| `period_type`             | varchar(10) | part of the composite PK; CHECK `IN ('weekly','yearly')`          |
+| `period_key`              | varchar(10) | part of the composite PK — `'2026-W44'` (week) or `'2026'` (year) |
+| `count`                   | integer     | `NOT NULL DEFAULT 0`                                              |
+| `created_at`/`updated_at` | timestamptz | `NOT NULL DEFAULT now()`                                          |
+
+One row per project/workflow/period, incremented with the same atomic upsert-increment as the project counters, in the same pass (`enforceExecution` bumps both). Like the project counters these are custom-DB rows, so they survive n8n's execution pruning. Indexes on `project_id` and `workflow_id` serve the detail-page reads. There is no foreign key to n8n tables: a workflow removed from a project leaves stale rows behind, which the read endpoints simply exclude.
 
 ---
 
@@ -100,7 +120,7 @@ The `workflow.preExecute` hook fires immediately before every workflow run (main
 1. Resolves the workflow's n8n project via `shared_workflow`. A workflow shared with **no** project is never limited or counted; if multiple projects are found (an n8n anomaly — workflows belong to exactly one project), the first is used and a warning is logged.
 2. Loads the project's configuration row and the current weekly/yearly counters.
 3. Evaluates breaches: a breach is `count >= limit` for any configured (non-`NULL`) limit. A configured limit of `0` therefore rejects every non-exempt run.
-4. Applies the stop behaviour and — when allowed and this process counts — increments both counters.
+4. Applies the stop behaviour and — when allowed and this process counts — increments the project's weekly/yearly counters and the workflow's counters in the same pass.
 
 ### Rules
 
@@ -110,6 +130,7 @@ The `workflow.preExecute` hook fires immediately before every workflow run (main
 - **Always-count.** Unconfigured and unlimited projects still accumulate usage on the counting process, so the admin list shows real usage for every project.
 - **Exempt modes are neither counted nor blocked:** `manual` (editor runs), `internal`, and n8n evaluation modes (`evaluation*`, `eval_*`).
 - **Sub-workflow executions count as runs.** `preExecute` also fires for sub-executions, and each is a real execution counting against the same project's limits.
+- **Per-workflow counters mirror the project counters.** Every counted run also increments the `(project, workflow)` rows, so the admin detail page shows per-workflow weekly/annual usage from real counter data. The matrix above applies to both levels.
 - **Boundary race.** The check and the increment are not one serialized transaction, so a burst of concurrent runs can overshoot a limit by a few executions. Accepted trade-off — the alternative would serialize all of a project's runs.
 - **Fail-open.** Any infrastructure error (custom DB unreachable, missing env, service build failure) is logged and the run is allowed. Only `RateLimitExceededError` propagates out of the hook.
 - **Kill switch.** With `RATE_LIMIT_ENFORCEMENT_ENABLED=false` the hook returns immediately: nothing is enforced and nothing is counted (until restart).
@@ -156,15 +177,18 @@ Both endpoints are on the existing admin router mounted at **`/ui-api/admin`** (
 
 Unchanged route; the service now enriches every item. Query parameters are unchanged (`page` default 1, `pageSize` default 25 max 100, `search`, `type`). Each item keeps `projectId`, `projectName`, `projectType`, `tenantId` and gains:
 
-| Field                  | Type                               | Meaning                                             |
-| ---------------------- | ---------------------------------- | --------------------------------------------------- |
-| `weeklyRateLimit`      | number \| null                     | Configured weekly limit; `null` when unconfigured   |
-| `yearlyRateLimit`      | number \| null                     | Configured yearly limit; `null` when unconfigured   |
-| `stopBehavior`         | 'hard_stop' \| 'soft_stop' \| null | `null` when the project is unconfigured             |
-| `lastAdminComment`     | string \| null                     | Last admin note; `null` when unset                  |
-| `weeklyExecutionCount` | number                             | Executions in the current ISO week (0 default)      |
-| `yearlyExecutionCount` | number                             | Executions in the current calendar year (0 default) |
-| `workflowCount`        | number                             | Workflows shared with the project (0 default)       |
+| Field                  | Type                               | Meaning                                                                           |
+| ---------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| `weeklyRateLimit`      | number \| null                     | Configured weekly limit; `null` when unconfigured                                 |
+| `yearlyRateLimit`      | number \| null                     | Configured yearly limit; `null` when unconfigured                                 |
+| `stopBehavior`         | 'hard_stop' \| 'soft_stop' \| null | `null` when the project is unconfigured                                           |
+| `lastAdminComment`     | string \| null                     | Last admin note; `null` when unset                                                |
+| `weeklyExecutionCount` | number                             | Executions in the current ISO week (0 default)                                    |
+| `yearlyExecutionCount` | number                             | Executions in the current calendar year (0 default)                               |
+| `workflowCount`        | number                             | Workflows shared with the project (0 default)                                     |
+| `membersCount`         | number                             | Project members, from n8n's project relations (0 default)                         |
+| `updatedAt`            | string \| null                     | When the rate-limit config was last changed (ISO 8601); `null` when never changed |
+| `updatedByName`        | string \| null                     | Display name of the admin who made the last change; `null` when unknown           |
 
 Example item (inside the usual `{ "data": [...], "pagination": { ... } }` envelope):
 
@@ -180,11 +204,35 @@ Example item (inside the usual `{ "data": [...], "pagination": { ... } }` envelo
   "lastAdminComment": "Tier A pilot limits",
   "weeklyExecutionCount": 12,
   "yearlyExecutionCount": 340,
-  "workflowCount": 4
+  "workflowCount": 4,
+  "membersCount": 6,
+  "updatedAt": "2026-10-26T23:01:02.345Z",
+  "updatedByName": "N. McInnis"
 }
 ```
 
-**Errors never break the list:** enrichment failures (e.g. custom-DB outage) are logged and fall back to defaults — `null` limits/comment, `0` counts — so the project list keeps working.
+**Errors never break the list:** enrichment failures (e.g. custom-DB outage) are logged and fall back to defaults — `null` limits/comment, `0` counts, `null` `updatedAt`/`updatedByName` — so the project list keeps working.
+
+### `GET /ui-api/admin/projects/:projectId`
+
+Same guard chain and the same item shape as the list, enrichment included. Backs the admin project detail page. **404** (`Project not found`) when the project does not exist.
+
+### `GET /ui-api/admin/projects/:projectId/workflow-usage`
+
+Per-workflow execution counts for the project's workflows, for the current weekly/yearly periods (keys returned as `weeklyPeriodKey` / `yearlyPeriodKey`):
+
+```json
+{
+  "projectId": "pKQ8pX7cQFdB",
+  "weeklyPeriodKey": "2026-W44",
+  "yearlyPeriodKey": "2026",
+  "workflows": [
+    { "workflowId": "wAbCdEfGhIjK", "workflowName": "Invoice QR intake", "weeklyCount": 2850, "yearlyCount": 121000 }
+  ]
+}
+```
+
+Counts come from `workflow_execution_usage` (custom DB), sorted by workflow name. Usage rows whose workflow is no longer shared with the project are excluded. **404** (`Project not found`) when the project is unknown.
 
 ### `PUT /ui-api/admin/projects/:projectId/rate-limit`
 
@@ -208,7 +256,7 @@ Example request body:
 }
 ```
 
-**200** response (`rateLimit` is the stored row):
+**200** response (`rateLimit` is the stored row; `updatedBy` records the authenticated admin's email, from the UI session):
 
 ```json
 {
@@ -220,6 +268,7 @@ Example request body:
     "yearlyRateLimit": 200000,
     "lastAdminComment": "Tier A pilot limits",
     "stopBehavior": "hard_stop",
+    "updatedBy": "admin.user@testapp.com",
     "createdAt": "2026-10-26T23:01:02.345Z",
     "updatedAt": "2026-10-26T23:01:02.345Z"
   }
@@ -238,13 +287,21 @@ Errors use the standard `{ "error": { "message": "…" } }` shape:
 
 ---
 
+## Admin UI (Projects page)
+
+The external-ui admin **Projects** page (`/projects`) renders this API data for platform admins: aggregate stat cards (runs this week, limit reached, near limit, no limit), Tenants / Personal accounts tabs, client-side search + status filter over the full project list (fetched in pages of 100), and a usage table with weekly/annual progress bars, status badges and per-project links. Status and bar tones are computed client-side: reached = count ≥ limit; near = ≥ 80% of any set limit; red at ≥ 100%, amber at ≥ 75%.
+
+Each row links to a per-project detail page (`/projects/:projectId`): limit cards with "Changed <date> by <name>" attribution (`updatedAt`/`updatedByName`), reset dates (next Monday / Jan 1, `America/Vancouver`), a member count from the project's relations, a per-workflow runs table from the workflow-usage endpoint, tenant-ID inline editing, and an "Edit limits" dialog (weekly/annual limits, stop behaviour, required reason) that PUTs the full-replace body. Elements the API does not provide yet (top-up amounts, pace projection, historical periods) render as placeholders; the "Default limits" and "Add top-up" buttons are intentional no-ops for now.
+
+---
+
 ## Operational notes
 
 - **Roll out the image and the helm worker env in the same release.** The enforcement hook ships in the image, but workers also need `CUSTOM_DATABASE_URL` (now injected from the `customDatabase` secret, mirroring main's block). A worker without it logs one error — `Rate limiting disabled in this process: CUSTOM_DATABASE_URL is not set` — and stays fail-open for the life of the pod: nothing is enforced **or counted** for queue runs.
 - **Kill switch:** `RATE_LIMIT_ENFORCEMENT_ENABLED=false` stops all enforcement; it takes effect after a process restart (env is read once at startup).
 - **Safe rollout by default:** with no `project_rate_limit` rows configured, nothing is ever rejected; usage counters still accumulate — exactly what you want before picking limits, since the admin list then shows real usage for every project.
 - **Counters survive n8n's execution pruning by design.** n8n prunes its own execution records after a deployment-configured age — this repo's helm sets `EXECUTIONS_DATA_PRUNE: "true"` with `EXECUTIONS_DATA_MAX_AGE: "336"` (hours ≈ 14 days) in the base values, and `8784` (1 year) in the prod values files — so counting live `execution_entity` rows would silently undercount yearly usage. The dedicated counter rows in the custom DB are unaffected.
-- **Old period rows accumulate slowly** — one row per project per period; a weekly row stops being read at the next week rollover. Retention/cleanup is a follow-up (explicit non-goal of the initial release).
+- **Old period rows accumulate slowly** — one row per project (plus one per project/workflow) per period; a weekly row stops being read at the next week rollover. Retention/cleanup is a follow-up (explicit non-goal of the initial release).
 - **Resumed (waiting) executions** may re-fire the pre-run hook on the worker; if n8n does so, a resumed run adds one extra usage increment. Upstream behaviour is not yet confirmed; the possible overcount is accepted.
 
 ---

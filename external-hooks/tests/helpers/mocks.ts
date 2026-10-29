@@ -229,6 +229,13 @@ export function createMockProjectExecutionUsageRepository() {
   };
 }
 
+export function createMockWorkflowExecutionUsageRepository() {
+  return {
+    increment: vi.fn().mockResolvedValue(undefined),
+    listCountsByWorkflowIds: vi.fn().mockResolvedValue(new Map()),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /*  n8n repository mocks                                               */
 /* ------------------------------------------------------------------ */
@@ -271,6 +278,8 @@ export function createMockN8nRepositories() {
       columns: [
         { propertyName: 'id', databaseName: 'id' },
         { propertyName: 'email', databaseName: 'email' },
+        { propertyName: 'firstName', databaseName: 'firstName' },
+        { propertyName: 'lastName', databaseName: 'lastName' },
       ],
     },
   } as const;
@@ -290,7 +299,12 @@ export function createMockN8nRepositories() {
   });
 
   return {
-    user: { findOne: vi.fn(), findOneBy: vi.fn(), metadata: metadata.User },
+    user: {
+      findOne: vi.fn(),
+      findOneBy: vi.fn(),
+      metadata: metadata.User,
+      manager: makeManager(),
+    },
     project: {
       findOneBy: vi.fn().mockImplementation(async ({ id }) => (id === VALID_PROJECT_ID ? defaultProject : null)),
       getPersonalProjectForUser: vi.fn().mockResolvedValue(defaultProject),
@@ -305,6 +319,7 @@ export function createMockN8nRepositories() {
           return role ? [{ role }] : [];
         }),
         findAllByUser: vi.fn().mockResolvedValue([{ projectId: VALID_PROJECT_ID }]),
+        countMembersByProjectIds: vi.fn().mockResolvedValue(new Map()),
         metadata: metadata.ProjectRelation,
         manager: makeManager(),
       };
@@ -314,6 +329,7 @@ export function createMockN8nRepositories() {
     sharedWorkflow: {
       findProjectIds: vi.fn().mockResolvedValue([VALID_PROJECT_ID]),
       countByProjectIds: vi.fn().mockResolvedValue(new Map()),
+      findWorkflowRowsByProjectIds: vi.fn().mockResolvedValue([]),
       findRowsByWorkflowId: vi
         .fn()
         .mockResolvedValue([
