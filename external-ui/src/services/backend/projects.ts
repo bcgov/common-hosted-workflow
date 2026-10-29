@@ -1,10 +1,55 @@
 import { instance } from './axios';
 
+export type RateLimitStopBehavior = 'hard_stop' | 'soft_stop';
+
 export type AdminProjectItem = {
   projectId: string;
   projectName: string;
   projectType: string;
   tenantId: string | null;
+  weeklyRateLimit: number | null;
+  yearlyRateLimit: number | null;
+  stopBehavior: RateLimitStopBehavior | null;
+  lastAdminComment: string | null;
+  weeklyExecutionCount: number;
+  yearlyExecutionCount: number;
+  workflowCount: number;
+  membersCount: number;
+  updatedAt: string | null;
+  updatedByName: string | null;
+};
+
+export type UpdateProjectRateLimitBody = {
+  weeklyRateLimit: number | null;
+  yearlyRateLimit: number | null;
+  lastAdminComment: string | null;
+  stopBehavior: RateLimitStopBehavior;
+};
+
+export type ProjectRateLimitRow = UpdateProjectRateLimitBody & {
+  projectId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateProjectRateLimitResponse = {
+  success: true;
+  message: string;
+  rateLimit: ProjectRateLimitRow;
+};
+
+export type ProjectWorkflowUsageItem = {
+  workflowId: string;
+  workflowName: string;
+  weeklyCount: number;
+  yearlyCount: number;
+};
+
+export type ProjectWorkflowUsage = {
+  projectId: string;
+  weeklyPeriodKey: string;
+  yearlyPeriodKey: string;
+  workflows: ProjectWorkflowUsageItem[];
 };
 
 export type AdminProjectsResponse = {
@@ -53,6 +98,46 @@ export function deleteProjectTenant(projectId: string) {
   return instance
     .delete<void>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/tenant`)
     .then((res) => res.data);
+}
+
+export function updateProjectRateLimit(projectId: string, body: UpdateProjectRateLimitBody) {
+  return instance
+    .put<UpdateProjectRateLimitResponse>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/rate-limit`, body)
+    .then((res) => res.data);
+}
+
+export function getAdminProject(projectId: string, signal?: AbortSignal) {
+  return instance
+    .get<AdminProjectItem>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}`, { signal })
+    .then((res) => res.data);
+}
+
+export function getProjectWorkflowUsage(projectId: string, signal?: AbortSignal) {
+  return instance
+    .get<ProjectWorkflowUsage>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/workflow-usage`, {
+      signal,
+    })
+    .then((res) => res.data);
+}
+
+const FETCH_ALL_PAGE_SIZE = 100;
+const FETCH_ALL_MAX_PAGES = 100;
+
+/**
+ * Fetches every admin project by paging through the paginated list endpoint
+ * (100 per page, capped at 100 pages) so client-side aggregates and filters
+ * see the whole dataset.
+ */
+export async function fetchAllAdminProjects(signal?: AbortSignal): Promise<AdminProjectItem[]> {
+  const all: AdminProjectItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await getAdminProjects({ page, pageSize: FETCH_ALL_PAGE_SIZE, signal });
+    all.push(...response.data);
+    if (page >= response.pagination.totalPages || page >= FETCH_ALL_MAX_PAGES) {
+      break;
+    }
+  }
+  return all;
 }
 
 export function getUserProjects(signal?: AbortSignal) {

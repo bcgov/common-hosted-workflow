@@ -75,6 +75,29 @@ export class ProjectTenantService {
   }
 
   /**
+   * Returns a single admin project item with the same shape as one
+   * listAllProjectsWithTenants entry. Throws AppError 404 when the project
+   * does not exist in n8n.
+   */
+  async getAdminProjectById(projectId: string): Promise<AdminProjectItem> {
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (!project) {
+      throw new AppError(404, 'Project not found');
+    }
+
+    const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
+    const rateLimitEnrichment = await this.projectRateLimitService.enrichAdminProjects([{ projectId }]);
+
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      projectType: project.type,
+      tenantId: tenantMap.get(project.id) ?? null,
+      ...rateLimitEnrichment[project.id],
+    };
+  }
+
+  /**
    * Assigns a tenant ID to a project. Validates that the project exists and that
    * the tenant is not already assigned to a different project.
    * Throws AppError 404 if project not found, 409 if tenant conflict.

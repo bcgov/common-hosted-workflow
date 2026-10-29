@@ -6,6 +6,7 @@ import { AccessRequest } from './pages/access-request';
 import { AccessRequests } from './pages/access-requests';
 import { WorkflowInteraction } from './pages/workflow-interaction';
 import { Projects } from './pages/projects';
+import { ProjectDetail } from './pages/project-detail';
 import { usePermissions, useSessionLoading } from './state/session';
 import { PermissionRoute } from './components/permission-route';
 
@@ -53,6 +54,14 @@ export function App() {
           element={
             <PermissionRoute permissionKey="canManageProject">
               <Projects />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId"
+          element={
+            <PermissionRoute permissionKey="canManageProject">
+              <ProjectDetail />
             </PermissionRoute>
           }
         />

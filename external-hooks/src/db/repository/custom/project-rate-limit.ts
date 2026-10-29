@@ -21,6 +21,7 @@ export class ProjectRateLimitRepository {
     yearlyRateLimit: number | null;
     lastAdminComment: string | null;
     stopBehavior: string;
+    updatedBy: string | null;
   }): Promise<void> {
     await this.db
       .insert(projectRateLimit)
@@ -32,6 +33,7 @@ export class ProjectRateLimitRepository {
           yearlyRateLimit: params.yearlyRateLimit,
           lastAdminComment: params.lastAdminComment,
           stopBehavior: params.stopBehavior,
+          updatedBy: params.updatedBy,
           updatedAt: sql`now()`,
         },
       });

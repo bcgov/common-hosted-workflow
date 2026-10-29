@@ -83,6 +83,40 @@ export class UserRepository {
       .filter((email): email is string => typeof email === 'string' && email.length > 0);
   }
 
+  /**
+   * Resolves display names for a batch of emails in a single query. The map is
+   * keyed by lowercased email so callers can look up case-insensitively;
+   * emails without a matching n8n user are simply absent.
+   */
+  async findUserNamesByEmails(emails: string[]): Promise<Map<string, { firstName: string; lastName: string }>> {
+    const names = new Map<string, { firstName: string; lastName: string }>();
+    const uniqueEmails = [...new Set(emails.map((email) => email.trim()).filter((email) => email.length > 0))];
+    if (!uniqueEmails.length) {
+      return names;
+    }
+
+    const tableName = this.userRepository.metadata.tableName;
+    const emailColumn = this.getColumnName('email');
+    const firstNameColumn = this.getColumnName('firstName');
+    const lastNameColumn = this.getColumnName('lastName');
+
+    const rows = await this.userRepository.manager.query(
+      `SELECT "${emailColumn}", "${firstNameColumn}", "${lastNameColumn}" FROM "${tableName}" WHERE LOWER("${emailColumn}") = ANY($1)`,
+      [uniqueEmails.map((email) => email.toLowerCase())],
+    );
+
+    for (const row of rows) {
+      const email = row[emailColumn];
+      if (typeof email === 'string') {
+        names.set(email.toLowerCase(), {
+          firstName: String(row[firstNameColumn] ?? ''),
+          lastName: String(row[lastNameColumn] ?? ''),
+        });
+      }
+    }
+    return names;
+  }
+
   private getColumnName(propertyName: string): string {
     const column = this.userRepository.metadata.columns.find((entry) => entry.propertyName === propertyName);
     if (column) {

@@ -9,6 +9,7 @@ export const projectRateLimit = pgTable(
     yearlyRateLimit: integer('yearly_rate_limit'),
     lastAdminComment: text('last_admin_comment'),
     stopBehavior: varchar('stop_behavior', { length: 20 }).notNull().default('hard_stop'),
+    updatedBy: varchar('updated_by', { length: 255 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

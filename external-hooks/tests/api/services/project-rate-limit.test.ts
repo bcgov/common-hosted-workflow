@@ -3,12 +3,14 @@ import { ProjectRateLimitService, RateLimitExceededError } from '../../../src/ap
 import { AppError } from '../../../src/api/utils/errors';
 import { getCurrentPeriodKeys } from '../../../src/api/helpers/period';
 import type { ProjectRateLimit } from '../../../src/db/schema/project-rate-limit';
+import { UserRepository } from '../../../src/db/repository/n8n/user';
 import {
   VALID_PROJECT_ID,
   VALID_WORKFLOW_ID,
   createMockN8nRepositories,
   createMockProjectExecutionUsageRepository,
   createMockProjectRateLimitRepository,
+  createMockWorkflowExecutionUsageRepository,
 } from '../../helpers/mocks';
 
 /** Captures the rejection reason; fails the test when the promise resolves. */
@@ -28,6 +30,7 @@ function makeConfigRow(overrides: Partial<ProjectRateLimit> = {}): ProjectRateLi
     yearlyRateLimit: null,
     lastAdminComment: null,
     stopBehavior: 'hard_stop',
+    updatedBy: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -38,6 +41,7 @@ describe('ProjectRateLimitService', () => {
   let n8nRepos: ReturnType<typeof createMockN8nRepositories>;
   let rateLimitRepo: ReturnType<typeof createMockProjectRateLimitRepository>;
   let usageRepo: ReturnType<typeof createMockProjectExecutionUsageRepository>;
+  let workflowUsageRepo: ReturnType<typeof createMockWorkflowExecutionUsageRepository>;
   let service: ProjectRateLimitService;
   let warnSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -47,11 +51,15 @@ describe('ProjectRateLimitService', () => {
     n8nRepos = createMockN8nRepositories();
     rateLimitRepo = createMockProjectRateLimitRepository();
     usageRepo = createMockProjectExecutionUsageRepository();
+    workflowUsageRepo = createMockWorkflowExecutionUsageRepository();
+    // The real user repository is wrapped around the raw mock so enrichment
+    // exercises the metadata-driven display-name lookup.
     service = new ProjectRateLimitService(
-      n8nRepos as any,
+      { ...n8nRepos, user: new UserRepository(n8nRepos.user as any) } as any,
       {
         projectRateLimit: rateLimitRepo,
         projectExecutionUsage: usageRepo,
+        workflowExecutionUsage: workflowUsageRepo,
       } as any,
     );
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -76,6 +84,7 @@ describe('ProjectRateLimitService', () => {
           expect(rateLimitRepo.get).not.toHaveBeenCalled();
           expect(usageRepo.getCounts).not.toHaveBeenCalled();
           expect(usageRepo.increment).not.toHaveBeenCalled();
+          expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
           expect(n8nRepos.sharedWorkflow.countByProjectIds).not.toHaveBeenCalled();
         },
       );
@@ -92,6 +101,7 @@ describe('ProjectRateLimitService', () => {
       expect(rateLimitRepo.get).not.toHaveBeenCalled();
       expect(usageRepo.getCounts).not.toHaveBeenCalled();
       expect(usageRepo.increment).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
     });
 
     it('rate limits against the first project when a workflow is shared with several', async () => {
@@ -120,6 +130,21 @@ describe('ProjectRateLimitService', () => {
       expect(usageRepo.increment).toHaveBeenCalledTimes(2);
       expect(usageRepo.increment).toHaveBeenNthCalledWith(1, VALID_PROJECT_ID, 'weekly', periodKeys.weekly);
       expect(usageRepo.increment).toHaveBeenNthCalledWith(2, VALID_PROJECT_ID, 'yearly', periodKeys.yearly);
+      expect(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+      expect(workflowUsageRepo.increment).toHaveBeenNthCalledWith(
+        1,
+        VALID_PROJECT_ID,
+        VALID_WORKFLOW_ID,
+        'weekly',
+        periodKeys.weekly,
+      );
+      expect(workflowUsageRepo.increment).toHaveBeenNthCalledWith(
+        2,
+        VALID_PROJECT_ID,
+        VALID_WORKFLOW_ID,
+        'yearly',
+        periodKeys.yearly,
+      );
     });
 
     it('allows executions under the configured limits and counts both periods', async () => {
@@ -133,6 +158,21 @@ describe('ProjectRateLimitService', () => {
       expect(usageRepo.increment).toHaveBeenCalledTimes(2);
       expect(usageRepo.increment).toHaveBeenNthCalledWith(1, VALID_PROJECT_ID, 'weekly', periodKeys.weekly);
       expect(usageRepo.increment).toHaveBeenNthCalledWith(2, VALID_PROJECT_ID, 'yearly', periodKeys.yearly);
+      expect(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+      expect(workflowUsageRepo.increment).toHaveBeenNthCalledWith(
+        1,
+        VALID_PROJECT_ID,
+        VALID_WORKFLOW_ID,
+        'weekly',
+        periodKeys.weekly,
+      );
+      expect(workflowUsageRepo.increment).toHaveBeenNthCalledWith(
+        2,
+        VALID_PROJECT_ID,
+        VALID_WORKFLOW_ID,
+        'yearly',
+        periodKeys.yearly,
+      );
     });
 
     it('rejects with RateLimitExceededError when the weekly limit is reached (hard stop, no increments)', async () => {
@@ -150,6 +190,7 @@ describe('ProjectRateLimitService', () => {
       expect(error.message).toContain('used 10');
       expect(error.message).toContain(periodKeys.weekly);
       expect(usageRepo.increment).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
     });
 
     it('rejects with RateLimitExceededError when the yearly limit is exceeded (hard stop, no increments)', async () => {
@@ -167,6 +208,7 @@ describe('ProjectRateLimitService', () => {
       expect(error.message).toContain('used 150');
       expect(error.message).toContain(periodKeys.yearly);
       expect(usageRepo.increment).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
     });
 
     it('allows over-limit executions with soft stop, counting usage and warning', async () => {
@@ -181,6 +223,21 @@ describe('ProjectRateLimitService', () => {
       expect(usageRepo.increment).toHaveBeenCalledTimes(2);
       expect(usageRepo.increment).toHaveBeenNthCalledWith(1, VALID_PROJECT_ID, 'weekly', periodKeys.weekly);
       expect(usageRepo.increment).toHaveBeenNthCalledWith(2, VALID_PROJECT_ID, 'yearly', periodKeys.yearly);
+      expect(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+      expect(workflowUsageRepo.increment).toHaveBeenNthCalledWith(
+        1,
+        VALID_PROJECT_ID,
+        VALID_WORKFLOW_ID,
+        'weekly',
+        periodKeys.weekly,
+      );
+      expect(workflowUsageRepo.increment).toHaveBeenNthCalledWith(
+        2,
+        VALID_PROJECT_ID,
+        VALID_WORKFLOW_ID,
+        'yearly',
+        periodKeys.yearly,
+      );
     });
 
     it('rejects over-limit executions without counting when countUsage is false (check-only)', async () => {
@@ -193,6 +250,7 @@ describe('ProjectRateLimitService', () => {
 
       expect(error).toBeInstanceOf(RateLimitExceededError);
       expect(usageRepo.increment).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
     });
 
     it('allows under-limit executions without counting when countUsage is false', async () => {
@@ -204,6 +262,7 @@ describe('ProjectRateLimitService', () => {
       ).resolves.toBeUndefined();
 
       expect(usageRepo.increment).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
     });
 
     it('fails open when the config repository rejects', async () => {
@@ -216,6 +275,19 @@ describe('ProjectRateLimitService', () => {
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('failing open'));
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(VALID_WORKFLOW_ID));
       expect(usageRepo.increment).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
+    });
+
+    it('fails open when the workflow usage repository rejects after project counts', async () => {
+      workflowUsageRepo.increment.mockRejectedValue(new Error('workflow usage table unavailable'));
+
+      await expect(
+        service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+      ).resolves.toBeUndefined();
+
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('failing open'));
+      expect(usageRepo.increment).toHaveBeenCalledTimes(2);
+      expect(workflowUsageRepo.increment).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -228,7 +300,9 @@ describe('ProjectRateLimitService', () => {
     };
 
     it('throws AppError 404 for an unknown project', async () => {
-      const error = (await captureRejection(service.updateRateLimit('unknown-project', body))) as AppError;
+      const error = (await captureRejection(
+        service.updateRateLimit('unknown-project', body, 'admin@example.com'),
+      )) as AppError;
 
       expect(error).toBeInstanceOf(AppError);
       expect(error.statusCode).toBe(404);
@@ -240,11 +314,31 @@ describe('ProjectRateLimitService', () => {
       const stored = makeConfigRow(body);
       rateLimitRepo.get.mockResolvedValue(stored);
 
-      const result = await service.updateRateLimit(VALID_PROJECT_ID, body);
+      const result = await service.updateRateLimit(VALID_PROJECT_ID, body, 'admin@example.com');
 
       expect(result).toBe(stored);
-      expect(rateLimitRepo.upsert).toHaveBeenCalledWith({ projectId: VALID_PROJECT_ID, ...body });
+      expect(rateLimitRepo.upsert).toHaveBeenCalledWith({
+        projectId: VALID_PROJECT_ID,
+        ...body,
+        updatedBy: 'admin@example.com',
+      });
       expect(rateLimitRepo.get).toHaveBeenCalledWith(VALID_PROJECT_ID);
+    });
+
+    it('trims surrounding whitespace from the recorded admin email', async () => {
+      rateLimitRepo.get.mockResolvedValue(makeConfigRow(body));
+
+      await service.updateRateLimit(VALID_PROJECT_ID, body, '  admin@example.com  ');
+
+      expect(rateLimitRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ updatedBy: 'admin@example.com' }));
+    });
+
+    it('stores null when the admin email is empty or whitespace only', async () => {
+      rateLimitRepo.get.mockResolvedValue(makeConfigRow(body));
+
+      await service.updateRateLimit(VALID_PROJECT_ID, body, '   ');
+
+      expect(rateLimitRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ updatedBy: null }));
     });
   });
 
@@ -261,6 +355,7 @@ describe('ProjectRateLimitService', () => {
         new Map([[VALID_PROJECT_ID, { weeklyCount: 3, yearlyCount: 30 }]]),
       );
       n8nRepos.sharedWorkflow.countByProjectIds.mockResolvedValue(new Map([[VALID_PROJECT_ID, 5]]));
+      n8nRepos.projectRelation.countMembersByProjectIds.mockResolvedValue(new Map([[VALID_PROJECT_ID, 2]]));
 
       const result = await service.enrichAdminProjects([{ projectId: 'proj-001' }, { projectId: 'proj-002' }]);
 
@@ -274,6 +369,8 @@ describe('ProjectRateLimitService', () => {
       );
       expect(n8nRepos.sharedWorkflow.countByProjectIds).toHaveBeenCalledTimes(1);
       expect(n8nRepos.sharedWorkflow.countByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002']);
+      expect(n8nRepos.projectRelation.countMembersByProjectIds).toHaveBeenCalledTimes(1);
+      expect(n8nRepos.projectRelation.countMembersByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002']);
       expect(result['proj-001']).toEqual({
         weeklyRateLimit: 10,
         yearlyRateLimit: 1000,
@@ -282,6 +379,9 @@ describe('ProjectRateLimitService', () => {
         weeklyExecutionCount: 3,
         yearlyExecutionCount: 30,
         workflowCount: 5,
+        membersCount: 2,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        updatedByName: null,
       });
       expect(result['proj-002']).toEqual({
         weeklyRateLimit: null,
@@ -291,7 +391,85 @@ describe('ProjectRateLimitService', () => {
         weeklyExecutionCount: 0,
         yearlyExecutionCount: 0,
         workflowCount: 0,
+        membersCount: 0,
+        updatedAt: null,
+        updatedByName: null,
       });
+      expect(n8nRepos.user.manager.query).not.toHaveBeenCalled();
+    });
+
+    it('resolves editor display names by email and formats them as F. Last', async () => {
+      const configRow = makeConfigRow({
+        updatedBy: 'Ada.Lovelace@Example.com',
+        updatedAt: new Date('2026-03-05T10:00:00Z'),
+      });
+      rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[VALID_PROJECT_ID, configRow]]));
+      n8nRepos.user.manager.query.mockResolvedValue([
+        { email: 'ada.lovelace@example.com', firstName: 'Ada', lastName: 'Lovelace' },
+      ]);
+
+      const result = await service.enrichAdminProjects([{ projectId: VALID_PROJECT_ID }]);
+
+      expect(result[VALID_PROJECT_ID]).toEqual({
+        weeklyRateLimit: null,
+        yearlyRateLimit: null,
+        stopBehavior: 'hard_stop',
+        lastAdminComment: null,
+        weeklyExecutionCount: 0,
+        yearlyExecutionCount: 0,
+        workflowCount: 0,
+        membersCount: 0,
+        updatedAt: '2026-03-05T10:00:00.000Z',
+        updatedByName: 'A. Lovelace',
+      });
+      expect(n8nRepos.user.manager.query).toHaveBeenCalledTimes(1);
+      expect(n8nRepos.user.manager.query).toHaveBeenCalledWith(expect.any(String), [['ada.lovelace@example.com']]);
+    });
+
+    it('falls back to the raw stored email when no n8n user matches it', async () => {
+      rateLimitRepo.listByProjectIds.mockResolvedValue(
+        new Map([[VALID_PROJECT_ID, makeConfigRow({ updatedBy: 'ghost@example.com' })]]),
+      );
+      n8nRepos.user.manager.query.mockResolvedValue([]);
+
+      const result = await service.enrichAdminProjects([{ projectId: VALID_PROJECT_ID }]);
+
+      expect(result[VALID_PROJECT_ID]?.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+      expect(result[VALID_PROJECT_ID]?.updatedByName).toBe('ghost@example.com');
+    });
+
+    it('degrades only the editor name to null when the user lookup fails', async () => {
+      rateLimitRepo.listByProjectIds.mockResolvedValue(
+        new Map([[VALID_PROJECT_ID, makeConfigRow({ weeklyRateLimit: 7, updatedBy: 'admin@example.com' })]]),
+      );
+      n8nRepos.user.manager.query.mockRejectedValue(new Error('user lookup failed'));
+
+      const result = await service.enrichAdminProjects([{ projectId: VALID_PROJECT_ID }]);
+
+      expect(result[VALID_PROJECT_ID]).toEqual({
+        weeklyRateLimit: 7,
+        yearlyRateLimit: null,
+        stopBehavior: 'hard_stop',
+        lastAdminComment: null,
+        weeklyExecutionCount: 0,
+        yearlyExecutionCount: 0,
+        workflowCount: 0,
+        membersCount: 0,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        updatedByName: null,
+      });
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('display names'));
+    });
+
+    it('skips the name lookup when no config row records an editor email', async () => {
+      rateLimitRepo.listByProjectIds.mockResolvedValue(
+        new Map([[VALID_PROJECT_ID, makeConfigRow({ updatedBy: '   ' })]]),
+      );
+
+      const result = await service.enrichAdminProjects([{ projectId: VALID_PROJECT_ID }]);
+
+      expect(result[VALID_PROJECT_ID]?.updatedByName).toBeNull();
+      expect(n8nRepos.user.manager.query).not.toHaveBeenCalled();
     });
 
     it('returns default enrichment when a source throws so the admin list keeps working', async () => {
@@ -307,6 +485,9 @@ describe('ProjectRateLimitService', () => {
         weeklyExecutionCount: 0,
         yearlyExecutionCount: 0,
         workflowCount: 0,
+        membersCount: 0,
+        updatedAt: null,
+        updatedByName: null,
       });
       expect(result['proj-002']).toEqual({
         weeklyRateLimit: null,
@@ -316,6 +497,9 @@ describe('ProjectRateLimitService', () => {
         weeklyExecutionCount: 0,
         yearlyExecutionCount: 0,
         workflowCount: 0,
+        membersCount: 0,
+        updatedAt: null,
+        updatedByName: null,
       });
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('rate-limit data'));
     });
@@ -327,6 +511,82 @@ describe('ProjectRateLimitService', () => {
       expect(rateLimitRepo.listByProjectIds).not.toHaveBeenCalled();
       expect(usageRepo.listCountsByProjectIds).not.toHaveBeenCalled();
       expect(n8nRepos.sharedWorkflow.countByProjectIds).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getProjectWorkflowUsage', () => {
+    it('throws AppError 404 for an unknown project', async () => {
+      const error = (await captureRejection(service.getProjectWorkflowUsage('unknown-project'))) as AppError;
+
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.statusCode).toBe(404);
+      expect(error.message).toBe('Project not found');
+      expect(n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds).not.toHaveBeenCalled();
+      expect(workflowUsageRepo.listCountsByWorkflowIds).not.toHaveBeenCalled();
+    });
+
+    it('returns per-workflow current-period usage sorted by workflow name', async () => {
+      n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds.mockResolvedValue([
+        { workflowId: 'wf-200', workflowName: 'Zeta workflow', projectId: VALID_PROJECT_ID },
+        { workflowId: 'wf-100', workflowName: 'Alpha workflow', projectId: VALID_PROJECT_ID },
+      ]);
+      workflowUsageRepo.listCountsByWorkflowIds.mockResolvedValue(
+        new Map([
+          ['wf-100', { weeklyCount: 3, yearlyCount: 30 }],
+          ['wf-200', { weeklyCount: 1, yearlyCount: 10 }],
+        ]),
+      );
+
+      const result = await service.getProjectWorkflowUsage(VALID_PROJECT_ID);
+
+      expect(n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds).toHaveBeenCalledWith([VALID_PROJECT_ID]);
+      expect(workflowUsageRepo.listCountsByWorkflowIds).toHaveBeenCalledWith(
+        VALID_PROJECT_ID,
+        ['wf-200', 'wf-100'],
+        periodKeys.weekly,
+        periodKeys.yearly,
+      );
+      expect(result).toEqual({
+        projectId: VALID_PROJECT_ID,
+        weeklyPeriodKey: periodKeys.weekly,
+        yearlyPeriodKey: periodKeys.yearly,
+        workflows: [
+          { workflowId: 'wf-100', workflowName: 'Alpha workflow', weeklyCount: 3, yearlyCount: 30 },
+          { workflowId: 'wf-200', workflowName: 'Zeta workflow', weeklyCount: 1, yearlyCount: 10 },
+        ],
+      });
+    });
+
+    it('zero-fills workflows without usage and drops usage rows for workflows no longer in the project', async () => {
+      n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds.mockResolvedValue([
+        { workflowId: 'wf-100', workflowName: 'Alpha workflow', projectId: VALID_PROJECT_ID },
+      ]);
+      workflowUsageRepo.listCountsByWorkflowIds.mockResolvedValue(
+        new Map([
+          ['wf-100', { weeklyCount: 0, yearlyCount: 0 }],
+          ['wf-999', { weeklyCount: 99, yearlyCount: 99 }],
+        ]),
+      );
+
+      const result = await service.getProjectWorkflowUsage(VALID_PROJECT_ID);
+
+      expect(result.workflows).toEqual([
+        { workflowId: 'wf-100', workflowName: 'Alpha workflow', weeklyCount: 0, yearlyCount: 0 },
+      ]);
+    });
+
+    it('returns an empty workflow list when the project has no workflows', async () => {
+      n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds.mockResolvedValue([]);
+
+      const result = await service.getProjectWorkflowUsage(VALID_PROJECT_ID);
+
+      expect(result.workflows).toEqual([]);
+      expect(workflowUsageRepo.listCountsByWorkflowIds).toHaveBeenCalledWith(
+        VALID_PROJECT_ID,
+        [],
+        periodKeys.weekly,
+        periodKeys.yearly,
+      );
     });
   });
 });

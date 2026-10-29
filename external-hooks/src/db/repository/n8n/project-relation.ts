@@ -78,4 +78,31 @@ export class ProjectRelationRepository {
 
     return rows as Array<{ projectId: string; email: string }>;
   }
+
+  /**
+   * Counts the members (project relations) of each project in a single grouped
+   * query. Projects without relations are absent from the map; callers treat a
+   * missing entry as zero members.
+   */
+  async countMembersByProjectIds(projectIds: string[]): Promise<Map<string, number>> {
+    if (!projectIds.length) {
+      return new Map();
+    }
+
+    const projectRelationMetadata = this.projectRelationRepository.metadata;
+    const projectRelationTable = quoteIdentifier(projectRelationMetadata.tableName);
+    const projectRelationProjectColumn = quoteIdentifier(getColumnName(projectRelationMetadata, 'projectId'));
+
+    const rows = await this.queryUserEmails(
+      `
+        SELECT pr.${projectRelationProjectColumn} AS "projectId", COUNT(*) AS "count"
+        FROM ${projectRelationTable} pr
+        WHERE pr.${projectRelationProjectColumn} = ANY($1)
+        GROUP BY pr.${projectRelationProjectColumn}
+      `,
+      [projectIds],
+    );
+
+    return new Map(rows.map((row) => [String(row.projectId), Number(row.count)]));
+  }
 }
