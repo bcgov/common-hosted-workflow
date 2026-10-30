@@ -7,6 +7,7 @@ import { MessageRepository } from '../../db/repository/custom/message';
 import { MultiWebhookWaitRepository } from '../../db/repository/custom/multi-webhook-wait';
 import { ProjectExecutionUsageRepository } from '../../db/repository/custom/project-execution-usage';
 import { ProjectRateLimitRepository } from '../../db/repository/custom/project-rate-limit';
+import { ProjectTopupRepository } from '../../db/repository/custom/project-topup';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
 import { WorkflowExecutionUsageRepository } from '../../db/repository/custom/workflow-execution-usage';
 import { WorkflowTriggerRepository } from '../../db/repository/custom/workflow-trigger';
@@ -23,6 +24,7 @@ export type CustomRepositories = {
   readonly projectRateLimit: ProjectRateLimitRepository;
   readonly projectExecutionUsage: ProjectExecutionUsageRepository;
   readonly workflowExecutionUsage: WorkflowExecutionUsageRepository;
+  readonly projectTopup: ProjectTopupRepository;
 };
 
 export function buildCustomRepositories(databaseUrl: string): CustomRepositories {
@@ -40,5 +42,6 @@ export function buildCustomRepositories(databaseUrl: string): CustomRepositories
     projectRateLimit: new ProjectRateLimitRepository(db),
     projectExecutionUsage: new ProjectExecutionUsageRepository(db),
     workflowExecutionUsage: new WorkflowExecutionUsageRepository(db),
+    projectTopup: new ProjectTopupRepository(db),
   };
 }

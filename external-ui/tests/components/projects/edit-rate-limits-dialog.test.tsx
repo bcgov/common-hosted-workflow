@@ -24,6 +24,7 @@ const PROJECT: AdminProjectItem = {
   lastAdminComment: 'Tier A pilot limits',
   weeklyExecutionCount: 8_640,
   yearlyExecutionCount: 121_000,
+  weeklyTopupRuns: 0,
   workflowCount: 2,
   membersCount: 4,
   updatedAt: '2026-09-02T20:00:00Z',

@@ -21,7 +21,9 @@ function makeProject(id: string): AdminProjectItem {
     lastAdminComment: null,
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
+    weeklyTopupRuns: 0,
     workflowCount: 0,
+    membersCount: 0,
     updatedAt: null,
     updatedByName: null,
   };

@@ -31,6 +31,7 @@ export interface MockResponse extends Partial<Response> {
   locals: Record<string, unknown>;
   header: ReturnType<typeof vi.fn>;
   redirect: ReturnType<typeof vi.fn>;
+  end: ReturnType<typeof vi.fn>;
 }
 
 export function createMockRequest(overrides: Partial<Request> = {}): Request {
@@ -59,6 +60,7 @@ export function createMockResponse(localsOverrides: Record<string, unknown> = {}
     locals: { ...localsOverrides },
     header: vi.fn(),
     redirect: vi.fn(),
+    end: vi.fn(),
   };
   return res;
 }
@@ -233,6 +235,31 @@ export function createMockWorkflowExecutionUsageRepository() {
   return {
     increment: vi.fn().mockResolvedValue(undefined),
     listCountsByWorkflowIds: vi.fn().mockResolvedValue(new Map()),
+  };
+}
+
+export const VALID_TOPUP_ID = 'c2a9e7b4-3d51-4f8a-9b2c-7e6d5f4a3b21';
+
+export function makeProjectTopupRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: VALID_TOPUP_ID,
+    projectId: VALID_PROJECT_ID,
+    periodKey: '2026-W44',
+    amount: 2000,
+    adminComment: 'Extra runs for the quarterly batch',
+    createdBy: 'test@example.com',
+    createdAt: BASE_DATE,
+    ...overrides,
+  };
+}
+
+export function createMockProjectTopupRepository() {
+  return {
+    list: vi.fn().mockResolvedValue({ rows: [], totalItems: 0 }),
+    getById: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockImplementation(async (params: Record<string, unknown>) => makeProjectTopupRow(params)),
+    deleteById: vi.fn().mockResolvedValue(true),
+    sumByProjectIds: vi.fn().mockResolvedValue(new Map()),
   };
 }
 

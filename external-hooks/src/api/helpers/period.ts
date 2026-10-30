@@ -98,3 +98,27 @@ export function getCurrentPeriodKeys(date: Date = new Date()): PeriodKeys {
   const { isoYear, week } = getIsoWeek(localDate);
   return { weekly: formatWeeklyKey(isoYear, week), yearly: `${localDate.year}` };
 }
+
+/** LocalDate of a UTC-midnight timestamp (inverse of `Date.UTC(y, m, d)`). */
+function getUtcMidnightLocalDate(utcMidnight: number): LocalDate {
+  const date = new Date(utcMidnight);
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+}
+
+/**
+ * Consecutive weekly period keys ('YYYY-Www'), starting with the ISO week that
+ * contains `date` (the current week) and extending `count - 1` weeks into the
+ * future, in the period timezone. Drives the top-up period horizon; stepping
+ * whole weeks keeps ISO-week rollovers (including year boundaries) correct.
+ */
+export function listUpcomingWeeklyPeriodKeys(count: number, date: Date = new Date()): string[] {
+  const localDate = getLocalDate(date);
+  const localMidnight = Date.UTC(localDate.year, localDate.month - 1, localDate.day);
+  const weekStart = localMidnight - (getIsoDayOfWeek(localMidnight) - 1) * MS_PER_DAY;
+  const keys: string[] = [];
+  for (let offset = 0; offset < count; offset += 1) {
+    const { isoYear, week } = getIsoWeek(getUtcMidnightLocalDate(weekStart + offset * 7 * MS_PER_DAY));
+    keys.push(formatWeeklyKey(isoYear, week));
+  }
+  return keys;
+}

@@ -5,13 +5,18 @@ import {
   formatCount,
   formatResetDate,
   formatShortDate,
+  formatWeeklyKeyRange,
   formatWeeklyPeriodLabel,
+  getEffectiveWeeklyLimit,
+  getHighestUsagePeriod,
   getNextWeeklyReset,
   getNextYearlyReset,
   getRateLimitStatus,
   getUsageBarTone,
   getUsagePercent,
   getUsageRatio,
+  getWeeklyPeriodKey,
+  listUpcomingWeeklyPeriodOptions,
 } from '@/lib/rate-limit';
 
 type UsageFixture = {
@@ -19,6 +24,7 @@ type UsageFixture = {
   yearlyRateLimit: number | null;
   weeklyExecutionCount: number;
   yearlyExecutionCount: number;
+  weeklyTopupRuns: number;
 };
 
 describe('getRateLimitStatus', () => {
@@ -28,6 +34,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: null,
       weeklyExecutionCount: 42,
       yearlyExecutionCount: 500,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('no_limit');
   });
@@ -38,6 +45,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: null,
       weeklyExecutionCount: 0,
       yearlyExecutionCount: 5_000,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('within_limit');
   });
@@ -48,6 +56,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: 500_000,
       weeklyExecutionCount: 12_000,
       yearlyExecutionCount: 60_000,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -58,6 +67,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: 500_000,
       weeklyExecutionCount: 100,
       yearlyExecutionCount: 500_000,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -68,6 +78,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: null,
       weeklyExecutionCount: 0,
       yearlyExecutionCount: 0,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -78,6 +89,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: null,
       weeklyExecutionCount: 8_000,
       yearlyExecutionCount: 0,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('near_limit');
   });
@@ -88,6 +100,7 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: null,
       weeklyExecutionCount: 7_990,
       yearlyExecutionCount: 0,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('within_limit');
   });
@@ -98,8 +111,76 @@ describe('getRateLimitStatus', () => {
       yearlyRateLimit: 50_000,
       weeklyExecutionCount: 8_000,
       yearlyExecutionCount: 50_000,
+      weeklyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
+  });
+
+  it.each([
+    [100, 'within_limit'],
+    [159, 'within_limit'],
+    [160, 'near_limit'],
+    [199, 'near_limit'],
+    [200, 'limit_reached'],
+    [201, 'limit_reached'],
+  ])('compares weekly usage of %d against the base plus top-ups', (weeklyExecutionCount, status) => {
+    const project: UsageFixture = {
+      weeklyRateLimit: 100,
+      yearlyRateLimit: null,
+      weeklyExecutionCount,
+      yearlyExecutionCount: 0,
+      weeklyTopupRuns: 100,
+    };
+
+    expect(getRateLimitStatus(project)).toBe(status);
+  });
+
+  it('does not increase the yearly limit when weekly top-ups are present', () => {
+    const project: UsageFixture = {
+      weeklyRateLimit: 100,
+      yearlyRateLimit: 1_000,
+      weeklyExecutionCount: 0,
+      yearlyExecutionCount: 1_000,
+      weeklyTopupRuns: 10_000,
+    };
+
+    expect(getRateLimitStatus(project)).toBe('limit_reached');
+  });
+});
+
+describe('effective weekly limit and highest usage period', () => {
+  const project: UsageFixture = {
+    weeklyRateLimit: 100,
+    yearlyRateLimit: 1_000,
+    weeklyExecutionCount: 90,
+    yearlyExecutionCount: 700,
+    weeklyTopupRuns: 0,
+  };
+
+  it('adds top-ups to a configured base and leaves a base without top-ups unchanged', () => {
+    expect(getEffectiveWeeklyLimit(project)).toBe(100);
+    expect(getEffectiveWeeklyLimit({ ...project, weeklyTopupRuns: 50 })).toBe(150);
+  });
+
+  it('does not create a weekly limit from top-ups alone', () => {
+    expect(getEffectiveWeeklyLimit({ ...project, weeklyRateLimit: null, weeklyTopupRuns: 50 })).toBeNull();
+  });
+
+  it('uses the effective weekly denominator when choosing the highest usage period', () => {
+    expect(getHighestUsagePeriod(project)).toBe('weekly');
+    expect(getHighestUsagePeriod({ ...project, weeklyTopupRuns: 100 })).toBe('yearly');
+  });
+
+  it('ignores unconfigured periods even if top-ups exist', () => {
+    expect(getHighestUsagePeriod({ ...project, weeklyRateLimit: null, weeklyTopupRuns: 100 })).toBe('yearly');
+    expect(getHighestUsagePeriod({ ...project, yearlyRateLimit: null })).toBe('weekly');
+    expect(
+      getHighestUsagePeriod({ ...project, weeklyRateLimit: null, yearlyRateLimit: null, weeklyTopupRuns: 100 }),
+    ).toBeNull();
+  });
+
+  it('prefers the weekly period when effective usage ratios tie', () => {
+    expect(getHighestUsagePeriod({ ...project, weeklyExecutionCount: 140, weeklyTopupRuns: 100 })).toBe('weekly');
   });
 });
 
@@ -185,5 +266,59 @@ describe('reset and period dates', () => {
   it('formats short and dated labels', () => {
     expect(formatShortDate(new Date('2026-09-02T20:00:00Z'))).toBe('Sep 2');
     expect(formatResetDate(new Date('2027-01-04T12:00:00Z'))).toBe('Jan 4, 2027');
+  });
+});
+
+describe('top-up weekly period keys and options', () => {
+  it.each([
+    ['2026-10-27T20:00:00Z', '2026-W44'],
+    ['2026-10-26T06:59:59Z', '2026-W43'],
+    ['2026-10-26T07:00:00Z', '2026-W44'],
+    ['2025-12-29T20:00:00Z', '2026-W01'],
+    ['2026-12-30T20:00:00Z', '2026-W53'],
+    ['2027-01-01T20:00:00Z', '2026-W53'],
+    ['2027-01-04T08:00:00Z', '2027-W01'],
+    ['2026-03-09T06:59:59Z', '2026-W10'],
+    ['2026-03-09T07:00:00Z', '2026-W11'],
+    ['2025-11-03T07:59:59Z', '2025-W44'],
+    ['2025-11-03T08:00:00Z', '2025-W45'],
+  ])('maps %s to the whole-number ISO week %s in Vancouver', (instant, key) => {
+    expect(getWeeklyPeriodKey(new Date(instant))).toBe(key);
+  });
+
+  it.each([
+    ['2026-W44', 'Oct 26 to Nov 1'],
+    ['2026-W45', 'Nov 2 to 8'],
+    ['2026-W53', 'Dec 28 to Jan 3'],
+    ['2026-W01', 'Dec 29 to Jan 4'],
+  ])('formats %s as %s', (key, range) => {
+    expect(formatWeeklyKeyRange(key)).toBe(range);
+  });
+
+  it.each(['invalid', '2026-10-27', '2026-W1', '2026-W00', '2026-W54', '2025-W53'])(
+    'falls back to the raw key for the invalid period %s',
+    (key) => {
+      expect(formatWeeklyKeyRange(key)).toBe(key);
+    },
+  );
+
+  it('offers the current week plus 25 future weeks without a Weekly prefix', () => {
+    const options = listUpcomingWeeklyPeriodOptions(undefined, new Date('2026-10-27T20:00:00Z'));
+
+    expect(options).toHaveLength(26);
+    expect(options[0]).toEqual({ value: '2026-W44', label: 'This week (Oct 26 to Nov 1)' });
+    expect(options[1]).toEqual({ value: '2026-W45', label: 'Nov 2 to 8' });
+    expect(options[25]).toEqual({ value: '2027-W16', label: 'Apr 19 to 25' });
+    expect(new Set(options.map((option) => option.value)).size).toBe(26);
+    expect(options.every((option) => /^\d{4}-W\d{2}$/.test(option.value))).toBe(true);
+    expect(options.every((option) => !option.label.includes('Weekly'))).toBe(true);
+  });
+
+  it('handles an ISO year rollover when listing the requested number of weeks', () => {
+    expect(listUpcomingWeeklyPeriodOptions(3, new Date('2026-12-30T20:00:00Z'))).toEqual([
+      { value: '2026-W53', label: 'This week (Dec 28 to Jan 3)' },
+      { value: '2027-W01', label: 'Jan 4 to 10' },
+      { value: '2027-W02', label: 'Jan 11 to 17' },
+    ]);
   });
 });

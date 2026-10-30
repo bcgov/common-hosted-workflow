@@ -19,6 +19,7 @@ import {
   formatCompactCount,
   formatCount,
   formatWeeklyPeriodLabel,
+  getEffectiveWeeklyLimit,
   getRateLimitStatus,
   getUsageBarTone,
   getUsagePercent,
@@ -350,7 +351,7 @@ function ProjectRow({ project }: { project: AdminProjectItem }) {
         </div>
       </TableCell>
       <TableCell>
-        <UsageBarCell used={project.weeklyExecutionCount} limit={project.weeklyRateLimit} />
+        <UsageBarCell used={project.weeklyExecutionCount} limit={getEffectiveWeeklyLimit(project)} />
       </TableCell>
       <TableCell>
         <UsageBarCell used={project.yearlyExecutionCount} limit={project.yearlyRateLimit} />
