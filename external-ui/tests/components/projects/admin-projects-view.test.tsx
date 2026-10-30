@@ -5,14 +5,15 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminProjectsView } from '@/components/projects/admin-projects-view';
-import { fetchAllAdminProjects, type AdminProjectItem } from '@/services/backend/projects';
+import { fetchAllAdminProjects, getRateLimitDefaults, type AdminProjectItem } from '@/services/backend/projects';
 
 vi.mock('@/services/backend/projects', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/projects')>('@/services/backend/projects');
-  return { ...actual, fetchAllAdminProjects: vi.fn() };
+  return { ...actual, fetchAllAdminProjects: vi.fn(), getRateLimitDefaults: vi.fn() };
 });
 
 const fetchAllMock = vi.mocked(fetchAllAdminProjects);
+const getRateLimitDefaultsMock = vi.mocked(getRateLimitDefaults);
 
 function makeProject(overrides: Partial<AdminProjectItem> = {}): AdminProjectItem {
   return {
@@ -103,6 +104,11 @@ describe('AdminProjectsView', () => {
   beforeEach(() => {
     fetchAllMock.mockReset();
     fetchAllMock.mockResolvedValue(PROJECTS);
+    getRateLimitDefaultsMock.mockReset();
+    getRateLimitDefaultsMock.mockResolvedValue({
+      team: { weeklyRateLimit: null, yearlyRateLimit: null },
+      personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+    });
   });
 
   it('aggregates stat cards over every fetched project', async () => {
@@ -270,14 +276,14 @@ describe('AdminProjectsView', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 
-  it('keeps the Default limits button inert', async () => {
+  it('opens the default limits dialog and loads the saved defaults', async () => {
     const user = userEvent.setup();
     renderView();
 
     await screen.findByText('CITZ Tenant');
     await user.click(screen.getByRole('button', { name: 'Default limits' }));
 
-    // The only request ever issued is the single full-list fetch.
-    expect(fetchAllMock).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('group', { name: 'Team projects (tenants)' })).toBeInTheDocument();
+    expect(getRateLimitDefaultsMock).toHaveBeenCalledTimes(1);
   });
 });

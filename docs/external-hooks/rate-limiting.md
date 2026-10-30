@@ -4,6 +4,8 @@ Platform admins can cap how many workflow **executions** each n8n **project** ma
 
 Admins can also grant **one-off weekly top-ups** for the current week or a coming week. A top-up adds runs to that week's configured weekly limit without changing the base configuration or the yearly limit. Multiple top-ups for the same week are summed; when the week rolls over, only the new week's top-ups apply.
 
+Projects **without limits of their own** fall back to the saved per-scope **default limits** — one defaults row for team (tenant) projects and one for personal accounts. With no default saved, that scope stays uncapped.
+
 Each configured project picks a stop behaviour:
 
 - **`hard_stop`** (default) — a run that would exceed a configured limit is rejected before it starts: the hook throws `RateLimitExceededError` and n8n aborts the run.
@@ -17,27 +19,32 @@ For the layered architecture these components live in, see [`architecture.md`](.
 
 ## Source layout
 
-| Path                                                                  | Role                                                                                                        |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `external-hooks/src/api/bootstrap/rate-limit-hook.ts`                 | `workflow.preExecute` policy: kill switch, exempt modes, counting-process decision, lazy memoized bootstrap |
-| `external-hooks/src/api/services/project-rate-limit.service.ts`       | Enforcement + counting, rate-limit update, top-up CRUD, admin reads/enrichment; `RateLimitExceededError`    |
-| `external-hooks/src/api/helpers/period.ts`                            | ISO-week / calendar-year period keys and `listUpcomingWeeklyPeriodKeys` for the top-up horizon              |
-| `external-hooks/src/db/schema/project-rate-limit.ts`                  | Drizzle table `project_rate_limit`                                                                          |
-| `external-hooks/src/db/schema/project-execution-usage.ts`             | Drizzle table `project_execution_usage`                                                                     |
-| `external-hooks/src/db/repository/custom/project-rate-limit.ts`       | Config repository: `get`, `upsert`, `listByProjectIds`                                                      |
-| `external-hooks/src/db/repository/custom/project-execution-usage.ts`  | Usage counters: `getCounts`, atomic `increment`, `listCountsByProjectIds`                                   |
-| `external-hooks/src/db/schema/workflow-execution-usage.ts`            | Drizzle table `workflow_execution_usage`                                                                    |
-| `external-hooks/src/db/repository/custom/workflow-execution-usage.ts` | Per-workflow usage counters: atomic `increment`, `listCountsByWorkflowIds`                                  |
-| `external-hooks/src/db/schema/project-topup.ts`                       | Drizzle table `project_topup`                                                                               |
-| `external-hooks/src/db/repository/custom/project-topup.ts`            | Top-up history, insert/delete and per-project current-week sums                                             |
-| `external-hooks/src/api/schemas/projects.ts`                          | Zod validation for project reads, rate-limit changes and top-up list/create/delete                          |
-| `external-hooks/src/api/routes/admin-projects.ts`                     | Admin project reads, rate-limit updates and top-up endpoints                                                |
-| `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`       | Additive-only migration: the two rate-limit tables (applied by the existing `node migrate.cjs` step)        |
-| `external-hooks/drizzle/0013_add_workflow_usage_and_updated_by.sql`   | Additive-only migration: `workflow_execution_usage` + `project_rate_limit.updated_by`                       |
-| `external-hooks/drizzle/0014_add_project_topup.sql`                   | Additive-only migration: `project_topup`                                                                    |
-| `external-ui/src/components/projects/manage-topups-dialog.tsx`        | Weekly top-up form, paged history and future-week removal                                                   |
-| `external-ui/src/lib/rate-limit.ts`                                   | Effective weekly limits, status/usage calculations and Vancouver week-key/range helpers                     |
-| `helm/_n8n/templates/deployments/worker.yaml`                         | Worker pods receive the custom-database env block                                                           |
+| Path                                                                    | Role                                                                                                        |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `external-hooks/src/api/bootstrap/rate-limit-hook.ts`                   | `workflow.preExecute` policy: kill switch, exempt modes, counting-process decision, lazy memoized bootstrap |
+| `external-hooks/src/api/services/project-rate-limit.service.ts`         | Enforcement + counting, rate-limit update, top-up CRUD, admin reads/enrichment; `RateLimitExceededError`    |
+| `external-hooks/src/api/helpers/period.ts`                              | ISO-week / calendar-year period keys and `listUpcomingWeeklyPeriodKeys` for the top-up horizon              |
+| `external-hooks/src/db/schema/project-rate-limit.ts`                    | Drizzle table `project_rate_limit`                                                                          |
+| `external-hooks/src/db/schema/project-execution-usage.ts`               | Drizzle table `project_execution_usage`                                                                     |
+| `external-hooks/src/db/repository/custom/project-rate-limit.ts`         | Config repository: `get`, `upsert`, `listByProjectIds`                                                      |
+| `external-hooks/src/db/repository/custom/project-execution-usage.ts`    | Usage counters: `getCounts`, atomic `increment`, `listCountsByProjectIds`                                   |
+| `external-hooks/src/db/schema/workflow-execution-usage.ts`              | Drizzle table `workflow_execution_usage`                                                                    |
+| `external-hooks/src/db/repository/custom/workflow-execution-usage.ts`   | Per-workflow usage counters: atomic `increment`, `listCountsByWorkflowIds`                                  |
+| `external-hooks/src/db/schema/project-topup.ts`                         | Drizzle table `project_topup`                                                                               |
+| `external-hooks/src/db/repository/custom/project-topup.ts`              | Top-up history, insert/delete and per-project current-week sums                                             |
+| `external-hooks/src/db/schema/project-rate-limit-default.ts`            | Drizzle table `project_rate_limit_default` (per-scope defaults, max 2 rows)                                 |
+| `external-hooks/src/db/repository/custom/project-rate-limit-default.ts` | Defaults repository: `get` per scope, `getAll`, atomic `upsertBoth` (one transaction)                       |
+| `external-hooks/src/api/schemas/projects.ts`                            | Zod validation for project reads, rate-limit changes and top-up list/create/delete                          |
+| `external-hooks/src/api/routes/admin-projects.ts`                       | Admin project reads, rate-limit updates and top-up endpoints                                                |
+| `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`         | Additive-only migration: the two rate-limit tables (applied by the existing `node migrate.cjs` step)        |
+| `external-hooks/drizzle/0013_add_workflow_usage_and_updated_by.sql`     | Additive-only migration: `workflow_execution_usage` + `project_rate_limit.updated_by`                       |
+| `external-hooks/drizzle/0014_add_project_topup.sql`                     | Additive-only migration: `project_topup`                                                                    |
+| `external-hooks/drizzle/0015_add_project_rate_limit_default.sql`        | Additive-only migration: the per-scope defaults table                                                       |
+| `external-ui/src/components/projects/manage-topups-dialog.tsx`          | Weekly top-up form, paged history and future-week removal                                                   |
+| `external-ui/src/lib/limit-input.ts`                                    | Shared limit parsing/validation for both dialogs (empty input → `null`, annual ≥ weekly, shared bounds)     |
+| `external-ui/src/components/projects/default-limits-dialog.tsx`         | Default-limits dialog: team/personal weekly + annual inputs; PUT full-replace body                          |
+| `external-ui/src/lib/rate-limit.ts`                                     | Effective weekly limits, status/usage calculations and Vancouver week-key/range helpers                     |
+| `helm/_n8n/templates/deployments/worker.yaml`                           | Worker pods receive the custom-database env block                                                           |
 
 ---
 
@@ -62,7 +69,7 @@ The admin UI also generates week options and renders date ranges in `America/Van
 
 ## Data model
 
-Four tables in the custom database. `0011_add_project_rate_limit_tables.sql` created the rate-limit configuration and the per-project counters; `0013_add_workflow_usage_and_updated_by.sql` added the per-workflow counters and `project_rate_limit.updated_by`; `0014_add_project_topup.sql` adds weekly top-ups. These are additive-only migrations, applied by the existing `node migrate.cjs` step. The workflow-usage migration was renumbered from 0012 to 0013 during the CCP-6033 merge because main claimed the 0012 slot.
+Five tables in the custom database. `0011_add_project_rate_limit_tables.sql` created the rate-limit configuration and the per-project counters; `0013_add_workflow_usage_and_updated_by.sql` added the per-workflow counters and `project_rate_limit.updated_by`; `0014_add_project_topup.sql` adds weekly top-ups; `0015_add_project_rate_limit_default.sql` adds the per-scope defaults table. These are additive-only migrations, applied by the existing `node migrate.cjs` step. The workflow-usage migration was renumbered from 0012 to 0013 during the CCP-6033 merge because main claimed the 0012 slot.
 
 ### `project_rate_limit` — per-project configuration
 
@@ -125,6 +132,18 @@ The `(project_id, period_key)` index serves current-week sums and project histor
 
 The **effective weekly limit** is `weeklyRateLimit + weeklyTopupRuns`, where `weeklyTopupRuns` is the sum for the current ISO weekly key. When `weeklyRateLimit` is `NULL`, the project remains unlimited for that period: top-ups never create a limit on their own. They do not raise the yearly limit or alter usage counters.
 
+### `project_rate_limit_default` — per-scope default limits
+
+| Column                    | Type         | Constraints                                 | Meaning                                                                                 |
+| ------------------------- | ------------ | ------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `project_kind`            | varchar(20)  | Primary key; CHECK `IN ('team','personal')` | Which scope the row covers — `team` (tenant projects) or `personal` (personal accounts) |
+| `weekly_rate_limit`       | integer      | nullable; CHECK `IS NULL OR ≥ 0` when set   | Default base executions per ISO week, before top-ups; `NULL` = no default               |
+| `yearly_rate_limit`       | integer      | nullable; CHECK `IS NULL OR ≥ 0` when set   | Default max executions per calendar year; `NULL` = no default                           |
+| `updated_by`              | varchar(255) | nullable                                    | Email of the admin who last saved the defaults (trimmed; empty saved as `NULL`)         |
+| `created_at`/`updated_at` | timestamptz  | `NOT NULL DEFAULT now()`                    | Convention timestamps                                                                   |
+
+At most **two rows ever exist** — one per `project_kind` (the full-replace PUT writes both scopes in one transaction). **No row or a `NULL` limit means no default for that scope.** A default of `0` is allowed and pauses every uncapped project of that scope, mirroring the per-project limits' `0` semantics. There is no foreign key: the kind mirrors n8n's `project.type`, with unknown/missing types treated as `team` (same as `project-tenant.service.ts`).
+
 ---
 
 ## Period semantics
@@ -144,7 +163,7 @@ The **effective weekly limit** is `weeklyRateLimit + weeklyTopupRuns`, where `we
 The `workflow.preExecute` hook fires immediately before every workflow run (main process, queue workers, sub-executions). The service:
 
 1. Resolves the workflow's n8n project via `shared_workflow`. A workflow shared with **no** project is never limited or counted; if multiple projects are found (an n8n anomaly — workflows belong to exactly one project), the first is used and a warning is logged.
-2. Loads the project's configuration row and the current weekly/yearly counters. If a weekly limit is configured, it also fetches and sums top-ups for the current weekly key.
+2. Loads the project's configuration row and the current weekly/yearly counters. For any limit the project does **not** configure, it falls back to the project scope's saved default (`project_rate_limit_default`; the scope is n8n's `project.type`, `team` for unknown types): own configuration wins, defaults fill the gaps. The project-kind lookup and the defaults read run only while some limit is unset, so fully configured projects execute the same queries as before. If an effective weekly limit remains, it also fetches and sums top-ups for the current weekly key.
 3. Evaluates breaches: weekly `count >= base limit + current-week top-ups`; yearly `count >= yearly limit`. `NULL` limits are ignored. A yearly limit of `0`, or a weekly base of `0` without top-ups, rejects every non-exempt run.
 4. Applies the stop behaviour and — when allowed and this process counts — increments the project's weekly/yearly counters and the workflow's counters in the same pass.
 
@@ -160,14 +179,18 @@ The `workflow.preExecute` hook fires immediately before every workflow run (main
 - **Per-workflow counters mirror the project counters.** Every counted run also increments the `(project, workflow)` rows, so the admin detail page shows per-workflow weekly/annual usage from real counter data. The matrix above applies to both levels.
 - **Boundary race.** The check and the increment are not one serialized transaction, so a burst of concurrent runs can overshoot a limit by a few executions. Accepted trade-off — the alternative would serialize all of a project's runs.
 - **Fail-open.** Any infrastructure error (custom DB unreachable, missing env, service build failure) is logged and the run is allowed. Only `RateLimitExceededError` propagates out of the hook.
-- **No unnecessary enforcement lookup.** Top-ups are queried only when a weekly limit is configured. A top-up lookup failure follows the same fail-open policy as other enforcement infrastructure failures.
+- **No unnecessary enforcement lookup.** Top-ups are queried only when an effective weekly limit exists (own configuration or a scope default). The project-kind lookup and the defaults read run only while one of the periods is unset. Lookup failures follow the same fail-open policy as other enforcement infrastructure failures.
+- **Default limits apply live.** Saving a scope default starts capping that scope's uncapped projects on their very next run — there is no grandfathering, and no per-project opt-out of a default other than configuring the project's own limits. Clearing a default (saving `null`) uncaps them again without touching per-project rows.
+- **Stop behaviour for default-based breaches.** A project with its own configuration row keeps its configured `stopBehavior` even when the breached limit came from a default; a project relying only on defaults has no row, so default-based breaches use the default `hard_stop`.
 - **Kill switch.** With `RATE_LIMIT_ENFORCEMENT_ENABLED=false` the hook returns immediately: nothing is enforced and nothing is counted (until restart).
 
 ### Matrix
 
 | Situation                                                               | Run allowed?              | Counted? |
 | ----------------------------------------------------------------------- | ------------------------- | -------- |
-| No config row (unconfigured project)                                    | Yes                       | Yes      |
+| No config row and no default for the project's scope (uncapped)         | Yes                       | Yes      |
+| No config row; a scope default exists and is not reached                | Yes                       | Yes      |
+| No config row; a scope default is reached (defaults have no soft stop)  | **No — run aborted**      | No       |
 | Configured limit(s) not reached                                         | Yes                       | Yes      |
 | Weekly base reached, but effective weekly and yearly limits not reached | Yes                       | Yes      |
 | Limit reached, `hard_stop`                                              | **No — run aborted**      | No       |
@@ -245,6 +268,41 @@ Example item (inside the usual `{ "data": [...], "pagination": { ... } }` envelo
 `weeklyRateLimit` remains the base configuration; clients calculate the effective weekly limit by adding `weeklyTopupRuns` when the base is not `null`. Current-week sums are returned even when no weekly limit is configured, but have no effect until one is configured.
 
 **Errors never break the list:** enrichment failures (e.g. custom-DB outage) are logged and fall back to defaults — `null` limits/comment, `0` counts/top-up runs, `null` `updatedAt`/`updatedByName` — so the project list keeps working.
+
+### `GET /ui-api/admin/projects/rate-limit-defaults`
+
+Returns the saved per-scope default limits. The response intentionally carries **no usage counts** — the defaults dialog needs only the saved values. This route is a literal path registered **before** the `/projects/:projectId` routes, otherwise Express would treat `rate-limit-defaults` as a project id.
+
+```json
+{
+  "team": { "weeklyRateLimit": 5000, "yearlyRateLimit": 250000 },
+  "personal": { "weeklyRateLimit": null, "yearlyRateLimit": null }
+}
+```
+
+A missing row (or `null` field) means that scope has no default: projects of that scope without their own limits stay uncapped.
+
+### `PUT /ui-api/admin/projects/rate-limit-defaults`
+
+Full-replace semantics for **both scopes in one atomic write**; every field is required.
+
+| Field-path                 | Validation                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `team.weeklyRateLimit`     | integer `0`–`1,000,000`, or `null` (no default for that scope)                           |
+| `team.yearlyRateLimit`     | integer `0`–`100,000,000`, or `null`; must be ≥ `team.weeklyRateLimit` when both set     |
+| `personal.weeklyRateLimit` | integer `0`–`1,000,000`, or `null`                                                       |
+| `personal.yearlyRateLimit` | integer `0`–`100,000,000`, or `null`; must be ≥ `personal.weeklyRateLimit` when both set |
+
+Example body (mirroring the dialog's output where personal fields were left blank):
+
+```json
+{
+  "team": { "weeklyRateLimit": 5000, "yearlyRateLimit": 250000 },
+  "personal": { "weeklyRateLimit": null, "yearlyRateLimit": null }
+}
+```
+
+**200** response: `{ "success": true, "message": "Default limits updated", "defaults": <saved values as GET> }`. The acting admin's email from the UI session is stamped (trimmed; empty/unavailable stored as `null`). Errors use the standard shape: **400** for validation failures (missing scope, non-int, out-of-range, `yearly < weekly`), **401/403** for missing session/permission/role; a missing table or other custom-DB failure surfaces as **500**.
 
 ### `GET /ui-api/admin/projects/:projectId`
 
@@ -395,7 +453,9 @@ The **Manage top-ups** header button opens **Manage top-ups for <project>**:
 - **Cancel / Add top-up** sit directly below the admin comment, above the separator and history. Successful creation keeps the dialog and selected period open, clears the amount/comment, and refreshes history plus the project list/detail queries. Background project refetches do not wipe an in-progress entry.
 - **History** is paged four rows at a time, in API order. Columns are Amount, Added, **Week** (the Monday–Sunday date range), Comment and actions; there is no separate Period or Ends column. Only future-week rows show a removal action, which requires confirmation.
 
-The list-page period selector remains current-week-only; historical usage browsing and default-limit persistence are not implemented. **Default limits** remains an intentional no-op.
+The **Default limits** header button on the Projects list opens a dialog with two fieldsets — **Team projects (tenants)** and **Personal accounts** — each seeding widget-style weekly + annual inputs from the saved defaults. Empty input means "no default": saving blank fields stores `null` and leaves that scope's uncapped projects uncapped. Validation matches the per-project dialog (whole numbers with commas tolerated, shared API bounds, annual ≥ weekly per scope) and reports errors inline per field. **Cancel** discards, **Save defaults** PUTs the full-replace body and closes; there is no reset action, and no usage counts are fetched or shown.
+
+The list-page period selector remains current-week-only, and historical usage browsing is not implemented. **Known trade-off:** the projects list and detail pages still show explicit configuration only — a team project capped only by the team default still reads "No limit set" in the UI while its runs are enforced.
 
 ---
 
@@ -403,6 +463,10 @@ The list-page period selector remains current-week-only; historical usage browsi
 
 - **Roll out the image and the helm worker env in the same release.** The enforcement hook ships in the image, but workers also need `CUSTOM_DATABASE_URL` (now injected from the `customDatabase` secret, mirroring main's block). A worker without it logs one error — `Rate limiting disabled in this process: CUSTOM_DATABASE_URL is not set` — and stays fail-open for the life of the pod: nothing is enforced **or counted** for queue runs.
 - **Apply migration `0014` with the top-up backend/UI release** using the existing provision step. Weekly enforcement and admin enrichment read `project_topup`; a missing table follows the existing fail-open/default-enrichment behavior. Before production, smoke-test current-week sums, automatic future-week activation and worker-side queue enforcement in a dev namespace.
+- **Apply migration `0015` with the defaults release.** Until it is applied, the defaults endpoints fail at the custom-DB layer (`GET` returns a 500) and enforcement treats the unusable defaults lookup as an infrastructure failure and fails open — explicitly configured projects are unaffected, nothing is rejected by defaults before the migration lands.
+- **Saving defaults starts capping today's uncapped projects.** There is no grandfathering: the next run of any project without its own limits is governed by the new default. To walk it back, save the fields empty (which stores `null`, no default) — the defaults dialog never touches per-project rows. A default of `0` pauses every uncapped project of the scope.
+- **Default limits stay enforced in queue mode** exactly like configured limits (worker-side counting and rejection); the existing worker-env + migration smoke test covers default-based caps as well.
+- **A default-capped project reads "No limit set" in the UI** (list/detail show explicit configuration only) — flag for admins when default capping is introduced.
 - **Kill switch:** `RATE_LIMIT_ENFORCEMENT_ENABLED=false` stops all enforcement; it takes effect after a process restart (env is read once at startup).
 - **Safe rollout by default:** with no `project_rate_limit` rows configured, nothing is ever rejected; usage counters still accumulate — exactly what you want before picking limits, since the admin list then shows real usage for every project.
 - **Counters survive n8n's execution pruning by design.** n8n prunes its own execution records after a deployment-configured age — this repo's helm sets `EXECUTIONS_DATA_PRUNE: "true"` with `EXECUTIONS_DATA_MAX_AGE: "336"` (hours ≈ 14 days) in the base values, and `8784` (1 year) in the prod values files — so counting live `execution_entity` rows would silently undercount yearly usage. The dedicated counter rows in the custom DB are unaffected.

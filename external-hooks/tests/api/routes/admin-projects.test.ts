@@ -25,6 +25,7 @@ import { expectNextAppError, getRouteHandlers, runHandlerChain } from '../../hel
 const RATE_LIMIT_ROUTE = '/projects/:projectId/rate-limit';
 const TOPUPS_ROUTE = '/projects/:projectId/topups';
 const TOPUP_DELETE_ROUTE = '/projects/:projectId/topups/:topupId';
+const DEFAULTS_ROUTE = '/projects/rate-limit-defaults';
 
 function makeRateLimitBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -93,6 +94,8 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
     listProjectTopups: vi.fn(),
     createProjectTopup: vi.fn(),
     deleteProjectTopup: vi.fn(),
+    getRateLimitDefaults: vi.fn(),
+    updateRateLimitDefaults: vi.fn(),
     ...serviceOverrides.projectRateLimit,
   };
 
@@ -662,5 +665,134 @@ describe('DELETE /ui-api/admin/projects/:projectId/topups/:topupId', () => {
 
     expectNextAppError(next, 409);
     expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  GET /projects/rate-limit-defaults                                  */
+/* ================================================================== */
+
+describe(`GET /ui-api/admin${DEFAULTS_ROUTE}`, () => {
+  it('returns the saved per-scope defaults without any usage counts', async () => {
+    const defaults = {
+      team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+      personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+    };
+    const getRateLimitDefaults = vi.fn().mockResolvedValue(defaults);
+    const { router } = createTestRouter({ projectRateLimit: { getRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'get', DEFAULTS_ROUTE);
+    const req = createMockRequest({ query: {} });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(getRateLimitDefaults).toHaveBeenCalledWith();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(defaults);
+  });
+
+  it('propagates the service error when reading the defaults fails', async () => {
+    const getRateLimitDefaults = vi.fn().mockRejectedValue(new AppError(500, 'Failed to read the rate-limit defaults'));
+    const { router } = createTestRouter({ projectRateLimit: { getRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'get', DEFAULTS_ROUTE);
+    const res = createMockResponse();
+    const next = await runHandlerChainCapturingErrors(handlers!, createMockRequest({ query: {} }), res);
+
+    expectNextAppError(next, 500);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  PUT /projects/rate-limit-defaults                                  */
+/* ================================================================== */
+
+describe(`PUT /ui-api/admin${DEFAULTS_ROUTE}`, () => {
+  function makeDefaultsBody(overrides: Record<string, unknown> = {}) {
+    return {
+      team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+      personal: { weeklyRateLimit: 2500, yearlyRateLimit: 100000 },
+      ...overrides,
+    };
+  }
+
+  it('saves both scopes with the acting admin email and responds with the saved values', async () => {
+    const body = makeDefaultsBody();
+    const updateRateLimitDefaults = vi.fn().mockResolvedValue(body);
+    const { router } = createTestRouter({ projectRateLimit: { updateRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'put', DEFAULTS_ROUTE);
+    const req = createMockRequest({ body, query: {}, session: makeSession() });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(updateRateLimitDefaults).toHaveBeenCalledWith(body, 'admin@example.com');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Default limits updated', defaults: body });
+  });
+
+  it('passes null as the actor when the session has no n8n user', async () => {
+    const body = makeDefaultsBody();
+    const updateRateLimitDefaults = vi.fn().mockResolvedValue(body);
+    const { router } = createTestRouter({ projectRateLimit: { updateRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'put', DEFAULTS_ROUTE);
+    const req = createMockRequest({ body, query: {}, session: makeSession({ n8nUser: null }) });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(updateRateLimitDefaults).toHaveBeenCalledWith(body, null);
+  });
+
+  it('rejects a scope whose yearly default is below its weekly default (400)', async () => {
+    const body = makeDefaultsBody({ personal: { weeklyRateLimit: 100000, yearlyRateLimit: 5000 } });
+    const updateRateLimitDefaults = vi.fn();
+    const { router } = createTestRouter({ projectRateLimit: { updateRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'put', DEFAULTS_ROUTE);
+    const req = createMockRequest({ body, query: {}, session: makeSession() });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(updateRateLimitDefaults).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing scope (400)', async () => {
+    const body = { team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 } };
+    const updateRateLimitDefaults = vi.fn();
+    const { router } = createTestRouter({ projectRateLimit: { updateRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'put', DEFAULTS_ROUTE);
+    const req = createMockRequest({ body, query: {}, session: makeSession() });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(updateRateLimitDefaults).not.toHaveBeenCalled();
+  });
+
+  it('rejects negative defaults (400)', async () => {
+    const body = makeDefaultsBody({ team: { weeklyRateLimit: -1, yearlyRateLimit: 250000 } });
+    const updateRateLimitDefaults = vi.fn();
+    const { router } = createTestRouter({ projectRateLimit: { updateRateLimitDefaults } });
+
+    const handlers = getRouteHandlers(router, 'put', DEFAULTS_ROUTE);
+    const req = createMockRequest({ body, query: {}, session: makeSession() });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(updateRateLimitDefaults).not.toHaveBeenCalled();
   });
 });

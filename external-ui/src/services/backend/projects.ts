@@ -74,7 +74,6 @@ export type ProjectTopupsResponse = {
     totalPages: number;
   };
 };
-
 export type CreateProjectTopupBody = {
   periodKey: string;
   amount: number;
@@ -85,6 +84,24 @@ export type CreateProjectTopupResponse = {
   success: true;
   message: string;
   topup: ProjectTopupItem;
+};
+
+/** Default rate limits for one project scope; null = no default (uncapped). */
+export type RateLimitScopeDefaults = {
+  weeklyRateLimit: number | null;
+  yearlyRateLimit: number | null;
+};
+
+/** Saved per-scope defaults for team and personal projects. */
+export type ProjectRateLimitDefaults = {
+  team: RateLimitScopeDefaults;
+  personal: RateLimitScopeDefaults;
+};
+
+export type UpdateRateLimitDefaultsResponse = {
+  success: true;
+  message: string;
+  defaults: ProjectRateLimitDefaults;
 };
 
 export type AdminProjectsResponse = {
@@ -173,6 +190,18 @@ export function createProjectTopup(projectId: string, body: CreateProjectTopupBo
 export function deleteProjectTopup(projectId: string, topupId: string) {
   return instance
     .delete<void>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/topups/${encodeURIComponent(topupId)}`)
+    .then((res) => res.data);
+}
+
+export function getRateLimitDefaults(signal?: AbortSignal) {
+  return instance
+    .get<ProjectRateLimitDefaults>('/ui-api/admin/projects/rate-limit-defaults', { signal })
+    .then((res) => res.data);
+}
+
+export function updateRateLimitDefaults(body: ProjectRateLimitDefaults) {
+  return instance
+    .put<UpdateRateLimitDefaultsResponse>('/ui-api/admin/projects/rate-limit-defaults', body)
     .then((res) => res.data);
 }
 
