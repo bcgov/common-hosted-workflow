@@ -266,6 +266,11 @@ describe('ManageTopupsDialog', () => {
       'Oct 26 to Nov 1',
       'Oct 19 to 25',
     ]);
+    // Zebra striping: odd history rows are striped, even rows keep the plain surface.
+    expect(rows[0]).not.toHaveClass('bg-surface-subtle');
+    expect(rows[1]).toHaveClass('bg-surface-subtle', 'hover:bg-surface-muted');
+    expect(rows[2]).not.toHaveClass('bg-surface-subtle');
+    expect(rows[3]).toHaveClass('bg-surface-subtle');
     expect(screen.getAllByRole('button', { name: /^Remove top-up for/ })).toHaveLength(2);
     expect(within(rows[0]).getByRole('button', { name: /Nov 9 to 15/ })).toBeInTheDocument();
     expect(within(rows[1]).getByRole('button', { name: /Nov 2 to 8/ })).toBeInTheDocument();
