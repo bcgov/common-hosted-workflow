@@ -282,8 +282,13 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {topups.map((topup) => (
-                      <TableRow key={topup.id}>
+                    {/* Zebra striping (odd rows) local to this dialog; odd rows keep a
+                        darker hover (surface-muted) so hover stays visible on striped rows. */}
+                    {topups.map((topup, topupIndex) => (
+                      <TableRow
+                        key={topup.id}
+                        className={topupIndex % 2 === 1 ? 'bg-surface-subtle hover:bg-surface-muted' : undefined}
+                      >
                         <TableCell className="text-sm font-semibold text-foreground">
                           +{formatCount(topup.amount)}
                         </TableCell>
@@ -292,14 +297,14 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
                         <TableCell className="max-w-[16rem] text-sm break-words whitespace-pre-wrap">
                           {topup.adminComment}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-1.5">
                           {/* Only future weeks can be removed; the current week is already in effect. */}
                           {topup.periodKey > currentWeeklyKey && (
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="text-muted-foreground hover:text-danger-foreground"
+                              className="size-8 text-muted-foreground hover:text-danger-foreground"
                               aria-label={`Remove top-up for the week of ${formatWeeklyKeyRange(topup.periodKey)}`}
                               onClick={() => setTopupToDelete(topup)}
                             >
