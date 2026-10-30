@@ -153,7 +153,9 @@ export function createAuthToken(user: N8nOidcUser, jwtService: JwtService) {
     usedMfa: false,
   };
 
-  return jwtService.sign(payload, { expiresIn: '7d' });
+  // 'session' = n8n's browser auth cookie purpose (aud: 'n8n:session'); n8n's AuthService verifies
+  // the cookie with jwtService.verify('session', ...), so the minted token must carry that audience.
+  return jwtService.sign('session', payload, { expiresIn: '7d' });
 }
 
 export function createUserHash(user: Pick<N8nOidcUser, 'email' | 'password' | 'mfaEnabled' | 'mfaSecret'>) {
