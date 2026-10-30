@@ -7,6 +7,7 @@ import type { TriggerService } from '../services/trigger.service';
 import type { TriggerTargetService } from '../services/trigger-target.service';
 import type { N8nWorkflowRunnerService } from '../services/n8n-workflow-runner.service';
 import type { ChefsService } from '../services/chefs.service';
+import type { ChefsSubmissionService } from '../services/chefs-submission.service';
 import type { CstarService } from '../services/cstar.service';
 import type { FeatureFlagService } from '../services/feature-flag.service';
 import type { MessageService } from '../services/message.service';
@@ -49,6 +50,7 @@ export type ApiServices = {
   triggerTarget: TriggerTargetService;
   workflowRunner: N8nWorkflowRunnerService;
   chefs: ChefsService;
+  chefsSubmission: ChefsSubmissionService;
   cstar: CstarService;
   featureFlag: FeatureFlagService;
   message: MessageService;

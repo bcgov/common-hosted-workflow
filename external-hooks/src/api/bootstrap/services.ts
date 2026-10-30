@@ -6,6 +6,7 @@ import { TriggerTargetService } from '../services/trigger-target.service';
 import type { N8nWorkflowRunnerService } from '../services/n8n-workflow-runner.service';
 import { AuthService, type BaseAuthService } from '../services/auth';
 import { ChefsService } from '../services/chefs.service';
+import { ChefsSubmissionService } from '../services/chefs-submission.service';
 import { CstarService } from '../services/cstar.service';
 import { FeatureFlagService } from '../services/feature-flag.service';
 import { MessageService } from '../services/message.service';
@@ -112,6 +113,7 @@ export async function buildApiServices(
     triggerTarget,
     workflowRunner,
     chefs,
+    chefsSubmission: new ChefsSubmissionService(customRepositories),
     cstar: cstarService,
     featureFlag,
     message: new MessageService(n8nRepositories, customRepositories),

@@ -63,7 +63,7 @@ describe('read-only maintenance middleware', () => {
       ['POST', '/multi-webhook-wait/callback/exec-1'],
       ['DELETE', '/multi-webhook-wait/cleanup/exec-1'],
       ['POST', '/chefs/submissions/register'],
-      ['POST', '/chefs/submissions/callback'],
+      ['POST', '/chefs/waste-management'],
     ])('lets %s %s through because running workflows call it', (method, path) => {
       const { res, next } = run(true, method, path);
 
