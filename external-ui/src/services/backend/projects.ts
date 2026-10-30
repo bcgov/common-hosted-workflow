@@ -13,6 +13,8 @@ export type AdminProjectItem = {
   lastAdminComment: string | null;
   weeklyExecutionCount: number;
   yearlyExecutionCount: number;
+  /** Runs added by top-ups for the current week (0 when none). */
+  weeklyTopupRuns: number;
   workflowCount: number;
   membersCount: number;
   updatedAt: string | null;
@@ -50,6 +52,39 @@ export type ProjectWorkflowUsage = {
   weeklyPeriodKey: string;
   yearlyPeriodKey: string;
   workflows: ProjectWorkflowUsageItem[];
+};
+
+/** One weekly-limit top-up row. */
+export type ProjectTopupItem = {
+  id: string;
+  projectId: string;
+  periodKey: string;
+  amount: number;
+  adminComment: string;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export type ProjectTopupsResponse = {
+  data: ProjectTopupItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+};
+
+export type CreateProjectTopupBody = {
+  periodKey: string;
+  amount: number;
+  adminComment: string;
+};
+
+export type CreateProjectTopupResponse = {
+  success: true;
+  message: string;
+  topup: ProjectTopupItem;
 };
 
 export type AdminProjectsResponse = {
@@ -117,6 +152,27 @@ export function getProjectWorkflowUsage(projectId: string, signal?: AbortSignal)
     .get<ProjectWorkflowUsage>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/workflow-usage`, {
       signal,
     })
+    .then((res) => res.data);
+}
+
+export function listProjectTopups(projectId: string, page: number, pageSize: number, signal?: AbortSignal) {
+  return instance
+    .get<ProjectTopupsResponse>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/topups`, {
+      params: { page, pageSize },
+      signal,
+    })
+    .then((res) => res.data);
+}
+
+export function createProjectTopup(projectId: string, body: CreateProjectTopupBody) {
+  return instance
+    .post<CreateProjectTopupResponse>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/topups`, body)
+    .then((res) => res.data);
+}
+
+export function deleteProjectTopup(projectId: string, topupId: string) {
+  return instance
+    .delete<void>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/topups/${encodeURIComponent(topupId)}`)
     .then((res) => res.data);
 }
 

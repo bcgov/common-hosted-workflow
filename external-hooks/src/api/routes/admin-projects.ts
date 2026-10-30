@@ -10,6 +10,9 @@ import {
   updateProjectRateLimitSchema,
   getAdminProjectSchema,
   getProjectWorkflowUsageSchema,
+  listProjectTopupsSchema,
+  createProjectTopupSchema,
+  deleteProjectTopupSchema,
 } from '../schemas/projects';
 import type { UiApiTypedRequest } from '../types/ui-api';
 
@@ -83,6 +86,39 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
       const { projectId } = req.parsed.params;
       const result = await services.projectRateLimit.getProjectWorkflowUsage(projectId);
       OkResponse(res, result);
+    },
+  );
+
+  router.get(
+    '/projects/:projectId/topups',
+    createRequestParser(listProjectTopupsSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof listProjectTopupsSchema>>, res) => {
+      const { projectId } = req.parsed.params;
+      const { page, pageSize } = req.parsed.query;
+      const result = await services.projectRateLimit.listProjectTopups(projectId, page, pageSize);
+      OkResponse(res, result);
+    },
+  );
+
+  router.post(
+    '/projects/:projectId/topups',
+    createRequestParser(createProjectTopupSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof createProjectTopupSchema>>, res) => {
+      const { projectId } = req.parsed.params;
+      const body = req.parsed.body;
+      const createdBy = req.session.n8nUser?.email ?? null;
+      const result = await services.projectRateLimit.createProjectTopup(projectId, body, createdBy);
+      OkResponse(res, { success: true, message: 'Top-up added', topup: result });
+    },
+  );
+
+  router.delete(
+    '/projects/:projectId/topups/:topupId',
+    createRequestParser(deleteProjectTopupSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof deleteProjectTopupSchema>>, res) => {
+      const { projectId, topupId } = req.parsed.params;
+      await services.projectRateLimit.deleteProjectTopup(projectId, topupId);
+      res.status(204).end();
     },
   );
 

@@ -18,11 +18,13 @@ import {
   type RateLimitStopBehavior,
 } from '../../services/backend/projects';
 import { EditRateLimitsDialog } from './edit-rate-limits-dialog';
+import { ManageTopupsDialog } from './manage-topups-dialog';
 import { ProjectTypeBadge, USAGE_BAR_TONE_CLASSES, USAGE_BAR_TRACK_CLASS } from './project-badges';
 import {
   formatCount,
   formatResetDate,
   formatShortDate,
+  getEffectiveWeeklyLimit,
   getHighestUsagePeriod,
   getNextWeeklyReset,
   getNextYearlyReset,
@@ -61,6 +63,7 @@ export function ProjectDetailView() {
   const { projectId = '' } = useParams();
   const queryClient = useQueryClient();
   const [isLimitsDialogOpen, setIsLimitsDialogOpen] = useState(false);
+  const [isTopupsDialogOpen, setIsTopupsDialogOpen] = useState(false);
   const [isEditingTenant, setIsEditingTenant] = useState(false);
   const [tenantValue, setTenantValue] = useState('');
   const [tenantError, setTenantError] = useState<string | null>(null);
@@ -220,7 +223,7 @@ export function ProjectDetailView() {
   let bannerText: string | null = null;
   if (showBanner && bannerPeriod !== null) {
     const used = bannerPeriod === 'weekly' ? project.weeklyExecutionCount : project.yearlyExecutionCount;
-    const limit = bannerPeriod === 'weekly' ? project.weeklyRateLimit : project.yearlyRateLimit;
+    const limit = bannerPeriod === 'weekly' ? getEffectiveWeeklyLimit(project) : project.yearlyRateLimit;
     const percent = getUsagePercent(used, limit) ?? 0;
     bannerText = `${project.projectName} has used ${percent}% of its ${getPeriodLabel(bannerPeriod)} limit`;
     if (status === 'limit_reached') {
@@ -335,9 +338,8 @@ export function ProjectDetailView() {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {/* Intentionally inert for now: top-ups are not supported yet. */}
-              <Button type="button" variant="outline">
-                Add top-up
+              <Button type="button" variant="outline" onClick={() => setIsTopupsDialogOpen(true)}>
+                Manage top-ups
               </Button>
               <Button type="button" onClick={() => setIsLimitsDialogOpen(true)}>
                 Edit tenant limits
@@ -349,7 +351,11 @@ export function ProjectDetailView() {
           {bannerText && (
             <Alert variant="warning">
               <AlertTitle>{bannerText}</AlertTitle>
-              <AlertDescription>Top-up: — · New runs pause around — (projection pending)</AlertDescription>
+              <AlertDescription>
+                {project.weeklyTopupRuns > 0
+                  ? `Top-up: +${formatCount(project.weeklyTopupRuns)} runs this week`
+                  : 'Top-up: none this week'}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -358,7 +364,8 @@ export function ProjectDetailView() {
             <LimitCard
               label="Weekly limit"
               used={project.weeklyExecutionCount}
-              limit={project.weeklyRateLimit}
+              limit={getEffectiveWeeklyLimit(project)}
+              topupRuns={project.weeklyTopupRuns}
               resetDate={nextWeeklyReset}
               changedAt={project.updatedAt}
               changedBy={project.updatedByName}
@@ -478,6 +485,9 @@ export function ProjectDetailView() {
 
       {/* Edit limits dialog */}
       <EditRateLimitsDialog project={project} open={isLimitsDialogOpen} onOpenChange={setIsLimitsDialogOpen} />
+
+      {/* Manage top-ups dialog */}
+      <ManageTopupsDialog project={project} open={isTopupsDialogOpen} onOpenChange={setIsTopupsDialogOpen} />
     </div>
   );
 }
@@ -486,13 +496,24 @@ interface LimitCardProps {
   label: 'Weekly limit' | 'Annual limit';
   used: number;
   limit: number | null;
+  /** Runs added by top-ups this week; shown on the weekly card only. */
+  topupRuns?: number;
   resetDate: Date;
   changedAt: string | null;
   changedBy: string | null;
   stopBehavior: RateLimitStopBehavior | null;
 }
 
-function LimitCard({ label, used, limit, resetDate, changedAt, changedBy, stopBehavior }: Readonly<LimitCardProps>) {
+function LimitCard({
+  label,
+  used,
+  limit,
+  topupRuns,
+  resetDate,
+  changedAt,
+  changedBy,
+  stopBehavior,
+}: Readonly<LimitCardProps>) {
   const ratio = getUsageRatio(used, limit);
   const percent = getUsagePercent(used, limit);
   const tone: UsageBarTone | null = ratio === null ? null : getUsageBarTone(ratio);
@@ -530,7 +551,9 @@ function LimitCard({ label, used, limit, resetDate, changedAt, changedBy, stopBe
         <span className="text-muted-foreground">
           {limit === null ? 'No limit configured' : getWhenReachedText(stopBehavior)}
         </span>
-        <span className="text-muted-foreground">Includes +— top-up</span>
+        {topupRuns !== undefined && topupRuns > 0 && (
+          <span className="text-muted-foreground">Includes +{formatCount(topupRuns)} top-up</span>
+        )}
       </div>
     </div>
   );

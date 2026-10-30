@@ -13,10 +13,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildAdminProjectRouter } from '../../../src/api/routes/admin-projects';
 import { AppError } from '../../../src/api/utils/errors';
-import { createMockRequest, createMockResponse, VALID_PROJECT_ID, VALID_TENANT_ID } from '../../helpers/mocks';
+import {
+  createMockRequest,
+  createMockResponse,
+  VALID_PROJECT_ID,
+  VALID_TENANT_ID,
+  VALID_TOPUP_ID,
+} from '../../helpers/mocks';
 import { expectNextAppError, getRouteHandlers, runHandlerChain } from '../../helpers/test-utils';
 
 const RATE_LIMIT_ROUTE = '/projects/:projectId/rate-limit';
+const TOPUPS_ROUTE = '/projects/:projectId/topups';
+const TOPUP_DELETE_ROUTE = '/projects/:projectId/topups/:topupId';
 
 function makeRateLimitBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -42,6 +50,28 @@ function makeStoredRateLimit(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeTopupBody(overrides: Record<string, unknown> = {}) {
+  return {
+    periodKey: '2026-W45',
+    amount: 2000,
+    adminComment: '  Extra runs for the quarterly batch  ',
+    ...overrides,
+  };
+}
+
+function makeStoredTopup(overrides: Record<string, unknown> = {}) {
+  return {
+    id: VALID_TOPUP_ID,
+    projectId: VALID_PROJECT_ID,
+    periodKey: '2026-W45',
+    amount: 2000,
+    adminComment: 'Extra runs for the quarterly batch',
+    createdBy: 'admin@example.com',
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    ...overrides,
+  };
+}
+
 function makeSession(sessionOverrides: Record<string, unknown> = {}) {
   return {
     n8nUser: { email: 'admin@example.com', firstName: 'Admin', lastName: 'User' },
@@ -60,6 +90,9 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
   const projectRateLimit = {
     updateRateLimit: vi.fn(),
     getProjectWorkflowUsage: vi.fn(),
+    listProjectTopups: vi.fn(),
+    createProjectTopup: vi.fn(),
+    deleteProjectTopup: vi.fn(),
     ...serviceOverrides.projectRateLimit,
   };
 
@@ -397,6 +430,237 @@ describe('GET /ui-api/admin/projects/:projectId/workflow-usage', () => {
     const next = await runHandlerChainCapturingErrors(handlers!, req, res);
 
     expectNextAppError(next, 404);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  GET /projects/:projectId/topups                                    */
+/* ================================================================== */
+
+describe('GET /ui-api/admin/projects/:projectId/topups', () => {
+  it('returns one page of top-ups with the default paging applied by the parser', async () => {
+    const pageData = { data: [], pagination: { page: 1, pageSize: 4, totalItems: 0, totalPages: 1 } };
+    const listProjectTopups = vi.fn().mockResolvedValue(pageData);
+    const { router } = createTestRouter({ projectRateLimit: { listProjectTopups } });
+
+    const handlers = getRouteHandlers(router, 'get', TOPUPS_ROUTE);
+    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, query: {} });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(listProjectTopups).toHaveBeenCalledWith(VALID_PROJECT_ID, 1, 4);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(pageData);
+  });
+
+  it('passes explicit page and pageSize query values through to the service', async () => {
+    const listProjectTopups = vi.fn().mockResolvedValue({ data: [], pagination: {} });
+    const { router } = createTestRouter({ projectRateLimit: { listProjectTopups } });
+
+    const handlers = getRouteHandlers(router, 'get', TOPUPS_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      query: { page: '2', pageSize: '10' },
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(listProjectTopups).toHaveBeenCalledWith(VALID_PROJECT_ID, 2, 10);
+  });
+
+  it('propagates the service AppError 404 for an unknown project', async () => {
+    const listProjectTopups = vi.fn().mockRejectedValue(new AppError(404, 'Project not found'));
+    const { router } = createTestRouter({ projectRateLimit: { listProjectTopups } });
+
+    const handlers = getRouteHandlers(router, 'get', TOPUPS_ROUTE);
+    const req = createMockRequest({ params: { projectId: 'missing-project' }, query: {} });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 404);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  POST /projects/:projectId/topups                                   */
+/* ================================================================== */
+
+describe('POST /ui-api/admin/projects/:projectId/topups', () => {
+  it('adds a top-up and responds with the stored row wrapped in a success envelope', async () => {
+    const body = makeTopupBody();
+    const stored = makeStoredTopup();
+    const createProjectTopup = vi.fn().mockResolvedValue(stored);
+    const { router } = createTestRouter({ projectRateLimit: { createProjectTopup } });
+
+    const handlers = getRouteHandlers(router, 'post', TOPUPS_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body,
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    // The zod parser trims the comment before the service sees it.
+    expect(createProjectTopup).toHaveBeenCalledWith(
+      VALID_PROJECT_ID,
+      { ...body, adminComment: 'Extra runs for the quarterly batch' },
+      'admin@example.com',
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Top-up added', topup: stored });
+  });
+
+  it('passes null as the creator when the session has no n8n user', async () => {
+    const createProjectTopup = vi.fn().mockResolvedValue(makeStoredTopup({ createdBy: null }));
+    const { router } = createTestRouter({ projectRateLimit: { createProjectTopup } });
+
+    const handlers = getRouteHandlers(router, 'post', TOPUPS_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body: makeTopupBody(),
+      query: {},
+      session: makeSession({ n8nUser: null }),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    // The zod parser trims the comment before the service sees it.
+    expect(createProjectTopup).toHaveBeenCalledWith(
+      VALID_PROJECT_ID,
+      { ...makeTopupBody(), adminComment: 'Extra runs for the quarterly batch' },
+      null,
+    );
+  });
+
+  it('propagates the service AppError 400 when the period is outside the top-up horizon', async () => {
+    const createProjectTopup = vi
+      .fn()
+      .mockRejectedValue(
+        new AppError(400, 'periodKey must be the current week or a coming week within the top-up horizon'),
+      );
+    const { router } = createTestRouter({ projectRateLimit: { createProjectTopup } });
+
+    const handlers = getRouteHandlers(router, 'post', TOPUPS_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      body: makeTopupBody(),
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
+  const invalidTopupBodies: Array<[string, Record<string, unknown>]> = [
+    ['a malformed periodKey', makeTopupBody({ periodKey: '2026-10-27' })],
+    ['a zero amount', makeTopupBody({ amount: 0 })],
+    ['a negative amount', makeTopupBody({ amount: -100 })],
+    ['a non-integer amount', makeTopupBody({ amount: 12.5 })],
+    ['an oversized amount', makeTopupBody({ amount: 1_000_001 })],
+    ['an empty adminComment', makeTopupBody({ adminComment: '' })],
+    ['a whitespace-only adminComment', makeTopupBody({ adminComment: '   ' })],
+    ['an oversized adminComment', makeTopupBody({ adminComment: 'x'.repeat(2001) })],
+  ];
+
+  it.each(invalidTopupBodies)(
+    'rejects %s with AppError 400 before reaching the service',
+    async (_label, invalidBody) => {
+      const createProjectTopup = vi.fn().mockResolvedValue(makeStoredTopup());
+      const { router } = createTestRouter({ projectRateLimit: { createProjectTopup } });
+
+      const handlers = getRouteHandlers(router, 'post', TOPUPS_ROUTE);
+      const req = createMockRequest({
+        params: { projectId: VALID_PROJECT_ID },
+        body: invalidBody,
+        query: {},
+        session: makeSession(),
+      });
+      const res = createMockResponse();
+
+      const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+      expectNextAppError(next, 400);
+      expect(createProjectTopup).not.toHaveBeenCalled();
+      expect(res.json).not.toHaveBeenCalled();
+    },
+  );
+});
+
+/* ================================================================== */
+/*  DELETE /projects/:projectId/topups/:topupId                        */
+/* ================================================================== */
+
+describe('DELETE /ui-api/admin/projects/:projectId/topups/:topupId', () => {
+  it('deletes a future-week top-up and responds 204 with no body', async () => {
+    const deleteProjectTopup = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter({ projectRateLimit: { deleteProjectTopup } });
+
+    const handlers = getRouteHandlers(router, 'delete', TOPUP_DELETE_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID, topupId: VALID_TOPUP_ID },
+      query: {},
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(deleteProjectTopup).toHaveBeenCalledWith(VALID_PROJECT_ID, VALID_TOPUP_ID);
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(res.end).toHaveBeenCalledTimes(1);
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-UUID topupId with AppError 400 before reaching the service', async () => {
+    const deleteProjectTopup = vi.fn().mockResolvedValue(undefined);
+    const { router } = createTestRouter({ projectRateLimit: { deleteProjectTopup } });
+
+    const handlers = getRouteHandlers(router, 'delete', TOPUP_DELETE_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID, topupId: 'not-a-uuid' },
+      query: {},
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(deleteProjectTopup).not.toHaveBeenCalled();
+  });
+
+  it('propagates the service AppError 409 for a top-up whose week already started', async () => {
+    const deleteProjectTopup = vi
+      .fn()
+      .mockRejectedValue(new AppError(409, 'Top-ups for the current or past weeks cannot be deleted'));
+    const { router } = createTestRouter({ projectRateLimit: { deleteProjectTopup } });
+
+    const handlers = getRouteHandlers(router, 'delete', TOPUP_DELETE_ROUTE);
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID, topupId: VALID_TOPUP_ID },
+      query: {},
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 409);
     expect(res.json).not.toHaveBeenCalled();
   });
 });

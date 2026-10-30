@@ -26,6 +26,7 @@ function makeProject(overrides: Partial<AdminProjectItem> = {}): AdminProjectIte
     lastAdminComment: null,
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
+    weeklyTopupRuns: 0,
     workflowCount: 0,
     membersCount: 0,
     updatedAt: null,
@@ -227,6 +228,21 @@ describe('AdminProjectsView', () => {
     await user.click(screen.getByRole('tab', { name: 'Personal accounts (1)' }));
     const personalRow = within(screen.getByRole('row', { name: /Jane Doe/ }));
     expect(personalRow.getByText('Within limit')).toBeInTheDocument();
+  });
+
+  it('uses current-week top-ups for weekly bars, statuses and aggregates only', async () => {
+    fetchAllMock.mockResolvedValue([{ ...CITZ, weeklyTopupRuns: 12_000 }, CSTAR, DEVX, PERSONAL]);
+    renderView();
+
+    await screen.findByText('CITZ Tenant');
+
+    const citzRow = within(screen.getByRole('row', { name: /CITZ Tenant/ }));
+    expect(citzRow.getByText('12,000 / 24,000')).toBeInTheDocument();
+    expect(citzRow.getByRole('img', { name: '12,000 of 24,000 runs used' })).toHaveAttribute('data-tone', 'blue');
+    expect(citzRow.getByText('Within limit')).toBeInTheDocument();
+    expect(citzRow.getByText('60,000 / 500,000')).toBeInTheDocument();
+    expect(statCardText('Workflows paused until reset')).toBe('Limit reached0Workflows paused until reset');
+    expect(screen.getByText('3 tenants · 0 at limit, 1 near limit, 1 with no limit')).toBeInTheDocument();
   });
 
   it('paginates the filtered rows client-side at 25 per page', async () => {

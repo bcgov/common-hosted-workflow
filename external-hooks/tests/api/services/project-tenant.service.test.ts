@@ -25,6 +25,7 @@ const DEFAULT_ENRICHMENT = {
   lastAdminComment: null,
   weeklyExecutionCount: 0,
   yearlyExecutionCount: 0,
+  weeklyTopupRuns: 0,
   workflowCount: 0,
   membersCount: 0,
   updatedAt: null,
@@ -69,6 +70,7 @@ function buildService({
     tenantProjectRelation: { listAll: vi.fn().mockResolvedValue(tenantMap) },
     projectRateLimit: { listByProjectIds: vi.fn().mockResolvedValue(rateLimitRows) },
     projectExecutionUsage: { listCountsByProjectIds: vi.fn().mockResolvedValue(usageCounts) },
+    projectTopup: { sumByProjectIds: vi.fn().mockResolvedValue(new Map()) },
   };
   const projectRateLimitService = new ProjectRateLimitService(n8nRepositories as any, customRepositories as any);
   const service = new ProjectTenantService(
@@ -132,6 +134,7 @@ describe('ProjectTenantService', () => {
         lastAdminComment: 'Cap for FY',
         weeklyExecutionCount: 3,
         yearlyExecutionCount: 30,
+        weeklyTopupRuns: 0,
         workflowCount: 5,
         membersCount: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -157,6 +160,7 @@ describe('ProjectTenantService', () => {
         tenantProjectRelation: { listAll: vi.fn().mockResolvedValue(new Map([['proj-001', 'tenant-1']])) },
         projectRateLimit: { listByProjectIds: vi.fn().mockRejectedValue(new Error('custom DB outage')) },
         projectExecutionUsage: { listCountsByProjectIds: vi.fn().mockResolvedValue(new Map()) },
+        projectTopup: { sumByProjectIds: vi.fn().mockResolvedValue(new Map()) },
       };
       const service = new ProjectTenantService(
         n8nRepositories as any,
@@ -229,6 +233,7 @@ describe('ProjectTenantService', () => {
         lastAdminComment: 'Cap for FY',
         weeklyExecutionCount: 3,
         yearlyExecutionCount: 30,
+        weeklyTopupRuns: 0,
         workflowCount: 5,
         membersCount: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -269,6 +274,7 @@ describe('ProjectTenantService', () => {
         tenantProjectRelation: { listAll: vi.fn().mockResolvedValue(new Map([['proj-001', 'tenant-1']])) },
         projectRateLimit: { listByProjectIds: vi.fn().mockRejectedValue(new Error('custom DB outage')) },
         projectExecutionUsage: { listCountsByProjectIds: vi.fn().mockResolvedValue(new Map()) },
+        projectTopup: { sumByProjectIds: vi.fn().mockResolvedValue(new Map()) },
       };
       const service = new ProjectTenantService(
         n8nRepositories as any,

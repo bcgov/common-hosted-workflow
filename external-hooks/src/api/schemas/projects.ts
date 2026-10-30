@@ -67,3 +67,42 @@ export const getProjectWorkflowUsageSchema = z.object({
   body: z.record(z.string(), z.unknown()).optional(),
   query: z.record(z.string(), z.unknown()).optional(),
 });
+
+/** GET /rest/admin/projects/:projectId/topups — one page of a project's top-ups. */
+export const listProjectTopupsSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+  }),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(4),
+  }),
+});
+
+/**
+ * POST /rest/admin/projects/:projectId/topups — adds a weekly-limit top-up.
+ * periodKey must be the current week or a coming week (re-checked against the
+ * horizon in the service); adminComment documents the change.
+ */
+export const createProjectTopupSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+  }),
+  body: z.object({
+    periodKey: z.string().regex(/^\d{4}-W\d{2}$/, { message: 'periodKey must match the weekly format YYYY-Www' }),
+    amount: z.number().int().min(1).max(1_000_000),
+    adminComment: z.string().trim().min(1, { message: 'adminComment is required' }).max(2000),
+  }),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** DELETE /rest/admin/projects/:projectId/topups/:topupId — removes a future-week top-up. */
+export const deleteProjectTopupSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+    topupId: z.string().uuid({ message: 'topupId must be a valid UUID' }),
+  }),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});

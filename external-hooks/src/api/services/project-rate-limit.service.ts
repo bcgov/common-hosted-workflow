@@ -1,11 +1,20 @@
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { ProjectRateLimit } from '../../db/schema/project-rate-limit';
-import { getCurrentPeriodKeys } from '../helpers/period';
+import type { ProjectTopup } from '../../db/schema/project-topup';
+import { getCurrentPeriodKeys, listUpcomingWeeklyPeriodKeys } from '../helpers/period';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('ProjectRateLimit');
+
+/** Top-ups may target the current week plus the following 25 (≈ half a year). */
+export const MAX_TOPUP_HORIZON_WEEKS = 26;
+
+/** Upper bound for a single top-up amount, in runs. */
+export const MAX_TOPUP_AMOUNT = 1_000_000;
+
+const WEEKLY_KEY_PATTERN = /^\d{4}-W\d{2}$/;
 
 export type RateLimitStopBehavior = 'hard_stop' | 'soft_stop';
 
@@ -29,6 +38,8 @@ export type ProjectRateLimitEnrichment = {
   lastAdminComment: string | null;
   weeklyExecutionCount: number;
   yearlyExecutionCount: number;
+  /** Runs added by top-ups for the current week (0 when none). */
+  weeklyTopupRuns: number;
   workflowCount: number;
   membersCount: number;
   updatedAt: string | null;
@@ -43,6 +54,7 @@ function defaultEnrichment(): ProjectRateLimitEnrichment {
     lastAdminComment: null,
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
+    weeklyTopupRuns: 0,
     workflowCount: 0,
     membersCount: 0,
     updatedAt: null,
@@ -76,13 +88,20 @@ function isExemptMode(mode: string): boolean {
 type LimitBreach = {
   period: 'weekly' | 'yearly';
   periodKey: string;
+  /** Effective limit that was enforced (base limit plus top-ups for weekly). */
   limit: number;
   count: number;
+  /** Runs added by top-ups on top of the base limit; weekly breaches only. */
+  topupRuns?: number;
 };
 
 function describeBreach(projectId: string, breach: LimitBreach): string {
   const label = breach.period === 'weekly' ? 'Weekly' : 'Yearly';
-  return `${label} execution limit reached for project '${projectId}' (limit ${breach.limit}, used ${breach.count} in ${breach.periodKey}).`;
+  const limitText =
+    breach.topupRuns !== undefined && breach.topupRuns > 0
+      ? `${breach.limit} (base ${breach.limit - breach.topupRuns} + ${breach.topupRuns} top-up)`
+      : `${breach.limit}`;
+  return `${label} execution limit reached for project '${projectId}' (limit ${limitText}, used ${breach.count} in ${breach.periodKey}).`;
 }
 
 /** Per-workflow current-period usage row for a project's workflow-usage read. */
@@ -99,6 +118,39 @@ export type ProjectWorkflowUsage = {
   yearlyPeriodKey: string;
   workflows: ProjectWorkflowUsageItem[];
 };
+
+/** Serialized weekly-limit top-up row (dates as ISO strings). */
+export type ProjectTopupItem = {
+  id: string;
+  projectId: string;
+  periodKey: string;
+  amount: number;
+  adminComment: string;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export type ProjectTopupsPage = {
+  data: ProjectTopupItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+};
+
+function serializeTopup(row: ProjectTopup): ProjectTopupItem {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    periodKey: row.periodKey,
+    amount: row.amount,
+    adminComment: row.adminComment,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
 
 export class ProjectRateLimitService {
   constructor(
@@ -146,14 +198,26 @@ export class ProjectRateLimitService {
         periodKeys.yearly,
       );
 
+      // Top-ups raise the effective weekly limit; fetched only when a weekly
+      // limit is configured (the only period they can extend).
+      let weeklyTopupRuns = 0;
+      if (config && config.weeklyRateLimit !== null) {
+        const topupSums = await this.customRepositories.projectTopup.sumByProjectIds([projectId], periodKeys.weekly);
+        weeklyTopupRuns = topupSums.get(projectId) ?? 0;
+      }
+
       const breaches: LimitBreach[] = [];
-      if (config && config.weeklyRateLimit !== null && counts.weeklyCount >= config.weeklyRateLimit) {
-        breaches.push({
-          period: 'weekly',
-          periodKey: periodKeys.weekly,
-          limit: config.weeklyRateLimit,
-          count: counts.weeklyCount,
-        });
+      if (config && config.weeklyRateLimit !== null) {
+        const effectiveWeeklyLimit = config.weeklyRateLimit + weeklyTopupRuns;
+        if (counts.weeklyCount >= effectiveWeeklyLimit) {
+          breaches.push({
+            period: 'weekly',
+            periodKey: periodKeys.weekly,
+            limit: effectiveWeeklyLimit,
+            count: counts.weeklyCount,
+            topupRuns: weeklyTopupRuns,
+          });
+        }
       }
       if (config && config.yearlyRateLimit !== null && counts.yearlyCount >= config.yearlyRateLimit) {
         breaches.push({
@@ -229,10 +293,7 @@ export class ProjectRateLimitService {
     },
     updatedBy: string | null,
   ): Promise<ProjectRateLimit> {
-    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
-    if (!project) {
-      throw new AppError(404, 'Project not found');
-    }
+    await this.assertProjectExists(projectId);
 
     const trimmedUpdatedBy = updatedBy !== null && updatedBy.trim().length > 0 ? updatedBy.trim() : null;
     await this.customRepositories.projectRateLimit.upsert({ projectId, ...body, updatedBy: trimmedUpdatedBy });
@@ -265,7 +326,7 @@ export class ProjectRateLimitService {
 
     try {
       const periodKeys = getCurrentPeriodKeys();
-      const [rateLimitMap, usageMap, workflowCountMap, memberCountMap] = await Promise.all([
+      const [rateLimitMap, usageMap, workflowCountMap, memberCountMap, topupMap] = await Promise.all([
         this.customRepositories.projectRateLimit.listByProjectIds(projectIds),
         this.customRepositories.projectExecutionUsage.listCountsByProjectIds(
           projectIds,
@@ -274,6 +335,7 @@ export class ProjectRateLimitService {
         ),
         this.n8nRepositories.sharedWorkflow.countByProjectIds(projectIds),
         this.n8nRepositories.projectRelation.countMembersByProjectIds(projectIds),
+        this.customRepositories.projectTopup.sumByProjectIds(projectIds, periodKeys.weekly),
       ]);
 
       // A failed name lookup must not discard the enrichment it accompanies,
@@ -312,6 +374,7 @@ export class ProjectRateLimitService {
           lastAdminComment: config?.lastAdminComment ?? null,
           weeklyExecutionCount: usage?.weeklyCount ?? 0,
           yearlyExecutionCount: usage?.yearlyCount ?? 0,
+          weeklyTopupRuns: topupMap.get(projectId) ?? 0,
           workflowCount: workflowCount ?? 0,
           membersCount: memberCount ?? 0,
           updatedAt: config?.updatedAt ? config.updatedAt.toISOString() : null,
@@ -334,10 +397,7 @@ export class ProjectRateLimitService {
    * Throws AppError 404 when the project does not exist in n8n.
    */
   async getProjectWorkflowUsage(projectId: string): Promise<ProjectWorkflowUsage> {
-    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
-    if (!project) {
-      throw new AppError(404, 'Project not found');
-    }
+    await this.assertProjectExists(projectId);
 
     const workflowRows = await this.n8nRepositories.sharedWorkflow.findWorkflowRowsByProjectIds([projectId]);
     const periodKeys = getCurrentPeriodKeys();
@@ -363,5 +423,89 @@ export class ProjectRateLimitService {
       yearlyPeriodKey: periodKeys.yearly,
       workflows,
     };
+  }
+
+  /**
+   * Lists a project's top-ups, most recent period first. Throws AppError 404
+   * when the project does not exist in n8n.
+   */
+  async listProjectTopups(projectId: string, page: number, pageSize: number): Promise<ProjectTopupsPage> {
+    await this.assertProjectExists(projectId);
+
+    const { rows, totalItems } = await this.customRepositories.projectTopup.list(projectId, page, pageSize);
+    return {
+      data: rows.map(serializeTopup),
+      pagination: {
+        page,
+        pageSize,
+        totalItems,
+        totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+      },
+    };
+  }
+
+  /**
+   * Adds a one-off top-up to a project's weekly limit for a target week.
+   * The period key must be the current week or one of the following weeks
+   * within the top-up horizon (validated against the live key list, so ISO
+   * year rollovers are handled); the amount must be a whole number within
+   * bounds. Throws AppError 404 for unknown projects and 400 for invalid
+   * input. Re-validates route-level zod input for direct callers.
+   */
+  async createProjectTopup(
+    projectId: string,
+    body: { periodKey: string; amount: number; adminComment: string },
+    createdBy: string | null,
+  ): Promise<ProjectTopup> {
+    await this.assertProjectExists(projectId);
+
+    if (!WEEKLY_KEY_PATTERN.test(body.periodKey)) {
+      throw new AppError(400, 'periodKey must match the weekly format YYYY-Www');
+    }
+    if (!listUpcomingWeeklyPeriodKeys(MAX_TOPUP_HORIZON_WEEKS).includes(body.periodKey)) {
+      throw new AppError(400, 'periodKey must be the current week or a coming week within the top-up horizon');
+    }
+    if (!Number.isInteger(body.amount) || body.amount < 1 || body.amount > MAX_TOPUP_AMOUNT) {
+      throw new AppError(400, `amount must be a whole number between 1 and ${MAX_TOPUP_AMOUNT}`);
+    }
+
+    const trimmedCreatedBy = createdBy !== null && createdBy.trim().length > 0 ? createdBy.trim() : null;
+    return this.customRepositories.projectTopup.create({
+      projectId,
+      periodKey: body.periodKey,
+      amount: body.amount,
+      adminComment: body.adminComment.trim(),
+      createdBy: trimmedCreatedBy,
+    });
+  }
+
+  /**
+   * Deletes a top-up row. Only top-ups whose target week has not started are
+   * deletable (the key must sort after the current weekly key; both keys are
+   * zero-padded so lexicographic order matches calendar order).
+   * Throws AppError 404 for unknown projects/rows and 409 for started weeks.
+   */
+  async deleteProjectTopup(projectId: string, topupId: string): Promise<void> {
+    await this.assertProjectExists(projectId);
+
+    const row = await this.customRepositories.projectTopup.getById(projectId, topupId);
+    if (!row) {
+      throw new AppError(404, 'Top-up not found');
+    }
+
+    const { weekly } = getCurrentPeriodKeys();
+    if (row.periodKey <= weekly) {
+      throw new AppError(409, 'Top-ups for the current or past weeks cannot be deleted');
+    }
+
+    await this.customRepositories.projectTopup.deleteById(topupId);
+  }
+
+  /** Throws AppError 404 when the project does not exist in n8n. */
+  private async assertProjectExists(projectId: string): Promise<void> {
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (!project) {
+      throw new AppError(404, 'Project not found');
+    }
   }
 }

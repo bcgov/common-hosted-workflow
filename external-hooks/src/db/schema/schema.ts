@@ -5,5 +5,6 @@ export * from './workflow-trigger';
 export * from './chefs-submission-webhook';
 export * from './multi-webhook-wait';
 export * from './project-rate-limit';
+export * from './project-topup';
 export * from './project-execution-usage';
 export * from './workflow-execution-usage';

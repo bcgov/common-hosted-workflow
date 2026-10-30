@@ -25,7 +25,9 @@ function Field({ label, htmlFor, description, error, required, className, childr
 
   return (
     <div className={cn('space-y-3', className)} {...props}>
-      <Label htmlFor={htmlFor}>
+      {/* flex keeps the label on its own line: a bare <label> is inline and
+          flows onto the same row as an inline control (e.g. a native select). */}
+      <Label htmlFor={htmlFor} className="flex">
         {label}
         {required ? (
           <>

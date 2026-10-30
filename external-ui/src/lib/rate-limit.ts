@@ -9,7 +9,7 @@ export type UsagePeriod = 'weekly' | 'yearly';
 /** The usage/limit fields needed to reason about a project's rate-limit state. */
 export type RateLimitUsage = Pick<
   AdminProjectItem,
-  'weeklyRateLimit' | 'yearlyRateLimit' | 'weeklyExecutionCount' | 'yearlyExecutionCount'
+  'weeklyRateLimit' | 'yearlyRateLimit' | 'weeklyExecutionCount' | 'yearlyExecutionCount' | 'weeklyTopupRuns'
 >;
 
 /** Share of a limit at which the usage bar turns amber. */
@@ -24,14 +24,28 @@ function meetsThreshold(count: number, limit: number, num: number, den: number):
 }
 
 /**
+ * The weekly limit actually enforced: the configured base limit plus the
+ * top-up runs added for the current week. Null when no weekly limit is
+ * configured — top-ups never apply without one.
+ */
+export function getEffectiveWeeklyLimit(project: RateLimitUsage): number | null {
+  if (project.weeklyRateLimit === null) {
+    return null;
+  }
+  return project.weeklyRateLimit + (project.weeklyTopupRuns ?? 0);
+}
+
+/**
  * Client-side status model:
  * - no_limit: neither weekly nor yearly limit is set
  * - limit_reached: usage is at or above a set limit on either period
  * - near_limit: not reached, but at or above 80% of any set limit
  * - within_limit: everything else
+ *
+ * Weekly comparisons use the effective weekly limit (base + top-ups).
  */
 export function getRateLimitStatus(project: RateLimitUsage): RateLimitStatus {
-  const weekly = project.weeklyRateLimit;
+  const weekly = getEffectiveWeeklyLimit(project);
   const yearly = project.yearlyRateLimit;
 
   if (weekly === null && yearly === null) {
@@ -84,7 +98,7 @@ export function getUsagePercent(used: number, limit: number | null): number | nu
 
 /** The period whose limit is closest to being reached (null when no limits are set). */
 export function getHighestUsagePeriod(project: RateLimitUsage): UsagePeriod | null {
-  const weeklyRatio = getUsageRatio(project.weeklyExecutionCount, project.weeklyRateLimit);
+  const weeklyRatio = getUsageRatio(project.weeklyExecutionCount, getEffectiveWeeklyLimit(project));
   const yearlyRatio = getUsageRatio(project.yearlyExecutionCount, project.yearlyRateLimit);
 
   if (weeklyRatio === null && yearlyRatio === null) {
@@ -193,4 +207,87 @@ export function formatWeeklyPeriodLabel(now: Date = new Date()): string {
   const weekStart = new Date(anchor.getTime() - getDaysSinceMonday(anchor) * DAY_MS);
   const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
   return `${formatShortDate(weekStart)} to ${formatShortDate(weekEnd)}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Weekly period keys (top-ups)                                       */
+/* ------------------------------------------------------------------ */
+
+/** Period options cover the current week plus the coming weeks (≈ half a year). */
+export const TOPUP_PERIOD_HORIZON_WEEKS = 26;
+
+const WEEKLY_KEY_PATTERN = /^(\d{4})-W(\d{2})$/;
+
+/** The Monday (noon-UTC anchored) starting the current Mon–Sun counting week in Vancouver. */
+function getCurrentWeekMonday(now: Date): Date {
+  const anchor = getVancouverAnchor(now);
+  return new Date(anchor.getTime() - getDaysSinceMonday(anchor) * DAY_MS);
+}
+
+/**
+ * ISO-8601 weekly period key ('2026-W44') of the Mon–Sun counting week that
+ * contains `now` in Vancouver — the same keys the server derives for
+ * enforcement. The ISO week number is anchored to the week's Thursday: the
+ * ISO year is the Thursday's year, and week 1 is the week containing Jan 4.
+ */
+export function getWeeklyPeriodKey(now: Date = new Date()): string {
+  const weekStart = getCurrentWeekMonday(now);
+  const thursday = new Date(weekStart.getTime() + 3 * DAY_MS);
+
+  const isoYear = thursday.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4, 12));
+  const firstMonday = jan4.getTime() - getDaysSinceMonday(jan4) * DAY_MS;
+  const week = Math.floor((thursday.getTime() - firstMonday) / DAY_MS / 7) + 1;
+
+  return `${isoYear}-W${String(week).padStart(2, '0')}`;
+}
+
+/** The Monday starting the given ISO weekly period key, or null for keys that cannot exist (e.g. week 53 in a 52-week year). */
+function getWeekMonday(periodKey: string): Date | null {
+  const match = WEEKLY_KEY_PATTERN.exec(periodKey);
+  if (!match) {
+    return null;
+  }
+  const isoYear = Number(match[1]);
+  const week = Number(match[2]);
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4, 12));
+  const firstMonday = jan4.getTime() - getDaysSinceMonday(jan4) * DAY_MS;
+  const monday = new Date(firstMonday + (week - 1) * 7 * DAY_MS);
+  return getWeeklyPeriodKey(monday) === periodKey ? monday : null;
+}
+
+/** "Nov 2 to 8" / "Oct 26 to Nov 1" range text for a Mon–Sun week (month dropped when shared). */
+function formatWeekRange(weekStart: Date, weekEnd: Date): string {
+  const startText = formatShortDate(weekStart);
+  const endText = formatShortDate(weekEnd);
+  const [startMonth, startDay] = startText.split(' ');
+  const [endMonth, endDay] = endText.split(' ');
+  return startMonth === endMonth ? `${startMonth} ${startDay} to ${endDay}` : `${startText} to ${endText}`;
+}
+
+/** Date-range label for a weekly period key, e.g. '2026-W44' → "Oct 26 to Nov 1". */
+export function formatWeeklyKeyRange(periodKey: string): string {
+  const monday = getWeekMonday(periodKey);
+  if (!monday) {
+    return periodKey;
+  }
+  return formatWeekRange(monday, new Date(monday.getTime() + 6 * DAY_MS));
+}
+
+/**
+ * Period-dropdown options for the current week plus the following weeks:
+ * "This week (Oct 26 to Nov 1)" first, then plain ranges like "Nov 2 to 8".
+ */
+export function listUpcomingWeeklyPeriodOptions(
+  count: number = TOPUP_PERIOD_HORIZON_WEEKS,
+  now: Date = new Date(),
+): Array<{ value: string; label: string }> {
+  const currentMonday = getCurrentWeekMonday(now);
+  const options: Array<{ value: string; label: string }> = [];
+  for (let offset = 0; offset < count; offset += 1) {
+    const monday = new Date(currentMonday.getTime() + offset * 7 * DAY_MS);
+    const range = formatWeekRange(monday, new Date(monday.getTime() + 6 * DAY_MS));
+    options.push({ value: getWeeklyPeriodKey(monday), label: offset === 0 ? `This week (${range})` : range });
+  }
+  return options;
 }

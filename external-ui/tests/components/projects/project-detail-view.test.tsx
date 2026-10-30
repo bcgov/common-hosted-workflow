@@ -9,6 +9,7 @@ import {
   deleteProjectTenant,
   getAdminProject,
   getProjectWorkflowUsage,
+  listProjectTopups,
   updateProjectTenant,
   type AdminProjectItem,
   type ProjectWorkflowUsage,
@@ -20,6 +21,7 @@ vi.mock('@/services/backend/projects', async () => {
     ...actual,
     getAdminProject: vi.fn(),
     getProjectWorkflowUsage: vi.fn(),
+    listProjectTopups: vi.fn(),
     updateProjectTenant: vi.fn(),
     deleteProjectTenant: vi.fn(),
     updateProjectRateLimit: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock('@/services/backend/projects', async () => {
 
 const getProjectMock = vi.mocked(getAdminProject);
 const getUsageMock = vi.mocked(getProjectWorkflowUsage);
+const listTopupsMock = vi.mocked(listProjectTopups);
 const updateTenantMock = vi.mocked(updateProjectTenant);
 const deleteTenantMock = vi.mocked(deleteProjectTenant);
 
@@ -45,6 +48,7 @@ function makeProject(overrides: Partial<AdminProjectItem> = {}): AdminProjectIte
     lastAdminComment: 'Tier A pilot limits',
     weeklyExecutionCount: 8_640,
     yearlyExecutionCount: 121_000,
+    weeklyTopupRuns: 0,
     workflowCount: 2,
     membersCount: 4,
     updatedAt: '2026-09-02T20:00:00Z',
@@ -87,10 +91,15 @@ describe('ProjectDetailView', () => {
   beforeEach(() => {
     getProjectMock.mockReset();
     getUsageMock.mockReset();
+    listTopupsMock.mockReset();
     updateTenantMock.mockReset();
     deleteTenantMock.mockReset();
     getProjectMock.mockResolvedValue(makeProject());
     getUsageMock.mockResolvedValue(USAGE);
+    listTopupsMock.mockResolvedValue({
+      data: [],
+      pagination: { page: 1, pageSize: 4, totalItems: 0, totalPages: 1 },
+    });
     updateTenantMock.mockResolvedValue(undefined);
     deleteTenantMock.mockResolvedValue(undefined);
   });
@@ -125,7 +134,7 @@ describe('ProjectDetailView', () => {
     expect(screen.getByText('of 500,000 runs')).toBeInTheDocument();
 
     expect(screen.getAllByText('When reached: pause new runs')).toHaveLength(2);
-    expect(screen.getAllByText('Includes +— top-up')).toHaveLength(2);
+    expect(screen.queryByText(/Includes \+/)).not.toBeInTheDocument();
 
     // Workflows table.
     expect(screen.getByRole('heading', { name: 'Workflows (2)' })).toBeInTheDocument();
@@ -136,7 +145,7 @@ describe('ProjectDetailView', () => {
     expect(screen.getByText('5,790')).toBeInTheDocument();
     expect(screen.getByText('Showing 2 of 2 workflows')).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Add top-up' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage top-ups' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit tenant limits' })).toBeInTheDocument();
   });
 
@@ -160,13 +169,25 @@ describe('ProjectDetailView', () => {
     expect(screen.queryByText(/has used \d+% of its/)).not.toBeInTheDocument();
   });
 
-  it('shows the near-limit banner with the projection placeholder', async () => {
+  it('shows the near-limit banner with no current-week top-up', async () => {
     getProjectMock.mockResolvedValue(makeProject({ weeklyExecutionCount: 11_520 }));
 
     renderView();
 
     expect(await screen.findByText('DEVX Tenant has used 96% of its weekly limit')).toBeInTheDocument();
-    expect(screen.getByText('Top-up: — · New runs pause around — (projection pending)')).toBeInTheDocument();
+    expect(screen.getByText('Top-up: none this week')).toBeInTheDocument();
+  });
+
+  it('shows top-ups only on the weekly card and uses the effective weekly limit', async () => {
+    getProjectMock.mockResolvedValue(makeProject({ weeklyExecutionCount: 13_440, weeklyTopupRuns: 2_000 }));
+
+    renderView();
+
+    expect(await screen.findByText('DEVX Tenant has used 96% of its weekly limit')).toBeInTheDocument();
+    expect(screen.getByText('of 14,000 runs')).toBeInTheDocument();
+    expect(screen.getByText('of 500,000 runs')).toBeInTheDocument();
+    expect(screen.getAllByText('Includes +2,000 top-up')).toHaveLength(1);
+    expect(screen.getByText('Top-up: +2,000 runs this week')).toBeInTheDocument();
   });
 
   it('explains that reached hard-stop limits pause new runs', async () => {
@@ -256,5 +277,18 @@ describe('ProjectDetailView', () => {
 
     expect(screen.getByText('Edit limits for DEVX Tenant')).toBeInTheDocument();
     expect(screen.getByText('Limits count every run of every workflow in this project.')).toBeInTheDocument();
+  });
+
+  it('opens the top-up manager from the header button', async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await screen.findByText('Invoice QR intake');
+    expect(listTopupsMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Manage top-ups' }));
+
+    expect(screen.getByRole('dialog', { name: 'Manage top-ups for DEVX Tenant' })).toBeInTheDocument();
+    expect(await screen.findByText('No top-ups yet.')).toBeInTheDocument();
+    expect(listTopupsMock).toHaveBeenCalledWith('p-devx', 1, 4, expect.any(AbortSignal));
   });
 });
