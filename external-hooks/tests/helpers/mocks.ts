@@ -223,6 +223,26 @@ export function createMockProjectRateLimitRepository() {
   };
 }
 
+export function createMockProjectRateLimitDefaultRepository() {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    getAll: vi.fn().mockResolvedValue([]),
+    upsertBoth: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+export function makeProjectRateLimitDefaultRow(overrides: Record<string, unknown> = {}) {
+  return {
+    projectKind: 'team',
+    weeklyRateLimit: null,
+    yearlyRateLimit: null,
+    updatedBy: null,
+    createdAt: BASE_DATE,
+    updatedAt: BASE_DATE,
+    ...overrides,
+  };
+}
+
 export function createMockProjectExecutionUsageRepository() {
   return {
     getCounts: vi.fn().mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 }),

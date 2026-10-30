@@ -15,6 +15,7 @@ import {
   USAGE_BAR_TONE_CLASSES,
   USAGE_BAR_TRACK_CLASS,
 } from './project-badges';
+import { DefaultLimitsDialog } from './default-limits-dialog';
 import {
   formatCompactCount,
   formatCount,
@@ -58,6 +59,7 @@ export function AdminProjectsView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
+  const [isDefaultLimitsOpen, setIsDefaultLimitsOpen] = useState(false);
 
   const projectsQuery = useQuery({
     queryKey: ['admin-projects', 'all'],
@@ -157,8 +159,9 @@ export function AdminProjectsView() {
             Set weekly and annual run limits for tenants, personal accounts and their workflows.
           </p>
         </div>
-        {/* Intentionally inert for now: default limits persistence is not built yet. */}
-        <Button type="button">Default limits</Button>
+        <Button type="button" onClick={() => setIsDefaultLimitsOpen(true)}>
+          Default limits
+        </Button>
       </div>
 
       {/* Stat cards */}
@@ -298,6 +301,8 @@ export function AdminProjectsView() {
           </Button>
         </div>
       </div>
+
+      <DefaultLimitsDialog open={isDefaultLimitsOpen} onOpenChange={setIsDefaultLimitsOpen} />
     </div>
   );
 }
