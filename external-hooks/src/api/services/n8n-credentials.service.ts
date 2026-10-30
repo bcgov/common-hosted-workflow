@@ -90,6 +90,9 @@ export class N8nCredentialsService {
       user,
       credentialType: dto.type,
       credentialId: created.id,
+      // Required by n8n's RelayEventMap since 2.45.x; audit/log-streaming relays record it as the
+      // resource name. Omitting it leaves the audit entry's resourceName undefined.
+      credentialName: dto.name,
       publicApi: false,
       projectId: dto.projectId,
       isDynamic: false,
@@ -117,6 +120,9 @@ export class N8nCredentialsService {
       user,
       credentialType: existing.type,
       credentialId: existing.id,
+      // Required by n8n's RelayEventMap since 2.45.x (see create above). `prepared.name` is the
+      // name being written; fall back to the existing name if the update did not change it.
+      credentialName: prepared.name ?? existing.name,
       isDynamic: false,
       usesExternalSecrets: false,
     });
