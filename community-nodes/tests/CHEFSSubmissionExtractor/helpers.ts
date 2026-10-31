@@ -125,7 +125,7 @@ interface CreateContextOptions {
   formId?: string;
   apiKey?: string;
   baseUrl?: string;
-  fieldMappingMode?: 'keyValue' | 'json';
+  fieldMappingMode?: 'keyValue' | 'json' | 'fullSubmission';
   missingPathBehavior?: 'returnNull' | 'throwError';
   includeSubmissionMeta?: boolean;
   fieldMappings?: { mapping: Array<{ outputKey: string; sourcePath: string }> };

@@ -116,12 +116,22 @@ async function processItem(
     throw new NodeOperationError(ctx.getNode(), 'Submission ID is required and cannot be empty', { itemIndex });
   }
 
+  const mode = ctx.getNodeParameter('fieldMappingMode', itemIndex) as string;
+
+  const response = await chefsApiRequest(ctx, 'GET', `/submissions/${submissionId}`, credentials);
+  const inner = validateResponseStructure(ctx, response, itemIndex);
+
+  // When "Get Full Submission Data" is selected, output the entire submission object as-is.
+  if (mode === 'fullSubmission') {
+    return ctx.helpers.constructExecutionMetaData(ctx.helpers.returnJsonArray(inner as unknown as IDataObject), {
+      itemData: { item: itemIndex },
+    });
+  }
+
   const missingPathBehavior = ctx.getNodeParameter('missingPathBehavior', itemIndex) as string;
   const includeSubmissionMeta = ctx.getNodeParameter('includeSubmissionMeta', itemIndex) as boolean;
   const mappings = parseFieldMappings(ctx, itemIndex);
 
-  const response = await chefsApiRequest(ctx, 'GET', `/submissions/${submissionId}`, credentials);
-  const inner = validateResponseStructure(ctx, response, itemIndex);
   const submissionData = inner.submission.data;
 
   // Validate field paths and handle missing ones
@@ -184,6 +194,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
         options: [
           { name: 'UI Field Pairs', value: 'keyValue' },
           { name: 'JSON', value: 'json' },
+          { name: 'Get Full Submission Data', value: 'fullSubmission' },
         ],
         default: 'keyValue',
         description: 'Choose how to define field mappings',
@@ -192,6 +203,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
         displayName: 'Missing Path Behavior',
         name: 'missingPathBehavior',
         type: 'options',
+        displayOptions: { show: { fieldMappingMode: ['keyValue', 'json'] } },
         options: [
           { name: 'Return Null', value: 'returnNull' },
           { name: 'Throw Error', value: 'throwError' },
@@ -204,6 +216,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
         displayName: 'Include Submission Metadata',
         name: 'includeSubmissionMeta',
         type: 'boolean',
+        displayOptions: { show: { fieldMappingMode: ['keyValue', 'json'] } },
         default: false,
         description:
           'When enabled, appends submission-level metadata fields (_createdBy, _createdAt, _updatedBy, _updatedAt) from the API response to the output object. These are prefixed with underscore to avoid collision with user-defined output keys.',

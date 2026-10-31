@@ -10,6 +10,7 @@ A custom n8n community node that fetches a [CHEFS](https://submit.digital.gov.bc
 - [Field Mapping](#field-mapping)
   - [UI Field Pairs Mode](#ui-field-pairs-mode)
   - [JSON Mode](#json-mode)
+  - [Get Full Submission Data Mode](#get-full-submission-data-mode)
 - [Dot-Notation Path Resolution](#dot-notation-path-resolution)
 - [Missing Path Behavior](#missing-path-behavior)
 - [Submission Metadata](#submission-metadata)
@@ -26,7 +27,7 @@ Key capabilities:
 
 - Fetch any CHEFS form submission by its Submission ID
 - Extract specific fields using dot-notation paths (e.g. `company.address.city`)
-- Two field mapping modes: interactive UI pairs or a JSON object
+- Three field mapping modes: interactive UI pairs, a JSON object, or the full submission object
 - Configurable behavior for missing paths (return `null` or throw an error)
 - Optional inclusion of submission metadata (created/updated timestamps and authors)
 - Compatible with n8n's AI agent tool integration (`usableAsTool: true`)
@@ -43,14 +44,14 @@ The node constructs a `Basic` authorization header from these values for every A
 
 ## Node Parameters
 
-| Parameter                   | Type              | Required    | Default          | Description                                                                 |
-| --------------------------- | ----------------- | ----------- | ---------------- | --------------------------------------------------------------------------- |
-| Submission ID               | `string`          | Yes         | —                | The ID of the CHEFS submission to retrieve                                  |
-| Field Mapping Mode          | `options`         | No          | `UI Field Pairs` | Choose between interactive key-value pairs or a JSON object                 |
-| Missing Path Behavior       | `options`         | No          | `Return Null`    | What to do when a source path does not exist in the submission              |
-| Include Submission Metadata | `boolean`         | No          | `false`          | Append `_createdBy`, `_createdAt`, `_updatedBy`, `_updatedAt` to the output |
-| Field Mappings              | `fixedCollection` | Conditional | —                | UI key-value pairs (shown when mode is `UI Field Pairs`)                    |
-| Field Mapping JSON          | `json`            | Conditional | `{}`             | JSON object mapping output keys to source paths (shown when mode is `JSON`) |
+| Parameter                   | Type              | Required    | Default          | Description                                                                                                  |
+| --------------------------- | ----------------- | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Submission ID               | `string`          | Yes         | —                | The ID of the CHEFS submission to retrieve                                                                   |
+| Field Mapping Mode          | `options`         | No          | `UI Field Pairs` | Choose UI key-value pairs, a JSON object, or the full submission object                                      |
+| Missing Path Behavior       | `options`         | No          | `Return Null`    | What to do when a source path does not exist (hidden in Full Submission mode)                                |
+| Include Submission Metadata | `boolean`         | No          | `false`          | Append `_createdBy`, `_createdAt`, `_updatedBy`, `_updatedAt` to the output (hidden in Full Submission mode) |
+| Field Mappings              | `fixedCollection` | Conditional | —                | UI key-value pairs (shown when mode is `UI Field Pairs`)                                                     |
+| Field Mapping JSON          | `json`            | Conditional | `{}`             | JSON object mapping output keys to source paths (shown when mode is `JSON`)                                  |
 
 ## Field Mapping
 
@@ -81,7 +82,16 @@ Provide a single JSON object where keys are output names and values are dot-nota
 }
 ```
 
-Both modes produce identical results for equivalent configurations. At least one field mapping is required.
+Both UI Field Pairs and JSON modes produce identical results for equivalent configurations. At least one field mapping is required for these two modes.
+
+### Get Full Submission Data Mode
+
+Select **Get Full Submission Data** to bypass field mapping entirely and output the complete submission object exactly as returned by the CHEFS API (the inner `submission` payload, including `id`, `formVersionId`, `confirmationId`, `draft`, `deleted`, the nested `submission` data, and the `createdBy`/`createdAt`/`updatedBy`/`updatedAt` metadata).
+
+In this mode:
+
+- No field mappings are required (the Field Mappings / Field Mapping JSON inputs are hidden).
+- The Missing Path Behavior and Include Submission Metadata options are hidden — they do not apply because the entire object is returned verbatim, metadata included.
 
 ## Dot-Notation Path Resolution
 
