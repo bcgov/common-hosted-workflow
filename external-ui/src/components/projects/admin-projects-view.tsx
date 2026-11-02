@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { fetchAllAdminProjects, type AdminProjectItem } from '../../services/backend/projects';
+import { fetchAllProjects, type ProjectItem } from '../../services/backend/projects';
 import {
   ProjectTypeBadge,
   RateLimitStatusBadge,
@@ -54,7 +54,7 @@ function getTabSummaryNoun(tab: ProjectTab): string {
   return tab === 'tenants' ? 'tenants' : 'personal accounts';
 }
 
-export function AdminProjectsView() {
+export function AdminProjectsView({ readOnly = false }: { readOnly?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -62,8 +62,8 @@ export function AdminProjectsView() {
   const [isDefaultLimitsOpen, setIsDefaultLimitsOpen] = useState(false);
 
   const projectsQuery = useQuery({
-    queryKey: ['admin-projects', 'all'],
-    queryFn: ({ signal }) => fetchAllAdminProjects(signal),
+    queryKey: ['projects', 'all'],
+    queryFn: ({ signal }) => fetchAllProjects(signal),
   });
 
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
@@ -153,15 +153,19 @@ export function AdminProjectsView() {
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[2rem] font-bold leading-10 text-foreground">Projects</h1>
-            <Badge variant="secondary">Admin view</Badge>
+            <Badge variant="secondary">{readOnly ? 'Read-only' : 'Admin view'}</Badge>
           </div>
           <p className="max-w-4xl text-base leading-6 text-muted-foreground">
-            Set weekly and annual run limits for tenants, personal accounts and their workflows.
+            {readOnly
+              ? 'View weekly and annual run usage for your projects.'
+              : 'Set weekly and annual run limits for tenants, personal accounts and their workflows.'}
           </p>
         </div>
-        <Button type="button" onClick={() => setIsDefaultLimitsOpen(true)}>
-          Default limits
-        </Button>
+        {!readOnly && (
+          <Button type="button" onClick={() => setIsDefaultLimitsOpen(true)}>
+            Default limits
+          </Button>
+        )}
       </div>
 
       {/* Stat cards */}
@@ -266,7 +270,7 @@ export function AdminProjectsView() {
             </TableHeader>
             <TableBody>
               {pageProjects.map((project) => (
-                <ProjectRow key={project.projectId} project={project} />
+                <ProjectRow key={project.projectId} project={project} readOnly={readOnly} />
               ))}
             </TableBody>
           </Table>
@@ -302,7 +306,7 @@ export function AdminProjectsView() {
         </div>
       </div>
 
-      <DefaultLimitsDialog open={isDefaultLimitsOpen} onOpenChange={setIsDefaultLimitsOpen} />
+      {!readOnly && <DefaultLimitsDialog open={isDefaultLimitsOpen} onOpenChange={setIsDefaultLimitsOpen} />}
     </div>
   );
 }
@@ -335,7 +339,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
   );
 }
 
-function ProjectRow({ project }: { project: AdminProjectItem }) {
+function ProjectRow({ project, readOnly }: { project: ProjectItem; readOnly?: boolean }) {
   const detailPath = `/projects/${encodeURIComponent(project.projectId)}`;
   return (
     <TableRow>
@@ -370,7 +374,7 @@ function ProjectRow({ project }: { project: AdminProjectItem }) {
           to={detailPath}
           className="text-sm font-medium text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
         >
-          Manage
+          {readOnly ? 'View' : 'Manage'}
         </Link>
       </TableCell>
     </TableRow>

@@ -42,6 +42,7 @@ import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { createReadOnlyMiddleware } from '../middlewares';
 import { buildWilRouter } from './wil';
 import { buildAdminProjectRouter } from './admin-projects';
+import { buildProjectsRouter } from './projects';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 
 type UiApiMutableRequest = Request & {
@@ -477,23 +478,14 @@ export function buildUiApiRouter(routeContext: ApiRouteContext) {
     },
   );
 
-  // List user personal project and their tenant projects (non-admin API)
-  // Upstream credential is resolved from the authenticated session context (server-side store / refresh),
-  // never by rereading the UI bearer (which is an app JWT in separate-token mode).
-  router.get('/projects', requireUiRequestContext, checkPermission('canManageProject'), async (req, res) => {
-    const session = (req as UiApiRequest).session;
-    const upstreamAccessToken = session.upstreamAccessToken ?? '';
-    const ssoUserId = resolveCstarSsoUserId(session.claims, session.subject, session.email);
-    const n8nUserId = session.n8nUser?.id ?? '';
-
-    const data = await services.projectTenant.listUserProjectTenants({
-      ssoUserId,
-      n8nUserId,
-      upstreamAccessToken,
-    });
-
-    OkResponse(res, { data });
-  });
+  // Mount shared project read sub-router (UI session auth + canManageProject).
+  // Admins see all n8n projects; members see only the projects they can access.
+  router.use(
+    '/projects',
+    requireUiRequestContext,
+    checkPermission('canManageProject'),
+    buildProjectsRouter(routeContext),
+  );
 
   // Mount admin project-tenant sub-router (UI session auth + admin role + canManageProject)
   router.use(

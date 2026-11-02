@@ -38,7 +38,7 @@ describe('project top-up API helpers', () => {
 
     const response = await listProjectTopups(TOPUP.projectId, 2, 4, signal);
 
-    expect(getMock).toHaveBeenCalledWith('/ui-api/admin/projects/project%2Fone/topups', {
+    expect(getMock).toHaveBeenCalledWith('/ui-api/projects/project%2Fone/topups', {
       params: { page: 2, pageSize: 4 },
       signal,
     });

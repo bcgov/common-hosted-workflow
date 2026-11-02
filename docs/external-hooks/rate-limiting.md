@@ -35,7 +35,8 @@ For the layered architecture these components live in, see [`architecture.md`](.
 | `external-hooks/src/db/schema/project-rate-limit-default.ts`            | Drizzle table `project_rate_limit_default` (per-scope defaults, max 2 rows)                                 |
 | `external-hooks/src/db/repository/custom/project-rate-limit-default.ts` | Defaults repository: `get` per scope, `getAll`, atomic `upsertBoth` (one transaction)                       |
 | `external-hooks/src/api/schemas/projects.ts`                            | Zod validation for project reads, rate-limit changes and top-up list/create/delete                          |
-| `external-hooks/src/api/routes/admin-projects.ts`                       | Admin project reads, rate-limit updates and top-up endpoints                                                |
+| `external-hooks/src/api/routes/projects.ts`                             | Shared project read endpoints (`/ui-api/projects`): admins get all projects, members their own              |
+| `external-hooks/src/api/routes/admin-projects.ts`                       | Admin project writes (limits, tenant mapping, top-ups) and the defaults endpoints                           |
 | `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`         | Additive-only migration: the two rate-limit tables (applied by the existing `node migrate.cjs` step)        |
 | `external-hooks/drizzle/0013_add_workflow_usage_and_updated_by.sql`     | Additive-only migration: `workflow_execution_usage` + `project_rate_limit.updated_by`                       |
 | `external-hooks/drizzle/0014_add_project_topup.sql`                     | Additive-only migration: `project_topup`                                                                    |
@@ -219,15 +220,13 @@ The webhook process creates and enqueues the execution record **before** the wor
 
 ---
 
-## Admin API
+## Projects API
 
-All endpoints below are on the existing admin router mounted at **`/ui-api/admin`** (the `/rest/admin/...` prefixes still present in some source JSDoc comments are legacy — `/ui-api/admin/...` is the real path).
+Reads and writes are split by audience. **Read endpoints** (list, detail, workflow usage, top-up history) live on a shared router mounted at **`/ui-api/projects`** and serve admins and non-admins alike — the mount enforces the UI session + `canManageProject`, and the handlers branch on the session's admin flag: admins get every n8n project, members get only the projects they can access in n8n (their personal project plus team project relations), with identical payloads. **Write endpoints** (limits, tenant mapping, top-up create/delete, defaults) remain on **`/ui-api/admin`** behind the full guard chain (`requireUiRequestContext` + `canManageProject` + `global:owner`/`global:admin`), so a non-admin can never reach them regardless of the UI. (The `/rest/admin/...` prefixes still present in some source JSDoc comments are legacy — `/ui-api/...` is the real path.)
 
-**Auth:** UI session (`Authorization: Bearer`, via `requireUiRequestContext`) + `canManageProject` permission + `global:owner` or `global:admin` role — the same guard chain as the tenant endpoints.
+### `GET /ui-api/projects`
 
-### `GET /ui-api/admin/projects`
-
-Unchanged route; the service now enriches every item. Query parameters are unchanged (`page` default 1, `pageSize` default 25 max 100, `search`, `type`). Each item keeps `projectId`, `projectName`, `projectType`, `tenantId` and gains:
+Query parameters: `page` (default 1), `pageSize` (default 25, max 100), `search`, `type` (`team`/`personal`). Each item keeps `projectId`, `projectName`, `projectType`, `tenantId` and:
 
 | Field                  | Type                               | Meaning                                                                           |
 | ---------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
@@ -269,6 +268,8 @@ Example item (inside the usual `{ "data": [...], "pagination": { ... } }` envelo
 
 **Errors never break the list:** enrichment failures (e.g. custom-DB outage) are logged and fall back to defaults — `null` limits/comment, `0` counts/top-up runs, `null` `updatedAt`/`updatedByName` — so the project list keeps working.
 
+**Member scoping:** for non-admins the list is restricted in SQL to the project ids the user can access in n8n (`listProjectIdsAccessibleToUser` — personal project + team project relations); a member of no project gets an empty page. All other enrichment is identical.
+
 ### `GET /ui-api/admin/projects/rate-limit-defaults`
 
 Returns the saved per-scope default limits. The response intentionally carries **no usage counts** — the defaults dialog needs only the saved values. This route is a literal path registered **before** the `/projects/:projectId` routes, otherwise Express would treat `rate-limit-defaults` as a project id.
@@ -304,11 +305,11 @@ Example body (mirroring the dialog's output where personal fields were left blan
 
 **200** response: `{ "success": true, "message": "Default limits updated", "defaults": <saved values as GET> }`. The acting admin's email from the UI session is stamped (trimmed; empty/unavailable stored as `null`). Errors use the standard shape: **400** for validation failures (missing scope, non-int, out-of-range, `yearly < weekly`), **401/403** for missing session/permission/role; a missing table or other custom-DB failure surfaces as **500**.
 
-### `GET /ui-api/admin/projects/:projectId`
+### `GET /ui-api/projects/:projectId`
 
-Same guard chain and the same item shape as the list, enrichment included. Backs the admin project detail page. **404** (`Project not found`) when the project does not exist.
+Same item shape as the list, enrichment included. Backs the project detail page for admins and members. Admins may read any project; a non-admin gets **403** unless they can access the project in n8n (project relation or personal-project owner). **404** (`Project not found`) when the project does not exist.
 
-### `GET /ui-api/admin/projects/:projectId/workflow-usage`
+### `GET /ui-api/projects/:projectId/workflow-usage`
 
 Per-workflow execution counts for the project's workflows, for the current weekly/yearly periods (keys returned as `weeklyPeriodKey` / `yearlyPeriodKey`):
 
@@ -323,7 +324,7 @@ Per-workflow execution counts for the project's workflows, for the current weekl
 }
 ```
 
-Counts come from `workflow_execution_usage` (custom DB), sorted by workflow name. Usage rows whose workflow is no longer shared with the project are excluded. **404** (`Project not found`) when the project is unknown.
+Counts come from `workflow_execution_usage` (custom DB), sorted by workflow name. Usage rows whose workflow is no longer shared with the project are excluded. Non-admins are subject to the same project-access check as the detail endpoint (**403** otherwise). **404** (`Project not found`) when the project is unknown.
 
 ### `PUT /ui-api/admin/projects/:projectId/rate-limit`
 
@@ -376,9 +377,9 @@ Errors use the standard `{ "error": { "message": "…" } }` shape:
 | 404  | Unknown project (`Project not found`)                                                        |
 | 500  | Stored row could not be read back after the write                                            |
 
-### `GET /ui-api/admin/projects/:projectId/topups`
+### `GET /ui-api/projects/:projectId/topups`
 
-Lists a project's stored top-ups, including past, current and future weeks, ordered by **`period_key DESC, created_at DESC`** (latest target week first, newest grant first within a week).
+Lists a project's stored top-ups, including past, current and future weeks, ordered by **`period_key DESC, created_at DESC`** (latest target week first, newest grant first within a week). Non-admins are subject to the same project-access check as the detail endpoint.
 
 Query parameters: `page` is an integer ≥ 1 (default 1); `pageSize` is an integer from 1 to 100 (default 4). **200** response:
 
@@ -438,11 +439,13 @@ The UI hides removal buttons for started weeks, but the server independently rec
 
 ---
 
-## Admin UI (Projects page)
+## Projects pages (admin and member views)
 
-The external-ui admin **Projects** page (`/projects`) renders this API data for platform admins: aggregate stat cards (runs this week, limit reached, near limit, no limit), Tenants / Personal accounts tabs, client-side search + status filter over the full project list (fetched in pages of 100), and a usage table with weekly/annual progress bars, status badges and per-project links. Status and bar tones are computed client-side: reached = count ≥ limit; near = ≥ 80% of any set limit; red at ≥ 100%, amber at ≥ 75%. Weekly comparisons and bars use the effective limit (base plus current-week top-ups); yearly comparisons are unchanged.
+The external-ui **Projects** page (`/projects`) renders this API data for platform admins: aggregate stat cards (runs this week, limit reached, near limit, no limit), Tenants / Personal accounts tabs, client-side search + status filter over the full project list (fetched in pages of 100), and a usage table with weekly/annual progress bars, status badges and per-project links. Status and bar tones are computed client-side: reached = count ≥ limit; near = ≥ 80% of any set limit; red at ≥ 100%, amber at ≥ 75%. Weekly comparisons and bars use the effective limit (base plus current-week top-ups); yearly comparisons are unchanged.
 
-Each row links to a per-project detail page (`/projects/:projectId`): limit cards with "Changed <date> by <name>" attribution (`updatedAt`/`updatedByName`), reset dates (next Monday / Jan 1, `America/Vancouver`), a member count from the project's relations, a per-workflow runs table from the workflow-usage endpoint, tenant-ID inline editing, and an "Edit limits" dialog (weekly/annual limits, stop behaviour, required reason) that PUTs the full-replace body.
+**Non-admins see the same pages read-only.** Both routes were already gated by `canManageProject` rather than admin role, so the pages render for every eligible user with a `readOnly` prop when the session is not an admin: the same table, stat cards, tabs, filters and usage bars, but the **Default limits** button is admin-only (hidden, and the defaults endpoints are never called), the row link reads **View** instead of **Manage**, and the detail page drops the tenant-ID editor, **Edit tenant limits** and **Manage top-ups** buttons (and their dialogs). The shared endpoints scope a member's list to their own projects server-side; opening another project's URL by hand renders a "No access to this project" card (403).
+
+Each row links to a per-project detail page (`/projects/:projectId`): limit cards with "Changed <date> by <name>" attribution (`updatedAt`/`updatedByName`), reset dates (next Monday / Jan 1, `America/Vancouver`), a member count from the project's relations, a per-workflow runs table from the workflow-usage endpoint, tenant-ID inline editing (admins only), and an "Edit limits" dialog (weekly/annual limits, stop behaviour, required reason) that PUTs the full-replace body.
 
 The weekly card uses the effective limit and shows `Includes +N top-up` only when current-week top-ups are positive; the annual card has no top-up footer. The near/reached banner uses the same effective percentage and describes the current week as `Top-up: +N runs this week` or `Top-up: none this week` (no projection placeholder).
 

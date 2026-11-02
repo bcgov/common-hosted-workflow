@@ -1,4 +1,4 @@
-import type { AdminProjectItem } from '../services/backend/projects';
+import type { ProjectItem } from '../services/backend/projects';
 
 export type RateLimitStatus = 'within_limit' | 'limit_reached' | 'near_limit' | 'no_limit';
 
@@ -8,7 +8,7 @@ export type UsagePeriod = 'weekly' | 'yearly';
 
 /** The usage/limit fields needed to reason about a project's rate-limit state. */
 export type RateLimitUsage = Pick<
-  AdminProjectItem,
+  ProjectItem,
   'weeklyRateLimit' | 'yearlyRateLimit' | 'weeklyExecutionCount' | 'yearlyExecutionCount' | 'weeklyTopupRuns'
 >;
 

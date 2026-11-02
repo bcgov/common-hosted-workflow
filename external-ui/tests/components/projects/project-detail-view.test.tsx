@@ -7,11 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectDetailView } from '@/components/projects/project-detail-view';
 import {
   deleteProjectTenant,
-  getAdminProject,
+  getProject,
   getProjectWorkflowUsage,
   listProjectTopups,
   updateProjectTenant,
-  type AdminProjectItem,
+  type ProjectItem,
   type ProjectWorkflowUsage,
 } from '@/services/backend/projects';
 
@@ -19,7 +19,7 @@ vi.mock('@/services/backend/projects', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/projects')>('@/services/backend/projects');
   return {
     ...actual,
-    getAdminProject: vi.fn(),
+    getProject: vi.fn(),
     getProjectWorkflowUsage: vi.fn(),
     listProjectTopups: vi.fn(),
     updateProjectTenant: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('@/services/backend/projects', async () => {
   };
 });
 
-const getProjectMock = vi.mocked(getAdminProject);
+const getProjectMock = vi.mocked(getProject);
 const getUsageMock = vi.mocked(getProjectWorkflowUsage);
 const listTopupsMock = vi.mocked(listProjectTopups);
 const updateTenantMock = vi.mocked(updateProjectTenant);
@@ -36,7 +36,7 @@ const deleteTenantMock = vi.mocked(deleteProjectTenant);
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111';
 
-function makeProject(overrides: Partial<AdminProjectItem> = {}): AdminProjectItem {
+function makeProject(overrides: Partial<ProjectItem> = {}): ProjectItem {
   return {
     projectId: 'p-devx',
     projectName: 'DEVX Tenant',
@@ -74,13 +74,13 @@ function axiosLikeError(status: number) {
   });
 }
 
-function renderView() {
+function renderView(props: { readOnly?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={['/projects/p-devx']}>
         <Routes>
-          <Route path="/projects/:projectId" element={<ProjectDetailView />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailView {...props} />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -290,5 +290,57 @@ describe('ProjectDetailView', () => {
     expect(screen.getByRole('dialog', { name: 'Manage top-ups for DEVX Tenant' })).toBeInTheDocument();
     expect(await screen.findByText('No top-ups yet.')).toBeInTheDocument();
     expect(listTopupsMock).toHaveBeenCalledWith('p-devx', 1, 4, expect.any(AbortSignal));
+  });
+
+  it('renders the 403 state for projects the member cannot access', async () => {
+    getProjectMock.mockRejectedValue(axiosLikeError(403));
+
+    renderView();
+
+    expect(await screen.findByRole('heading', { name: 'No access to this project' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to projects' })).toHaveAttribute('href', '/projects');
+  });
+});
+
+describe('ProjectDetailView in read-only (non-admin) mode', () => {
+  beforeEach(() => {
+    getProjectMock.mockReset();
+    getUsageMock.mockReset();
+    listTopupsMock.mockReset();
+    updateTenantMock.mockReset();
+    deleteTenantMock.mockReset();
+    getProjectMock.mockResolvedValue(makeProject());
+    getUsageMock.mockResolvedValue(USAGE);
+    updateTenantMock.mockResolvedValue(undefined);
+    deleteTenantMock.mockResolvedValue(undefined);
+  });
+
+  it('keeps the limits, workflow usage and tenant id visible but removes every write affordance', async () => {
+    renderView({ readOnly: true });
+
+    await screen.findByText('Invoice QR intake');
+
+    // Same information as the admin view...
+    expect(screen.getByText(TENANT_ID)).toBeInTheDocument();
+    expect(screen.getByText('of 12,000 runs')).toBeInTheDocument();
+    expect(screen.getByText('4 members')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Workflows (2)' })).toBeInTheDocument();
+    expect(screen.getByText('2,850')).toBeInTheDocument();
+
+    // ...without any way to change it.
+    expect(screen.queryByRole('button', { name: 'Edit tenant limits' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manage top-ups' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(listTopupsMock).not.toHaveBeenCalled();
+  });
+
+  it('never loads top-up history while read-only', async () => {
+    renderView({ readOnly: true });
+
+    await screen.findByText('Invoice QR intake');
+
+    // Give the usage query time to settle; the top-ups list must stay untouched.
+    await waitFor(() => expect(getUsageMock).toHaveBeenCalledTimes(1));
+    expect(listTopupsMock).not.toHaveBeenCalled();
   });
 });
