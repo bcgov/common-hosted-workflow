@@ -4,28 +4,37 @@ import type { UiApiTypedRequest } from '../types/ui-api';
 import { createRequestParser } from '../utils/validation';
 import { chefsSubmissionCallbackSchema, chefsSubmissionRegisterSchema } from '../schemas/chefs-submission';
 import { OkResponse } from './responses';
-import { AppError } from '../utils/errors';
 import { callWebhook } from './helpers/webhook-fire';
 import { CALLBACK_TIMEOUT_MS } from './constants/constants';
 import { createLogger } from '../utils/logger';
-import { N8N_BASE_URL } from '@config';
 import type { z } from 'zod';
 
 const log = createLogger('ChefsSubmissionRoutes');
 
-const WEBHOOK_PATH_HEADER = 'x-n8n-webhook-path';
+/**
+ * Incoming headers that must NOT be forwarded to the n8n webhook: hop-by-hop headers and
+ * request-framing headers that would conflict with the outbound request we build. `content-type`
+ * is excluded too — `callWebhook` sets a single canonical `Content-Type: application/json` for the
+ * re-serialized body (forwarding the incoming one caused a duplicated header that broke JSON
+ * parsing on the n8n side). Everything else (including the caller-chosen auth header, e.g.
+ * `x-n8n-chef-key`) is passed through so the n8n Webhook node's Header Auth can validate it.
+ */
+const NON_FORWARDED_HEADERS = new Set([
+  'host',
+  'content-length',
+  'content-type',
+  'connection',
+  'keep-alive',
+  'transfer-encoding',
+  'upgrade',
+  'proxy-authorization',
+  'proxy-authenticate',
+  'te',
+  'trailer',
+  'accept-encoding',
+]);
 
-/** Builds a full webhook URL by resolving a webhook path against the configured n8n base URL. */
-function buildWebhookUrlFromPath(path: string): string {
-  if (!N8N_BASE_URL) {
-    throw new AppError(500, `Cannot build webhook URL from path: N8N_BASE_URL is not configured`);
-  }
-  const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
-  const base = N8N_BASE_URL.endsWith('/') ? N8N_BASE_URL : `${N8N_BASE_URL}/`;
-  return new URL(`webhook/${normalizedPath}`, base).toString();
-}
-
-/** Constructs the outbound URL by appending the incoming request's query params to the base webhook URL. */
+/** Appends the incoming request's query params to the resolved base webhook URL. */
 function buildOutboundUrl(baseUrl: string, req: Request): string {
   if (!req.url || !req.url.includes('?')) return baseUrl;
   const incomingQuery = req.url.slice(req.url.indexOf('?') + 1);
@@ -33,51 +42,84 @@ function buildOutboundUrl(baseUrl: string, req: Request): string {
   return `${baseUrl}${separator}${incomingQuery}`;
 }
 
+/**
+ * Collects the incoming request headers to forward to the n8n webhook, preserving the caller-chosen
+ * authentication header (the n8n Webhook node validates it via its Header Auth credential). Drops
+ * hop-by-hop / framing / content-type headers (see `NON_FORWARDED_HEADERS`).
+ */
+function buildForwardedHeaders(req: Request): Record<string, string> {
+  const forwarded: Record<string, string> = {};
+  const raw = req.headers as Record<string, unknown>;
+  for (const [name, value] of Object.entries(raw)) {
+    if (NON_FORWARDED_HEADERS.has(name.toLowerCase())) continue;
+    if (Array.isArray(value)) forwarded[name] = value.join(', ');
+    else if (typeof value === 'string') forwarded[name] = value;
+  }
+  return forwarded;
+}
+
 export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
-  const { customRepositories, internalBearerMiddleware } = routeContext;
+  const { services, internalBearerMiddleware } = routeContext;
   const router = Router();
 
   /**
-   * POST /chefs/submissions/callback
-   * Receives submission events from CHEFS (Form Builder Service).
+   * POST /chefs/submissions/register
+   * Internal-only endpoint called by the CHEFS Resubmit Wait custom node before an execution is put
+   * to wait. Registered before the `/:webhookPath` catch-all so it is never shadowed.
    *
-   * - Resolves formId/submissionId from the request body.
-   * - Looks up a pending `chefs_submission_webhook` row by formId + submissionId.
-   * - If found, forwards to the stored webhook_url and deletes the row on 2xx.
-   * - If not found, falls back to the `x-n8n-webhook-path` request header, resolving it
-   *   against the configured `N8N_BASE_URL` to produce the full outbound webhook URL.
-   * - The incoming request body and query params are forwarded as-is.
+   * - Secured by internalBearerMiddleware (Authorization: Bearer <INTERNAL_AUTH_TOKEN>).
+   * - Registers a pending `chefs_submission_webhook` row so the later CHEFS callback can resume the
+   *   correct n8n execution.
    */
   router.post(
-    '/submissions/callback',
+    '/submissions/register',
+    internalBearerMiddleware,
+    createRequestParser(chefsSubmissionRegisterSchema),
+    async (req: UiApiTypedRequest<z.infer<typeof chefsSubmissionRegisterSchema>>, res: Response) => {
+      const { executionId, formId, submissionId, resumeUrl } = req.parsed.body;
+      await services.chefsSubmission.register({ executionId, formId, submissionId, resumeUrl });
+      OkResponse(res, { success: true, message: 'CHEFS submission webhook registered' });
+    },
+  );
+
+  /**
+   * POST /chefs/:webhookPath
+   * CHEFS-facing entry point for submission events. external-hooks forwards to the n8n Webhook node;
+   * the webhook authenticates the caller itself via its Header Auth credential. CHEFS sends the
+   * agreed auth header (e.g. `x-n8n-chef-key: <value>`); external-hooks passes it through unchanged.
+   *
+   * The forward decision (ignore non-submission events; resume URL for resubmissions vs. the
+   * path-derived webhook URL for fresh submissions) and the post-delivery row cleanup live in
+   * `ChefsSubmissionService`. This handler only shapes and fires the HTTP request and writes the
+   * response. external-hooks does not validate the auth header — the n8n Webhook node does.
+   */
+  router.post(
+    '/:webhookPath',
     createRequestParser(chefsSubmissionCallbackSchema),
     async (req: UiApiTypedRequest<z.infer<typeof chefsSubmissionCallbackSchema>>, res: Response) => {
-      const { formId, submissionId } = req.parsed.body;
-      const headerWebhookPath = req.header(WEBHOOK_PATH_HEADER);
+      const { webhookPath } = req.parsed.params;
+      const { subscriptionEvent, formId, submissionId } = req.parsed.body;
 
-      const pendingRow = await customRepositories.chefsSubmissionWebhook.getPendingByFormAndSubmission({
+      const decision = await services.chefsSubmission.resolveForward({
+        webhookPath,
+        subscriptionEvent,
         formId,
         submissionId,
       });
 
-      let outboundUrl: string | undefined = pendingRow?.webhookUrl;
-      if (!outboundUrl && headerWebhookPath) {
-        outboundUrl = buildWebhookUrlFromPath(headerWebhookPath);
-      }
-      if (!outboundUrl) {
-        throw new AppError(400, `Missing webhook URL: no pending record and no ${WEBHOOK_PATH_HEADER} header`);
+      if (decision.action === 'ignore') {
+        OkResponse(res, { success: true, message: 'Event ignored (not a submission event)' });
+        return;
       }
 
-      const usedDbRow = pendingRow !== null;
-      const requestUrl = buildOutboundUrl(outboundUrl, req);
+      const requestUrl = buildOutboundUrl(decision.outboundBaseUrl, req);
       const payload = JSON.stringify(req.body ?? {});
 
       log.info('Forwarding CHEFS submission callback', {
         requestUrl,
-        payload,
         formId,
         submissionId,
-        source: usedDbRow ? 'db' : 'header',
+        source: decision.usedDbRow ? 'db' : 'path',
       });
 
       const upstream = await callWebhook({
@@ -87,6 +129,7 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
         timeoutMs: CALLBACK_TIMEOUT_MS,
         timeoutMessage: 'CHEFS submission callback timed out',
         unreachableMessage: 'CHEFS submission webhook URL unreachable',
+        headers: buildForwardedHeaders(req),
       });
 
       if (!upstream.ok) {
@@ -97,41 +140,9 @@ export function buildChefsSubmissionRouter(routeContext: ApiRouteContext) {
         return;
       }
 
-      if (usedDbRow) {
-        await customRepositories.chefsSubmissionWebhook.deleteRow({ formId, submissionId });
-      }
+      await services.chefsSubmission.confirmDelivered({ formId, submissionId, usedDbRow: decision.usedDbRow });
 
       OkResponse(res, { success: true, message: 'CHEFS submission callback forwarded' });
-    },
-  );
-
-  /**
-   * POST /chefs/submissions/register
-   * Internal-only endpoint called by the CHEFS Resubmit Wait custom node before an
-   * execution is put to wait.
-   *
-   * - Secured by internalBearerMiddleware (Authorization: Bearer <INTERNAL_AUTH_TOKEN>).
-   * - Upserts a `chefs_submission_webhook` row keyed by (formId, submissionId),
-   *   storing executionId and resumeUrl so the later CHEFS callback route knows
-   *   which n8n execution to resume.
-   */
-  router.post(
-    '/submissions/register',
-    internalBearerMiddleware,
-    createRequestParser(chefsSubmissionRegisterSchema),
-    async (req: UiApiTypedRequest<z.infer<typeof chefsSubmissionRegisterSchema>>, res: Response) => {
-      const { executionId, formId, submissionId, resumeUrl } = req.parsed.body;
-
-      log.debug('Registering CHEFS submission webhook', { formId, submissionId, executionId });
-
-      await customRepositories.chefsSubmissionWebhook.upsertPending({
-        executionId,
-        formId,
-        submissionId,
-        webhookUrl: resumeUrl,
-      });
-
-      OkResponse(res, { success: true, message: 'CHEFS submission webhook registered' });
     },
   );
 

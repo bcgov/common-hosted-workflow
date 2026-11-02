@@ -12,6 +12,7 @@ export async function callWebhook({
   timeoutMs,
   timeoutMessage,
   unreachableMessage,
+  headers,
 }: {
   url: string;
   method: string;
@@ -19,11 +20,13 @@ export async function callWebhook({
   timeoutMs: number;
   timeoutMessage: string;
   unreachableMessage: string;
+  /** Extra headers merged over the default `Content-Type: application/json` (e.g. an internal bearer). */
+  headers?: Record<string, string>;
 }): Promise<globalThis.Response> {
   try {
     return await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body,
       signal: AbortSignal.timeout(timeoutMs),
     });

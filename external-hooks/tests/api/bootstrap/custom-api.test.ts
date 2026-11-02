@@ -78,7 +78,7 @@ describe('mountCustomApi in read-only mode', () => {
     ['POST', '/multi-webhook-wait/callback/exec-1'],
     ['DELETE', '/multi-webhook-wait/cleanup/exec-1'],
     ['POST', '/chefs/submissions/register'],
-    ['POST', '/chefs/submissions/callback'],
+    ['POST', '/chefs/waste-management'],
   ])('lets %s %s through to the router', async (method, url) => {
     const { error, responded } = await dispatch(method, url);
 

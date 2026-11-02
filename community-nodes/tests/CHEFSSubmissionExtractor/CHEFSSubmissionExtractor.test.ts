@@ -42,6 +42,33 @@ describe('CHEFSSubmissionExtractor execute', () => {
     });
   });
 
+  describe('full submission mode', () => {
+    it('outputs the complete inner submission object', async () => {
+      const { result } = await executeWith({ fieldMappingMode: 'fullSubmission' });
+
+      expect(result[0]).toHaveLength(1);
+      const json = result[0][0].json as Record<string, unknown>;
+      expect(json.id).toBe('sub-001');
+      expect(json.confirmationId).toBe('CONF001');
+      expect(json.createdBy).toBe('gateway-user');
+      expect(json.updatedBy).toBeNull();
+      expect((json.submission as Record<string, unknown>).state).toBe('submitted');
+      expect(((json.submission as Record<string, unknown>).data as Record<string, unknown>).status).toBe('submitted');
+    });
+
+    it('does not require any field mappings', async () => {
+      await expect(
+        executeWith({ fieldMappingMode: 'fullSubmission', fieldMappings: { mapping: [] } }),
+      ).resolves.toBeDefined();
+    });
+
+    it('includes pairedItem metadata on output', async () => {
+      const { result } = await executeWith({ fieldMappingMode: 'fullSubmission' });
+
+      expect(result[0][0]).toHaveProperty('pairedItem', { item: 0 });
+    });
+  });
+
   // ── Missing path behavior ──
 
   describe('missing path behavior', () => {
