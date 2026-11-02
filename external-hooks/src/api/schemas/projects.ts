@@ -106,3 +106,38 @@ export const deleteProjectTopupSchema = z.object({
   body: z.record(z.string(), z.unknown()).optional(),
   query: z.record(z.string(), z.unknown()).optional(),
 });
+
+/**
+ * One scope's default limits. Explicit null clears the default (that scope's
+ * projects without their own limits stay uncapped); 0 is allowed the same way
+ * as per-project limits (it pauses every uncapped project of the scope).
+ */
+const rateLimitDefaultsScopeSchema = z
+  .object({
+    weeklyRateLimit: z.number().int().min(0).max(1_000_000).nullable(),
+    yearlyRateLimit: z.number().int().min(0).max(100_000_000).nullable(),
+  })
+  .refine(
+    (scope) =>
+      scope.weeklyRateLimit === null ||
+      scope.yearlyRateLimit === null ||
+      scope.yearlyRateLimit >= scope.weeklyRateLimit,
+    { message: 'yearlyRateLimit must be at least the weeklyRateLimit' },
+  );
+
+/** GET /rest/admin/projects/rate-limit-defaults — saved per-scope defaults. */
+export const getRateLimitDefaultsSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** PUT /rest/admin/projects/rate-limit-defaults — replaces both scopes' defaults atomically. */
+export const updateRateLimitDefaultsSchema = z.object({
+  params: z.record(z.string(), z.unknown()).optional(),
+  body: z.object({
+    team: rateLimitDefaultsScopeSchema,
+    personal: rateLimitDefaultsScopeSchema,
+  }),
+  query: z.record(z.string(), z.unknown()).optional(),
+});

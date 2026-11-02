@@ -18,9 +18,11 @@ import {
   VALID_WORKFLOW_ID,
   createMockN8nRepositories,
   createMockProjectExecutionUsageRepository,
+  createMockProjectRateLimitDefaultRepository,
   createMockProjectRateLimitRepository,
   createMockProjectTopupRepository,
   createMockWorkflowExecutionUsageRepository,
+  makeProjectRateLimitDefaultRow,
   makeProjectTopupRow,
 } from '../../helpers/mocks';
 
@@ -51,6 +53,7 @@ function makeConfigRow(overrides: Partial<ProjectRateLimit> = {}): ProjectRateLi
 describe('ProjectRateLimitService', () => {
   let n8nRepos: ReturnType<typeof createMockN8nRepositories>;
   let rateLimitRepo: ReturnType<typeof createMockProjectRateLimitRepository>;
+  let defaultsRepo: ReturnType<typeof createMockProjectRateLimitDefaultRepository>;
   let usageRepo: ReturnType<typeof createMockProjectExecutionUsageRepository>;
   let workflowUsageRepo: ReturnType<typeof createMockWorkflowExecutionUsageRepository>;
   let topupRepo: ReturnType<typeof createMockProjectTopupRepository>;
@@ -62,6 +65,7 @@ describe('ProjectRateLimitService', () => {
   beforeEach(() => {
     n8nRepos = createMockN8nRepositories();
     rateLimitRepo = createMockProjectRateLimitRepository();
+    defaultsRepo = createMockProjectRateLimitDefaultRepository();
     usageRepo = createMockProjectExecutionUsageRepository();
     workflowUsageRepo = createMockWorkflowExecutionUsageRepository();
     topupRepo = createMockProjectTopupRepository();
@@ -71,6 +75,7 @@ describe('ProjectRateLimitService', () => {
       { ...n8nRepos, user: new UserRepository(n8nRepos.user as any) } as any,
       {
         projectRateLimit: rateLimitRepo,
+        projectRateLimitDefault: defaultsRepo,
         projectExecutionUsage: usageRepo,
         workflowExecutionUsage: workflowUsageRepo,
         projectTopup: topupRepo,
@@ -357,6 +362,154 @@ describe('ProjectRateLimitService', () => {
       expect(usageRepo.increment).not.toHaveBeenCalled();
       expect(workflowUsageRepo.increment).not.toHaveBeenCalled();
     });
+
+    describe('scope defaults fallback', () => {
+      const TEAM_DEFAULTS = makeProjectRateLimitDefaultRow({
+        projectKind: 'team',
+        weeklyRateLimit: 5000,
+        yearlyRateLimit: 250000,
+      });
+      const PERSONAL_DEFAULTS = makeProjectRateLimitDefaultRow({
+        projectKind: 'personal',
+        weeklyRateLimit: 2500,
+        yearlyRateLimit: 100000,
+      });
+
+      it('rejects on a weekly breach when an unconfigured project falls back to its team default', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+        n8nRepos.project.findOneBy.mockResolvedValue({ id: VALID_PROJECT_ID, name: 'Team project', type: 'team' });
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5000, yearlyCount: 0 });
+
+        const error = (await captureRejection(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        )) as RateLimitExceededError;
+
+        expect(error).toBeInstanceOf(RateLimitExceededError);
+        expect(error.message).toContain('Weekly');
+        expect(error.message).toContain('limit 5000');
+        expect(defaultsRepo.get).toHaveBeenCalledWith('team');
+        expect(usageRepo.increment).not.toHaveBeenCalled();
+      });
+
+      it('uses the personal defaults for personal projects', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        defaultsRepo.get.mockResolvedValue(PERSONAL_DEFAULTS);
+        // The mock n8n project already is a personal project.
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 100000 });
+
+        const error = (await captureRejection(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        )) as RateLimitExceededError;
+
+        expect(error.message).toContain('Yearly');
+        expect(error.message).toContain('limit 100000');
+        expect(defaultsRepo.get).toHaveBeenCalledWith('personal');
+      });
+
+      it('treats unknown project types as team', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+        n8nRepos.project.findOneBy.mockResolvedValue({ id: VALID_PROJECT_ID, name: 'Odd', type: 'something-new' });
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 });
+
+        await expect(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        ).resolves.toBeUndefined();
+
+        expect(defaultsRepo.get).toHaveBeenCalledWith('team');
+      });
+
+      it('combines own-config and defaults per period (own weekly wins, yearly falls back)', async () => {
+        rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10 }));
+        defaultsRepo.get.mockResolvedValue(PERSONAL_DEFAULTS);
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5, yearlyCount: 100000 });
+
+        const error = (await captureRejection(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        )) as RateLimitExceededError;
+
+        expect(error.message).toContain('Yearly');
+        expect(error.message).toContain('limit 100000');
+        // Own weekly limit stays enforced (5 runs under 10): the weekly breach is the default only.
+        expect(error.message).not.toContain('Weekly');
+      });
+
+      it('keeps uncapped projects uncapped when their scope has no defaults, counting usage', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        defaultsRepo.get.mockResolvedValue(null);
+
+        await expect(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        ).resolves.toBeUndefined();
+
+        expect(usageRepo.increment).toHaveBeenCalledTimes(2);
+        expect(topupRepo.sumByProjectIds).not.toHaveBeenCalled();
+      });
+
+      it('does not consult defaults when the project has both of its own limits', async () => {
+        rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10, yearlyRateLimit: 1000 }));
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 });
+
+        await expect(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        ).resolves.toBeUndefined();
+
+        expect(n8nRepos.project.findOneBy).not.toHaveBeenCalled();
+        expect(defaultsRepo.get).not.toHaveBeenCalled();
+      });
+
+      it('adds top-up runs on a default weekly base and mentions them in the breach', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+        topupRepo.sumByProjectIds.mockResolvedValue(new Map([[VALID_PROJECT_ID, 2000]]));
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 7000, yearlyCount: 0 });
+
+        const error = (await captureRejection(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        )) as RateLimitExceededError;
+
+        expect(error.message).toContain('limit 7000 (base 5000 + 2000 top-up)');
+      });
+
+      it('applies the project soft-stop behavior to a default-based breach', async () => {
+        rateLimitRepo.get.mockResolvedValue(makeConfigRow({ stopBehavior: 'soft_stop' }));
+        defaultsRepo.get.mockResolvedValue(PERSONAL_DEFAULTS);
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 2500, yearlyCount: 0 });
+
+        await expect(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        ).resolves.toBeUndefined();
+
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Soft stop configured — execution continues'));
+        expect(usageRepo.increment).toHaveBeenCalledTimes(2);
+      });
+
+      it('hard-stops a default-based breach when the project has no configuration row', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+        usageRepo.getCounts.mockResolvedValue({ weeklyCount: 6000, yearlyCount: 0 });
+
+        const error = (await captureRejection(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        )) as RateLimitExceededError;
+
+        expect(error).toBeInstanceOf(RateLimitExceededError);
+        expect(error.message).toContain('Execution rejected');
+      });
+
+      it('degrades to uncapped when the project-kind lookup fails (fail open path)', async () => {
+        rateLimitRepo.get.mockResolvedValue(null);
+        n8nRepos.project.findOneBy.mockRejectedValue(new Error('n8n db gone'));
+
+        await expect(
+          service.enforceExecution({ workflowId: VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true }),
+        ).resolves.toBeUndefined();
+
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('failing open'));
+        expect(usageRepo.increment).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('updateRateLimit', () => {
@@ -407,6 +560,65 @@ describe('ProjectRateLimitService', () => {
       await service.updateRateLimit(VALID_PROJECT_ID, body, '   ');
 
       expect(rateLimitRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ updatedBy: null }));
+    });
+  });
+
+  describe('rate-limit defaults (per scope)', () => {
+    it('returns nulls for scopes without saved defaults rows', async () => {
+      defaultsRepo.getAll.mockResolvedValue([]);
+
+      await expect(service.getRateLimitDefaults()).resolves.toEqual({
+        team: { weeklyRateLimit: null, yearlyRateLimit: null },
+        personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+      });
+    });
+
+    it('maps saved rows by project kind and returns them', async () => {
+      defaultsRepo.getAll.mockResolvedValue([
+        makeProjectRateLimitDefaultRow({
+          projectKind: 'team',
+          weeklyRateLimit: 5000,
+          yearlyRateLimit: 250000,
+          updatedBy: 'admin@example.com',
+        }),
+        makeProjectRateLimitDefaultRow({ projectKind: 'personal', weeklyRateLimit: 2500, yearlyRateLimit: null }),
+      ]);
+
+      await expect(service.getRateLimitDefaults()).resolves.toEqual({
+        team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+        personal: { weeklyRateLimit: 2500, yearlyRateLimit: null },
+      });
+    });
+
+    it('upserts both scopes with the trimmed acting admin and echoes the saved values', async () => {
+      const body = {
+        team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+        personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+      };
+
+      const result = await service.updateRateLimitDefaults(body, '  admin@example.com  ');
+
+      expect(defaultsRepo.upsertBoth).toHaveBeenCalledWith({
+        team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+        personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+        updatedBy: 'admin@example.com',
+      });
+      expect(result).toEqual(body);
+    });
+
+    it('stores a blank actor email as null', async () => {
+      const body = {
+        team: { weeklyRateLimit: null, yearlyRateLimit: null },
+        personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+      };
+
+      await service.updateRateLimitDefaults(body, '   ');
+
+      expect(defaultsRepo.upsertBoth).toHaveBeenCalledWith({
+        team: { weeklyRateLimit: null, yearlyRateLimit: null },
+        personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+        updatedBy: null,
+      });
     });
   });
 

@@ -7,6 +7,7 @@ import { MessageRepository } from '../../db/repository/custom/message';
 import { MultiWebhookWaitRepository } from '../../db/repository/custom/multi-webhook-wait';
 import { ProjectExecutionUsageRepository } from '../../db/repository/custom/project-execution-usage';
 import { ProjectRateLimitRepository } from '../../db/repository/custom/project-rate-limit';
+import { ProjectRateLimitDefaultRepository } from '../../db/repository/custom/project-rate-limit-default';
 import { ProjectTopupRepository } from '../../db/repository/custom/project-topup';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
 import { WorkflowExecutionUsageRepository } from '../../db/repository/custom/workflow-execution-usage';
@@ -22,6 +23,7 @@ export type CustomRepositories = {
   readonly chefsSubmissionWebhook: ChefsSubmissionWebhookRepository;
   readonly multiWebhookWait: MultiWebhookWaitRepository;
   readonly projectRateLimit: ProjectRateLimitRepository;
+  readonly projectRateLimitDefault: ProjectRateLimitDefaultRepository;
   readonly projectExecutionUsage: ProjectExecutionUsageRepository;
   readonly workflowExecutionUsage: WorkflowExecutionUsageRepository;
   readonly projectTopup: ProjectTopupRepository;
@@ -40,6 +42,7 @@ export function buildCustomRepositories(databaseUrl: string): CustomRepositories
     chefsSubmissionWebhook: new ChefsSubmissionWebhookRepository(db),
     multiWebhookWait: new MultiWebhookWaitRepository(db),
     projectRateLimit: new ProjectRateLimitRepository(db),
+    projectRateLimitDefault: new ProjectRateLimitDefaultRepository(db),
     projectExecutionUsage: new ProjectExecutionUsageRepository(db),
     workflowExecutionUsage: new WorkflowExecutionUsageRepository(db),
     projectTopup: new ProjectTopupRepository(db),

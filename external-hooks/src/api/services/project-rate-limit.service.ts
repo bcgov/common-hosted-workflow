@@ -1,6 +1,7 @@
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { ProjectRateLimit } from '../../db/schema/project-rate-limit';
+import type { ProjectRateLimitDefault } from '../../db/schema/project-rate-limit-default';
 import type { ProjectTopup } from '../../db/schema/project-topup';
 import { getCurrentPeriodKeys, listUpcomingWeeklyPeriodKeys } from '../helpers/period';
 import { AppError } from '../utils/errors';
@@ -152,6 +153,25 @@ function serializeTopup(row: ProjectTopup): ProjectTopupItem {
   };
 }
 
+/** Default limits for one project scope; a null limit means "no default" (uncapped). */
+export type RateLimitScopeDefaults = {
+  weeklyRateLimit: number | null;
+  yearlyRateLimit: number | null;
+};
+
+/** Saved per-scope defaults, keyed by project kind. */
+export type ProjectRateLimitDefaults = {
+  team: RateLimitScopeDefaults;
+  personal: RateLimitScopeDefaults;
+};
+
+function serializeScopeDefaults(row: ProjectRateLimitDefault | null): RateLimitScopeDefaults {
+  return {
+    weeklyRateLimit: row?.weeklyRateLimit ?? null,
+    yearlyRateLimit: row?.yearlyRateLimit ?? null,
+  };
+}
+
 export class ProjectRateLimitService {
   constructor(
     private readonly n8nRepositories: N8nRepositories,
@@ -198,17 +218,33 @@ export class ProjectRateLimitService {
         periodKeys.yearly,
       );
 
-      // Top-ups raise the effective weekly limit; fetched only when a weekly
-      // limit is configured (the only period they can extend).
+      // Effective base limits: the project's own configuration first, then its
+      // scope's saved defaults (team/personal). A scope with no defaults stays
+      // uncapped for that period. The project-kind lookup runs only when a
+      // fallback can matter (some limit is unset), keeping configured projects
+      // at the same query count as before.
+      let weeklyBase = config?.weeklyRateLimit ?? null;
+      let yearlyBase = config?.yearlyRateLimit ?? null;
+      if (weeklyBase === null || yearlyBase === null) {
+        const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+        const kind = project?.type === 'personal' ? 'personal' : 'team';
+        const defaults = await this.customRepositories.projectRateLimitDefault.get(kind);
+        weeklyBase = weeklyBase ?? defaults?.weeklyRateLimit ?? null;
+        yearlyBase = yearlyBase ?? defaults?.yearlyRateLimit ?? null;
+      }
+
+      // Top-ups raise the effective weekly limit whenever a weekly base is
+      // enforced, whether it comes from the project's own configuration or a
+      // scope default.
       let weeklyTopupRuns = 0;
-      if (config && config.weeklyRateLimit !== null) {
+      if (weeklyBase !== null) {
         const topupSums = await this.customRepositories.projectTopup.sumByProjectIds([projectId], periodKeys.weekly);
         weeklyTopupRuns = topupSums.get(projectId) ?? 0;
       }
 
       const breaches: LimitBreach[] = [];
-      if (config && config.weeklyRateLimit !== null) {
-        const effectiveWeeklyLimit = config.weeklyRateLimit + weeklyTopupRuns;
+      if (weeklyBase !== null) {
+        const effectiveWeeklyLimit = weeklyBase + weeklyTopupRuns;
         if (counts.weeklyCount >= effectiveWeeklyLimit) {
           breaches.push({
             period: 'weekly',
@@ -219,17 +255,18 @@ export class ProjectRateLimitService {
           });
         }
       }
-      if (config && config.yearlyRateLimit !== null && counts.yearlyCount >= config.yearlyRateLimit) {
+      if (yearlyBase !== null && counts.yearlyCount >= yearlyBase) {
         breaches.push({
           period: 'yearly',
           periodKey: periodKeys.yearly,
-          limit: config.yearlyRateLimit,
+          limit: yearlyBase,
           count: counts.yearlyCount,
         });
       }
 
-      if (breaches.length > 0 && config) {
-        if (config.stopBehavior === 'soft_stop') {
+      if (breaches.length > 0) {
+        // Without a project row the stop behavior is the hard-stop default.
+        if (config?.stopBehavior === 'soft_stop') {
           for (const breach of breaches) {
             log.warn(`${describeBreach(projectId, breach)} Soft stop configured — execution continues`, {
               projectId,
@@ -303,6 +340,42 @@ export class ProjectRateLimitService {
       throw new AppError(500, 'Failed to read the stored rate limit');
     }
     return stored;
+  }
+
+  /**
+   * Returns the saved per-scope default limits. A missing row or null limit
+   * means "no default" — projects of that scope without their own limits stay
+   * uncapped. The response intentionally contains no usage counts; the
+   * defaults dialog needs only the saved values.
+   */
+  async getRateLimitDefaults(): Promise<ProjectRateLimitDefaults> {
+    const rows = await this.customRepositories.projectRateLimitDefault.getAll();
+    const byKind = new Map(rows.map((row) => [row.projectKind, row]));
+    return {
+      team: serializeScopeDefaults(byKind.get('team') ?? null),
+      personal: serializeScopeDefaults(byKind.get('personal') ?? null),
+    };
+  }
+
+  /**
+   * Replaces the per-scope default limits (full-replace semantics; both scopes
+   * are written atomically). `updatedBy` records the acting admin's email
+   * (trimmed; an empty value is stored as null).
+   */
+  async updateRateLimitDefaults(
+    body: { team: RateLimitScopeDefaults; personal: RateLimitScopeDefaults },
+    updatedBy: string | null,
+  ): Promise<ProjectRateLimitDefaults> {
+    const trimmedUpdatedBy = updatedBy !== null && updatedBy.trim().length > 0 ? updatedBy.trim() : null;
+    await this.customRepositories.projectRateLimitDefault.upsertBoth({
+      team: { ...body.team },
+      personal: { ...body.personal },
+      updatedBy: trimmedUpdatedBy,
+    });
+    return {
+      team: { ...body.team },
+      personal: { ...body.personal },
+    };
   }
 
   /**

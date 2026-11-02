@@ -13,6 +13,8 @@ import {
   listProjectTopupsSchema,
   createProjectTopupSchema,
   deleteProjectTopupSchema,
+  getRateLimitDefaultsSchema,
+  updateRateLimitDefaultsSchema,
 } from '../schemas/projects';
 import type { UiApiTypedRequest } from '../types/ui-api';
 
@@ -33,6 +35,28 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
       const { page, pageSize, search, type } = req.parsed.query;
       const result = await services.projectTenant.listAllProjectsWithTenants(page, pageSize, { search, type });
       OkResponse(res, result);
+    },
+  );
+
+  // Literal-path defaults routes must be registered BEFORE the matching
+  // '/projects/:projectId' routes below, or Express would treat
+  // 'rate-limit-defaults' as a projectId.
+  router.get(
+    '/projects/rate-limit-defaults',
+    createRequestParser(getRateLimitDefaultsSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof getRateLimitDefaultsSchema>>, res) => {
+      const result = await services.projectRateLimit.getRateLimitDefaults();
+      OkResponse(res, result);
+    },
+  );
+
+  router.put(
+    '/projects/rate-limit-defaults',
+    createRequestParser(updateRateLimitDefaultsSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof updateRateLimitDefaultsSchema>>, res) => {
+      const updatedBy = req.session.n8nUser?.email ?? null;
+      const result = await services.projectRateLimit.updateRateLimitDefaults(req.parsed.body, updatedBy);
+      OkResponse(res, { success: true, message: 'Default limits updated', defaults: result });
     },
   );
 

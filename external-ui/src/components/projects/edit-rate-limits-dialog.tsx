@@ -16,6 +16,7 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toasts';
+import { validateLimitPair, parseLimitInput, type LimitParseResult } from '@/lib/limit-input';
 import { formatCount, formatShortDate } from '@/lib/rate-limit';
 import {
   updateProjectRateLimit,
@@ -23,12 +24,6 @@ import {
   type RateLimitStopBehavior,
   type UpdateProjectRateLimitBody,
 } from '../../services/backend/projects';
-
-const MAX_WEEKLY_LIMIT = 1_000_000;
-const MAX_YEARLY_LIMIT = 100_000_000;
-
-type LimitParseResult = number | null | undefined;
-// undefined = not a valid whole number; null = input cleared (limit removed)
 
 type DialogFieldErrors = Partial<Record<'weekly' | 'yearly' | 'reason', string>>;
 
@@ -41,41 +36,8 @@ function getRateLimitMutationErrorMessage(error: unknown): string {
   return 'Network error';
 }
 
-/**
- * Parses a limit input: empty string → null (clear the limit); a whole number
- * (commas/spaces tolerated) → the number; anything else → undefined.
- */
-function parseLimitInput(raw: string): LimitParseResult {
-  const trimmed = raw.trim();
-  if (trimmed === '') {
-    return null;
-  }
-  const normalized = trimmed.replaceAll(',', '').replaceAll(' ', '');
-  if (!/^\d+$/.test(normalized)) {
-    return undefined;
-  }
-  const value = Number.parseInt(normalized, 10);
-  return Number.isSafeInteger(value) ? value : undefined;
-}
-
 function validateLimits(weekly: LimitParseResult, yearly: LimitParseResult, reason: string): DialogFieldErrors {
-  const errors: DialogFieldErrors = {};
-
-  if (weekly === undefined) {
-    errors.weekly = 'Enter a whole number';
-  } else if (weekly !== null && weekly > MAX_WEEKLY_LIMIT) {
-    errors.weekly = `Weekly limit must be ${formatCount(MAX_WEEKLY_LIMIT)} or less`;
-  }
-
-  if (yearly === undefined) {
-    errors.yearly = 'Enter a whole number';
-  } else if (yearly !== null && yearly > MAX_YEARLY_LIMIT) {
-    errors.yearly = `Annual limit must be ${formatCount(MAX_YEARLY_LIMIT)} or less`;
-  }
-
-  if (typeof weekly === 'number' && typeof yearly === 'number' && yearly < weekly) {
-    errors.yearly = 'Annual limit must be at least the weekly limit';
-  }
+  const errors: DialogFieldErrors = validateLimitPair(weekly, yearly);
 
   if (reason.trim() === '') {
     errors.reason = 'Reason for change is required';
