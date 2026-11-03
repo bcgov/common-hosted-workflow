@@ -1,8 +1,9 @@
 /**
- * Unit tests for the admin project-management routes in
+ * Unit tests for the admin project-management write routes in
  * `src/api/routes/admin-projects.ts` (mounted under /ui-api/admin by the
  * parent router in ui-api.ts, behind the UI session + permission + role
- * guards).
+ * guards). Shared read endpoints live in `routes/projects.ts` and are
+ * covered by `tests/api/routes/projects.test.ts`.
  *
  * Strategy: build the sub-router with mocked services, then invoke each
  * route's handler chain (zod request parser + handler) directly through
@@ -82,16 +83,12 @@ function makeSession(sessionOverrides: Record<string, unknown> = {}) {
 
 function createTestRouter(serviceOverrides: Record<string, any> = {}) {
   const projectTenant = {
-    listAllProjectsWithTenants: vi.fn(),
     assignTenantToProject: vi.fn(),
     removeTenantFromProject: vi.fn(),
-    getAdminProjectById: vi.fn(),
     ...serviceOverrides.projectTenant,
   };
   const projectRateLimit = {
     updateRateLimit: vi.fn(),
-    getProjectWorkflowUsage: vi.fn(),
-    listProjectTopups: vi.fn(),
     createProjectTopup: vi.fn(),
     deleteProjectTopup: vi.fn(),
     getRateLimitDefaults: vi.fn(),
@@ -141,83 +138,6 @@ async function runHandlerChainCapturingErrors(
   }
   return next;
 }
-
-/* ================================================================== */
-/*  GET /projects                                                      */
-/* ================================================================== */
-
-describe('GET /ui-api/admin/projects', () => {
-  it('returns the enriched projects page with rate-limit fields for configured and unconfigured projects', async () => {
-    const page = {
-      data: [
-        {
-          projectId: VALID_PROJECT_ID,
-          projectName: 'Configured project',
-          projectType: 'team',
-          tenantId: VALID_TENANT_ID,
-          weeklyRateLimit: 10,
-          yearlyRateLimit: 1000,
-          stopBehavior: 'hard_stop',
-          lastAdminComment: 'Cap for FY',
-          weeklyExecutionCount: 3,
-          yearlyExecutionCount: 30,
-          workflowCount: 5,
-        },
-        {
-          projectId: 'proj-002',
-          projectName: 'Unconfigured project',
-          projectType: 'personal',
-          tenantId: null,
-          weeklyRateLimit: null,
-          yearlyRateLimit: null,
-          stopBehavior: null,
-          lastAdminComment: null,
-          weeklyExecutionCount: 0,
-          yearlyExecutionCount: 0,
-          workflowCount: 0,
-        },
-      ],
-      pagination: { page: 1, pageSize: 25, totalItems: 2, totalPages: 1 },
-    };
-    const listAllProjectsWithTenants = vi.fn().mockResolvedValue(page);
-    const { router } = createTestRouter({ projectTenant: { listAllProjectsWithTenants } });
-
-    const handlers = getRouteHandlers(router, 'get', '/projects');
-    const req = createMockRequest({ query: {} });
-    const res = createMockResponse();
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeNull();
-    expect(listAllProjectsWithTenants).toHaveBeenCalledWith(1, 25, { search: undefined, type: undefined });
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(page);
-
-    const [payload] = res.json.mock.calls[0];
-    expect(payload.data[0]).toEqual(
-      expect.objectContaining({
-        weeklyRateLimit: 10,
-        yearlyRateLimit: 1000,
-        stopBehavior: 'hard_stop',
-        lastAdminComment: 'Cap for FY',
-        weeklyExecutionCount: 3,
-        yearlyExecutionCount: 30,
-        workflowCount: 5,
-      }),
-    );
-    expect(payload.data[1]).toEqual(
-      expect.objectContaining({
-        weeklyRateLimit: null,
-        yearlyRateLimit: null,
-        stopBehavior: null,
-        lastAdminComment: null,
-        weeklyExecutionCount: 0,
-        yearlyExecutionCount: 0,
-        workflowCount: 0,
-      }),
-    );
-  });
-});
 
 /* ================================================================== */
 /*  PUT /projects/:projectId/rate-limit                                */
@@ -340,153 +260,6 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
 
     expectNextAppError(next, 400);
     expect(updateRateLimit).not.toHaveBeenCalled();
-    expect(res.json).not.toHaveBeenCalled();
-  });
-});
-
-/* ================================================================== */
-/*  GET /projects/:projectId                                           */
-/* ================================================================== */
-
-describe('GET /ui-api/admin/projects/:projectId', () => {
-  it('returns the enriched single-project item', async () => {
-    const item = {
-      projectId: VALID_PROJECT_ID,
-      projectName: 'Configured project',
-      projectType: 'team',
-      tenantId: VALID_TENANT_ID,
-      weeklyRateLimit: 10,
-      yearlyRateLimit: 1000,
-      stopBehavior: 'hard_stop',
-      lastAdminComment: 'Cap for FY',
-      weeklyExecutionCount: 3,
-      yearlyExecutionCount: 30,
-      workflowCount: 5,
-      updatedAt: '2026-03-05T10:00:00.000Z',
-      updatedByName: 'A. Lovelace',
-    };
-    const getAdminProjectById = vi.fn().mockResolvedValue(item);
-    const { router } = createTestRouter({ projectTenant: { getAdminProjectById } });
-
-    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId');
-    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, query: {} });
-    const res = createMockResponse();
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeNull();
-    expect(getAdminProjectById).toHaveBeenCalledWith(VALID_PROJECT_ID);
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(item);
-  });
-
-  it('propagates the service AppError 404 for an unknown project', async () => {
-    const getAdminProjectById = vi.fn().mockRejectedValue(new AppError(404, 'Project not found'));
-    const { router } = createTestRouter({ projectTenant: { getAdminProjectById } });
-
-    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId');
-    const req = createMockRequest({ params: { projectId: 'missing-project' }, query: {} });
-    const res = createMockResponse();
-
-    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
-
-    expectNextAppError(next, 404);
-    expect(res.json).not.toHaveBeenCalled();
-  });
-});
-
-/* ================================================================== */
-/*  GET /projects/:projectId/workflow-usage                            */
-/* ================================================================== */
-
-describe('GET /ui-api/admin/projects/:projectId/workflow-usage', () => {
-  it('returns the per-workflow usage payload', async () => {
-    const usage = {
-      projectId: VALID_PROJECT_ID,
-      weeklyPeriodKey: '2026-W44',
-      yearlyPeriodKey: '2026',
-      workflows: [{ workflowId: 'wf-100', workflowName: 'Alpha workflow', weeklyCount: 3, yearlyCount: 30 }],
-    };
-    const getProjectWorkflowUsage = vi.fn().mockResolvedValue(usage);
-    const { router } = createTestRouter({ projectRateLimit: { getProjectWorkflowUsage } });
-
-    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId/workflow-usage');
-    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, query: {} });
-    const res = createMockResponse();
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeNull();
-    expect(getProjectWorkflowUsage).toHaveBeenCalledWith(VALID_PROJECT_ID);
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(usage);
-  });
-
-  it('propagates the service AppError 404 for an unknown project', async () => {
-    const getProjectWorkflowUsage = vi.fn().mockRejectedValue(new AppError(404, 'Project not found'));
-    const { router } = createTestRouter({ projectRateLimit: { getProjectWorkflowUsage } });
-
-    const handlers = getRouteHandlers(router, 'get', '/projects/:projectId/workflow-usage');
-    const req = createMockRequest({ params: { projectId: 'missing-project' }, query: {} });
-    const res = createMockResponse();
-
-    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
-
-    expectNextAppError(next, 404);
-    expect(res.json).not.toHaveBeenCalled();
-  });
-});
-
-/* ================================================================== */
-/*  GET /projects/:projectId/topups                                    */
-/* ================================================================== */
-
-describe('GET /ui-api/admin/projects/:projectId/topups', () => {
-  it('returns one page of top-ups with the default paging applied by the parser', async () => {
-    const pageData = { data: [], pagination: { page: 1, pageSize: 4, totalItems: 0, totalPages: 1 } };
-    const listProjectTopups = vi.fn().mockResolvedValue(pageData);
-    const { router } = createTestRouter({ projectRateLimit: { listProjectTopups } });
-
-    const handlers = getRouteHandlers(router, 'get', TOPUPS_ROUTE);
-    const req = createMockRequest({ params: { projectId: VALID_PROJECT_ID }, query: {} });
-    const res = createMockResponse();
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeNull();
-    expect(listProjectTopups).toHaveBeenCalledWith(VALID_PROJECT_ID, 1, 4);
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(pageData);
-  });
-
-  it('passes explicit page and pageSize query values through to the service', async () => {
-    const listProjectTopups = vi.fn().mockResolvedValue({ data: [], pagination: {} });
-    const { router } = createTestRouter({ projectRateLimit: { listProjectTopups } });
-
-    const handlers = getRouteHandlers(router, 'get', TOPUPS_ROUTE);
-    const req = createMockRequest({
-      params: { projectId: VALID_PROJECT_ID },
-      query: { page: '2', pageSize: '10' },
-    });
-    const res = createMockResponse();
-
-    const error = await runHandlerChain(handlers!, req, res);
-
-    expect(error).toBeNull();
-    expect(listProjectTopups).toHaveBeenCalledWith(VALID_PROJECT_ID, 2, 10);
-  });
-
-  it('propagates the service AppError 404 for an unknown project', async () => {
-    const listProjectTopups = vi.fn().mockRejectedValue(new AppError(404, 'Project not found'));
-    const { router } = createTestRouter({ projectRateLimit: { listProjectTopups } });
-
-    const handlers = getRouteHandlers(router, 'get', TOPUPS_ROUTE);
-    const req = createMockRequest({ params: { projectId: 'missing-project' }, query: {} });
-    const res = createMockResponse();
-
-    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
-
-    expectNextAppError(next, 404);
     expect(res.json).not.toHaveBeenCalled();
   });
 });

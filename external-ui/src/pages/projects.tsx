@@ -1,7 +1,6 @@
 import { IconLogin2 } from '@tabler/icons-react';
 import { login } from '../auth/session-actions';
 import { AdminProjectsView } from '../components/projects/admin-projects-view';
-import { UserProjectsView } from '../components/projects/user-projects-view';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { PageContainer } from '@/components/layout/page-container';
@@ -17,22 +16,10 @@ export function Projects() {
     <div className="min-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height))] bg-surface-muted">
       <PageContainer>
         <div className="space-y-6">
-          {user && isAdmin && <AdminProjectsView />}
-          {user && !isAdmin && (
-            <>
-              <PageHeader
-                title="Projects"
-                description="View your CSTAR tenants and their associated project mappings."
-              />
-              <UserProjectsView />
-            </>
-          )}
+          {user && <AdminProjectsView readOnly={!isAdmin} />}
           {!user && (
             <>
-              <PageHeader
-                title="Projects"
-                description="View your CSTAR tenants and their associated project mappings."
-              />
+              <PageHeader title="Projects" description="View your projects and their run-limit usage." />
               <Alert>
                 <AlertTitle>Sign in required</AlertTitle>
                 <AlertDescription>

@@ -92,5 +92,43 @@ describe('ProjectRepository', () => {
       expect(result.totalCount).toBe(0);
       expect(result.projects).toEqual([]);
     });
+
+    it('restricts count and data queries to the given project ids', async () => {
+      const rows = [{ id: 'p2', name: 'Beta', type: 'team' }];
+      const baseRepo = createMockBaseRepo([{ count: '1' }], rows);
+      const repo = new ProjectRepository(baseRepo);
+
+      const result = await repo.listPaginated(1, 25, { ids: ['p2', 'p9'] });
+
+      const queryCalls = (baseRepo.manager.query as ReturnType<typeof vi.fn>).mock.calls;
+      expect(queryCalls[0][0]).toContain('id IN ($1, $2)');
+      expect(queryCalls[0][1]).toEqual(['p2', 'p9']);
+      expect(queryCalls[1][0]).toContain('id IN ($1, $2)');
+      // Ids first, then LIMIT/OFFSET parameters.
+      expect(queryCalls[1][1]).toEqual(['p2', 'p9', 25, 0]);
+      expect(result.projects).toEqual([{ id: 'p2', name: 'Beta', type: 'team' }]);
+    });
+
+    it('combines the ids filter with the type and search filters', async () => {
+      const baseRepo = createMockBaseRepo([{ count: '0' }], []);
+      const repo = new ProjectRepository(baseRepo);
+
+      await repo.listPaginated(1, 25, { ids: ['p1'], type: 'team', search: 'beta' });
+
+      const queryCalls = (baseRepo.manager.query as ReturnType<typeof vi.fn>).mock.calls;
+      expect(queryCalls[0][0]).toContain('id IN ($1) AND type = $2 AND LOWER(name) LIKE $3');
+      expect(queryCalls[0][1]).toEqual(['p1', 'team', '%beta%']);
+      expect(queryCalls[1][1]).toEqual(['p1', 'team', '%beta%', 25, 0]);
+    });
+
+    it('short-circuits to an empty page when the id list is empty', async () => {
+      const baseRepo = createMockBaseRepo();
+      const repo = new ProjectRepository(baseRepo);
+
+      const result = await repo.listPaginated(1, 25, { ids: [] });
+
+      expect(result).toEqual({ projects: [], totalCount: 0 });
+      expect(baseRepo.manager.query).not.toHaveBeenCalled();
+    });
   });
 });

@@ -9,7 +9,7 @@ import {
   createProjectTopup,
   deleteProjectTopup,
   listProjectTopups,
-  type AdminProjectItem,
+  type ProjectItem,
   type ProjectTopupItem,
   type ProjectTopupsResponse,
 } from '@/services/backend/projects';
@@ -27,7 +27,7 @@ const listMock = vi.mocked(listProjectTopups);
 const successToastMock = vi.mocked(toast.success);
 const errorToastMock = vi.mocked(toast.error);
 
-const PROJECT: AdminProjectItem = {
+const PROJECT: ProjectItem = {
   projectId: 'p-devx',
   projectName: 'DEVX Tenant',
   projectType: 'team',
@@ -72,10 +72,10 @@ const HISTORY = [
   makeTopup({ id: 'past', periodKey: '2026-W43', adminComment: 'Past batch' }),
 ];
 
-function renderDialog(project: AdminProjectItem = PROJECT, open = true) {
+function renderDialog(project: ProjectItem = PROJECT, open = true) {
   const onOpenChange = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const view = (nextProject: AdminProjectItem, nextOpen: boolean) => (
+  const view = (nextProject: ProjectItem, nextOpen: boolean) => (
     <QueryClientProvider client={client}>
       <ManageTopupsDialog project={nextProject} open={nextOpen} onOpenChange={onOpenChange} />
     </QueryClientProvider>
@@ -211,9 +211,9 @@ describe('ManageTopupsDialog', () => {
     expect(screen.getByLabelText('Period')).toHaveValue('2026-W45');
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(successToastMock).toHaveBeenCalledWith('Top-up added');
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin-project-topups', 'p-devx'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin-projects'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin-project', 'p-devx'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project-topups', 'p-devx'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['projects'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['project', 'p-devx'] });
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
   });
 

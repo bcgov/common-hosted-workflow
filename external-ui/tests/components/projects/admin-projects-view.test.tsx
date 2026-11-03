@@ -5,17 +5,17 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminProjectsView } from '@/components/projects/admin-projects-view';
-import { fetchAllAdminProjects, getRateLimitDefaults, type AdminProjectItem } from '@/services/backend/projects';
+import { fetchAllProjects, getRateLimitDefaults, type ProjectItem } from '@/services/backend/projects';
 
 vi.mock('@/services/backend/projects', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/projects')>('@/services/backend/projects');
-  return { ...actual, fetchAllAdminProjects: vi.fn(), getRateLimitDefaults: vi.fn() };
+  return { ...actual, fetchAllProjects: vi.fn(), getRateLimitDefaults: vi.fn() };
 });
 
-const fetchAllMock = vi.mocked(fetchAllAdminProjects);
+const fetchAllMock = vi.mocked(fetchAllProjects);
 const getRateLimitDefaultsMock = vi.mocked(getRateLimitDefaults);
 
-function makeProject(overrides: Partial<AdminProjectItem> = {}): AdminProjectItem {
+function makeProject(overrides: Partial<ProjectItem> = {}): ProjectItem {
   return {
     projectId: 'p-1',
     projectName: 'Tenant One',
@@ -81,12 +81,12 @@ const PERSONAL = makeProject({
 
 const PROJECTS = [CITZ, CSTAR, DEVX, PERSONAL];
 
-function renderView(initialEntries: string[] = ['/projects']) {
+function renderView(initialEntries: string[] = ['/projects'], props: { readOnly?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={initialEntries}>
-        <AdminProjectsView />
+        <AdminProjectsView {...props} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -285,5 +285,40 @@ describe('AdminProjectsView', () => {
 
     expect(await screen.findByRole('group', { name: 'Team projects (tenants)' })).toBeInTheDocument();
     expect(getRateLimitDefaultsMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AdminProjectsView in read-only (non-admin) mode', () => {
+  beforeEach(() => {
+    fetchAllMock.mockReset();
+    fetchAllMock.mockResolvedValue(PROJECTS);
+    getRateLimitDefaultsMock.mockReset();
+    getRateLimitDefaultsMock.mockResolvedValue({
+      team: { weeklyRateLimit: null, yearlyRateLimit: null },
+      personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+    });
+  });
+
+  it('hides the default limits control and never loads the defaults', async () => {
+    renderView(['/projects'], { readOnly: true });
+
+    await screen.findByText('CITZ Tenant');
+
+    expect(screen.queryByRole('button', { name: 'Default limits' })).not.toBeInTheDocument();
+    expect(screen.getByText('Read-only')).toBeInTheDocument();
+    expect(screen.queryByText('Admin view')).not.toBeInTheDocument();
+    expect(getRateLimitDefaultsMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the same table with View links into the detail page', async () => {
+    renderView(['/projects'], { readOnly: true });
+
+    await screen.findByText('CITZ Tenant');
+
+    expect(screen.getByText('12,000 / 12,000')).toBeInTheDocument();
+    const viewLinks = screen.getAllByRole('link', { name: 'View' });
+    expect(viewLinks).toHaveLength(3);
+    expect(viewLinks[0]).toHaveAttribute('href', '/projects/p-citz');
+    expect(screen.queryByRole('link', { name: 'Manage' })).not.toBeInTheDocument();
   });
 });

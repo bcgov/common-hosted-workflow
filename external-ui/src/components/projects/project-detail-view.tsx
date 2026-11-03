@@ -11,10 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from '@/hooks/use-toasts';
 import {
   deleteProjectTenant,
-  getAdminProject,
+  getProject,
   getProjectWorkflowUsage,
   updateProjectTenant,
-  type AdminProjectItem,
+  type ProjectItem,
   type RateLimitStopBehavior,
 } from '../../services/backend/projects';
 import { EditRateLimitsDialog } from './edit-rate-limits-dialog';
@@ -51,6 +51,10 @@ function isNotFoundError(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
 
+function isForbiddenError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
 function getPeriodLabel(period: 'weekly' | 'yearly'): string {
   return period === 'weekly' ? 'weekly' : 'annual';
 }
@@ -59,7 +63,7 @@ function getWhenReachedText(stopBehavior: RateLimitStopBehavior | null): string 
   return stopBehavior === 'soft_stop' ? 'When reached: keep running and alert admins' : 'When reached: pause new runs';
 }
 
-export function ProjectDetailView() {
+export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) {
   const { projectId = '' } = useParams();
   const queryClient = useQueryClient();
   const [isLimitsDialogOpen, setIsLimitsDialogOpen] = useState(false);
@@ -72,20 +76,20 @@ export function ProjectDetailView() {
   const [workflowPage, setWorkflowPage] = useState(1);
 
   const projectQuery = useQuery({
-    queryKey: ['admin-project', projectId],
-    queryFn: ({ signal }) => getAdminProject(projectId, signal),
+    queryKey: ['project', projectId],
+    queryFn: ({ signal }) => getProject(projectId, signal),
     enabled: projectId !== '',
   });
   const usageQuery = useQuery({
-    queryKey: ['admin-project-workflow-usage', projectId],
+    queryKey: ['project-workflow-usage', projectId],
     queryFn: ({ signal }) => getProjectWorkflowUsage(projectId, signal),
     enabled: projectId !== '',
   });
 
   function invalidateProjectQueries() {
-    void queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
-    void queryClient.invalidateQueries({ queryKey: ['admin-project', projectId] });
-    void queryClient.invalidateQueries({ queryKey: ['admin-project-workflow-usage', projectId] });
+    void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    void queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+    void queryClient.invalidateQueries({ queryKey: ['project-workflow-usage', projectId] });
   }
 
   const updateTenantMutation = useMutation({
@@ -199,6 +203,23 @@ export function ProjectDetailView() {
         </div>
       );
     }
+    if (isForbiddenError(projectQuery.error)) {
+      return (
+        <div className="min-h-[calc(100svh-var(--ds-header-height)-var(--ds-footer-height))] bg-surface-muted">
+          <div className="mx-auto w-full max-w-[calc(var(--ds-content-max)+2*var(--ds-page-gutter))] px-[var(--ds-page-gutter)] py-8 sm:py-10">
+            <div className="rounded-card border border-border bg-surface p-10 text-center shadow-card">
+              <h1 className="text-2xl font-bold text-foreground">No access to this project</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                You are not a member of this project. Ask a platform admin if you believe this is a mistake.
+              </p>
+              <Button asChild variant="outline" className="mt-4">
+                <Link to="/projects">Back to projects</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     const errorMessage =
       projectQuery.error instanceof Error ? projectQuery.error.message : 'Could not load the project';
     return (
@@ -213,7 +234,7 @@ export function ProjectDetailView() {
     );
   }
 
-  const project: AdminProjectItem = projectQuery.data;
+  const project: ProjectItem = projectQuery.data;
   const status = getRateLimitStatus(project);
   const bannerPeriod = getHighestUsagePeriod(project);
   const showBanner = status === 'near_limit' || status === 'limit_reached';
@@ -321,14 +342,16 @@ export function ProjectDetailView() {
                     <span>
                       Tenant ID <span className="font-mono text-xs">{project.tenantId ?? '—'}</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={startTenantEdit}
-                      className="inline-flex items-center gap-1 font-medium text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
-                    >
-                      <IconPencil size={14} aria-hidden="true" />
-                      Edit
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={startTenantEdit}
+                        className="inline-flex items-center gap-1 font-medium text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
+                      >
+                        <IconPencil size={14} aria-hidden="true" />
+                        Edit
+                      </button>
+                    )}
                     <span aria-hidden="true">·</span>
                     <span>{project.workflowCount} workflows</span>
                     <span aria-hidden="true">·</span>
@@ -337,14 +360,16 @@ export function ProjectDetailView() {
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsTopupsDialogOpen(true)}>
-                Manage top-ups
-              </Button>
-              <Button type="button" onClick={() => setIsLimitsDialogOpen(true)}>
-                Edit tenant limits
-              </Button>
-            </div>
+            {!readOnly && (
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsTopupsDialogOpen(true)}>
+                  Manage top-ups
+                </Button>
+                <Button type="button" onClick={() => setIsLimitsDialogOpen(true)}>
+                  Edit tenant limits
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Usage banner */}
@@ -472,22 +497,28 @@ export function ProjectDetailView() {
       </div>
 
       {/* Tenant removal confirmation */}
-      <ConfirmDialog
-        open={isDeleteTenantConfirmOpen}
-        title="Remove tenant mapping"
-        description={`This removes the tenant ID mapped to ${project.projectName}. The project keeps running with its current limits.`}
-        confirmLabel="Remove"
-        confirmVariant="destructive"
-        isConfirming={deleteTenantMutation.isPending}
-        onConfirm={confirmDeleteTenant}
-        onCancel={() => setIsDeleteTenantConfirmOpen(false)}
-      />
+      {!readOnly && (
+        <ConfirmDialog
+          open={isDeleteTenantConfirmOpen}
+          title="Remove tenant mapping"
+          description={`This removes the tenant ID mapped to ${project.projectName}. The project keeps running with its current limits.`}
+          confirmLabel="Remove"
+          confirmVariant="destructive"
+          isConfirming={deleteTenantMutation.isPending}
+          onConfirm={confirmDeleteTenant}
+          onCancel={() => setIsDeleteTenantConfirmOpen(false)}
+        />
+      )}
 
       {/* Edit limits dialog */}
-      <EditRateLimitsDialog project={project} open={isLimitsDialogOpen} onOpenChange={setIsLimitsDialogOpen} />
+      {!readOnly && (
+        <EditRateLimitsDialog project={project} open={isLimitsDialogOpen} onOpenChange={setIsLimitsDialogOpen} />
+      )}
 
       {/* Manage top-ups dialog */}
-      <ManageTopupsDialog project={project} open={isTopupsDialogOpen} onOpenChange={setIsTopupsDialogOpen} />
+      {!readOnly && (
+        <ManageTopupsDialog project={project} open={isTopupsDialogOpen} onOpenChange={setIsTopupsDialogOpen} />
+      )}
     </div>
   );
 }

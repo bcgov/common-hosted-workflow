@@ -133,13 +133,7 @@ export async function buildApiServices(
       globalOwnerRoleSlug,
     ),
     projectRateLimit: projectRateLimitService,
-    projectTenant: new ProjectTenantService(
-      n8nRepositories,
-      customRepositories,
-      tenantService,
-      cstarService,
-      projectRateLimitService,
-    ),
+    projectTenant: new ProjectTenantService(n8nRepositories, customRepositories, projectRateLimitService),
     multiWebhookWait: new MultiWebhookWaitService(customRepositories),
   };
 }

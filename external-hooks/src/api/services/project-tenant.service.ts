@@ -1,19 +1,18 @@
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
-import type { TenantService } from './tenant.service';
-import type { CstarService } from './cstar.service';
 import type { ProjectRateLimitEnrichment, ProjectRateLimitService } from './project-rate-limit.service';
+import { listProjectIdsAccessibleToUser, verifyCallerHasN8nProjectAccess } from './project-access';
 import { AppError } from '../utils/errors';
 
-export type AdminProjectItem = {
+export type ProjectItem = {
   projectId: string;
   projectName: string;
   projectType: string;
   tenantId: string | null;
 } & Partial<ProjectRateLimitEnrichment>;
 
-export type AdminProjectsPage = {
-  data: AdminProjectItem[];
+export type ProjectsPage = {
+  data: ProjectItem[];
   pagination: {
     page: number;
     pageSize: number;
@@ -22,18 +21,10 @@ export type AdminProjectsPage = {
   };
 };
 
-export type UserProjectTenantItem = {
-  tenantId: string;
-  tenantName: string;
-  projectId: string | null;
-};
-
 export class ProjectTenantService {
   constructor(
     private readonly n8nRepositories: N8nRepositories,
     private readonly customRepositories: CustomRepositories,
-    private readonly tenantService: TenantService,
-    private readonly cstarService: CstarService,
     private readonly projectRateLimitService: ProjectRateLimitService,
   ) {}
 
@@ -45,41 +36,41 @@ export class ProjectTenantService {
     page: number,
     pageSize: number,
     filters?: { search?: string; type?: string },
-  ): Promise<AdminProjectsPage> {
+  ): Promise<ProjectsPage> {
     const { projects, totalCount } = await this.n8nRepositories.project.listPaginated(page, pageSize, filters);
-    const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
-
-    // Batched rate-limit enrichment keyed by projectId; falls back to defaults
-    // (null limits, zero counts) when the custom DB is unavailable.
-    const rateLimitEnrichment = await this.projectRateLimitService.enrichAdminProjects(
-      projects.map((p) => ({ projectId: p.id })),
-    );
-
-    const data: AdminProjectItem[] = projects.map((p) => ({
-      projectId: p.id,
-      projectName: p.name,
-      projectType: p.type,
-      tenantId: tenantMap.get(p.id) ?? null,
-      ...rateLimitEnrichment[p.id],
-    }));
-
-    return {
-      data,
-      pagination: {
-        page,
-        pageSize,
-        totalItems: totalCount,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return this.buildProjectPage(projects, page, pageSize, totalCount);
   }
 
   /**
-   * Returns a single admin project item with the same shape as one
-   * listAllProjectsWithTenants entry. Throws AppError 404 when the project
-   * does not exist in n8n.
+   * Lists only the n8n projects the user can access (their personal project and
+   * team project relations), with the same shape as the admin list. Members of
+   * no project get an empty page.
    */
-  async getAdminProjectById(projectId: string): Promise<AdminProjectItem> {
+  async listProjectsWithTenantsForUser(
+    page: number,
+    pageSize: number,
+    filters: { search?: string; type?: string } | undefined,
+    userId: string,
+  ): Promise<ProjectsPage> {
+    const accessibleIds = await listProjectIdsAccessibleToUser(
+      this.n8nRepositories.project,
+      this.n8nRepositories.projectRelation,
+      userId,
+    );
+    const { projects, totalCount } = await this.n8nRepositories.project.listPaginated(page, pageSize, {
+      ...filters,
+      ids: accessibleIds,
+    });
+    return this.buildProjectPage(projects, page, pageSize, totalCount);
+  }
+
+  /**
+   * Returns a single project item with the same shape as one list entry.
+   * Throws AppError 404 when the project does not exist in n8n. Callers are
+   * responsible for access control (admins by role; members via
+   * `assertUserProjectAccess` first).
+   */
+  async getProjectById(projectId: string): Promise<ProjectItem> {
     const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
     if (!project) {
       throw new AppError(404, 'Project not found');
@@ -95,6 +86,28 @@ export class ProjectTenantService {
       tenantId: tenantMap.get(project.id) ?? null,
       ...rateLimitEnrichment[project.id],
     };
+  }
+
+  /**
+   * Ensures the project exists in n8n and that the user may see it (a project
+   * relation row, or ownership of the personal project). Throws AppError 404
+   * for an unknown project and AppError 403 when the user has no access.
+   */
+  async assertUserProjectAccess(projectId: string, userId: string): Promise<void> {
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (!project) {
+      throw new AppError(404, 'Project not found');
+    }
+
+    const hasAccess = await verifyCallerHasN8nProjectAccess(
+      this.n8nRepositories.project,
+      this.n8nRepositories.projectRelation,
+      userId,
+      projectId,
+    );
+    if (!hasAccess) {
+      throw new AppError(403, 'You do not have access to this project');
+    }
   }
 
   /**
@@ -136,81 +149,39 @@ export class ProjectTenantService {
   }
 
   /**
-   * Lists the authenticated user's CSTAR tenants with their associated project IDs.
-   * Uses the CstarService to fetch tenants, then maps each to its project via the relation table.
-   * Returns an empty list gracefully if the user does not exist in CSTAR or has no tenants/projects.
+   * Merges project rows with tenant mappings and batched rate-limit enrichment
+   * into one page. Shared by the admin (all projects) and user-scoped lists.
    */
-  async listUserProjectTenants(params: {
-    ssoUserId: string;
-    n8nUserId: string;
-    /** Upstream OIDC access token — never the UI app JWT */
-    upstreamAccessToken: string;
-    /** @deprecated Use upstreamAccessToken */
-    accessToken?: string;
-  }): Promise<UserProjectTenantItem[]> {
-    const { ssoUserId, n8nUserId } = params;
-    const upstreamAccessToken = params.upstreamAccessToken ?? params.accessToken ?? '';
-    const results: UserProjectTenantItem[] = [];
+  private async buildProjectPage(
+    projects: Array<{ id: string; name: string; type: string }>,
+    page: number,
+    pageSize: number,
+    totalCount: number,
+  ): Promise<ProjectsPage> {
+    const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
 
-    // Fetch CSTAR tenants for the user
-    if (this.cstarService.isConfigured()) {
-      const cstarTenants = await this.cstarService.getUserTenants({ ssoUserId, accessToken: upstreamAccessToken });
-      const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
+    // Batched rate-limit enrichment keyed by projectId; falls back to defaults
+    // (null limits, zero counts) when the custom DB is unavailable.
+    const rateLimitEnrichment = await this.projectRateLimitService.enrichAdminProjects(
+      projects.map((p) => ({ projectId: p.id })),
+    );
 
-      // Build a reverse map: tenantId → projectId
-      const tenantToProject = new Map<string, string>();
-      for (const [projectId, tenantId] of tenantMap) {
-        tenantToProject.set(tenantId, projectId);
-      }
+    const data: ProjectItem[] = projects.map((p) => ({
+      projectId: p.id,
+      projectName: p.name,
+      projectType: p.type,
+      tenantId: tenantMap.get(p.id) ?? null,
+      ...rateLimitEnrichment[p.id],
+    }));
 
-      for (const tenant of cstarTenants) {
-        results.push({
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          projectId: tenantToProject.get(tenant.id) ?? null,
-        });
-      }
-    }
-
-    // Include the user's personal project if it has a tenant mapping
-    const personalItem = await this.resolvePersonalProjectTenant(n8nUserId);
-    if (personalItem && !results.some((r) => r.tenantId === personalItem.tenantId)) {
-      results.push(personalItem);
-    }
-
-    return results;
-  }
-
-  /**
-   * Resolves the personal project tenant mapping for a user.
-   * Returns null gracefully if the user has no n8n user ID, no personal project, or no tenant mapping.
-   */
-  private async resolvePersonalProjectTenant(n8nUserId: string): Promise<UserProjectTenantItem | null> {
-    if (!n8nUserId) {
-      return null;
-    }
-
-    try {
-      const personalProject = await this.n8nRepositories.project.getPersonalProjectForUser(n8nUserId);
-      if (!personalProject) {
-        return null;
-      }
-
-      const personalTenantId = await this.customRepositories.tenantProjectRelation.getTenantIdByProjectId(
-        personalProject.id,
-      );
-      if (!personalTenantId) {
-        return null;
-      }
-
-      return {
-        tenantId: personalTenantId,
-        tenantName: 'My Personal Project',
-        projectId: personalProject.id,
-      };
-    } catch {
-      // User may not have a personal project in n8n — gracefully return null
-      return null;
-    }
+    return {
+      data,
+      pagination: {
+        page,
+        pageSize,
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    };
   }
 }

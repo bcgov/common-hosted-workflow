@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EditRateLimitsDialog } from '@/components/projects/edit-rate-limits-dialog';
-import { updateProjectRateLimit, type AdminProjectItem } from '@/services/backend/projects';
+import { updateProjectRateLimit, type ProjectItem } from '@/services/backend/projects';
 
 vi.mock('@/services/backend/projects', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/projects')>('@/services/backend/projects');
@@ -13,7 +13,7 @@ vi.mock('@/services/backend/projects', async () => {
 
 const updateMock = vi.mocked(updateProjectRateLimit);
 
-const PROJECT: AdminProjectItem = {
+const PROJECT: ProjectItem = {
   projectId: 'p-devx',
   projectName: 'DEVX Tenant',
   projectType: 'team',
@@ -31,7 +31,7 @@ const PROJECT: AdminProjectItem = {
   updatedByName: 'N. McInnis',
 };
 
-function renderDialog(project: AdminProjectItem = PROJECT) {
+function renderDialog(project: ProjectItem = PROJECT) {
   const onOpenChange = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(

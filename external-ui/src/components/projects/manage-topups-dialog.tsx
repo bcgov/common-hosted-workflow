@@ -31,7 +31,7 @@ import {
   createProjectTopup,
   deleteProjectTopup,
   listProjectTopups,
-  type AdminProjectItem,
+  type ProjectItem,
   type ProjectTopupItem,
 } from '../../services/backend/projects';
 
@@ -77,7 +77,7 @@ function validateAmount(amount: number | undefined, comment: string): DialogFiel
 }
 
 export interface ManageTopupsDialogProps {
-  project: AdminProjectItem;
+  project: ProjectItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -107,15 +107,15 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
   const currentWeeklyKey = getWeeklyPeriodKey();
 
   const topupsQuery = useQuery({
-    queryKey: ['admin-project-topups', project.projectId, page],
+    queryKey: ['project-topups', project.projectId, page],
     queryFn: ({ signal }) => listProjectTopups(project.projectId, page, TOPUP_HISTORY_PAGE_SIZE, signal),
     enabled: open,
   });
 
   function invalidateTopupQueries() {
-    void queryClient.invalidateQueries({ queryKey: ['admin-project-topups', project.projectId] });
-    void queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
-    void queryClient.invalidateQueries({ queryKey: ['admin-project', project.projectId] });
+    void queryClient.invalidateQueries({ queryKey: ['project-topups', project.projectId] });
+    void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    void queryClient.invalidateQueries({ queryKey: ['project', project.projectId] });
   }
 
   const addMutation = useMutation({

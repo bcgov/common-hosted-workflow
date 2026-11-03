@@ -106,6 +106,34 @@ async function runProtectedRoute(services: any, method: string, path: string, re
   await runRoute(router, method, path, req, res);
 }
 
+/**
+ * Dispatches a real HTTP request against the full ui-api router. Required for
+ * routes mounted with `router.use` (e.g. /ui-api/projects): getRouteHandlers
+ * cannot traverse mounts, so guard + handler behavior is proven over HTTP.
+ */
+async function dispatchUiRequest(services: Record<string, unknown>, method: 'get' | 'put', path: string) {
+  const express = (await import('express')).default;
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/ui-api',
+    buildUiApiRouter({
+      services: { tenant: mockTenantService, featureFlag: mockFeatureFlagService, ...services },
+    } as any),
+  );
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  try {
+    const { port } = server.address() as { port: number };
+    return await fetch(`http://127.0.0.1:${port}/ui-api${path}`, {
+      method: method.toUpperCase(),
+      headers: { authorization: 'Bearer ui-test-token', 'content-type': 'application/json' },
+    });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
 beforeEach(() => {
   mockTenantService.getTenantRolesForSession.mockReset();
   mockTenantService.getTenantGroupsForSession.mockReset();
@@ -708,14 +736,12 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
 
     it('cannot list project tenants', async () => {
       const uiApi = makeUnprovisionedContextService();
-      const projectTenant = { listUserProjectTenants: vi.fn() };
-      const req = createMockRequest({ get: vi.fn(() => undefined) as any });
-      const res = createMockResponse();
+      const projectTenant = { listProjectsWithTenantsForUser: vi.fn() };
 
-      await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+      const response = await dispatchUiRequest({ uiApi, projectTenant }, 'get', '/projects');
 
-      makeDeniedExpectations(res);
-      expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalled();
+      expect(response.status).toBe(403);
+      expect(projectTenant.listProjectsWithTenantsForUser).not.toHaveBeenCalled();
     });
 
     it('can still create an access request', async () => {
@@ -897,21 +923,18 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
 
     it('cannot list project tenants', async () => {
       const uiApi = makeDisabledAdminContextService();
-      const projectTenant = { listUserProjectTenants: vi.fn() };
-      const req = createMockRequest({ get: vi.fn(() => undefined) as any });
-      const res = createMockResponse();
+      const projectTenant = { listProjectsWithTenantsForUser: vi.fn() };
 
-      await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+      const response = await dispatchUiRequest({ uiApi, projectTenant }, 'get', '/projects');
 
-      makeDeniedExpectations(res);
-      expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalled();
+      expect(response.status).toBe(403);
+      expect(projectTenant.listProjectsWithTenantsForUser).not.toHaveBeenCalled();
     });
   });
 });
 
-describe('GET /ui-api/projects', () => {
-  it('returns user project tenants from projectTenant service using upstream token (raw mode)', async () => {
-    getUiOidcAccessTokenByEmailMock.mockResolvedValue('stored-upstream-access-token');
+describe('GET /ui-api/projects (shared read endpoints)', () => {
+  it('scopes the list to the member accessible projects via the shared sub-router', async () => {
     const uiApi = {
       loadUserContext: vi.fn().mockResolvedValue({
         n8nUser: {
@@ -925,158 +948,81 @@ describe('GET /ui-api/projects', () => {
         workflows: [],
       }),
     };
+    const page = { data: [], pagination: { page: 1, pageSize: 25, totalItems: 0, totalPages: 0 } };
     const projectTenant = {
-      listUserProjectTenants: vi.fn().mockResolvedValue([
-        { tenantId: '550e8400-e29b-41d4-a716-446655440000', tenantName: 'My Org', projectId: 'abc-123' },
-        { tenantId: '660e8400-e29b-41d4-a716-446655440000', tenantName: 'My Personal Project', projectId: 'def-456' },
-      ]),
+      listAllProjectsWithTenants: vi.fn(),
+      listProjectsWithTenantsForUser: vi.fn().mockResolvedValue(page),
     };
-    const req = createMockRequest({
-      headers: { authorization: 'Bearer test-access-token' }, // pragma: allowlist secret
-      get: vi.fn((name: string) => {
-        if (name.toLowerCase() === 'authorization') return 'Bearer test-access-token'; // pragma: allowlist secret
-        return undefined;
-      }) as any,
-    });
-    const res = createMockResponse();
 
-    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+    const response = await dispatchUiRequest({ uiApi, projectTenant }, 'get', '/projects');
+    const payload = await response.json();
 
-    expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith({
-      ssoUserId: 'sub-1',
-      n8nUserId: 'user-123',
-      upstreamAccessToken: 'stored-upstream-access-token',
-    });
-    expect(res.json).toHaveBeenCalledWith({
-      data: [
-        { tenantId: '550e8400-e29b-41d4-a716-446655440000', tenantName: 'My Org', projectId: 'abc-123' },
-        { tenantId: '660e8400-e29b-41d4-a716-446655440000', tenantName: 'My Personal Project', projectId: 'def-456' },
-      ],
-    });
+    expect(response.status).toBe(200);
+    expect(projectTenant.listProjectsWithTenantsForUser).toHaveBeenCalledWith(
+      1,
+      25,
+      { search: undefined, type: undefined },
+      'user-123',
+    );
+    expect(projectTenant.listAllProjectsWithTenants).not.toHaveBeenCalled();
+    expect(payload).toEqual(page);
   });
 
-  it('never forwards the app JWT upstream in separate-token mode (regression)', async () => {
-    // In separate-token mode the bearer is an app JWT (HS256, sid-checked), not the OIDC access token.
-    // The route must resolve the upstream token from the server-side store/session, not the bearer.
-    const appJwt = 'app.jwt.token'; // pragma: allowlist secret
-    const upstreamToken = 'upstream-oidc-access-token'; // pragma: allowlist secret
+  it('lists every project for an admin session', async () => {
     getUiSessionMock.mockResolvedValue({
-      session: {
-        subject: 'sub-1',
-        email: 'person@example.com',
-        issuer: 'https://issuer.example.com',
-        audience: ['app'],
-        claims: {},
+      subject: 'sub-1',
+      email: 'admin@example.com',
+      issuer: 'https://issuer.example.com',
+      audience: ['app'],
+      claims: {},
+      n8nUser: {
+        id: 'admin-123',
+        email: 'admin@example.com',
+        role: { slug: 'global:admin', displayName: 'Admin' },
       },
-      upstreamAccessToken: upstreamToken,
     });
-    getUiOidcAccessTokenByEmailMock.mockResolvedValue(upstreamToken);
     const uiApi = {
       loadUserContext: vi.fn().mockResolvedValue({
         n8nUser: {
-          id: 'user-123',
-          email: 'person@example.com',
+          id: 'admin-123',
+          email: 'admin@example.com',
           disabled: false,
-          role: { slug: 'global:member', displayName: 'Member' },
+          role: { slug: 'global:admin', displayName: 'Admin' },
         },
         accessibleProjectIds: [],
         projects: [],
         workflows: [],
       }),
     };
+    const page = { data: [], pagination: { page: 1, pageSize: 25, totalItems: 0, totalPages: 0 } };
     const projectTenant = {
-      listUserProjectTenants: vi.fn().mockResolvedValue([]),
+      listAllProjectsWithTenants: vi.fn().mockResolvedValue(page),
+      listProjectsWithTenantsForUser: vi.fn(),
     };
-    const req = createMockRequest({
-      headers: { authorization: `Bearer ${appJwt}` },
-      get: vi.fn((name: string) => {
-        if (name.toLowerCase() === 'authorization') return `Bearer ${appJwt}`;
-        return undefined;
-      }) as any,
+
+    const response = await dispatchUiRequest({ uiApi, projectTenant }, 'get', '/projects');
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(projectTenant.listAllProjectsWithTenants).toHaveBeenCalledWith(1, 25, {
+      search: undefined,
+      type: undefined,
     });
-    const res = createMockResponse();
-
-    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
-
-    expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith(
-      expect.objectContaining({ upstreamAccessToken: upstreamToken }),
-    );
-    expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalledWith(
-      expect.objectContaining({ upstreamAccessToken: appJwt }),
-    );
-    expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalledWith(
-      expect.objectContaining({ accessToken: appJwt }),
-    );
-  });
-
-  it('uses refreshed upstream token in the same request that triggered refresh', async () => {
-    const refreshedUpstream = 'refreshed-upstream-token'; // pragma: allowlist secret
-    const staleStoreToken = 'stale-upstream-token'; // pragma: allowlist secret
-    // getUiSession already refreshed and provided fresh upstream token (separate-token window refresh)
-    getUiSessionMock.mockResolvedValue({
-      session: {
-        subject: 'sub-1',
-        email: 'person@example.com',
-        issuer: 'https://issuer.example.com',
-        audience: ['app'],
-        claims: {},
-      },
-      refreshedToken: 'new-app-jwt',
-      upstreamAccessToken: refreshedUpstream,
-    });
-    // Even if store still returns stale, the request should use the refreshed value from session result
-    getUiOidcAccessTokenByEmailMock.mockResolvedValue(staleStoreToken);
-    const uiApi = {
-      loadUserContext: vi.fn().mockResolvedValue({
-        n8nUser: {
-          id: 'user-123',
-          email: 'person@example.com',
-          disabled: false,
-          role: { slug: 'global:member', displayName: 'Member' },
-        },
-        accessibleProjectIds: [],
-        projects: [],
-        workflows: [],
-      }),
-    };
-    const projectTenant = {
-      listUserProjectTenants: vi.fn().mockResolvedValue([]),
-    };
-    const req = createMockRequest({
-      headers: { authorization: 'Bearer app-near-expiry-jwt' },
-      get: vi.fn((name: string) => {
-        if (name.toLowerCase() === 'authorization') return 'Bearer app-near-expiry-jwt';
-        return undefined;
-      }) as any,
-    });
-    const res = createMockResponse() as any;
-    res.setHeader = vi.fn();
-    res.clearCookie = vi.fn();
-    res.cookie = vi.fn();
-
-    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
-
-    expect(projectTenant.listUserProjectTenants).toHaveBeenCalledWith(
-      expect.objectContaining({ upstreamAccessToken: refreshedUpstream }),
-    );
+    expect(projectTenant.listProjectsWithTenantsForUser).not.toHaveBeenCalled();
+    expect(payload).toEqual(page);
   });
 
   it('returns 401 when unauthenticated', async () => {
     getUiSessionMock.mockResolvedValue(null);
 
-    const uiApi = {
-      loadUserContext: vi.fn(),
-    };
     const projectTenant = {
-      listUserProjectTenants: vi.fn(),
+      listProjectsWithTenantsForUser: vi.fn(),
     };
-    const req = createMockRequest({ get: vi.fn(() => undefined) as any });
-    const res = createMockResponse();
 
-    await runProtectedRoute({ uiApi, projectTenant }, 'get', '/projects', req as any, res as any);
+    const response = await dispatchUiRequest({ projectTenant }, 'get', '/projects');
 
-    expect(projectTenant.listUserProjectTenants).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(401);
+    expect(response.status).toBe(401);
+    expect(projectTenant.listProjectsWithTenantsForUser).not.toHaveBeenCalled();
   });
 });
 

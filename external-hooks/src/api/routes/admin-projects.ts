@@ -4,13 +4,9 @@ import { OkResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import { createRequestParser } from '../utils/validation';
 import {
-  adminProjectsQuerySchema,
   updateProjectTenantSchema,
   deleteProjectTenantSchema,
   updateProjectRateLimitSchema,
-  getAdminProjectSchema,
-  getProjectWorkflowUsageSchema,
-  listProjectTopupsSchema,
   createProjectTopupSchema,
   deleteProjectTopupSchema,
   getRateLimitDefaultsSchema,
@@ -19,8 +15,9 @@ import {
 import type { UiApiTypedRequest } from '../types/ui-api';
 
 /**
- * Admin project-tenant management sub-router.
- * Used for listing all n8n projects and managing tenant mappings.
+ * Admin project-management sub-router (writes + defaults).
+ * Shared read endpoints (list, detail, workflow usage, top-up history) live in
+ * routes/projects.ts at /ui-api/projects for admins and members alike.
  * Restricted to users with global:admin or global:owner roles
  * (enforced by the parent router via requireUiRequestContext + checkRole).
  */
@@ -28,19 +25,10 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
   const { services } = routeContext;
   const router = Router();
 
-  router.get(
-    '/projects',
-    createRequestParser(adminProjectsQuerySchema),
-    async (req: UiApiTypedRequest<zInfer<typeof adminProjectsQuerySchema>>, res) => {
-      const { page, pageSize, search, type } = req.parsed.query;
-      const result = await services.projectTenant.listAllProjectsWithTenants(page, pageSize, { search, type });
-      OkResponse(res, result);
-    },
-  );
-
-  // Literal-path defaults routes must be registered BEFORE the matching
-  // '/projects/:projectId' routes below, or Express would treat
-  // 'rate-limit-defaults' as a projectId.
+  // Literal-path defaults routes are kept ahead of the '/projects/:projectId/...'
+  // routes below as a defensive convention: Express matches in registration
+  // order, so a single-segment ':projectId' route added later cannot shadow
+  // 'rate-limit-defaults'.
   router.get(
     '/projects/rate-limit-defaults',
     createRequestParser(getRateLimitDefaultsSchema),
@@ -90,37 +78,6 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
       const updatedBy = req.session.n8nUser?.email ?? null;
       const result = await services.projectRateLimit.updateRateLimit(projectId, body, updatedBy);
       OkResponse(res, { success: true, message: 'Rate limit updated', rateLimit: result });
-    },
-  );
-
-  router.get(
-    '/projects/:projectId',
-    createRequestParser(getAdminProjectSchema),
-    async (req: UiApiTypedRequest<zInfer<typeof getAdminProjectSchema>>, res) => {
-      const { projectId } = req.parsed.params;
-      const result = await services.projectTenant.getAdminProjectById(projectId);
-      OkResponse(res, result);
-    },
-  );
-
-  router.get(
-    '/projects/:projectId/workflow-usage',
-    createRequestParser(getProjectWorkflowUsageSchema),
-    async (req: UiApiTypedRequest<zInfer<typeof getProjectWorkflowUsageSchema>>, res) => {
-      const { projectId } = req.parsed.params;
-      const result = await services.projectRateLimit.getProjectWorkflowUsage(projectId);
-      OkResponse(res, result);
-    },
-  );
-
-  router.get(
-    '/projects/:projectId/topups',
-    createRequestParser(listProjectTopupsSchema),
-    async (req: UiApiTypedRequest<zInfer<typeof listProjectTopupsSchema>>, res) => {
-      const { projectId } = req.parsed.params;
-      const { page, pageSize } = req.parsed.query;
-      const result = await services.projectRateLimit.listProjectTopups(projectId, page, pageSize);
-      OkResponse(res, result);
     },
   );
 

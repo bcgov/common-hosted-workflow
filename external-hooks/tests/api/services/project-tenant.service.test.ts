@@ -51,9 +51,14 @@ function buildService({
       findOneBy: vi
         .fn()
         .mockImplementation(async ({ id }: { id: string }) => projects.find((p) => p.id === id) ?? null),
+      getPersonalProjectForUser: vi.fn().mockResolvedValue(null),
     },
     sharedWorkflow: { countByProjectIds: vi.fn().mockResolvedValue(workflowCounts) },
-    projectRelation: { countMembersByProjectIds: vi.fn().mockResolvedValue(new Map()) },
+    projectRelation: {
+      countMembersByProjectIds: vi.fn().mockResolvedValue(new Map()),
+      findAllByUser: vi.fn().mockResolvedValue([]),
+      findProjectRole: vi.fn().mockResolvedValue(null),
+    },
     user: {
       findUserNamesByEmails: vi.fn().mockImplementation(async (emails: string[]) => {
         const names = new Map<string, { firstName: string; lastName: string }>();
@@ -73,13 +78,7 @@ function buildService({
     projectTopup: { sumByProjectIds: vi.fn().mockResolvedValue(new Map()) },
   };
   const projectRateLimitService = new ProjectRateLimitService(n8nRepositories as any, customRepositories as any);
-  const service = new ProjectTenantService(
-    n8nRepositories as any,
-    customRepositories as any,
-    {} as any,
-    {} as any,
-    projectRateLimitService,
-  );
+  const service = new ProjectTenantService(n8nRepositories as any, customRepositories as any, projectRateLimitService);
   return { service, n8nRepositories, customRepositories };
 }
 
@@ -165,8 +164,6 @@ describe('ProjectTenantService', () => {
       const service = new ProjectTenantService(
         n8nRepositories as any,
         customRepositories as any,
-        {} as any,
-        {} as any,
         new ProjectRateLimitService(n8nRepositories as any, customRepositories as any),
       );
 
@@ -200,7 +197,7 @@ describe('ProjectTenantService', () => {
     });
   });
 
-  describe('getAdminProjectById', () => {
+  describe('getProjectById', () => {
     it('returns a single enriched item identical to one list entry', async () => {
       const { service } = buildService({
         projects: [{ id: 'proj-001', name: 'Configured project', type: 'team' }],
@@ -220,7 +217,7 @@ describe('ProjectTenantService', () => {
         tenantMap: new Map([['proj-001', 'tenant-1']]),
       });
 
-      const item = await service.getAdminProjectById('proj-001');
+      const item = await service.getProjectById('proj-001');
 
       expect(item).toEqual({
         projectId: 'proj-001',
@@ -251,7 +248,7 @@ describe('ProjectTenantService', () => {
       });
 
       try {
-        await service.getAdminProjectById('unknown-project');
+        await service.getProjectById('unknown-project');
         expect.unreachable('Expected AppError 404');
       } catch (error) {
         expect(error).toBeInstanceOf(AppError);
@@ -279,12 +276,10 @@ describe('ProjectTenantService', () => {
       const service = new ProjectTenantService(
         n8nRepositories as any,
         customRepositories as any,
-        {} as any,
-        {} as any,
         new ProjectRateLimitService(n8nRepositories as any, customRepositories as any),
       );
 
-      const item = await service.getAdminProjectById('proj-001');
+      const item = await service.getProjectById('proj-001');
 
       expect(item).toEqual({
         projectId: 'proj-001',
@@ -293,6 +288,123 @@ describe('ProjectTenantService', () => {
         tenantId: 'tenant-1',
         ...DEFAULT_ENRICHMENT,
       });
+    });
+  });
+
+  describe('listProjectsWithTenantsForUser', () => {
+    it('scopes listPaginated to the projects the user can access and enriches identically', async () => {
+      const { service, n8nRepositories, customRepositories } = buildService({
+        projects: [{ id: 'proj-010', name: 'My personal project', type: 'personal' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map([['proj-010', 'tenant-9']]),
+      });
+      n8nRepositories.projectRelation.findAllByUser.mockResolvedValue([{ projectId: 'proj-001' }]);
+      n8nRepositories.project.getPersonalProjectForUser.mockResolvedValue({ id: 'proj-010' });
+
+      const page = await service.listProjectsWithTenantsForUser(2, 10, { search: 'personal' }, 'user-77');
+
+      expect(n8nRepositories.project.listPaginated).toHaveBeenCalledWith(2, 10, {
+        search: 'personal',
+        ids: ['proj-001', 'proj-010'],
+      });
+      expect(page.data).toEqual([
+        {
+          projectId: 'proj-010',
+          projectName: 'My personal project',
+          projectType: 'personal',
+          tenantId: 'tenant-9',
+          ...DEFAULT_ENRICHMENT,
+        },
+      ]);
+      expect(page.pagination).toEqual({ page: 2, pageSize: 10, totalItems: 1, totalPages: 1 });
+      expect(customRepositories.projectRateLimit.listByProjectIds).toHaveBeenCalledWith(['proj-010']);
+    });
+
+    it('passes an empty id list when the user has no relations and no personal project', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+
+      await service.listProjectsWithTenantsForUser(1, 25, undefined, 'user-with-nothing');
+
+      expect(n8nRepositories.project.listPaginated).toHaveBeenCalledWith(1, 25, { ids: [] });
+    });
+  });
+
+  describe('assertUserProjectAccess', () => {
+    it('resolves when the user holds a project role', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-001', name: 'Shared project', type: 'team' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue('projectAdmin');
+
+      await expect(service.assertUserProjectAccess('proj-001', 'user-77')).resolves.toBeUndefined();
+      expect(n8nRepositories.project.getPersonalProjectForUser).not.toHaveBeenCalled();
+    });
+
+    it('resolves for the owner of the personal project', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-010', name: 'My personal project', type: 'personal' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue(null);
+      n8nRepositories.project.getPersonalProjectForUser.mockResolvedValue({ id: 'proj-010' });
+
+      await expect(service.assertUserProjectAccess('proj-010', 'user-77')).resolves.toBeUndefined();
+    });
+
+    it('throws AppError 403 when the user has neither a project role nor the personal project', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-001', name: 'Other tenant project', type: 'team' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue(null);
+      n8nRepositories.project.getPersonalProjectForUser.mockResolvedValue({ id: 'proj-010' });
+
+      try {
+        await service.assertUserProjectAccess('proj-001', 'user-77');
+        expect.unreachable('Expected AppError 403');
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError);
+        expect((error as AppError).statusCode).toBe(403);
+        expect((error as AppError).message).toBe('You do not have access to this project');
+      }
+    });
+
+    it('throws AppError 404 for an unknown project without consulting relations', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+
+      try {
+        await service.assertUserProjectAccess('unknown-project', 'user-77');
+        expect.unreachable('Expected AppError 404');
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError);
+        expect((error as AppError).statusCode).toBe(404);
+        expect((error as AppError).message).toBe('Project not found');
+      }
+      expect(n8nRepositories.projectRelation.findProjectRole).not.toHaveBeenCalled();
     });
   });
 });

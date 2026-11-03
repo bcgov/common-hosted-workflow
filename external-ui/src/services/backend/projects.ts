@@ -2,7 +2,7 @@ import { instance } from './axios';
 
 export type RateLimitStopBehavior = 'hard_stop' | 'soft_stop';
 
-export type AdminProjectItem = {
+export type ProjectItem = {
   projectId: string;
   projectName: string;
   projectType: string;
@@ -104,8 +104,8 @@ export type UpdateRateLimitDefaultsResponse = {
   defaults: ProjectRateLimitDefaults;
 };
 
-export type AdminProjectsResponse = {
-  data: AdminProjectItem[];
+export type ProjectsResponse = {
+  data: ProjectItem[];
   pagination: {
     page: number;
     pageSize: number;
@@ -114,17 +114,11 @@ export type AdminProjectsResponse = {
   };
 };
 
-export type UserProjectTenantItem = {
-  tenantId: string;
-  tenantName: string;
-  projectId: string | null;
-};
-
-export type UserProjectsResponse = {
-  data: UserProjectTenantItem[];
-};
-
-export function getAdminProjects(params: {
+/**
+ * Lists projects from the shared read endpoint: admins get every n8n project,
+ * members get only the projects they can access in n8n.
+ */
+export function getProjects(params: {
   page: number;
   pageSize: number;
   search?: string;
@@ -133,7 +127,7 @@ export function getAdminProjects(params: {
 }) {
   const { signal, search, type, ...rest } = params;
   return instance
-    .get<AdminProjectsResponse>('/ui-api/admin/projects', {
+    .get<ProjectsResponse>('/ui-api/projects', {
       params: { ...rest, ...(search ? { search } : {}), ...(type && type !== 'all' ? { type } : {}) },
       signal,
     })
@@ -158,15 +152,15 @@ export function updateProjectRateLimit(projectId: string, body: UpdateProjectRat
     .then((res) => res.data);
 }
 
-export function getAdminProject(projectId: string, signal?: AbortSignal) {
+export function getProject(projectId: string, signal?: AbortSignal) {
   return instance
-    .get<AdminProjectItem>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}`, { signal })
+    .get<ProjectItem>(`/ui-api/projects/${encodeURIComponent(projectId)}`, { signal })
     .then((res) => res.data);
 }
 
 export function getProjectWorkflowUsage(projectId: string, signal?: AbortSignal) {
   return instance
-    .get<ProjectWorkflowUsage>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/workflow-usage`, {
+    .get<ProjectWorkflowUsage>(`/ui-api/projects/${encodeURIComponent(projectId)}/workflow-usage`, {
       signal,
     })
     .then((res) => res.data);
@@ -174,7 +168,7 @@ export function getProjectWorkflowUsage(projectId: string, signal?: AbortSignal)
 
 export function listProjectTopups(projectId: string, page: number, pageSize: number, signal?: AbortSignal) {
   return instance
-    .get<ProjectTopupsResponse>(`/ui-api/admin/projects/${encodeURIComponent(projectId)}/topups`, {
+    .get<ProjectTopupsResponse>(`/ui-api/projects/${encodeURIComponent(projectId)}/topups`, {
       params: { page, pageSize },
       signal,
     })
@@ -209,22 +203,18 @@ const FETCH_ALL_PAGE_SIZE = 100;
 const FETCH_ALL_MAX_PAGES = 100;
 
 /**
- * Fetches every admin project by paging through the paginated list endpoint
- * (100 per page, capped at 100 pages) so client-side aggregates and filters
- * see the whole dataset.
+ * Fetches every visible project by paging through the shared paginated list
+ * endpoint (100 per page, capped at 100 pages) so client-side aggregates and
+ * filters see the whole dataset. Admins get all projects; members get theirs.
  */
-export async function fetchAllAdminProjects(signal?: AbortSignal): Promise<AdminProjectItem[]> {
-  const all: AdminProjectItem[] = [];
+export async function fetchAllProjects(signal?: AbortSignal): Promise<ProjectItem[]> {
+  const all: ProjectItem[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await getAdminProjects({ page, pageSize: FETCH_ALL_PAGE_SIZE, signal });
+    const response = await getProjects({ page, pageSize: FETCH_ALL_PAGE_SIZE, signal });
     all.push(...response.data);
     if (page >= response.pagination.totalPages || page >= FETCH_ALL_MAX_PAGES) {
       break;
     }
   }
   return all;
-}
-
-export function getUserProjects(signal?: AbortSignal) {
-  return instance.get<UserProjectsResponse>('/ui-api/projects', { signal }).then((res) => res.data);
 }

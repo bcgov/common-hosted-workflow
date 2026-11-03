@@ -20,7 +20,7 @@ import { validateLimitPair, parseLimitInput, type LimitParseResult } from '@/lib
 import { formatCount, formatShortDate } from '@/lib/rate-limit';
 import {
   updateProjectRateLimit,
-  type AdminProjectItem,
+  type ProjectItem,
   type RateLimitStopBehavior,
   type UpdateProjectRateLimitBody,
 } from '../../services/backend/projects';
@@ -47,7 +47,7 @@ function validateLimits(weekly: LimitParseResult, yearly: LimitParseResult, reas
 }
 
 export interface EditRateLimitsDialogProps {
-  project: AdminProjectItem;
+  project: ProjectItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -88,9 +88,9 @@ export function EditRateLimitsDialog({ project, open, onOpenChange }: Readonly<E
     onSuccess: () => {
       toast.success('Rate limits updated');
       onOpenChange(false);
-      void queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
-      void queryClient.invalidateQueries({ queryKey: ['admin-project', project.projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['admin-project-workflow-usage', project.projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void queryClient.invalidateQueries({ queryKey: ['project', project.projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['project-workflow-usage', project.projectId] });
     },
     onError: (error) => {
       toast.error(getRateLimitMutationErrorMessage(error));

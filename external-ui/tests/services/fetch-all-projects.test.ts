@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { instance } from '@/services/backend/axios';
-import { fetchAllAdminProjects, type AdminProjectItem } from '@/services/backend/projects';
+import { fetchAllProjects, type ProjectItem } from '@/services/backend/projects';
 
 vi.mock('@/services/backend/axios', () => ({
   instance: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -9,7 +9,7 @@ vi.mock('@/services/backend/axios', () => ({
 
 const getMock = vi.mocked(instance.get);
 
-function makeProject(id: string): AdminProjectItem {
+function makeProject(id: string): ProjectItem {
   return {
     projectId: id,
     projectName: `Project ${id}`,
@@ -38,7 +38,7 @@ function pageResponse(page: number, totalPages: number, ids: string[]) {
   };
 }
 
-describe('fetchAllAdminProjects', () => {
+describe('fetchAllProjects', () => {
   beforeEach(() => {
     getMock.mockReset();
   });
@@ -46,7 +46,7 @@ describe('fetchAllAdminProjects', () => {
   it('stops after a single page when everything fits', async () => {
     getMock.mockResolvedValueOnce(pageResponse(1, 1, ['p1', 'p2']) as never);
 
-    const projects = await fetchAllAdminProjects();
+    const projects = await fetchAllProjects();
 
     expect(projects).toHaveLength(2);
     expect(projects.map((project) => project.projectId)).toEqual(['p1', 'p2']);
@@ -58,11 +58,11 @@ describe('fetchAllAdminProjects', () => {
       .mockResolvedValueOnce(pageResponse(1, 2, ['p1', 'p2']) as never)
       .mockResolvedValueOnce(pageResponse(2, 2, ['p3']) as never);
 
-    const projects = await fetchAllAdminProjects();
+    const projects = await fetchAllProjects();
 
     expect(projects).toHaveLength(3);
     expect(getMock).toHaveBeenCalledTimes(2);
-    expect(getMock.mock.calls[0][0]).toBe('/ui-api/admin/projects');
+    expect(getMock.mock.calls[0][0]).toBe('/ui-api/projects');
     expect(getMock.mock.calls[0][1]?.params).toMatchObject({ page: 1, pageSize: 100 });
     expect(getMock.mock.calls[1][1]?.params).toMatchObject({ page: 2, pageSize: 100 });
   });
@@ -70,7 +70,7 @@ describe('fetchAllAdminProjects', () => {
   it('gives up after a hard cap of pages even if the endpoint keeps paginating', async () => {
     getMock.mockImplementation((async () => pageResponse(1, 500, ['p1'])) as never);
 
-    const projects = await fetchAllAdminProjects();
+    const projects = await fetchAllProjects();
 
     expect(projects).toHaveLength(100);
     expect(getMock).toHaveBeenCalledTimes(100);

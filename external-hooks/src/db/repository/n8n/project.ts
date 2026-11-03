@@ -3,6 +3,8 @@ import type { BaseN8nProjectRepository, N8nProjectRecord } from '../../../api/ty
 export type ProjectListFilters = {
   search?: string;
   type?: string;
+  /** Restricts results to these project ids (non-admin scoping). Empty array short-circuits to an empty page. */
+  ids?: string[];
 };
 
 export type PaginatedProjects = {
@@ -43,6 +45,17 @@ export class ProjectRepository {
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
+
+    if (filters?.ids) {
+      // Caller-scoped listing: an empty id list can never match, so skip the
+      // queries entirely (an `IN ()` clause would be invalid SQL anyway).
+      if (filters.ids.length === 0) {
+        return { projects: [], totalCount: 0 };
+      }
+      const idPlaceholders = filters.ids.map(() => `$${paramIndex++}`);
+      conditions.push(`id IN (${idPlaceholders.join(', ')})`);
+      params.push(...filters.ids);
+    }
 
     if (filters?.type) {
       conditions.push(`type = $${paramIndex}`);
