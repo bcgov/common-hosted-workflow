@@ -3,8 +3,16 @@ import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { ProjectRateLimit } from '../../db/schema/project-rate-limit';
 import type { ProjectRateLimitDefault } from '../../db/schema/project-rate-limit-default';
 import type { ProjectTopup } from '../../db/schema/project-topup';
+import type { RateLimitNotificationKind } from '../../db/schema/rate-limit-notification';
+import type { NodeMailerService } from './node-mailer';
+import { renderEmail } from './email-templates';
+import { UI_APP_BASE_URL } from '@config';
 import {
+  describeWeeklyPeriodKey,
+  formatPeriodDateLong,
   getCurrentPeriodKeys,
+  getNextWeeklyReset,
+  getNextYearlyReset,
   listUpcomingWeeklyPeriodKeys,
   listWeeklyPeriodKeysOverlappingYearlyPeriod,
 } from '../helpers/period';
@@ -112,6 +120,137 @@ type LimitBreach = {
   topupRuns?: number;
 };
 
+/**
+ * One notification trigger detected while checking a run's limits: a period
+ * being reached or crossing a near-limit threshold. At most one event per
+ * period per run — the highest applicable severity wins.
+ */
+type LimitEvent = {
+  kind: RateLimitNotificationKind;
+  period: 'weekly' | 'yearly';
+  periodKey: string;
+  /** Usage percent against the effective limit (floored integer, 100 when reached). */
+  percent: number;
+  limit: number;
+  count: number;
+  topupRuns: number;
+};
+
+/** Near-limit thresholds, highest severity first (matches the UI banner's 80%). */
+const NEAR_LIMIT_THRESHOLDS = [80, 50] as const;
+
+/**
+ * Project roles that receive rate-limit emails: team project admins and
+ * editors, plus a personal project's owner (its only member). Slugs match
+ * n8n's `role` table; the relation's `role` column stores the slug directly.
+ */
+const RATE_LIMIT_NOTIFY_ROLE_SLUGS = ['project:admin', 'project:editor', 'project:personalOwner'] as const;
+
+function formatRuns(count: number): string {
+  return count.toLocaleString('en-CA');
+}
+
+function periodLabel(period: 'weekly' | 'yearly'): string {
+  return period === 'weekly' ? 'weekly' : 'annual';
+}
+
+/**
+ * Derives the notification events for one run's limit check: a "reached"
+ * event when the count is at or over the effective limit (kind reflects the
+ * enforced stop behaviour), otherwise the highest near-limit threshold the
+ * count has crossed (80% before 50%). Periods without an effective limit
+ * produce no events.
+ */
+function collectLimitEvents(params: {
+  weekly: { base: number; topupRuns: number; count: number; periodKey: string } | null;
+  yearly: { base: number; topupRuns: number; count: number; periodKey: string } | null;
+  stopBehavior: RateLimitStopBehavior;
+}): LimitEvent[] {
+  const events: LimitEvent[] = [];
+  for (const period of ['weekly', 'yearly'] as const) {
+    const state = params[period];
+    if (state === null) {
+      continue;
+    }
+    const limit = state.base + state.topupRuns;
+    const periodKey = state.periodKey;
+    const topupRuns = state.topupRuns;
+    const count = state.count;
+    if (count >= limit) {
+      events.push({
+        kind: `${period}_reached_${params.stopBehavior === 'soft_stop' ? 'soft' : 'hard'}`,
+        period,
+        periodKey,
+        percent: 100,
+        limit,
+        count,
+        topupRuns,
+      });
+      continue;
+    }
+    for (const threshold of NEAR_LIMIT_THRESHOLDS) {
+      // Integer math only: count/limit vs threshold/100 without floats.
+      if (count * 100 >= limit * threshold) {
+        events.push({
+          kind: `${period}_near_${threshold}`,
+          period,
+          periodKey,
+          percent: Math.floor((count * 100) / limit),
+          limit,
+          count,
+          topupRuns,
+        });
+        break;
+      }
+    }
+  }
+  return events;
+}
+
+function isReachedEvent(event: LimitEvent): boolean {
+  return event.kind.endsWith('_reached_soft') || event.kind.endsWith('_reached_hard');
+}
+
+function isHardStopEvent(event: LimitEvent): boolean {
+  return event.kind.endsWith('_reached_hard');
+}
+
+function renderLimitEventEmail(
+  event: LimitEvent,
+  projectName: string,
+  projectUrl: string,
+): { subject: string; html: string } {
+  const label = periodLabel(event.period);
+  if (isReachedEvent(event)) {
+    const resetDate = event.period === 'weekly' ? getNextWeeklyReset() : getNextYearlyReset();
+    return {
+      subject: `${projectName}: ${label} limit reached`,
+      html: renderEmail('rateLimitReached', {
+        projectName,
+        periodLabel: label,
+        used: formatRuns(event.count),
+        limit: formatRuns(event.limit),
+        includesTopup: event.topupRuns > 0,
+        topupRuns: formatRuns(event.topupRuns),
+        hardStop: isHardStopEvent(event),
+        resetDate: formatPeriodDateLong(resetDate),
+        projectUrl,
+      }),
+    };
+  }
+  return {
+    subject: `${projectName}: ${label} limit at ${event.percent}%`,
+    html: renderEmail('rateLimitNearLimit', {
+      projectName,
+      periodLabel: label,
+      percent: String(event.percent),
+      used: formatRuns(event.count),
+      limit: formatRuns(event.limit),
+      projectUrl,
+    }),
+  };
+}
+
 function describeBreach(projectId: string, breach: LimitBreach): string {
   const label = breach.period === 'weekly' ? 'Weekly' : 'Yearly';
   const limitText =
@@ -192,6 +331,12 @@ export class ProjectRateLimitService {
   constructor(
     private readonly n8nRepositories: N8nRepositories,
     private readonly customRepositories: CustomRepositories,
+    /**
+     * Optional mailer for rate-limit notifications. Null (the default)
+     * disables notifications without affecting enforcement — the contract
+     * `AccessRequestService` uses for its optional mailer as well.
+     */
+    private readonly nodeMailerService: NodeMailerService | null = null,
   ) {}
 
   /**
@@ -278,36 +423,41 @@ export class ProjectRateLimitService {
         yearlyTopupRuns = yearlySums.get(projectId) ?? 0;
       }
 
-      const breaches: LimitBreach[] = [];
-      if (weeklyBase !== null) {
-        const effectiveWeeklyLimit = weeklyBase + weeklyTopupRuns;
-        if (counts.weeklyCount >= effectiveWeeklyLimit) {
-          breaches.push({
-            period: 'weekly',
-            periodKey: periodKeys.weekly,
-            limit: effectiveWeeklyLimit,
-            count: counts.weeklyCount,
-            topupRuns: weeklyTopupRuns,
-          });
-        }
-      }
-      if (yearlyBase !== null) {
-        const effectiveYearlyLimit = yearlyBase + yearlyTopupRuns;
-        if (counts.yearlyCount >= effectiveYearlyLimit) {
-          breaches.push({
-            period: 'yearly',
-            periodKey: periodKeys.yearly,
-            limit: effectiveYearlyLimit,
-            count: counts.yearlyCount,
-            topupRuns: yearlyTopupRuns,
-          });
-        }
+      const stopBehavior: RateLimitStopBehavior =
+        !useDefaults && config?.stopBehavior === 'soft_stop' ? 'soft_stop' : 'hard_stop';
+      const limitEvents = collectLimitEvents({
+        weekly:
+          weeklyBase === null
+            ? null
+            : { base: weeklyBase, topupRuns: weeklyTopupRuns, count: counts.weeklyCount, periodKey: periodKeys.weekly },
+        yearly:
+          yearlyBase === null
+            ? null
+            : {
+                base: yearlyBase,
+                topupRuns: yearlyTopupRuns,
+                count: counts.yearlyCount,
+                periodKey: periodKeys.yearly,
+              },
+        stopBehavior,
+      });
+
+      const breaches: LimitBreach[] = limitEvents.filter(isReachedEvent).map((event) => ({
+        period: event.period,
+        periodKey: event.periodKey,
+        limit: event.limit,
+        count: event.count,
+        topupRuns: event.topupRuns > 0 ? event.topupRuns : undefined,
+      }));
+
+      if (limitEvents.length > 0) {
+        // Fire-and-forget: spawned before a hard-stop throw so a rejected
+        // run still triggers its one-time notification.
+        this.notifyLimitEvents(projectId, limitEvents);
       }
 
       if (breaches.length > 0) {
-        // Default mode behaves like an unconfigured project: hard stop unless
-        // the custom row explicitly configured soft stop.
-        if (!useDefaults && config?.stopBehavior === 'soft_stop') {
+        if (stopBehavior === 'soft_stop') {
           for (const breach of breaches) {
             log.warn(`${describeBreach(projectId, breach)} Soft stop configured — execution continues`, {
               projectId,
@@ -355,6 +505,198 @@ export class ProjectRateLimitService {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Email notifications (fire-and-forget; failures logged, never thrown)
+  // -------------------------------------------------------------------------
+
+  private async resolveProjectContext(
+    projectId: string,
+  ): Promise<{ projectName: string; projectType: string; projectUrl: string } | null> {
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (!project) {
+      return null;
+    }
+    return {
+      projectName: project.name,
+      projectType: project.type,
+      projectUrl: `${UI_APP_BASE_URL}/projects/${projectId}`,
+    };
+  }
+
+  /** Resolves the project's admin/editor email addresses (the notification recipients). */
+  private async resolveProjectRecipientEmails(projectId: string): Promise<string[]> {
+    const emailsByProject = await this.n8nRepositories.projectRelation.listMemberEmailsByProjectIdsAndRoles(
+      [projectId],
+      [...RATE_LIMIT_NOTIFY_ROLE_SLUGS],
+    );
+    return emailsByProject.get(projectId) ?? [];
+  }
+
+  /**
+   * Spawns the notification dispatch for the given enforcement-time events.
+   * Deliberately not awaited by enforcement: SMTP latency must never delay
+   * (or fail) a workflow run, and a rejected run still gets its notification
+   * because the spawn happens before the hard-stop throw.
+   */
+  private notifyLimitEvents(projectId: string, events: LimitEvent[]): void {
+    if (!this.nodeMailerService || events.length === 0) {
+      return;
+    }
+    void this.dispatchLimitNotifications(projectId, events).catch((error) => {
+      log.error('Rate-limit notification dispatch failed', {
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
+  private async dispatchLimitNotifications(projectId: string, events: LimitEvent[]): Promise<void> {
+    try {
+      // Send-once semantics: the first claim wins; concurrent runs (in any
+      // process) that find the claim already present stay silent.
+      const claimed: LimitEvent[] = [];
+      for (const event of events) {
+        const won = await this.customRepositories.rateLimitNotification.claim({
+          projectId,
+          periodKey: event.periodKey,
+          eventKind: event.kind,
+          usageCount: event.count,
+        });
+        if (won) {
+          claimed.push(event);
+        }
+      }
+      if (claimed.length === 0) {
+        log.debug('Rate-limit notifications already sent for these periods; skipping', { projectId });
+        return;
+      }
+
+      const context = await this.resolveProjectContext(projectId);
+      if (!context) {
+        log.warn('Project not found when sending rate-limit notifications', { projectId });
+        return;
+      }
+
+      const recipients = new Set<string>(await this.resolveProjectRecipientEmails(projectId));
+      // Hard-stop reached events are incidents platform admins should see too.
+      if (claimed.some(isHardStopEvent)) {
+        for (const email of await this.n8nRepositories.user.findAdminEmails()) {
+          recipients.add(email);
+        }
+      }
+      if (recipients.size === 0) {
+        log.warn('No rate-limit notification recipients resolved', {
+          projectId,
+          kinds: claimed.map((event) => event.kind),
+        });
+        return;
+      }
+
+      for (const event of claimed) {
+        const { subject, html } = renderLimitEventEmail(event, context.projectName, context.projectUrl);
+        await Promise.all([...recipients].map((to) => this.nodeMailerService!.sendMail({ to, subject, html })));
+      }
+      log.info('Sent rate-limit notification emails', {
+        projectId,
+        kinds: claimed.map((event) => event.kind),
+        recipientCount: recipients.size,
+      });
+    } catch (error) {
+      log.error('Failed to send rate-limit notification emails', {
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Spawns a config-change notification (top-up granted, limits changed) for
+   * the project's admins and editors. Fire-and-forget like enforcement-time
+   * notifications; `reason` only labels log lines.
+   */
+  private notifyConfigEvent(
+    projectId: string,
+    render: (context: { projectName: string; projectType: string; projectUrl: string }) => Promise<{
+      subject: string;
+      html: string;
+    }>,
+    reason: string,
+  ): void {
+    if (!this.nodeMailerService) {
+      return;
+    }
+    void (async () => {
+      try {
+        const context = await this.resolveProjectContext(projectId);
+        if (!context) {
+          log.warn(`Project not found when sending the ${reason} email`, { projectId });
+          return;
+        }
+        const emails = await this.resolveProjectRecipientEmails(projectId);
+        if (emails.length === 0) {
+          log.warn(`No recipients resolved for the ${reason} email`, { projectId });
+          return;
+        }
+        const { subject, html } = await render(context);
+        await Promise.all(emails.map((to) => this.nodeMailerService!.sendMail({ to, subject, html })));
+        log.info(`Sent the ${reason} email`, { projectId, recipientCount: emails.length });
+      } catch (error) {
+        log.error(`Failed to send the ${reason} email`, {
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  }
+
+  private notifyTopupGranted(projectId: string, topup: ProjectTopup): void {
+    this.notifyConfigEvent(
+      projectId,
+      ({ projectName, projectUrl }) =>
+        Promise.resolve({
+          subject: `Extra runs added for ${projectName}`,
+          html: renderEmail('rateLimitTopupGranted', {
+            projectName,
+            amount: formatRuns(topup.amount),
+            weekDescription: describeWeeklyPeriodKey(topup.periodKey) ?? topup.periodKey,
+            projectUrl,
+          }),
+        }),
+      'top-up granted',
+    );
+  }
+
+  private notifyLimitsChanged(projectId: string, stored: ProjectRateLimit): void {
+    this.notifyConfigEvent(
+      projectId,
+      async ({ projectName, projectType, projectUrl }) => {
+        // The email shows the limits that will actually be enforced: scope
+        // defaults in default mode, custom values (with per-period defaults
+        // fallback) in custom mode — resolved exactly like enforcement.
+        const kind = projectType === 'personal' ? 'personal' : 'team';
+        const defaults = await this.customRepositories.projectRateLimitDefault.get(kind);
+        const effectiveWeekly = stored.usesDefaultLimits
+          ? (defaults?.weeklyRateLimit ?? null)
+          : (stored.weeklyRateLimit ?? defaults?.weeklyRateLimit ?? null);
+        const effectiveYearly = stored.usesDefaultLimits
+          ? (defaults?.yearlyRateLimit ?? null)
+          : (stored.yearlyRateLimit ?? defaults?.yearlyRateLimit ?? null);
+        const limitText = (value: number | null): string => (value === null ? 'No limit' : `${formatRuns(value)} runs`);
+        return {
+          subject: `Execution limits updated for ${projectName}`,
+          html: renderEmail('rateLimitLimitsChanged', {
+            projectName,
+            weeklyLimit: limitText(effectiveWeekly),
+            yearlyLimit: limitText(effectiveYearly),
+            changedBy: stored.updatedBy,
+            projectUrl,
+          }),
+        };
+      },
+      'limits-changed',
+    );
+  }
+
   /**
    * Replaces the rate-limit configuration for a project (full-replace semantics).
    * With `usesDefaultLimits` the project follows its scope's saved defaults:
@@ -395,6 +737,7 @@ export class ProjectRateLimitService {
     if (!stored) {
       throw new AppError(500, 'Failed to read the stored rate limit');
     }
+    this.notifyLimitsChanged(projectId, stored);
     return stored;
   }
 
@@ -621,13 +964,15 @@ export class ProjectRateLimitService {
     }
 
     const trimmedCreatedBy = createdBy !== null && createdBy.trim().length > 0 ? createdBy.trim() : null;
-    return this.customRepositories.projectTopup.create({
+    const created = await this.customRepositories.projectTopup.create({
       projectId,
       periodKey: body.periodKey,
       amount: body.amount,
       adminComment: body.adminComment.trim(),
       createdBy: trimmedCreatedBy,
     });
+    this.notifyTopupGranted(projectId, created);
+    return created;
   }
 
   /**

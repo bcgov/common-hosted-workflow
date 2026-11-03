@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  describeWeeklyPeriodKey,
+  formatPeriodDateLong,
   getCurrentPeriodKeys,
+  getNextWeeklyReset,
+  getNextYearlyReset,
   getWeeklyPeriodKey,
   getYearlyPeriodKey,
   listWeeklyPeriodKeysOverlappingYearlyPeriod,
@@ -170,5 +174,53 @@ describe('RATE_LIMIT_TIMEZONE handling', () => {
       weekly: '2026-W53',
       yearly: '2026',
     });
+  });
+});
+
+describe('getNextWeeklyReset', () => {
+  it('returns the Monday after the current Mon–Sun week', () => {
+    // Wednesday Nov 4, 2026 → reset Monday Nov 9 (noon-UTC anchored).
+    expect(formatPeriodDateLong(getNextWeeklyReset(new Date('2026-11-04T20:00:00Z')))).toBe('Monday, November 9, 2026');
+  });
+
+  it('returns the next day when the run happens on a Sunday', () => {
+    // Sunday Nov 1, 2026 (PDT) → reset Monday Nov 2.
+    expect(formatPeriodDateLong(getNextWeeklyReset(new Date('2026-11-01T20:00:00Z')))).toBe('Monday, November 2, 2026');
+  });
+});
+
+describe('getNextYearlyReset', () => {
+  it('returns January 1 of the next Vancouver calendar year', () => {
+    expect(formatPeriodDateLong(getNextYearlyReset(new Date('2026-11-04T20:00:00Z')))).toBe('Friday, January 1, 2027');
+  });
+
+  it('already targets the next year for runs on late-December Vancouver dates', () => {
+    // Dec 31, 2026 16:00 UTC is still Dec 31 in Vancouver → reset Jan 1, 2027.
+    expect(formatPeriodDateLong(getNextYearlyReset(new Date('2026-12-31T16:00:00Z')))).toBe('Friday, January 1, 2027');
+  });
+});
+
+describe('describeWeeklyPeriodKey', () => {
+  it('formats a mid-month week with the month dropped from the end date', () => {
+    // 2026-W45 starts Monday Nov 2, 2026.
+    expect(describeWeeklyPeriodKey('2026-W45')).toBe('Nov 2 to 8, 2026');
+  });
+
+  it('keeps both months when the week straddles a month boundary', () => {
+    // 2026-W44 starts Monday Oct 26, 2026 and ends Sunday Nov 1.
+    expect(describeWeeklyPeriodKey('2026-W44')).toBe('Oct 26 to Nov 1, 2026');
+  });
+
+  it('formats the ISO year-boundary week with the correct year', () => {
+    // 2026-W01 starts Monday Dec 29, 2025.
+    expect(describeWeeklyPeriodKey('2026-W01')).toBe('Dec 29 to Jan 4, 2026');
+  });
+
+  it('returns null for keys that cannot exist, so callers can fall back to the raw key', () => {
+    expect(describeWeeklyPeriodKey('2026-W53')).toBe('Dec 28 to Jan 3, 2027'); // real 53rd week
+    expect(describeWeeklyPeriodKey('2027-W53')).toBeNull(); // ISO 2027 has 52 weeks
+    expect(describeWeeklyPeriodKey('2026-W00')).toBeNull();
+    expect(describeWeeklyPeriodKey('2026')).toBeNull();
+    expect(describeWeeklyPeriodKey('not-a-key')).toBeNull();
   });
 });

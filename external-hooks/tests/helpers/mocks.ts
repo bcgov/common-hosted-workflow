@@ -284,6 +284,14 @@ export function createMockProjectTopupRepository() {
   };
 }
 
+export function createMockRateLimitNotificationRepository() {
+  return {
+    /** Default: every claim wins (no prior notification). */
+    claim: vi.fn().mockResolvedValue(true),
+    pruneOlderThan: vi.fn().mockResolvedValue(0),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /*  n8n repository mocks                                               */
 /* ------------------------------------------------------------------ */
@@ -328,6 +336,8 @@ export function createMockN8nRepositories() {
         { propertyName: 'email', databaseName: 'email' },
         { propertyName: 'firstName', databaseName: 'firstName' },
         { propertyName: 'lastName', databaseName: 'lastName' },
+        { propertyName: 'disabled', databaseName: 'disabled' },
+        { propertyName: 'roleSlug', databaseName: 'roleSlug' },
       ],
     },
   } as const;
@@ -368,6 +378,8 @@ export function createMockN8nRepositories() {
         }),
         findAllByUser: vi.fn().mockResolvedValue([{ projectId: VALID_PROJECT_ID }]),
         countMembersByProjectIds: vi.fn().mockResolvedValue(new Map()),
+        listUserEmailsByProjectIds: vi.fn().mockResolvedValue([]),
+        listMemberEmailsByProjectIdsAndRoles: vi.fn().mockResolvedValue(new Map()),
         metadata: metadata.ProjectRelation,
         manager: makeManager(),
       };
