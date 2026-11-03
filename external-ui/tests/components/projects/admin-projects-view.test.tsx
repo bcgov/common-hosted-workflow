@@ -28,6 +28,7 @@ function makeProject(overrides: Partial<ProjectItem> = {}): ProjectItem {
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
     weeklyTopupRuns: 0,
+    yearlyTopupRuns: 0,
     workflowCount: 0,
     membersCount: 0,
     updatedAt: null,
@@ -118,7 +119,7 @@ describe('AdminProjectsView', () => {
 
     // 12000 + 8640 + 42 + 10 = 20692 weekly runs across all projects.
     expect(statCardText('3 tenants, 1 personal accounts')).toBe('Runs this week21K3 tenants, 1 personal accounts');
-    expect(statCardText('Workflows paused until reset')).toBe('Limit reached1Workflows paused until reset');
+    expect(statCardText('At a weekly or annual limit')).toBe('Limit reached1At a weekly or annual limit');
     expect(statCardText('Close to a weekly or annual limit')).toBe(
       'Near limit (80%+)1Close to a weekly or annual limit',
     );
@@ -247,7 +248,7 @@ describe('AdminProjectsView', () => {
     expect(citzRow.getByRole('img', { name: '12,000 of 24,000 runs used' })).toHaveAttribute('data-tone', 'blue');
     expect(citzRow.getByText('Within limit')).toBeInTheDocument();
     expect(citzRow.getByText('60,000 / 500,000')).toBeInTheDocument();
-    expect(statCardText('Workflows paused until reset')).toBe('Limit reached0Workflows paused until reset');
+    expect(statCardText('At a weekly or annual limit')).toBe('Limit reached0At a weekly or annual limit');
     expect(screen.getByText('3 tenants · 0 at limit, 1 near limit, 1 with no limit')).toBeInTheDocument();
   });
 

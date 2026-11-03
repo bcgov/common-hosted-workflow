@@ -24,6 +24,7 @@ import {
   formatCount,
   formatResetDate,
   formatShortDate,
+  getEffectiveYearlyLimit,
   getEffectiveWeeklyLimit,
   getHighestUsagePeriod,
   getNextWeeklyReset,
@@ -244,7 +245,7 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
   let bannerText: string | null = null;
   if (showBanner && bannerPeriod !== null) {
     const used = bannerPeriod === 'weekly' ? project.weeklyExecutionCount : project.yearlyExecutionCount;
-    const limit = bannerPeriod === 'weekly' ? getEffectiveWeeklyLimit(project) : project.yearlyRateLimit;
+    const limit = bannerPeriod === 'weekly' ? getEffectiveWeeklyLimit(project) : getEffectiveYearlyLimit(project);
     const percent = getUsagePercent(used, limit) ?? 0;
     bannerText = `${project.projectName} has used ${percent}% of its ${getPeriodLabel(bannerPeriod)} limit`;
     if (status === 'limit_reached') {
@@ -366,7 +367,7 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
                   Manage top-ups
                 </Button>
                 <Button type="button" onClick={() => setIsLimitsDialogOpen(true)}>
-                  Edit tenant limits
+                  Edit limits
                 </Button>
               </div>
             )}
@@ -390,6 +391,7 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
               label="Weekly limit"
               used={project.weeklyExecutionCount}
               limit={getEffectiveWeeklyLimit(project)}
+              usesDefaultLimits={project.usesDefaultLimits}
               topupRuns={project.weeklyTopupRuns}
               resetDate={nextWeeklyReset}
               changedAt={project.updatedAt}
@@ -399,7 +401,9 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
             <LimitCard
               label="Annual limit"
               used={project.yearlyExecutionCount}
-              limit={project.yearlyRateLimit}
+              limit={getEffectiveYearlyLimit(project)}
+              usesDefaultLimits={project.usesDefaultLimits}
+              topupRuns={project.yearlyTopupRuns}
               resetDate={nextYearlyReset}
               changedAt={project.updatedAt}
               changedBy={project.updatedByName}
@@ -527,6 +531,8 @@ interface LimitCardProps {
   label: 'Weekly limit' | 'Annual limit';
   used: number;
   limit: number | null;
+  /** True when the shown limit comes from the scope's saved defaults. */
+  usesDefaultLimits?: boolean;
   /** Runs added by top-ups this week; shown on the weekly card only. */
   topupRuns?: number;
   resetDate: Date;
@@ -539,6 +545,7 @@ function LimitCard({
   label,
   used,
   limit,
+  usesDefaultLimits,
   topupRuns,
   resetDate,
   changedAt,
@@ -553,12 +560,19 @@ function LimitCard({
     <div className="rounded-card border border-border bg-surface p-5 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</h3>
-        {changedAt !== null && (
-          <span className="inline-flex items-center rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-            Changed {formatShortDate(new Date(changedAt))}
-            {changedBy ? ` by ${changedBy}` : ''}
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          {usesDefaultLimits === true && limit !== null && (
+            <span className="inline-flex items-center rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+              Default
+            </span>
+          )}
+          {changedAt !== null && (
+            <span className="inline-flex items-center rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+              Changed {formatShortDate(new Date(changedAt))}
+              {changedBy ? ` by ${changedBy}` : ''}
+            </span>
+          )}
+        </span>
       </div>
       <p className="mt-3 flex flex-wrap items-baseline gap-x-1.5">
         <span className="text-3xl font-bold text-foreground">{formatCount(used)}</span>

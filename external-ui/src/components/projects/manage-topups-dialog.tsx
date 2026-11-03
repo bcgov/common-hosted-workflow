@@ -70,7 +70,7 @@ function validateAmount(amount: number | undefined, comment: string): DialogFiel
   }
 
   if (comment.trim() === '') {
-    errors.comment = 'Admin comment is required';
+    errors.comment = 'Comment is required';
   }
 
   return errors;
@@ -167,7 +167,7 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
   const annualLimitText = project.yearlyRateLimit === null ? 'not set' : formatCount(project.yearlyRateLimit);
   const limitsText =
     weeklyLimitText === null
-      ? `No weekly limit is configured, so a top-up would not take effect. Annual limit is ${annualLimitText}.`
+      ? `No weekly limit is configured, so a top-up would only affect the annual limit (currently ${annualLimitText}).`
       : `Weekly limit is ${weeklyLimitText} and annual limit is ${annualLimitText}.`;
 
   return (
@@ -182,7 +182,8 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
           <DialogHeader>
             <DialogTitle>Manage top-ups for {project.projectName}</DialogTitle>
             <DialogDescription>
-              Top-ups add runs to the weekly limit for a single week. They apply on top of the configured limit.
+              Top-ups add extra runs to a single week's weekly limit, on top of the configured limit. They also raise
+              the annual limit for the year that week falls in.
             </DialogDescription>
           </DialogHeader>
 
@@ -224,13 +225,7 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
 
           <p className="text-xs text-muted-foreground">{limitsText}</p>
 
-          <Field
-            label="Admin comment"
-            htmlFor="topup-comment"
-            required
-            description="Required. Saved with the top-up as its audit trail."
-            error={errors.comment}
-          >
+          <Field label="Comment" htmlFor="topup-comment" required error={errors.comment}>
             <Textarea
               id="topup-comment"
               value={comment}

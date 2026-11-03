@@ -30,6 +30,7 @@ const DEFAULTS_ROUTE = '/projects/rate-limit-defaults';
 
 function makeRateLimitBody(overrides: Record<string, unknown> = {}) {
   return {
+    usesDefaultLimits: false,
     weeklyRateLimit: 100,
     yearlyRateLimit: 5000,
     lastAdminComment: 'Approved by the platform team',
@@ -41,6 +42,7 @@ function makeRateLimitBody(overrides: Record<string, unknown> = {}) {
 function makeStoredRateLimit(overrides: Record<string, unknown> = {}) {
   return {
     projectId: VALID_PROJECT_ID,
+    usesDefaultLimits: false,
     weeklyRateLimit: 100,
     yearlyRateLimit: 5000,
     lastAdminComment: 'Approved by the platform team',
@@ -189,8 +191,15 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
   });
 
   it('accepts explicit nulls that clear the limits and the admin comment', async () => {
-    const body = { weeklyRateLimit: null, yearlyRateLimit: null, lastAdminComment: null, stopBehavior: 'soft_stop' };
+    const body = {
+      usesDefaultLimits: false,
+      weeklyRateLimit: null,
+      yearlyRateLimit: null,
+      lastAdminComment: null,
+      stopBehavior: 'soft_stop',
+    };
     const stored = makeStoredRateLimit({
+      usesDefaultLimits: false,
       weeklyRateLimit: null,
       yearlyRateLimit: null,
       lastAdminComment: null,
@@ -239,7 +248,15 @@ describe(`PUT /ui-api/admin${RATE_LIMIT_ROUTE}`, () => {
     ['a negative weeklyRateLimit', makeRateLimitBody({ weeklyRateLimit: -1 })],
     ['a non-integer weeklyRateLimit', makeRateLimitBody({ weeklyRateLimit: 12.5 })],
     ['an invalid stopBehavior', makeRateLimitBody({ stopBehavior: 'sometimes_stop' })],
-    ['a missing stopBehavior', { weeklyRateLimit: 100, yearlyRateLimit: 5000, lastAdminComment: null }],
+    [
+      'a missing stopBehavior',
+      { usesDefaultLimits: false, weeklyRateLimit: 100, yearlyRateLimit: 5000, lastAdminComment: null },
+    ],
+    [
+      'a missing usesDefaultLimits',
+      { weeklyRateLimit: 100, yearlyRateLimit: 5000, lastAdminComment: null, stopBehavior: 'hard_stop' },
+    ],
+    ['a non-boolean usesDefaultLimits', makeRateLimitBody({ usesDefaultLimits: 'yes' })],
     ['an oversized lastAdminComment', makeRateLimitBody({ lastAdminComment: 'x'.repeat(2001) })],
   ];
 

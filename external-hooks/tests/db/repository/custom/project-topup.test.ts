@@ -148,4 +148,22 @@ describe('ProjectTopupRepository', () => {
       expect(result.get('proj-3')).toBeUndefined();
     });
   });
+
+  describe('sumByProjectIdsInWeeklyKeys', () => {
+    it('should return an empty Map without querying for empty project or key input', async () => {
+      expect(await repo.sumByProjectIdsInWeeklyKeys([], ['2026-W44'])).toEqual(new Map());
+      expect(await repo.sumByProjectIdsInWeeklyKeys(['proj-1'], [])).toEqual(new Map());
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it('should aggregate per-project sums across the given weekly keys', async () => {
+      db.groupBy.mockResolvedValue([{ projectId: 'proj-1', total: 1000 }]);
+
+      const result = await repo.sumByProjectIdsInWeeklyKeys(['proj-1', 'proj-2'], ['2026-W44', '2026-W45']);
+
+      expect(db.groupBy).toHaveBeenCalledWith(projectTopup.projectId);
+      expect(result.get('proj-1')).toBe(1000);
+      expect(result.get('proj-2')).toBeUndefined();
+    });
+  });
 });

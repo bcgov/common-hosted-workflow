@@ -51,6 +51,7 @@ describe('ProjectRateLimitRepository', () => {
     it('should insert the given values and upsert on the projectId primary key', async () => {
       const params = {
         projectId: 'proj-123',
+        usesDefaultLimits: false,
         weeklyRateLimit: 100,
         yearlyRateLimit: 5000,
         lastAdminComment: 'Cap for FY',
@@ -64,6 +65,7 @@ describe('ProjectRateLimitRepository', () => {
       expect(db.onConflictDoUpdate).toHaveBeenCalledWith({
         target: projectRateLimit.projectId,
         set: {
+          usesDefaultLimits: params.usesDefaultLimits,
           weeklyRateLimit: params.weeklyRateLimit,
           yearlyRateLimit: params.yearlyRateLimit,
           lastAdminComment: params.lastAdminComment,
@@ -76,6 +78,7 @@ describe('ProjectRateLimitRepository', () => {
     it('should pass explicit nulls through to clear limits and comment', async () => {
       const params = {
         projectId: 'proj-123',
+        usesDefaultLimits: true,
         weeklyRateLimit: null,
         yearlyRateLimit: null,
         lastAdminComment: null,
@@ -88,6 +91,7 @@ describe('ProjectRateLimitRepository', () => {
       expect(db.onConflictDoUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           set: {
+            usesDefaultLimits: true,
             weeklyRateLimit: null,
             yearlyRateLimit: null,
             lastAdminComment: null,

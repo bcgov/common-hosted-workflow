@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getCurrentPeriodKeys, getWeeklyPeriodKey, getYearlyPeriodKey } from '../../../src/api/helpers/period';
+import {
+  getCurrentPeriodKeys,
+  getWeeklyPeriodKey,
+  getYearlyPeriodKey,
+  listWeeklyPeriodKeysOverlappingYearlyPeriod,
+} from '../../../src/api/helpers/period';
 
 // RATE_LIMIT_TIMEZONE is unset in tests, so the helper runs with the
 // documented default timezone: America/Vancouver (PST = UTC-8, PDT = UTC-7).
@@ -83,6 +88,43 @@ describe('getCurrentPeriodKeys', () => {
       weekly: '2026-W53',
       yearly: '2027',
     });
+  });
+});
+
+describe('listWeeklyPeriodKeysOverlappingYearlyPeriod', () => {
+  it('covers every ISO week of the year for a year that needs no straddling neighbours', () => {
+    const keys = listWeeklyPeriodKeysOverlappingYearlyPeriod('2026');
+    // 2026 spans ISO weeks 2026-W01 (Mon Dec 29, 2025) through 2026-W53.
+    expect(keys[0]).toBe('2026-W01');
+    expect(keys[keys.length - 1]).toBe('2026-W53');
+    expect(keys).toHaveLength(53);
+    expect(keys.some((key) => key.startsWith('2025-'))).toBe(false);
+  });
+
+  it('includes the straddling previous-year week when Jan 1 falls inside it', () => {
+    // Fri Jan 1, 2027 belongs to ISO week 2026-W53 (Mon Dec 28, 2026 – Sun Jan 3, 2027).
+    const keys = listWeeklyPeriodKeysOverlappingYearlyPeriod('2027');
+    expect(keys[0]).toBe('2026-W53');
+    expect(keys).toContain('2027-W01');
+  });
+
+  it('contains the weekly key of every day of the year (noon-UTC samples share the Vancouver date)', () => {
+    const keys = listWeeklyPeriodKeysOverlappingYearlyPeriod('2026');
+    const set = new Set(keys);
+    for (const day of ['2026-01-01', '2026-06-15', '2026-12-31']) {
+      expect(set.has(getWeeklyPeriodKey(new Date(`${day}T12:00:00Z`)))).toBe(true);
+    }
+  });
+
+  it('returns the memoized array for repeated calls', () => {
+    expect(listWeeklyPeriodKeysOverlappingYearlyPeriod('2026')).toBe(
+      listWeeklyPeriodKeysOverlappingYearlyPeriod('2026'),
+    );
+  });
+
+  it('returns an empty list for a malformed yearly key', () => {
+    expect(listWeeklyPeriodKeysOverlappingYearlyPeriod('20X6')).toEqual([]);
+    expect(listWeeklyPeriodKeysOverlappingYearlyPeriod('')).toEqual([]);
   });
 });
 

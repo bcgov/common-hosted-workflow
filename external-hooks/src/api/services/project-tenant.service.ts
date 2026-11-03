@@ -77,7 +77,9 @@ export class ProjectTenantService {
     }
 
     const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
-    const rateLimitEnrichment = await this.projectRateLimitService.enrichAdminProjects([{ projectId }]);
+    const rateLimitEnrichment = await this.projectRateLimitService.enrichProjectsWithRateLimits([
+      { projectId, projectType: project.type },
+    ]);
 
     return {
       projectId: project.id,
@@ -161,9 +163,9 @@ export class ProjectTenantService {
     const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
 
     // Batched rate-limit enrichment keyed by projectId; falls back to defaults
-    // (null limits, zero counts) when the custom DB is unavailable.
-    const rateLimitEnrichment = await this.projectRateLimitService.enrichAdminProjects(
-      projects.map((p) => ({ projectId: p.id })),
+    // (default mode, null limits, zero counts) when the custom DB is unavailable.
+    const rateLimitEnrichment = await this.projectRateLimitService.enrichProjectsWithRateLimits(
+      projects.map((p) => ({ projectId: p.id, projectType: p.type })),
     );
 
     const data: ProjectItem[] = projects.map((p) => ({

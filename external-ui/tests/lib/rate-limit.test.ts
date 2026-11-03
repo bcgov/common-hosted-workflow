@@ -8,6 +8,7 @@ import {
   formatWeeklyKeyRange,
   formatWeeklyPeriodLabel,
   getEffectiveWeeklyLimit,
+  getEffectiveYearlyLimit,
   getHighestUsagePeriod,
   getNextWeeklyReset,
   getNextYearlyReset,
@@ -25,6 +26,7 @@ type UsageFixture = {
   weeklyExecutionCount: number;
   yearlyExecutionCount: number;
   weeklyTopupRuns: number;
+  yearlyTopupRuns: number;
 };
 
 describe('getRateLimitStatus', () => {
@@ -35,6 +37,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 42,
       yearlyExecutionCount: 500,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('no_limit');
   });
@@ -46,6 +49,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 0,
       yearlyExecutionCount: 5_000,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('within_limit');
   });
@@ -57,6 +61,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 12_000,
       yearlyExecutionCount: 60_000,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -68,6 +73,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 100,
       yearlyExecutionCount: 500_000,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -79,6 +85,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 0,
       yearlyExecutionCount: 0,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -90,6 +97,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 8_000,
       yearlyExecutionCount: 0,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('near_limit');
   });
@@ -101,6 +109,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 7_990,
       yearlyExecutionCount: 0,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('within_limit');
   });
@@ -112,6 +121,7 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount: 8_000,
       yearlyExecutionCount: 50_000,
       weeklyTopupRuns: 0,
+      yearlyTopupRuns: 0,
     };
     expect(getRateLimitStatus(project)).toBe('limit_reached');
   });
@@ -130,21 +140,25 @@ describe('getRateLimitStatus', () => {
       weeklyExecutionCount,
       yearlyExecutionCount: 0,
       weeklyTopupRuns: 100,
+      yearlyTopupRuns: 0,
     };
 
     expect(getRateLimitStatus(project)).toBe(status);
   });
 
-  it('does not increase the yearly limit when weekly top-ups are present', () => {
+  it('raises the yearly limit by the aggregated weekly top-ups', () => {
     const project: UsageFixture = {
       weeklyRateLimit: 100,
       yearlyRateLimit: 1_000,
       weeklyExecutionCount: 0,
       yearlyExecutionCount: 1_000,
       weeklyTopupRuns: 10_000,
+      yearlyTopupRuns: 10_000,
     };
 
-    expect(getRateLimitStatus(project)).toBe('limit_reached');
+    // The top-up-boosted weekly allowance feeds the yearly counter, so the
+    // yearly gate rises with it instead of blocking allowed runs.
+    expect(getRateLimitStatus(project)).toBe('within_limit');
   });
 });
 
@@ -155,15 +169,19 @@ describe('effective weekly limit and highest usage period', () => {
     weeklyExecutionCount: 90,
     yearlyExecutionCount: 700,
     weeklyTopupRuns: 0,
+    yearlyTopupRuns: 0,
   };
 
   it('adds top-ups to a configured base and leaves a base without top-ups unchanged', () => {
     expect(getEffectiveWeeklyLimit(project)).toBe(100);
     expect(getEffectiveWeeklyLimit({ ...project, weeklyTopupRuns: 50 })).toBe(150);
+    expect(getEffectiveYearlyLimit(project)).toBe(1_000);
+    expect(getEffectiveYearlyLimit({ ...project, yearlyTopupRuns: 50 })).toBe(1_050);
   });
 
   it('does not create a weekly limit from top-ups alone', () => {
     expect(getEffectiveWeeklyLimit({ ...project, weeklyRateLimit: null, weeklyTopupRuns: 50 })).toBeNull();
+    expect(getEffectiveYearlyLimit({ ...project, yearlyRateLimit: null, yearlyTopupRuns: 50 })).toBeNull();
   });
 
   it('uses the effective weekly denominator when choosing the highest usage period', () => {

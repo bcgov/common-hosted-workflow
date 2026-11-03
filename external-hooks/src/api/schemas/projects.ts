@@ -35,13 +35,16 @@ export const deleteProjectTenantSchema = z.object({
 /**
  * PUT /rest/admin/projects/:projectId/rate-limit — replaces a project's rate-limit
  * configuration. All body fields are required (full replace); explicit null clears
- * a limit or the admin comment.
+ * a limit or the admin comment. `usesDefaultLimits` selects the mode: true makes
+ * the project follow its scope's saved defaults (the service normalizes the
+ * stored limits to nulls), false stores the custom values as given.
  */
 export const updateProjectRateLimitSchema = z.object({
   params: z.object({
     projectId: z.string().min(1),
   }),
   body: z.object({
+    usesDefaultLimits: z.boolean(),
     weeklyRateLimit: z.number().int().min(0).max(1_000_000).nullable(),
     yearlyRateLimit: z.number().int().min(0).max(100_000_000).nullable(),
     lastAdminComment: z.string().max(2000).nullable(),

@@ -7,6 +7,12 @@ export type ProjectItem = {
   projectName: string;
   projectType: string;
   tenantId: string | null;
+  /** True when the project follows its scope's saved defaults instead of custom limits. */
+  usesDefaultLimits: boolean;
+  /**
+   * Effective enforced limits (scope defaults in default mode; custom values,
+   * falling back to scope defaults per unset period, otherwise).
+   */
   weeklyRateLimit: number | null;
   yearlyRateLimit: number | null;
   stopBehavior: RateLimitStopBehavior | null;
@@ -15,6 +21,8 @@ export type ProjectItem = {
   yearlyExecutionCount: number;
   /** Runs added by top-ups for the current week (0 when none). */
   weeklyTopupRuns: number;
+  /** Runs added by weekly top-ups whose weeks overlap the current year (0 when none). */
+  yearlyTopupRuns: number;
   workflowCount: number;
   membersCount: number;
   updatedAt: string | null;
@@ -22,6 +30,8 @@ export type ProjectItem = {
 };
 
 export type UpdateProjectRateLimitBody = {
+  /** True = follow the scope's saved defaults; stored limits are normalized to nulls. */
+  usesDefaultLimits: boolean;
   weeklyRateLimit: number | null;
   yearlyRateLimit: number | null;
   lastAdminComment: string | null;

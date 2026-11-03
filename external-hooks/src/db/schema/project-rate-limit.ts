@@ -1,10 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { check, integer, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, integer, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 export const projectRateLimit = pgTable(
   'project_rate_limit',
   {
     projectId: varchar('project_id', { length: 50 }).primaryKey(),
+    /**
+     * False = the row's weekly/yearly values are the project's custom limits;
+     * true = the project follows its scope's saved defaults and the row's
+     * limit values are inert (the write path stores nulls for them).
+     */
+    usesDefaultLimits: boolean('uses_default_limits').notNull().default(true),
     weeklyRateLimit: integer('weekly_rate_limit'),
     yearlyRateLimit: integer('yearly_rate_limit'),
     lastAdminComment: text('last_admin_comment'),
