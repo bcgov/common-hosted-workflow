@@ -202,7 +202,7 @@ export function DefaultLimitsDialog({ open, onOpenChange }: Readonly<DefaultLimi
         <DialogHeader>
           <DialogTitle>Default limits</DialogTitle>
           <DialogDescription>
-            Projects without limits of their own run on these defaults. Leave a field blank for no default.
+            Projects following the standard limits run on these defaults. Leave a field blank for no default (uncapped).
           </DialogDescription>
         </DialogHeader>
 

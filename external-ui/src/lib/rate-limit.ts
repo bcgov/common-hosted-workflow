@@ -9,7 +9,12 @@ export type UsagePeriod = 'weekly' | 'yearly';
 /** The usage/limit fields needed to reason about a project's rate-limit state. */
 export type RateLimitUsage = Pick<
   ProjectItem,
-  'weeklyRateLimit' | 'yearlyRateLimit' | 'weeklyExecutionCount' | 'yearlyExecutionCount' | 'weeklyTopupRuns'
+  | 'weeklyRateLimit'
+  | 'yearlyRateLimit'
+  | 'weeklyExecutionCount'
+  | 'yearlyExecutionCount'
+  | 'weeklyTopupRuns'
+  | 'yearlyTopupRuns'
 >;
 
 /** Share of a limit at which the usage bar turns amber. */
@@ -36,6 +41,18 @@ export function getEffectiveWeeklyLimit(project: RateLimitUsage): number | null 
 }
 
 /**
+ * The yearly limit actually enforced: the configured base limit plus the sums
+ * of the weekly top-ups whose weeks overlap the current calendar year. Null
+ * when no yearly limit is configured.
+ */
+export function getEffectiveYearlyLimit(project: RateLimitUsage): number | null {
+  if (project.yearlyRateLimit === null) {
+    return null;
+  }
+  return project.yearlyRateLimit + (project.yearlyTopupRuns ?? 0);
+}
+
+/**
  * Client-side status model:
  * - no_limit: neither weekly nor yearly limit is set
  * - limit_reached: usage is at or above a set limit on either period
@@ -46,7 +63,7 @@ export function getEffectiveWeeklyLimit(project: RateLimitUsage): number | null 
  */
 export function getRateLimitStatus(project: RateLimitUsage): RateLimitStatus {
   const weekly = getEffectiveWeeklyLimit(project);
-  const yearly = project.yearlyRateLimit;
+  const yearly = getEffectiveYearlyLimit(project);
 
   if (weekly === null && yearly === null) {
     return 'no_limit';
@@ -99,7 +116,7 @@ export function getUsagePercent(used: number, limit: number | null): number | nu
 /** The period whose limit is closest to being reached (null when no limits are set). */
 export function getHighestUsagePeriod(project: RateLimitUsage): UsagePeriod | null {
   const weeklyRatio = getUsageRatio(project.weeklyExecutionCount, getEffectiveWeeklyLimit(project));
-  const yearlyRatio = getUsageRatio(project.yearlyExecutionCount, project.yearlyRateLimit);
+  const yearlyRatio = getUsageRatio(project.yearlyExecutionCount, getEffectiveYearlyLimit(project));
 
   if (weeklyRatio === null && yearlyRatio === null) {
     return null;

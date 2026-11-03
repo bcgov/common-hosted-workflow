@@ -280,6 +280,7 @@ export function createMockProjectTopupRepository() {
     create: vi.fn().mockImplementation(async (params: Record<string, unknown>) => makeProjectTopupRow(params)),
     deleteById: vi.fn().mockResolvedValue(true),
     sumByProjectIds: vi.fn().mockResolvedValue(new Map()),
+    sumByProjectIdsInWeeklyKeys: vi.fn().mockResolvedValue(new Map()),
   };
 }
 

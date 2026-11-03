@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { IconX } from '@tabler/icons-react';
@@ -18,7 +18,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toasts';
 import { validateLimitPair, parseLimitInput, type LimitParseResult } from '@/lib/limit-input';
 import { formatCount, formatShortDate } from '@/lib/rate-limit';
+import { RATE_LIMIT_DEFAULTS_QUERY_KEY } from './default-limits-dialog';
 import {
+  getRateLimitDefaults,
   updateProjectRateLimit,
   type ProjectItem,
   type RateLimitStopBehavior,
@@ -58,13 +60,24 @@ export function EditRateLimitsDialog({ project, open, onOpenChange }: Readonly<E
   const [yearlyInput, setYearlyInput] = useState('');
   const [stopBehavior, setStopBehavior] = useState<RateLimitStopBehavior>('hard_stop');
   const [reason, setReason] = useState('');
+  const [useDefaults, setUseDefaults] = useState(project.usesDefaultLimits);
   const [errors, setErrors] = useState<DialogFieldErrors>({});
+
+  // Fetched only while default mode is on, so the read-only inputs show the
+  // scope limits the project would actually follow.
+  const defaultsQuery = useQuery({
+    queryKey: RATE_LIMIT_DEFAULTS_QUERY_KEY,
+    queryFn: ({ signal }) => getRateLimitDefaults(signal),
+    enabled: open && useDefaults,
+  });
+  const scopeDefaults = project.projectType === 'personal' ? defaultsQuery.data?.personal : defaultsQuery.data?.team;
 
   // Re-seed the form from the current project config each time the dialog opens.
   useEffect(() => {
     if (!open) {
       return;
     }
+    setUseDefaults(project.usesDefaultLimits);
     setWeeklyInput(project.weeklyRateLimit === null ? '' : formatCount(project.weeklyRateLimit));
     setYearlyInput(project.yearlyRateLimit === null ? '' : formatCount(project.yearlyRateLimit));
     setStopBehavior(project.stopBehavior ?? 'hard_stop');
@@ -99,21 +112,49 @@ export function EditRateLimitsDialog({ project, open, onOpenChange }: Readonly<E
 
   const parsedWeekly = parseLimitInput(weeklyInput);
   const parsedYearly = parseLimitInput(yearlyInput);
-  const showPauseWarning = typeof parsedWeekly === 'number' && parsedWeekly < project.weeklyExecutionCount;
+  const showPauseWarning =
+    !useDefaults && typeof parsedWeekly === 'number' && parsedWeekly < project.weeklyExecutionCount;
 
   function handleSave() {
+    if (reason.trim() === '') {
+      setErrors({ reason: 'Reason for change is required' });
+      return;
+    }
+
+    if (useDefaults) {
+      // The server normalizes default-mode rows to the unconfigured shape.
+      saveMutation.mutate({
+        usesDefaultLimits: true,
+        weeklyRateLimit: null,
+        yearlyRateLimit: null,
+        lastAdminComment: reason.trim(),
+        stopBehavior: 'hard_stop',
+      });
+      return;
+    }
+
     const nextErrors = validateLimits(parsedWeekly, parsedYearly, reason);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
     saveMutation.mutate({
+      usesDefaultLimits: false,
       weeklyRateLimit: parsedWeekly === undefined ? null : parsedWeekly,
       yearlyRateLimit: parsedYearly === undefined ? null : parsedYearly,
       lastAdminComment: reason.trim(),
       stopBehavior,
     });
   }
+
+  const defaultsWeeklyInput =
+    scopeDefaults?.weeklyRateLimit === null || scopeDefaults?.weeklyRateLimit === undefined
+      ? ''
+      : formatCount(scopeDefaults.weeklyRateLimit);
+  const defaultsYearlyInput =
+    scopeDefaults?.yearlyRateLimit === null || scopeDefaults?.yearlyRateLimit === undefined
+      ? ''
+      : formatCount(scopeDefaults.yearlyRateLimit);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,18 +169,53 @@ export function EditRateLimitsDialog({ project, open, onOpenChange }: Readonly<E
           <DialogDescription>Limits count every run of every workflow in this project.</DialogDescription>
         </DialogHeader>
 
+        <label className="flex items-start gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={useDefaults}
+            onChange={(e) => {
+              const nextUseDefaults = e.target.checked;
+              setUseDefaults(nextUseDefaults);
+              setErrors({});
+              // Switching from defaults to custom mode starts from the
+              // displayed default numbers instead of an empty form.
+              if (!nextUseDefaults && scopeDefaults) {
+                setWeeklyInput(
+                  scopeDefaults.weeklyRateLimit === null ? '' : formatCount(scopeDefaults.weeklyRateLimit),
+                );
+                setYearlyInput(
+                  scopeDefaults.yearlyRateLimit === null ? '' : formatCount(scopeDefaults.yearlyRateLimit),
+                );
+                setStopBehavior('hard_stop');
+              }
+            }}
+            className="mt-0.5 size-4 accent-[#013366]"
+          />
+          <span>
+            <span className="font-bold">Use default limits</span>
+            <span className="block text-muted-foreground">
+              Follow the standard limits for this project's type instead of custom values.
+            </span>
+          </span>
+        </label>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Weekly limit"
             htmlFor="weekly-rate-limit"
-            description="Runs per calendar week, Monday to Sunday"
+            description={
+              useDefaults
+                ? 'Comes from the standard limits for this project type'
+                : 'Runs per calendar week, Monday to Sunday'
+            }
             error={errors.weekly}
           >
             <Input
               id="weekly-rate-limit"
               inputMode="numeric"
               autoComplete="off"
-              value={weeklyInput}
+              value={useDefaults ? defaultsWeeklyInput : weeklyInput}
+              disabled={useDefaults}
               onChange={(e) => {
                 setWeeklyInput(e.target.value);
                 clearFieldError('weekly');
@@ -149,14 +225,19 @@ export function EditRateLimitsDialog({ project, open, onOpenChange }: Readonly<E
           <Field
             label="Annual limit"
             htmlFor="annual-rate-limit"
-            description="Runs per calendar year. Must be at least the weekly limit."
+            description={
+              useDefaults
+                ? 'Comes from the standard limits for this project type'
+                : 'Runs per calendar year. Must be at least the weekly limit.'
+            }
             error={errors.yearly}
           >
             <Input
               id="annual-rate-limit"
               inputMode="numeric"
               autoComplete="off"
-              value={yearlyInput}
+              value={useDefaults ? defaultsYearlyInput : yearlyInput}
+              disabled={useDefaults}
               onChange={(e) => {
                 setYearlyInput(e.target.value);
                 clearFieldError('yearly');
@@ -165,41 +246,44 @@ export function EditRateLimitsDialog({ project, open, onOpenChange }: Readonly<E
           </Field>
         </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-bold leading-5 text-foreground">When a limit is reached</legend>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-foreground">
-              <input
-                type="radio"
-                name="stop-behavior"
-                value="hard_stop"
-                checked={stopBehavior === 'hard_stop'}
-                onChange={() => setStopBehavior('hard_stop')}
-                className="size-4 accent-[#013366]"
-              />
-              Pause new runs until the limit resets
-            </label>
-            <label className="flex items-center gap-2 text-sm text-foreground">
-              <input
-                type="radio"
-                name="stop-behavior"
-                value="soft_stop"
-                checked={stopBehavior === 'soft_stop'}
-                onChange={() => setStopBehavior('soft_stop')}
-                className="size-4 accent-[#013366]"
-              />
-              Keep running and alert admins (soft limit)
-            </label>
-          </div>
-        </fieldset>
+        {!useDefaults && (
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-bold leading-5 text-foreground">When a limit is reached</legend>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="stop-behavior"
+                  value="hard_stop"
+                  checked={stopBehavior === 'hard_stop'}
+                  onChange={() => setStopBehavior('hard_stop')}
+                  className="size-4 accent-[#013366]"
+                />
+                Pause new runs until the limit resets
+              </label>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="stop-behavior"
+                  value="soft_stop"
+                  checked={stopBehavior === 'soft_stop'}
+                  onChange={() => setStopBehavior('soft_stop')}
+                  className="size-4 accent-[#013366]"
+                />
+                Keep running and alert admins (soft limit)
+              </label>
+            </div>
+          </fieldset>
+        )}
 
-        <Field
-          label="Reason for change"
-          htmlFor="rate-limit-reason"
-          required
-          description="Required. Every change is saved to the audit log with your name."
-          error={errors.reason}
-        >
+        {useDefaults && (
+          <p className="text-sm text-muted-foreground">
+            When a default limit is reached, new runs pause until it resets — the same behavior as projects without
+            custom limits.
+          </p>
+        )}
+
+        <Field label="Reason for change" htmlFor="rate-limit-reason" required error={errors.reason}>
           <Textarea
             id="rate-limit-reason"
             value={reason}

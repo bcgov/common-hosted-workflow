@@ -14,9 +14,12 @@ export class ProjectRateLimitRepository {
     return row ?? null;
   }
 
-  /** Upserts the rate-limit configuration for a project. Uses the primary key on project_id for conflict resolution. */
+  /**
+   * Upserts the rate-limit configuration for a project. Uses the primary key on project_id for conflict resolution.
+   */
   async upsert(params: {
     projectId: string;
+    usesDefaultLimits: boolean;
     weeklyRateLimit: number | null;
     yearlyRateLimit: number | null;
     lastAdminComment: string | null;
@@ -29,6 +32,7 @@ export class ProjectRateLimitRepository {
       .onConflictDoUpdate({
         target: projectRateLimit.projectId,
         set: {
+          usesDefaultLimits: params.usesDefaultLimits,
           weeklyRateLimit: params.weeklyRateLimit,
           yearlyRateLimit: params.yearlyRateLimit,
           lastAdminComment: params.lastAdminComment,

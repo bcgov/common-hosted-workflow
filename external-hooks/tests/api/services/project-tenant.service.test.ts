@@ -7,6 +7,7 @@ import type { ProjectRateLimit } from '../../../src/db/schema/project-rate-limit
 function makeConfigRow(overrides: Partial<ProjectRateLimit> = {}): ProjectRateLimit {
   return {
     projectId: 'proj-001',
+    usesDefaultLimits: false,
     weeklyRateLimit: null,
     yearlyRateLimit: null,
     lastAdminComment: null,
@@ -19,6 +20,7 @@ function makeConfigRow(overrides: Partial<ProjectRateLimit> = {}): ProjectRateLi
 }
 
 const DEFAULT_ENRICHMENT = {
+  usesDefaultLimits: true,
   weeklyRateLimit: null,
   yearlyRateLimit: null,
   stopBehavior: null,
@@ -26,6 +28,7 @@ const DEFAULT_ENRICHMENT = {
   weeklyExecutionCount: 0,
   yearlyExecutionCount: 0,
   weeklyTopupRuns: 0,
+  yearlyTopupRuns: 0,
   workflowCount: 0,
   membersCount: 0,
   updatedAt: null,
@@ -74,8 +77,12 @@ function buildService({
   const customRepositories = {
     tenantProjectRelation: { listAll: vi.fn().mockResolvedValue(tenantMap) },
     projectRateLimit: { listByProjectIds: vi.fn().mockResolvedValue(rateLimitRows) },
+    projectRateLimitDefault: { getAll: vi.fn().mockResolvedValue([]) },
     projectExecutionUsage: { listCountsByProjectIds: vi.fn().mockResolvedValue(usageCounts) },
-    projectTopup: { sumByProjectIds: vi.fn().mockResolvedValue(new Map()) },
+    projectTopup: {
+      sumByProjectIds: vi.fn().mockResolvedValue(new Map()),
+      sumByProjectIdsInWeeklyKeys: vi.fn().mockResolvedValue(new Map()),
+    },
   };
   const projectRateLimitService = new ProjectRateLimitService(n8nRepositories as any, customRepositories as any);
   const service = new ProjectTenantService(n8nRepositories as any, customRepositories as any, projectRateLimitService);
@@ -127,6 +134,7 @@ describe('ProjectTenantService', () => {
         projectName: 'Configured project',
         projectType: 'team',
         tenantId: 'tenant-1',
+        usesDefaultLimits: false,
         weeklyRateLimit: 10,
         yearlyRateLimit: 1000,
         stopBehavior: 'hard_stop',
@@ -134,6 +142,7 @@ describe('ProjectTenantService', () => {
         weeklyExecutionCount: 3,
         yearlyExecutionCount: 30,
         weeklyTopupRuns: 0,
+        yearlyTopupRuns: 0,
         workflowCount: 5,
         membersCount: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -224,6 +233,7 @@ describe('ProjectTenantService', () => {
         projectName: 'Configured project',
         projectType: 'team',
         tenantId: 'tenant-1',
+        usesDefaultLimits: false,
         weeklyRateLimit: 10,
         yearlyRateLimit: 1000,
         stopBehavior: 'hard_stop',
@@ -231,6 +241,7 @@ describe('ProjectTenantService', () => {
         weeklyExecutionCount: 3,
         yearlyExecutionCount: 30,
         weeklyTopupRuns: 0,
+        yearlyTopupRuns: 0,
         workflowCount: 5,
         membersCount: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',

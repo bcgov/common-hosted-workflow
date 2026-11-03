@@ -39,6 +39,7 @@ const PROJECT: ProjectItem = {
   weeklyExecutionCount: 8_640,
   yearlyExecutionCount: 121_000,
   weeklyTopupRuns: 0,
+  yearlyTopupRuns: 0,
   workflowCount: 2,
   membersCount: 4,
   updatedAt: '2026-09-02T20:00:00Z',
@@ -89,7 +90,7 @@ function renderDialog(project: ProjectItem = PROJECT, open = true) {
 }
 
 function commentInput() {
-  return screen.getByLabelText(/^Admin comment/);
+  return screen.getByLabelText(/^Comment/);
 }
 
 function axiosLikeError(status: number) {
@@ -151,14 +152,27 @@ describe('ManageTopupsDialog', () => {
     expect(screen.getByText('Weekly limit is 12,000 (+2,000 top-up) and annual limit is 500,000.')).toBeInTheDocument();
   });
 
-  it('warns that top-ups have no effect without a weekly limit', async () => {
+  it('warns that a top-up would only affect the annual limit without a weekly limit', async () => {
     renderDialog({ ...PROJECT, weeklyRateLimit: null, yearlyRateLimit: null, weeklyTopupRuns: 2_000 });
     await screen.findByText('No top-ups yet.');
 
     expect(
-      screen.getByText('No weekly limit is configured, so a top-up would not take effect. Annual limit is not set.'),
+      screen.getByText(
+        'No weekly limit is configured, so a top-up would only affect the annual limit (currently not set).',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add top-up' })).toBeEnabled();
+  });
+
+  it('mentions the annual limit in the no-weekly-limit warning when one is set', async () => {
+    renderDialog({ ...PROJECT, weeklyRateLimit: null, yearlyRateLimit: 100_000, weeklyTopupRuns: 2_000 });
+    await screen.findByText('No top-ups yet.');
+
+    expect(
+      screen.getByText(
+        'No weekly limit is configured, so a top-up would only affect the annual limit (currently 100,000).',
+      ),
+    ).toBeInTheDocument();
   });
 
   it.each(['', '0', '-1', '1.5', 'abc', '1,000,001'])('rejects an invalid amount of "%s"', async (amount) => {
@@ -184,7 +198,7 @@ describe('ManageTopupsDialog', () => {
     await user.type(commentInput(), '   ');
     await user.click(screen.getByRole('button', { name: 'Add top-up' }));
 
-    expect(screen.getByText('Admin comment is required')).toBeInTheDocument();
+    expect(screen.getByText('Comment is required')).toBeInTheDocument();
     expect(createMock).not.toHaveBeenCalled();
   });
 
@@ -240,7 +254,7 @@ describe('ManageTopupsDialog', () => {
     await user.selectOptions(screen.getByLabelText('Period'), '2026-W45');
     await user.type(screen.getByLabelText('Top-up amount'), '0');
     await user.click(screen.getByRole('button', { name: 'Add top-up' }));
-    expect(screen.getByText('Admin comment is required')).toBeInTheDocument();
+    expect(screen.getByText('Comment is required')).toBeInTheDocument();
     rerenderDialog(PROJECT, false);
     rerenderDialog(PROJECT, true);
 

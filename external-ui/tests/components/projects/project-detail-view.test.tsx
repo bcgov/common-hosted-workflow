@@ -49,6 +49,7 @@ function makeProject(overrides: Partial<ProjectItem> = {}): ProjectItem {
     weeklyExecutionCount: 8_640,
     yearlyExecutionCount: 121_000,
     weeklyTopupRuns: 0,
+    yearlyTopupRuns: 0,
     workflowCount: 2,
     membersCount: 4,
     updatedAt: '2026-09-02T20:00:00Z',
@@ -146,7 +147,7 @@ describe('ProjectDetailView', () => {
     expect(screen.getByText('Showing 2 of 2 workflows')).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: 'Manage top-ups' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit tenant limits' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit limits' })).toBeInTheDocument();
   });
 
   it('shows the same Projects-only breadcrumb for personal projects', async () => {
@@ -273,7 +274,7 @@ describe('ProjectDetailView', () => {
     renderView();
 
     await screen.findByText('Invoice QR intake');
-    await user.click(screen.getByRole('button', { name: 'Edit tenant limits' }));
+    await user.click(screen.getByRole('button', { name: 'Edit limits' }));
 
     expect(screen.getByText('Edit limits for DEVX Tenant')).toBeInTheDocument();
     expect(screen.getByText('Limits count every run of every workflow in this project.')).toBeInTheDocument();
@@ -328,7 +329,7 @@ describe('ProjectDetailView in read-only (non-admin) mode', () => {
     expect(screen.getByText('2,850')).toBeInTheDocument();
 
     // ...without any way to change it.
-    expect(screen.queryByRole('button', { name: 'Edit tenant limits' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit limits' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Manage top-ups' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(listTopupsMock).not.toHaveBeenCalled();

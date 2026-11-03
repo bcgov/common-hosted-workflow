@@ -20,6 +20,7 @@ import {
   formatCompactCount,
   formatCount,
   formatWeeklyPeriodLabel,
+  getEffectiveYearlyLimit,
   getEffectiveWeeklyLimit,
   getRateLimitStatus,
   getUsageBarTone,
@@ -175,7 +176,7 @@ export function AdminProjectsView({ readOnly = false }: { readOnly?: boolean }) 
           value={formatCompactCount(totalWeeklyRuns)}
           caption={`${teamCount} tenants, ${personalCount} personal accounts`}
         />
-        <StatCard label="Limit reached" value={statusCounts.limit_reached} caption="Workflows paused until reset" />
+        <StatCard label="Limit reached" value={statusCounts.limit_reached} caption="At a weekly or annual limit" />
         <StatCard
           label="Near limit (80%+)"
           value={statusCounts.near_limit}
@@ -360,10 +361,18 @@ function ProjectRow({ project, readOnly }: { project: ProjectItem; readOnly?: bo
         </div>
       </TableCell>
       <TableCell>
-        <UsageBarCell used={project.weeklyExecutionCount} limit={getEffectiveWeeklyLimit(project)} />
+        <UsageBarCell
+          used={project.weeklyExecutionCount}
+          limit={getEffectiveWeeklyLimit(project)}
+          usesDefaultLimits={project.usesDefaultLimits}
+        />
       </TableCell>
       <TableCell>
-        <UsageBarCell used={project.yearlyExecutionCount} limit={project.yearlyRateLimit} />
+        <UsageBarCell
+          used={project.yearlyExecutionCount}
+          limit={getEffectiveYearlyLimit(project)}
+          usesDefaultLimits={project.usesDefaultLimits}
+        />
       </TableCell>
       <TableCell className="text-sm">{project.workflowCount}</TableCell>
       <TableCell>
@@ -381,15 +390,30 @@ function ProjectRow({ project, readOnly }: { project: ProjectItem; readOnly?: bo
   );
 }
 
-function UsageBarCell({ used, limit }: { used: number; limit: number | null }) {
+function UsageBarCell({
+  used,
+  limit,
+  usesDefaultLimits,
+}: {
+  used: number;
+  limit: number | null;
+  usesDefaultLimits?: boolean;
+}) {
   const ratio = getUsageRatio(used, limit);
   const percent = getUsagePercent(used, limit);
   const tone: UsageBarTone | null = ratio === null ? null : getUsageBarTone(ratio);
 
   return (
     <div className="min-w-[9rem] space-y-1.5">
-      <p className="text-sm text-foreground">
-        {formatCount(used)} / {limit === null ? 'No limit' : formatCount(limit)}
+      <p className="flex flex-wrap items-center gap-1.5 text-sm text-foreground">
+        <span>
+          {formatCount(used)} / {limit === null ? 'No limit' : formatCount(limit)}
+        </span>
+        {usesDefaultLimits === true && limit !== null && (
+          <span className="rounded-full border border-border bg-surface-muted px-1.5 text-[0.6875rem] leading-4 text-muted-foreground">
+            Default
+          </span>
+        )}
       </p>
       <div
         data-tone={tone}

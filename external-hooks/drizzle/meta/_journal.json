@@ -113,6 +113,13 @@
       "when": 1793341284491,
       "tag": "0015_add_project_rate_limit_default",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793738853903,
+      "tag": "0016_add_project_uses_default_limits",
+      "breakpoints": true
     }
   ]
 }

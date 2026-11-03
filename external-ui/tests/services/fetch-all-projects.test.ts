@@ -22,6 +22,7 @@ function makeProject(id: string): ProjectItem {
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
     weeklyTopupRuns: 0,
+    yearlyTopupRuns: 0,
     workflowCount: 0,
     membersCount: 0,
     updatedAt: null,

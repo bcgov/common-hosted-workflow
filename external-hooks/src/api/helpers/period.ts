@@ -122,3 +122,37 @@ export function listUpcomingWeeklyPeriodKeys(count: number, date: Date = new Dat
   }
   return keys;
 }
+
+/** Weekly period keys that overlap a yearly period, memoized per year (one tiny entry per year). */
+const yearlyOverlapCache = new Map<string, string[]>();
+
+/**
+ * Weekly period keys whose Mon–Sun week contains at least one calendar day of
+ * the given yearly period ('YYYY', period-timezone calendar year).
+ *
+ * Usually these are exactly the year's own ISO weeks, but the one or two ISO
+ * weeks straddling Jan 1 also overlap the neighbouring year — and because a
+ * run's yearly usage is bucketed by its calendar day, a weekly top-up must
+ * raise the yearly limit of every year its week overlaps for the two gates to
+ * stay consistent. Returns an empty list for malformed keys.
+ */
+export function listWeeklyPeriodKeysOverlappingYearlyPeriod(yearlyKey: string): string[] {
+  const cached = yearlyOverlapCache.get(yearlyKey);
+  if (cached) {
+    return cached;
+  }
+  if (!/^\d{4}$/.test(yearlyKey)) {
+    return [];
+  }
+  const year = Number(yearlyKey);
+  const jan1 = Date.UTC(year, 0, 1);
+  const dec31 = Date.UTC(year, 11, 31);
+  const weekStart = jan1 - (getIsoDayOfWeek(jan1) - 1) * MS_PER_DAY;
+  const keys: string[] = [];
+  for (let monday = weekStart; monday <= dec31; monday += 7 * MS_PER_DAY) {
+    const { isoYear, week } = getIsoWeek(getUtcMidnightLocalDate(monday));
+    keys.push(formatWeeklyKey(isoYear, week));
+  }
+  yearlyOverlapCache.set(yearlyKey, keys);
+  return keys;
+}

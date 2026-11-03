@@ -81,4 +81,27 @@ export class ProjectTopupRepository {
       .groupBy(projectTopup.projectId);
     return new Map(rows.map((row) => [row.projectId, Number(row.total)]));
   }
+
+  /**
+   * Sums the top-up amounts per project across the given weekly period keys in
+   * one query. Used for the yearly aggregation: a weekly top-up raises the
+   * yearly limit of every calendar year its week overlaps, so the caller passes
+   * all weekly keys overlapping the yearly period. Projects without matching
+   * rows report 0 via the defaulting map lookup.
+   */
+  async sumByProjectIdsInWeeklyKeys(projectIds: string[], weeklyKeys: string[]): Promise<Map<string, number>> {
+    if (!projectIds.length || !weeklyKeys.length) {
+      return new Map();
+    }
+
+    const rows: Array<{ projectId: string; total: number }> = await this.db
+      .select({
+        projectId: projectTopup.projectId,
+        total: sql<number>`coalesce(sum(${projectTopup.amount}), 0)::int`,
+      })
+      .from(projectTopup)
+      .where(and(inArray(projectTopup.projectId, projectIds), inArray(projectTopup.periodKey, weeklyKeys)))
+      .groupBy(projectTopup.projectId);
+    return new Map(rows.map((row) => [row.projectId, Number(row.total)]));
+  }
 }

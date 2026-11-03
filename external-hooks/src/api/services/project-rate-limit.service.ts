@@ -3,7 +3,11 @@ import type { N8nRepositories } from '../bootstrap/n8n-repositories';
 import type { ProjectRateLimit } from '../../db/schema/project-rate-limit';
 import type { ProjectRateLimitDefault } from '../../db/schema/project-rate-limit-default';
 import type { ProjectTopup } from '../../db/schema/project-topup';
-import { getCurrentPeriodKeys, listUpcomingWeeklyPeriodKeys } from '../helpers/period';
+import {
+  getCurrentPeriodKeys,
+  listUpcomingWeeklyPeriodKeys,
+  listWeeklyPeriodKeysOverlappingYearlyPeriod,
+} from '../helpers/period';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 
@@ -31,16 +35,26 @@ export class RateLimitExceededError extends Error {
   }
 }
 
-/** Per-project admin-list enrichment: configured limits, current-period usage, workflow count, editor stamp. */
+/** Per-project list enrichment: limit mode, effective limits, current-period usage, workflow count, editor stamp. */
 export type ProjectRateLimitEnrichment = {
+  /** True when the project follows its scope's saved defaults instead of custom values. */
+  usesDefaultLimits: boolean;
+  /**
+   * Effective enforced base limits (what `enforceExecution` resolves): the
+   * project's custom values when configured, otherwise its scope's defaults.
+   * Null means that period is uncapped.
+   */
   weeklyRateLimit: number | null;
   yearlyRateLimit: number | null;
+  /** Custom stop behavior; null in default mode (hard stop applies). */
   stopBehavior: RateLimitStopBehavior | null;
   lastAdminComment: string | null;
   weeklyExecutionCount: number;
   yearlyExecutionCount: number;
   /** Runs added by top-ups for the current week (0 when none). */
   weeklyTopupRuns: number;
+  /** Runs added by weekly top-ups whose weeks overlap the current year (0 when none). */
+  yearlyTopupRuns: number;
   workflowCount: number;
   membersCount: number;
   updatedAt: string | null;
@@ -49,6 +63,7 @@ export type ProjectRateLimitEnrichment = {
 
 function defaultEnrichment(): ProjectRateLimitEnrichment {
   return {
+    usesDefaultLimits: true,
     weeklyRateLimit: null,
     yearlyRateLimit: null,
     stopBehavior: null,
@@ -56,6 +71,7 @@ function defaultEnrichment(): ProjectRateLimitEnrichment {
     weeklyExecutionCount: 0,
     yearlyExecutionCount: 0,
     weeklyTopupRuns: 0,
+    yearlyTopupRuns: 0,
     workflowCount: 0,
     membersCount: 0,
     updatedAt: null,
@@ -89,10 +105,10 @@ function isExemptMode(mode: string): boolean {
 type LimitBreach = {
   period: 'weekly' | 'yearly';
   periodKey: string;
-  /** Effective limit that was enforced (base limit plus top-ups for weekly). */
+  /** Effective limit that was enforced (base limit plus top-up runs). */
   limit: number;
   count: number;
-  /** Runs added by top-ups on top of the base limit; weekly breaches only. */
+  /** Runs added by top-ups on top of the base limit; omitted when zero. */
   topupRuns?: number;
 };
 
@@ -218,13 +234,17 @@ export class ProjectRateLimitService {
         periodKeys.yearly,
       );
 
-      // Effective base limits: the project's own configuration first, then its
-      // scope's saved defaults (team/personal). A scope with no defaults stays
+      // Effective base limits. Default mode (the flag's default, also for
+      // unconfigured projects) ignores the row's own values entirely and
+      // follows the scope's saved defaults (team/personal). Custom mode
+      // resolves the project's own configuration first, then its scope's
+      // saved defaults per unset period. A scope with no defaults stays
       // uncapped for that period. The project-kind lookup runs only when a
-      // fallback can matter (some limit is unset), keeping configured projects
+      // scope default can matter, keeping fully custom-configured projects
       // at the same query count as before.
-      let weeklyBase = config?.weeklyRateLimit ?? null;
-      let yearlyBase = config?.yearlyRateLimit ?? null;
+      const useDefaults = config?.usesDefaultLimits ?? true;
+      let weeklyBase = !useDefaults ? (config?.weeklyRateLimit ?? null) : null;
+      let yearlyBase = !useDefaults ? (config?.yearlyRateLimit ?? null) : null;
       if (weeklyBase === null || yearlyBase === null) {
         const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
         const kind = project?.type === 'personal' ? 'personal' : 'team';
@@ -235,11 +255,27 @@ export class ProjectRateLimitService {
 
       // Top-ups raise the effective weekly limit whenever a weekly base is
       // enforced, whether it comes from the project's own configuration or a
-      // scope default.
+      // scope default. Every counted run also accrues to the calendar-year
+      // counter, so the sum of all weekly top-ups whose weeks overlap the
+      // current year raises the yearly limit by the same amount — otherwise
+      // the yearly gate could block runs the top-up-boosted weekly gate
+      // allowed.
       let weeklyTopupRuns = 0;
-      if (weeklyBase !== null) {
-        const topupSums = await this.customRepositories.projectTopup.sumByProjectIds([projectId], periodKeys.weekly);
-        weeklyTopupRuns = topupSums.get(projectId) ?? 0;
+      let yearlyTopupRuns = 0;
+      if (weeklyBase !== null || yearlyBase !== null) {
+        const [weeklySums, yearlySums] = await Promise.all([
+          weeklyBase !== null
+            ? this.customRepositories.projectTopup.sumByProjectIds([projectId], periodKeys.weekly)
+            : Promise.resolve(new Map<string, number>()),
+          yearlyBase !== null
+            ? this.customRepositories.projectTopup.sumByProjectIdsInWeeklyKeys(
+                [projectId],
+                listWeeklyPeriodKeysOverlappingYearlyPeriod(periodKeys.yearly),
+              )
+            : Promise.resolve(new Map<string, number>()),
+        ]);
+        weeklyTopupRuns = weeklySums.get(projectId) ?? 0;
+        yearlyTopupRuns = yearlySums.get(projectId) ?? 0;
       }
 
       const breaches: LimitBreach[] = [];
@@ -255,18 +291,23 @@ export class ProjectRateLimitService {
           });
         }
       }
-      if (yearlyBase !== null && counts.yearlyCount >= yearlyBase) {
-        breaches.push({
-          period: 'yearly',
-          periodKey: periodKeys.yearly,
-          limit: yearlyBase,
-          count: counts.yearlyCount,
-        });
+      if (yearlyBase !== null) {
+        const effectiveYearlyLimit = yearlyBase + yearlyTopupRuns;
+        if (counts.yearlyCount >= effectiveYearlyLimit) {
+          breaches.push({
+            period: 'yearly',
+            periodKey: periodKeys.yearly,
+            limit: effectiveYearlyLimit,
+            count: counts.yearlyCount,
+            topupRuns: yearlyTopupRuns,
+          });
+        }
       }
 
       if (breaches.length > 0) {
-        // Without a project row the stop behavior is the hard-stop default.
-        if (config?.stopBehavior === 'soft_stop') {
+        // Default mode behaves like an unconfigured project: hard stop unless
+        // the custom row explicitly configured soft stop.
+        if (!useDefaults && config?.stopBehavior === 'soft_stop') {
           for (const breach of breaches) {
             log.warn(`${describeBreach(projectId, breach)} Soft stop configured — execution continues`, {
               projectId,
@@ -316,13 +357,18 @@ export class ProjectRateLimitService {
 
   /**
    * Replaces the rate-limit configuration for a project (full-replace semantics).
-   * `updatedBy` records the acting admin's email (trimmed; an empty value is
-   * stored as null — display names are resolved at read time).
+   * With `usesDefaultLimits` the project follows its scope's saved defaults:
+   * the row is normalized to the unconfigured shape (null limits, hard stop) so
+   * stored values always mirror what enforcement uses in custom mode; the
+   * admin comment is kept as the audit trail. Custom mode stores the given
+   * values. `updatedBy` records the acting admin's email (trimmed; an empty
+   * value is stored as null — display names are resolved at read time).
    * Throws AppError 404 when the project does not exist in n8n.
    */
   async updateRateLimit(
     projectId: string,
     body: {
+      usesDefaultLimits: boolean;
       weeklyRateLimit: number | null;
       yearlyRateLimit: number | null;
       lastAdminComment: string | null;
@@ -332,8 +378,18 @@ export class ProjectRateLimitService {
   ): Promise<ProjectRateLimit> {
     await this.assertProjectExists(projectId);
 
+    const normalized = body.usesDefaultLimits
+      ? {
+          usesDefaultLimits: true,
+          weeklyRateLimit: null,
+          yearlyRateLimit: null,
+          lastAdminComment: body.lastAdminComment,
+          stopBehavior: 'hard_stop' as const,
+        }
+      : { ...body, usesDefaultLimits: false };
+
     const trimmedUpdatedBy = updatedBy !== null && updatedBy.trim().length > 0 ? updatedBy.trim() : null;
-    await this.customRepositories.projectRateLimit.upsert({ projectId, ...body, updatedBy: trimmedUpdatedBy });
+    await this.customRepositories.projectRateLimit.upsert({ projectId, ...normalized, updatedBy: trimmedUpdatedBy });
 
     const stored = await this.customRepositories.projectRateLimit.get(projectId);
     if (!stored) {
@@ -381,17 +437,23 @@ export class ProjectRateLimitService {
   /**
    * Batch-fetches rate-limit configuration, current-period usage and workflow
    * counts for the given projects (one query per source, no per-item loops)
-   * and returns the enrichment keyed by projectId. Unconfigured projects get
-   * null limits/comment and zero counts.
+   * and returns the enrichment keyed by projectId. Limits are resolved exactly
+   * as enforcement resolves them: default-mode (or unconfigured) projects get
+   * their scope's saved limits, custom-mode projects their own values with
+   * scope defaults per unset period — so the UI can show the limits that are
+   * actually enforced, plus the mode that produced them. Unconfigured projects
+   * get null limits/comment and zero counts.
    *
    * Never throws: on any error the default enrichment is returned so the
-   * admin project list keeps working during custom-DB outages.
+   * project list keeps working during custom-DB outages.
    */
-  async enrichAdminProjects(items: Array<{ projectId: string }>): Promise<Record<string, ProjectRateLimitEnrichment>> {
+  async enrichProjectsWithRateLimits(
+    items: Array<{ projectId: string; projectType: string }>,
+  ): Promise<Record<string, ProjectRateLimitEnrichment>> {
     const projectIds = items.map((item) => item.projectId);
     const enrichment: Record<string, ProjectRateLimitEnrichment> = {};
-    for (const projectId of projectIds) {
-      enrichment[projectId] = defaultEnrichment();
+    for (const item of items) {
+      enrichment[item.projectId] = defaultEnrichment();
     }
     if (projectIds.length === 0) {
       return enrichment;
@@ -399,17 +461,22 @@ export class ProjectRateLimitService {
 
     try {
       const periodKeys = getCurrentPeriodKeys();
-      const [rateLimitMap, usageMap, workflowCountMap, memberCountMap, topupMap] = await Promise.all([
-        this.customRepositories.projectRateLimit.listByProjectIds(projectIds),
-        this.customRepositories.projectExecutionUsage.listCountsByProjectIds(
-          projectIds,
-          periodKeys.weekly,
-          periodKeys.yearly,
-        ),
-        this.n8nRepositories.sharedWorkflow.countByProjectIds(projectIds),
-        this.n8nRepositories.projectRelation.countMembersByProjectIds(projectIds),
-        this.customRepositories.projectTopup.sumByProjectIds(projectIds, periodKeys.weekly),
-      ]);
+      const yearOverlapKeys = listWeeklyPeriodKeysOverlappingYearlyPeriod(periodKeys.yearly);
+      const [rateLimitMap, usageMap, workflowCountMap, memberCountMap, topupMap, yearlyTopupMap, defaultsRows] =
+        await Promise.all([
+          this.customRepositories.projectRateLimit.listByProjectIds(projectIds),
+          this.customRepositories.projectExecutionUsage.listCountsByProjectIds(
+            projectIds,
+            periodKeys.weekly,
+            periodKeys.yearly,
+          ),
+          this.n8nRepositories.sharedWorkflow.countByProjectIds(projectIds),
+          this.n8nRepositories.projectRelation.countMembersByProjectIds(projectIds),
+          this.customRepositories.projectTopup.sumByProjectIds(projectIds, periodKeys.weekly),
+          this.customRepositories.projectTopup.sumByProjectIdsInWeeklyKeys(projectIds, yearOverlapKeys),
+          this.customRepositories.projectRateLimitDefault.getAll(),
+        ]);
+      const defaultsByKind = new Map(defaultsRows.map((row) => [row.projectKind, row]));
 
       // A failed name lookup must not discard the enrichment it accompanies,
       // so resolution degrades to its own catch (updatedByName → null) instead
@@ -432,7 +499,8 @@ export class ProjectRateLimitService {
         nameMap = null;
       }
 
-      for (const projectId of projectIds) {
+      for (const item of items) {
+        const projectId = item.projectId;
         const config = rateLimitMap.get(projectId);
         const usage = usageMap.get(projectId);
         const workflowCount = workflowCountMap.get(projectId);
@@ -440,14 +508,24 @@ export class ProjectRateLimitService {
         const editorEmail =
           config?.updatedBy != null && config.updatedBy.trim().length > 0 ? config.updatedBy.trim() : null;
         const editorName = nameMap?.get(editorEmail?.toLowerCase() ?? '');
+        const useDefaults = config?.usesDefaultLimits ?? true;
+        const kind = item.projectType === 'personal' ? 'personal' : 'team';
+        const defaults = defaultsByKind.get(kind) ?? null;
         enrichment[projectId] = {
-          weeklyRateLimit: config?.weeklyRateLimit ?? null,
-          yearlyRateLimit: config?.yearlyRateLimit ?? null,
-          stopBehavior: (config?.stopBehavior as RateLimitStopBehavior | undefined) ?? null,
+          usesDefaultLimits: useDefaults,
+          weeklyRateLimit: useDefaults
+            ? (defaults?.weeklyRateLimit ?? null)
+            : (config?.weeklyRateLimit ?? defaults?.weeklyRateLimit ?? null),
+          yearlyRateLimit: useDefaults
+            ? (defaults?.yearlyRateLimit ?? null)
+            : (config?.yearlyRateLimit ?? defaults?.yearlyRateLimit ?? null),
+          stopBehavior:
+            !useDefaults && config ? ((config.stopBehavior as RateLimitStopBehavior | undefined) ?? null) : null,
           lastAdminComment: config?.lastAdminComment ?? null,
           weeklyExecutionCount: usage?.weeklyCount ?? 0,
           yearlyExecutionCount: usage?.yearlyCount ?? 0,
           weeklyTopupRuns: topupMap.get(projectId) ?? 0,
+          yearlyTopupRuns: yearlyTopupMap.get(projectId) ?? 0,
           workflowCount: workflowCount ?? 0,
           membersCount: memberCount ?? 0,
           updatedAt: config?.updatedAt ? config.updatedAt.toISOString() : null,
