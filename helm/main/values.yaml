@@ -100,7 +100,7 @@ n8n:
     QUEUE_BULL_REDIS_PORT: "6379"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/executions/#executions-environment-variables
     EXECUTIONS_MODE: "queue" # worker.enabled = true
-    EXECUTIONS_DATA_PRUNE: "true"
+    EXECUTIONS_DATA_PRUNE: "false"
     EXECUTIONS_DATA_MAX_AGE: "336"
     # See https://docs.n8n.io/hosting/configuration/environment-variables/user-management-smtp-2fa/
     N8N_EMAIL_MODE: "smtp"
