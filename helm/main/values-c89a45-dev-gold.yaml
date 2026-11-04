@@ -18,7 +18,7 @@ n8n:
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     CSTAR_BASE_URL: https://dev.connect.digital.gov.bc.ca
     AUTHZ_ENVIRONMENT: dev
-    N8N_DISABLED_MODULES: "chat-hub"
+    N8N_DISABLED_MODULES: ""
     N8N_LICENSE_AUTO_RENEW_ENABLED: "true"
     N8N_DEFAULT_BINARY_DATA_MODE: "s3"
     N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
