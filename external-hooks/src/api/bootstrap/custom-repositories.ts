@@ -9,6 +9,7 @@ import { ProjectExecutionUsageRepository } from '../../db/repository/custom/proj
 import { ProjectRateLimitRepository } from '../../db/repository/custom/project-rate-limit';
 import { ProjectRateLimitDefaultRepository } from '../../db/repository/custom/project-rate-limit-default';
 import { ProjectTopupRepository } from '../../db/repository/custom/project-topup';
+import { RateLimitNotificationRepository } from '../../db/repository/custom/rate-limit-notification';
 import { TenantProjectRelationRepository } from '../../db/repository/custom/tenant-project-relation';
 import { WorkflowExecutionUsageRepository } from '../../db/repository/custom/workflow-execution-usage';
 import { WorkflowTriggerRepository } from '../../db/repository/custom/workflow-trigger';
@@ -27,6 +28,7 @@ export type CustomRepositories = {
   readonly projectExecutionUsage: ProjectExecutionUsageRepository;
   readonly workflowExecutionUsage: WorkflowExecutionUsageRepository;
   readonly projectTopup: ProjectTopupRepository;
+  readonly rateLimitNotification: RateLimitNotificationRepository;
 };
 
 export function buildCustomRepositories(databaseUrl: string): CustomRepositories {
@@ -46,5 +48,6 @@ export function buildCustomRepositories(databaseUrl: string): CustomRepositories
     projectExecutionUsage: new ProjectExecutionUsageRepository(db),
     workflowExecutionUsage: new WorkflowExecutionUsageRepository(db),
     projectTopup: new ProjectTopupRepository(db),
+    rateLimitNotification: new RateLimitNotificationRepository(db),
   };
 }

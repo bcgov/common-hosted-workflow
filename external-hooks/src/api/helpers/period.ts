@@ -105,6 +105,90 @@ function getUtcMidnightLocalDate(utcMidnight: number): LocalDate {
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
 }
 
+/** Noon-UTC Date whose UTC calendar date equals `date`'s calendar date in the period timezone. */
+function getPeriodAnchor(date: Date): Date {
+  const { year, month, day } = getLocalDate(date);
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+
+function getDaysSinceMonday(date: Date): number {
+  return (date.getUTCDay() + 6) % 7;
+}
+
+/** The Monday after the current Mon–Sun period week — when weekly counters reset. */
+export function getNextWeeklyReset(date: Date = new Date()): Date {
+  const anchor = getPeriodAnchor(date);
+  return new Date(anchor.getTime() + (7 - getDaysSinceMonday(anchor)) * MS_PER_DAY);
+}
+
+/** January 1 (noon UTC) of the year after the current period-timezone calendar year. */
+export function getNextYearlyReset(date: Date = new Date()): Date {
+  const anchor = getPeriodAnchor(date);
+  return new Date(Date.UTC(anchor.getUTCFullYear() + 1, 0, 1, 12));
+}
+
+// Anchor formatters: reset dates and week ranges are produced as UTC-anchored
+// Dates whose UTC calendar date equals the period-timezone calendar date, so
+// they must be rendered in UTC — rendering the anchor instant in the period
+// timezone would shift the calendar day (UTC midnight = 4–5pm the previous
+// day in Vancouver).
+const periodShortDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'UTC',
+  month: 'short',
+  day: 'numeric',
+});
+
+const periodLongDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'UTC',
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+/**
+ * 'Monday, November 9, 2026' style description of a period-timezone calendar
+ * date. Expects a UTC-anchored Date (from getNextWeeklyReset /
+ * getNextYearlyReset): its UTC calendar date is the period calendar date.
+ */
+export function formatPeriodDateLong(date: Date): string {
+  return periodLongDateFormatter.format(date);
+}
+
+/** The Monday (UTC-midnight anchor) starting the ISO week of the given weekly period key, or null for keys that cannot exist. */
+function getWeeklyPeriodKeyMonday(periodKey: string): number | null {
+  const match = /^(\d{4})-W(\d{2})$/.exec(periodKey);
+  if (!match || Number(match[2]) < 1) {
+    return null;
+  }
+  const isoYear = Number(match[1]);
+  const week = Number(match[2]);
+  const jan4 = Date.UTC(isoYear, 0, 4);
+  const firstMonday = jan4 - (getIsoDayOfWeek(jan4) - 1) * MS_PER_DAY;
+  const monday = firstMonday + (week - 1) * 7 * MS_PER_DAY;
+  // Week 53 in a 52-week ISO year rolls into the next year — not a real key.
+  return getIsoWeek(getUtcMidnightLocalDate(monday)).isoYear === isoYear ? monday : null;
+}
+
+/**
+ * 'Nov 2 to 8, 2026' style description of a weekly period key (month dropped
+ * when both dates share it), in the period timezone. Returns null for keys
+ * that cannot exist — callers fall back to the raw key.
+ */
+export function describeWeeklyPeriodKey(periodKey: string): string | null {
+  const monday = getWeeklyPeriodKeyMonday(periodKey);
+  if (monday === null) {
+    return null;
+  }
+  const startText = periodShortDateFormatter.format(new Date(monday));
+  const end = monday + 6 * MS_PER_DAY;
+  const endText = periodShortDateFormatter.format(new Date(end));
+  const [startMonth, startDay] = startText.split(' ');
+  const [endMonth, endDay] = endText.split(' ');
+  const range = startMonth === endMonth ? `${startMonth} ${startDay} to ${endDay}` : `${startText} to ${endText}`;
+  return `${range}, ${getUtcMidnightLocalDate(end).year}`;
+}
+
 /**
  * Consecutive weekly period keys ('YYYY-Www'), starting with the ISO week that
  * contains `date` (the current week) and extending `count - 1` weeks into the

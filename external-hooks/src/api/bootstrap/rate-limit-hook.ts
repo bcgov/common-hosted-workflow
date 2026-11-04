@@ -4,6 +4,7 @@ import { ProjectRateLimitService, RateLimitExceededError } from '../services/pro
 import type { WorkflowPreExecuteHook } from '../types/hooks';
 import { buildCustomRepositories } from './custom-repositories';
 import { buildN8nRuntimeContext, type N8nContainer } from './n8n-repositories';
+import { tryResolveNodeMailerService } from './services';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('RateLimitHook');
@@ -108,9 +109,12 @@ export function createMemoizedRateLimitServiceGetter(
           return null;
         }
         try {
-          const { n8nRepositories } = buildN8nRuntimeContext();
+          const { container, n8nRepositories } = buildN8nRuntimeContext();
           const customRepositories = buildCustomRepositories(databaseUrl);
-          return new ProjectRateLimitService(n8nRepositories, customRepositories);
+          // Notifications are optional: a process without the mailer (some
+          // workers) still enforces, it just never sends emails.
+          const nodeMailerService = tryResolveNodeMailerService(container);
+          return new ProjectRateLimitService(n8nRepositories, customRepositories, nodeMailerService);
         } catch (error) {
           log.error('Failed to build the rate limit service; failing open', {
             error: error instanceof Error ? error.message : String(error),

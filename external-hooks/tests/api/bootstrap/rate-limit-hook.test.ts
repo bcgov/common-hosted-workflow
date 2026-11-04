@@ -18,6 +18,9 @@ vi.mock('../../../src/api/bootstrap/n8n-repositories', () => ({
 vi.mock('../../../src/api/bootstrap/custom-repositories', () => ({
   buildCustomRepositories: vi.fn(),
 }));
+vi.mock('../../../src/api/bootstrap/services', () => ({
+  tryResolveNodeMailerService: vi.fn().mockReturnValue(null),
+}));
 
 const WORKFLOW_ID = 'wf-100';
 

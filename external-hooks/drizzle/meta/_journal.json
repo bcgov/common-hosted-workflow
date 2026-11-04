@@ -120,6 +120,20 @@
       "when": 1793738853903,
       "tag": "0016_add_project_uses_default_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793744622785,
+      "tag": "0017_add_rate_limit_notification",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793744642510,
+      "tag": "0018_probe0017",
+      "breakpoints": true
     }
   ]
 }

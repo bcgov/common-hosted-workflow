@@ -80,6 +80,44 @@ export class ProjectRelationRepository {
   }
 
   /**
+   * Lists the distinct email addresses of each project's members holding one
+   * of the given project-role slugs, keyed by projectId. The relation's `role`
+   * column stores the slug directly (FK to role(slug)), and disabled users or
+   * users without an email are excluded. Used to resolve rate-limit
+   * notification recipients — project admins and editors; a personal
+   * project's owner (`project:personalOwner`) is its only member.
+   */
+  async listMemberEmailsByProjectIdsAndRoles(
+    projectIds: string[],
+    roleSlugs: string[],
+  ): Promise<Map<string, string[]>> {
+    if (!projectIds.length || !roleSlugs.length) {
+      return new Map();
+    }
+
+    const { projectRelationProjectColumn, selectSql } = this.buildUserEmailLookup();
+    const projectRelationRoleColumn = quoteIdentifier(getColumnName(this.projectRelationRepository.metadata, 'role'));
+    const userEmailColumn = quoteIdentifier(getColumnName(this.userMetadata, 'email'));
+    const userDisabledColumn = quoteIdentifier(getColumnName(this.userMetadata, 'disabled'));
+
+    const rows = await this.queryUserEmails(
+      `${selectSql} WHERE pr.${projectRelationProjectColumn} = ANY($1)
+         AND pr.${projectRelationRoleColumn} = ANY($2)
+         AND u.${userDisabledColumn} = false
+         AND u.${userEmailColumn} IS NOT NULL`,
+      [projectIds, roleSlugs],
+    );
+
+    const emailsByProject = new Map<string, string[]>();
+    for (const row of rows as Array<{ projectId: string; email: string }>) {
+      const emails = emailsByProject.get(String(row.projectId)) ?? [];
+      emails.push(String(row.email));
+      emailsByProject.set(String(row.projectId), emails);
+    }
+    return emailsByProject;
+  }
+
+  /**
    * Counts the members (project relations) of each project in a single grouped
    * query. Projects without relations are absent from the map; callers treat a
    * missing entry as zero members.

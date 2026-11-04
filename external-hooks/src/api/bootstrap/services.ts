@@ -44,6 +44,9 @@ import { CssSsoService } from '../services/css-sso';
 import { JwtService, type BaseJwtService } from '../services/jwt';
 import { NodeMailerService, type BaseNodeMailerService } from '../services/node-mailer';
 import { UserService, type BaseUserService } from '../services/user';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('ApiServices');
 
 export type N8nServices = {
   authService: AuthService;
@@ -89,6 +92,26 @@ export function buildN8nServices(container: N8nContainer): N8nServices {
   };
 }
 
+/**
+ * Resolves n8n's mailer from the given DI container, or null when it is
+ * unavailable — e.g. a worker process where the mailer service is not
+ * registered, or a broken n8n install. Callers treat null as "notifications
+ * disabled" and skip sending (the same contract AccessRequestService uses
+ * for its optional mailer); a missing mailer must never take enforcement or
+ * an API request down.
+ */
+export function tryResolveNodeMailerService(container: N8nContainer): NodeMailerService | null {
+  try {
+    const { NodeMailer: BaseNodeMailerServiceClass } = require(N8N_NODE_MAILER_PATH) as { NodeMailer: unknown };
+    return new NodeMailerService(container.get<BaseNodeMailerService>(BaseNodeMailerServiceClass));
+  } catch (error) {
+    log.warn('Node mailer unavailable; email notifications are disabled in this process', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 export async function buildApiServices(
   n8nRepositories: N8nRepositories,
   customRepositories: CustomRepositories,
@@ -103,7 +126,11 @@ export async function buildApiServices(
   const tenantService = new TenantService(customRepositories, n8nRepositories, cstarService);
   const chefs = new ChefsService(n8nRepositories, n8nServices.credentialDecrypt, n8nServices.n8nCredentials);
   const triggerTarget = new TriggerTargetService(n8nRepositories, workflowRunner);
-  const projectRateLimitService = new ProjectRateLimitService(n8nRepositories, customRepositories);
+  const projectRateLimitService = new ProjectRateLimitService(
+    n8nRepositories,
+    customRepositories,
+    n8nServices.nodeMailerService,
+  );
 
   return {
     uiApi: new UiApiService(n8nRepositories),
