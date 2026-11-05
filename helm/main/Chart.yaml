@@ -18,7 +18,7 @@ dependencies:
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
   - name: redis
-    version: 25.5.3
+    version: 28.3.10
     repository: https://charts.bitnami.com/bitnami
     condition: redis.enabled
   - name: sdg-mock-app
