@@ -53,6 +53,7 @@ jobs:
         insecure_skip_tls_verify: true
 
     - name: Deploy apps with Helm chart
+      id: deploy
       env:
         NAMESPACE: ${{ vars.OPENSHIFT_NAMESPACE }}
         IMAGE_TAG: ${{ inputs.tag }}
@@ -60,8 +61,123 @@ jobs:
       run: |
         make upgrade
 
-        kubectl rollout status deployment/chwf-n8n-main
-        kubectl rollout status deployment/chwf-n8n-worker
-        kubectl rollout status deployment/chwf-n8n-webhook
-        kubectl rollout status deployment/chwf-n8n-runner
+        kubectl rollout status deployment/chwf-n8n-main --timeout=5m
+        kubectl rollout status deployment/chwf-n8n-worker --timeout=5m
+        kubectl rollout status deployment/chwf-n8n-webhook --timeout=5m
+        kubectl rollout status deployment/chwf-n8n-runner --timeout=5m
       working-directory: ./helm/main
+
+    - name: Send deployment status webhook
+      if: always()
+      env:
+        NAMESPACE: ${{ vars.OPENSHIFT_NAMESPACE }}
+        IMAGE_TAG: ${{ inputs.tag }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        CLUSTER: ${{ contains(secrets.OPENSHIFT_SERVER,'golddr') && 'golddr' || 'gold' }}
+        JOB_STATUS: ${{ job.status }}
+        DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        RUN_ID: ${{ github.run_id }}
+        EVENT_NAME: ${{ github.event_name }}
+        WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${WEBHOOK_URL}" ]; then
+          echo "DEPLOY_WEBHOOK_URL is not set on this environment; skipping deployment status notification."
+          exit 0
+        fi
+
+        # Ask the cluster for the result of the last Helm deployment.
+        helm_status="unknown"
+        helm_description=""
+        helm_last_deployed=""
+        last_revision="{}"
+
+        status_json="$(helm status chwf -n "${NAMESPACE}" -o json 2>/dev/null || true)"
+        if [ -n "${status_json}" ]; then
+          helm_status="$(jq -r '.info.status // "unknown"' <<<"${status_json}")"
+          helm_description="$(jq -r '.info.description // ""' <<<"${status_json}")"
+          helm_last_deployed="$(jq -r '.info.last_deployed // ""' <<<"${status_json}")"
+        fi
+
+        history_json="$(helm history chwf -n "${NAMESPACE}" -o json 2>/dev/null || true)"
+        if [ -n "${history_json}" ]; then
+          # Select the highest revision explicitly: history is listed oldest first,
+          # and '--max 1' + '.[0]' was unreliable on older Helm versions.
+          last_revision="$(jq -c 'max_by(.revision) // {}' <<<"${history_json}" 2>/dev/null || echo '{}')"
+        fi
+        helm_revision="$(jq -r '.revision // "unknown"' <<<"${last_revision}")"
+
+        payload="$(jq -n \
+          --arg repository "${GITHUB_REPOSITORY}" \
+          --arg workflow "${GITHUB_WORKFLOW}" \
+          --arg run_id "${RUN_ID}" \
+          --arg event "${EVENT_NAME}" \
+          --arg environment "${ENVIRONMENT}" \
+          --arg cluster "${CLUSTER}" \
+          --arg namespace "${NAMESPACE}" \
+          --arg image_tag "${IMAGE_TAG}" \
+          --arg job_status "${JOB_STATUS}" \
+          --arg deploy_outcome "${DEPLOY_OUTCOME}" \
+          --arg helm_status "${helm_status}" \
+          --arg helm_description "${helm_description}" \
+          --arg helm_last_deployed "${helm_last_deployed}" \
+          --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+          --argjson last_revision "${last_revision}" \
+          '{source: "github-actions",
+            repository: $repository,
+            workflow: $workflow,
+            run_id: $run_id,
+            event: $event,
+            environment: $environment,
+            cluster: $cluster,
+            namespace: $namespace,
+            image_tag: $image_tag,
+            status: $job_status,
+            deploy_outcome: $deploy_outcome,
+            helm: {
+              status: $helm_status,
+              description: $helm_description,
+              last_deployed: $helm_last_deployed,
+              last_revision: $last_revision
+            },
+            run_url: $run_url,
+            timestamp: (now | todate)}')"
+
+        echo "Deployment status payload:"
+        jq . <<<"${payload}"
+
+        echo "Sending deployment status webhook..."
+        # stderr is suppressed so the webhook hostname (part of the secret URL)
+        # never appears in logs; failures are reported via curl's exit code.
+        curl_exit=0
+        http_code="$(curl -sS -o /dev/null -w '%{http_code}' \
+          --max-time 15 --retry 1 --retry-delay 2 --retry-all-errors \
+          -X POST "${WEBHOOK_URL}" \
+          -H 'Content-Type: application/json' \
+          -d "${payload}" 2>/dev/null)" || curl_exit=$?
+
+        # curl exit codes: 6 = could not resolve host, 7 = connection refused,
+        # 22 = HTTP error (with --fail), 28 = timeout.
+        if [ "${curl_exit}" -ne 0 ]; then
+          echo "::warning::Could not reach the deployment status webhook (curl exit ${curl_exit})."
+        elif [[ "${http_code}" == 2* ]]; then
+          echo "Deployment status webhook accepted (HTTP ${http_code})."
+        else
+          echo "::warning::Deployment status webhook responded with HTTP ${http_code}."
+        fi
+
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          {
+            echo "## Deployment status"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Result | **${JOB_STATUS}** (deploy step: ${DEPLOY_OUTCOME}) |"
+            echo "| Environment | ${ENVIRONMENT} (${CLUSTER}) |"
+            echo "| Namespace | ${NAMESPACE} |"
+            echo "| Image tag | ${IMAGE_TAG} |"
+            echo "| Helm release | \`chwf\`: ${helm_status}, revision ${helm_revision} |"
+            echo "| Webhook | HTTP ${http_code} |"
+          } >>"${GITHUB_STEP_SUMMARY}"
+        fi
