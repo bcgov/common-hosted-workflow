@@ -28,6 +28,7 @@ runs:
     uses: egose/actions/asdf-tools@71efad841d4b7bb6a479984abacf7111ebd44a16
     with:
       github-token: ${{ github.token }}
+      update-plugins: 'true'
 
   - name: Install python tools
     run: |

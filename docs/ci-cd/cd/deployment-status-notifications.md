@@ -27,10 +27,10 @@ The URL is resolved inside `_deploy.yml` as:
 WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL || secrets.REPO_DEPLOY_WEBHOOK_URL }}
 ```
 
-| Secret | Scope | Purpose |
-| --- | --- | --- |
-| `DEPLOY_WEBHOOK_URL` | Environment (e.g. `standard-prod`) | Optional per-environment override; wins if defined |
-| `REPO_DEPLOY_WEBHOOK_URL` | Repository | Repository-wide default, threaded from the caller workflows (`deploy-dev.yml`, `deploy-test.yml`, `deploy-prod.yml` → `deploy-standard.yml` / `deploy-devx.yml` → `_deploy.yml`) |
+| Secret                    | Scope                              | Purpose                                                                                                                                                                          |
+| ------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEPLOY_WEBHOOK_URL`      | Environment (e.g. `standard-prod`) | Optional per-environment override; wins if defined                                                                                                                               |
+| `REPO_DEPLOY_WEBHOOK_URL` | Repository                         | Repository-wide default, threaded from the caller workflows (`deploy-dev.yml`, `deploy-test.yml`, `deploy-prod.yml` → `deploy-standard.yml` / `deploy-devx.yml` → `_deploy.yml`) |
 
 If neither is set, the step logs `No deployment status webhook URL configured … skipping notification` and exits without failing the job.
 
@@ -71,26 +71,26 @@ The webhook body is a flat JSON object:
 }
 ```
 
-| Field | Source | Notes |
-| --- | --- | --- |
-| `workflow` | `github.workflow` of the caller | `Deploy Dev`, `Deploy Test`, `Deploy Prod`, … |
-| `run_id` / `run_url` | GitHub run | Stable dedup key + deep link |
-| `event` | `github.event_name` | `push`, `release`, `workflow_dispatch` |
-| `environment` / `cluster` | deployment target | e.g. `standard-prod` on `gold` / `golddr` |
-| `image_tag` | deploy input | Commit SHA or release version |
-| `status` | GitHub job status | `success`, `failure`, `cancelled` |
-| `deploy_outcome` | deploy step outcome | additionally `skipped` when the job failed before deploying |
-| `helm.*` | `helm status` / `helm history` of release `chwf` | Cluster-side view; `unknown` when the job failed before Helm ran |
+| Field                     | Source                                           | Notes                                                            |
+| ------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
+| `workflow`                | `github.workflow` of the caller                  | `Deploy Dev`, `Deploy Test`, `Deploy Prod`, …                    |
+| `run_id` / `run_url`      | GitHub run                                       | Stable dedup key + deep link                                     |
+| `event`                   | `github.event_name`                              | `push`, `release`, `workflow_dispatch`                           |
+| `environment` / `cluster` | deployment target                                | e.g. `standard-prod` on `gold` / `golddr`                        |
+| `image_tag`               | deploy input                                     | Commit SHA or release version                                    |
+| `status`                  | GitHub job status                                | `success`, `failure`, `cancelled`                                |
+| `deploy_outcome`          | deploy step outcome                              | additionally `skipped` when the job failed before deploying      |
+| `helm.*`                  | `helm status` / `helm history` of release `chwf` | Cluster-side view; `unknown` when the job failed before Helm ran |
 
 ### Failure scenarios
 
-| Scenario | `status` | `deploy_outcome` | `helm.status` |
-| --- | --- | --- | --- |
-| Healthy deploy | `success` | `success` | `deployed` |
-| Pods never became ready (rollout timed out) | `failure` | `failure` | `deployed` |
-| `helm upgrade` failed | `failure` | `failure` | `failed` / `pending-upgrade` |
-| Failed before deploying (auth, checkout) | `failure` | `skipped` | last good state or `unknown` |
-| Job cancelled | `cancelled` | `cancelled` | last recorded state |
+| Scenario                                    | `status`    | `deploy_outcome` | `helm.status`                |
+| ------------------------------------------- | ----------- | ---------------- | ---------------------------- |
+| Healthy deploy                              | `success`   | `success`        | `deployed`                   |
+| Pods never became ready (rollout timed out) | `failure`   | `failure`        | `deployed`                   |
+| `helm upgrade` failed                       | `failure`   | `failure`        | `failed` / `pending-upgrade` |
+| Failed before deploying (auth, checkout)    | `failure`   | `skipped`        | last good state or `unknown` |
+| Job cancelled                               | `cancelled` | `cancelled`      | last recorded state          |
 
 ## n8n workflow setup
 
@@ -114,15 +114,13 @@ const formatTime = (value) => {
   const go = raw.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:\.\d+)? ([+-]\d{4}) UTC$/);
   if (go) return go[1] + ' ' + go[2] + ' UTC';
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime())
-    ? raw
-    : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  return Number.isNaN(parsed.getTime()) ? raw : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 };
 
 const STATES = {
-  success:   { emoji: '✅', label: 'Deploy succeeded',  style: 'good',      color: 'Good' },
-  failure:   { emoji: '❌', label: 'Deploy failed',     style: 'attention', color: 'Attention' },
-  cancelled: { emoji: '🚫', label: 'Deploy cancelled',  style: 'warning',   color: 'Warning' },
+  success: { emoji: '✅', label: 'Deploy succeeded', style: 'good', color: 'Good' },
+  failure: { emoji: '❌', label: 'Deploy failed', style: 'attention', color: 'Attention' },
+  cancelled: { emoji: '🚫', label: 'Deploy cancelled', style: 'warning', color: 'Warning' },
 };
 const DEFAULT_STATE = { emoji: '❔', label: 'Unknown status', style: 'emphasis', color: 'Default' };
 
@@ -132,7 +130,11 @@ const payloadOf = (json) => {
   let p = json || {};
   if (p.body !== undefined) {
     if (typeof p.body === 'string') {
-      try { p = JSON.parse(p.body); } catch { p = {}; }
+      try {
+        p = JSON.parse(p.body);
+      } catch {
+        p = {};
+      }
     } else {
       p = p.body;
     }
@@ -163,24 +165,37 @@ return $input.all().map((item) => {
     facts.push({ title: 'Workflow', value: [p.workflow, p.event && `(${p.event})`].filter(Boolean).join(' ') });
   }
   if (p.status || p.deploy_outcome) {
-    facts.push({ title: 'Result', value: [p.status, p.deploy_outcome && `deploy step: ${p.deploy_outcome}`].filter(Boolean).join(' · ') });
+    facts.push({
+      title: 'Result',
+      value: [p.status, p.deploy_outcome && `deploy step: ${p.deploy_outcome}`].filter(Boolean).join(' · '),
+    });
   }
   if (p.image_tag) facts.push({ title: 'Image tag', value: String(p.image_tag) });
   if (p.namespace) facts.push({ title: 'Namespace', value: String(p.namespace) });
   facts.push({
     title: 'Helm release',
-    value: ['chwf', helm.status || 'unknown',
-      rev.revision !== undefined && `rev ${rev.revision}`, rev.chart,
-      rev.app_version && `app v${rev.app_version}`].filter(Boolean).join(' · '),
+    value: [
+      'chwf',
+      helm.status || 'unknown',
+      rev.revision !== undefined && `rev ${rev.revision}`,
+      rev.chart,
+      rev.app_version && `app v${rev.app_version}`,
+    ]
+      .filter(Boolean)
+      .join(' · '),
   });
   if (helm.last_deployed) facts.push({ title: 'Last deployed', value: formatTime(helm.last_deployed) });
   if (p.timestamp) facts.push({ title: 'Payload time', value: formatTime(p.timestamp) });
 
-  const headerItems = [{
-    type: 'TextBlock',
-    text: `${state.emoji} ${state.label} — ${p.environment ?? 'unknown env'}`,
-    weight: 'Bolder', size: 'Medium', wrap: true,
-  }];
+  const headerItems = [
+    {
+      type: 'TextBlock',
+      text: `${state.emoji} ${state.label} — ${p.environment ?? 'unknown env'}`,
+      weight: 'Bolder',
+      size: 'Medium',
+      wrap: true,
+    },
+  ];
   const subtitle = [p.workflow, p.cluster && `cluster ${p.cluster}`].filter(Boolean).join(' · ');
   if (subtitle) {
     headerItems.push({ type: 'TextBlock', text: subtitle, isSubtle: true, size: 'Small', wrap: true });
