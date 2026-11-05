@@ -29,16 +29,13 @@ on:
         required: true
         type: string
         default: dev
-      webhook-url:
-        description: Deployment status webhook URL (falls back to the DEPLOY_WEBHOOK_URL secret)
-        required: false
-        type: string
-        default: ''
     secrets:
       OPENSHIFT_SERVER:
         required: true
       OPENSHIFT_TOKEN:
         required: true
+      REPO_DEPLOY_WEBHOOK_URL:
+        required: false
 
 permissions:
   contents: read
@@ -50,10 +47,10 @@ jobs:
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+      REPO_DEPLOY_WEBHOOK_URL: ${{ secrets.REPO_DEPLOY_WEBHOOK_URL || secrets.DEPLOY_WEBHOOK_URL }}
     with:
       environment: devx-${{ inputs.environment }}
       tag: ${{ inputs.tag }}
-      webhook-url: ${{ inputs['webhook-url'] || secrets.DEPLOY_WEBHOOK_URL }}
 
   deploy-devx-dr:
     name: Deploy DevX-${{ inputs.environment }}dr
@@ -61,7 +58,7 @@ jobs:
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+      REPO_DEPLOY_WEBHOOK_URL: ${{ secrets.REPO_DEPLOY_WEBHOOK_URL || secrets.DEPLOY_WEBHOOK_URL }}
     with:
       environment: devx-${{ inputs.environment }}dr
       tag: ${{ inputs.tag }}
-      webhook-url: ${{ inputs['webhook-url'] || secrets.DEPLOY_WEBHOOK_URL }}
