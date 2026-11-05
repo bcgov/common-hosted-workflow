@@ -4,8 +4,30 @@ description: Setup required tools in the workspace
 runs:
   using: composite
   steps:
+  - name: Install Linux build dependencies
+    if: runner.os == 'Linux'
+    shell: bash
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y \
+        build-essential \
+        libssl-dev \
+        zlib1g-dev \
+        libbz2-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libncursesw5-dev \
+        xz-utils \
+        tk-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        libffi-dev \
+        liblzma-dev
+
   - name: Setup Tools
-    uses: egose/actions/asdf-tools@d0de96cd40ac3aa9b42cf7f6363bd374eced26e4
+    uses: egose/actions/asdf-tools@71efad841d4b7bb6a479984abacf7111ebd44a16
+    with:
+      github-token: ${{ github.token }}
 
   - name: Install python tools
     run: |
