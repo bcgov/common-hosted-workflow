@@ -23,16 +23,13 @@ on:
         description: Environment to run the deployment in
         type: string
         required: true
-      webhook-url:
-        description: Deployment status webhook URL. Falls back to the DEPLOY_WEBHOOK_URL environment secret.
-        type: string
-        required: false
-        default: ''
     secrets:
       OPENSHIFT_SERVER:
         required: true
       OPENSHIFT_TOKEN:
         required: true
+      REPO_DEPLOY_WEBHOOK_URL:
+        required: false
 jobs:
   deploy:
     name: Deploy - ${{ inputs.environment }}
@@ -83,12 +80,12 @@ jobs:
         DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         RUN_ID: ${{ github.run_id }}
         EVENT_NAME: ${{ github.event_name }}
-        WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL || inputs['webhook-url'] }}
+        WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL || secrets.REPO_DEPLOY_WEBHOOK_URL }}
       run: |
         set -euo pipefail
 
         if [ -z "${WEBHOOK_URL}" ]; then
-          echo "No deployment status webhook URL configured (set DEPLOY_WEBHOOK_URL environment secret or pass the webhook-url input); skipping notification."
+          echo "No deployment status webhook URL configured (set the DEPLOY_WEBHOOK_URL secret); skipping notification."
           exit 0
         fi
 

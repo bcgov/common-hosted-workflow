@@ -47,10 +47,10 @@ jobs:
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+      REPO_DEPLOY_WEBHOOK_URL: ${{ secrets.REPO_DEPLOY_WEBHOOK_URL || secrets.DEPLOY_WEBHOOK_URL }}
     with:
       environment: dev
       tag: ${{ github.sha }}
-      webhook-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
 
   deploy-standard-dev:
     name: Deploys Standard (Dev)
@@ -59,7 +59,7 @@ jobs:
     secrets:
       OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
       OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+      REPO_DEPLOY_WEBHOOK_URL: ${{ secrets.REPO_DEPLOY_WEBHOOK_URL || secrets.DEPLOY_WEBHOOK_URL }}
     with:
       environment: dev
       tag: ${{ github.sha }}
-      webhook-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
