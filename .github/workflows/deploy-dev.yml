@@ -50,6 +50,7 @@ jobs:
     with:
       environment: dev
       tag: ${{ github.sha }}
+      webhook-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
 
   deploy-standard-dev:
     name: Deploys Standard (Dev)
@@ -61,3 +62,4 @@ jobs:
     with:
       environment: dev
       tag: ${{ github.sha }}
+      webhook-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}

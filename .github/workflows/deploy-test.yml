@@ -59,3 +59,4 @@ jobs:
     with:
       environment: test
       tag: ${{ needs.prepare-tag.outputs.tag }}
+      webhook-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}

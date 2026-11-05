@@ -29,6 +29,11 @@ on:
         required: true
         type: string
         default: dev
+      webhook-url:
+        description: Deployment status webhook URL (falls back to the DEPLOY_WEBHOOK_URL secret)
+        required: false
+        type: string
+        default: ''
     secrets:
       OPENSHIFT_SERVER:
         required: true
@@ -48,6 +53,7 @@ jobs:
     with:
       environment: devx-${{ inputs.environment }}
       tag: ${{ inputs.tag }}
+      webhook-url: ${{ inputs['webhook-url'] || secrets.DEPLOY_WEBHOOK_URL }}
 
   deploy-devx-dr:
     name: Deploy DevX-${{ inputs.environment }}dr
@@ -58,3 +64,4 @@ jobs:
     with:
       environment: devx-${{ inputs.environment }}dr
       tag: ${{ inputs.tag }}
+      webhook-url: ${{ inputs['webhook-url'] || secrets.DEPLOY_WEBHOOK_URL }}

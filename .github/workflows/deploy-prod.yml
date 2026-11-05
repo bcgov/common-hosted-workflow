@@ -37,3 +37,4 @@ jobs:
     with:
       environment: prod
       tag: ${{ needs.prepare-tag.outputs.tag }}
+      webhook-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}

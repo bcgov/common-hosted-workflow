@@ -23,6 +23,11 @@ on:
         description: Environment to run the deployment in
         type: string
         required: true
+      webhook-url:
+        description: Deployment status webhook URL. Falls back to the DEPLOY_WEBHOOK_URL environment secret.
+        type: string
+        required: false
+        default: ''
     secrets:
       OPENSHIFT_SERVER:
         required: true
@@ -78,12 +83,12 @@ jobs:
         DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         RUN_ID: ${{ github.run_id }}
         EVENT_NAME: ${{ github.event_name }}
-        WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL || inputs['webhook-url'] }}
       run: |
         set -euo pipefail
 
         if [ -z "${WEBHOOK_URL}" ]; then
-          echo "DEPLOY_WEBHOOK_URL is not set on this environment; skipping deployment status notification."
+          echo "No deployment status webhook URL configured (set DEPLOY_WEBHOOK_URL environment secret or pass the webhook-url input); skipping notification."
           exit 0
         fi
 
