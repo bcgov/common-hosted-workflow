@@ -71,7 +71,7 @@ Because of that:
 
 - trigger nodes are disabled on DR in current Helm overlays using `n8n.extraExcludedNodes`
 - selected DR overlays enable `pgo.conditionalRestore` to restore from S3-backed backups
-- `dns-probe` is used in some DR environments to support failover-aware restore behavior
+- `dns-probe` is used in some DR environments to support failover-aware restore behavior (see [DNS Probe](./dns-probe.md) for how the probe works and how it notifies)
 - the same `dns-probe` signal also drives the `failover` CronJob (`helm/main/templates/failover/`). After a stable failover it re-runs `helm upgrade` with the `values-<namespace>-golddr-failover.yaml` overlay (for example, higher n8n replica counts), and after a stable failback it re-runs it without the overlay
 
 For the underlying backup and restore pipeline, see [Database Backup Process](./database-backup-process.md).
