@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import main  # noqa: E402
 
-
 WEBHOOK_URL = "https://n8n.example.com/webhook/dns-alert"  # NOSONAR
 
 EVENT_ARGS = ("1.2.3.4", "5.6.7.8", "primary", "secondary")

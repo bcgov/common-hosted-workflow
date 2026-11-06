@@ -59,13 +59,13 @@ Enabled only when `ALERT_WEBHOOK_URL` is defined. The probe POSTs the same facts
 }
 ```
 
-| Behaviour          | Detail                                                                        |
-| ------------------ | ----------------------------------------------------------------------------- |
-| Method / body      | `POST` with `Content-Type: application/json`                                   |
-| Enabled when       | `ALERT_WEBHOOK_URL` is set in the `chwf-dns-probe` secret                       |
-| Timeout            | 10 seconds                                                                     |
-| Failure handling   | Logged and swallowed — a webhook outage never blocks the email (and vice versa) |
-| Resolved / clear   | Not sent — every notification describes a change; the next one may be the change back |
+| Behaviour        | Detail                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| Method / body    | `POST` with `Content-Type: application/json`                                          |
+| Enabled when     | `ALERT_WEBHOOK_URL` is set in the `chwf-dns-probe` secret                             |
+| Timeout          | 10 seconds                                                                            |
+| Failure handling | Logged and swallowed — a webhook outage never blocks the email (and vice versa)       |
+| Resolved / clear | Not sent — every notification describes a change; the next one may be the change back |
 
 This payload is a single flat object — unlike [Grafana's webhook schema](../operations/grafana-alert-notifications.md#payload-reference), there is no `alerts[]` envelope to iterate. The n8n workflow that turns this callback into a Teams card is documented below.
 
@@ -90,9 +90,7 @@ string, and adds `card` (object) and `cardJson` (string) to each item.
 const formatTime = (value) => {
   if (!value) return 'unknown';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? String(value)
-    : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 };
 
 // Every dns-probe notification describes a change — the direction it points in
@@ -185,7 +183,7 @@ return $input.all().map((item) => {
 
 ## Card appearance
 
-- **Status header band**: tinted by the *direction* of the change — red (`attention`) when the
+- **Status header band**: tinted by the _direction_ of the change — red (`attention`) when the
   domain stops resolving or lands on an unclassified IP ("DNS routing lost"), amber
   (`warning`) when traffic moves to GoldDR, green (`good`) when it is on — or back to — Gold.
 - **Header line**: the state label, with a subtle `domain · environment` subtitle.
@@ -199,18 +197,18 @@ return $input.all().map((item) => {
 
 Non-secret settings are set in the Helm values (the `dns-probe.env` block of each `values-<namespace>-golddr.yaml` overlay); environment-specific identity and routing values are supplied through the `chwf-dns-probe` secret and injected with `envFrom`.
 
-| Variable                | Where      | Purpose                                                            |
-| ----------------------- | ---------- | ------------------------------------------------------------------ |
-| `DOMAIN_NAME`           | secret     | The domain to watch (**required** — the container exits without it) |
-| `PRIMARY_IPS`           | secret     | Comma-separated Gold cluster IPs → `primary`                        |
-| `SECONDARY_IPS`         | secret     | Comma-separated GoldDR cluster IPs → `secondary`                    |
-| `ALERT_EMAIL_RECIPIENTS`| secret     | Comma-separated alert email recipients                              |
-| `ALERT_WEBHOOK_URL`     | secret     | Optional webhook callback URL; empty/absent disables the channel    |
-| `APP_ENV`               | values     | Label used in the email subject and webhook payload                 |
-| `SMTP_HOST` / `SMTP_PORT` | values   | Mail relay (default `apps.smtp.gov.bc.ca:25`)                       |
-| `SMTP_SENDER`           | values     | From address (default `DoNotReplyCITZ@gov.bc.ca`)                   |
-| `POLL_INTERVAL`         | values     | Seconds between DNS lookups (default 5)                             |
-| `ALERT_ON_STARTUP`      | values     | `true` also notifies on the first resolution after a pod restart (default `false`) |
+| Variable                  | Where  | Purpose                                                                            |
+| ------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| `DOMAIN_NAME`             | secret | The domain to watch (**required** — the container exits without it)                |
+| `PRIMARY_IPS`             | secret | Comma-separated Gold cluster IPs → `primary`                                       |
+| `SECONDARY_IPS`           | secret | Comma-separated GoldDR cluster IPs → `secondary`                                   |
+| `ALERT_EMAIL_RECIPIENTS`  | secret | Comma-separated alert email recipients                                             |
+| `ALERT_WEBHOOK_URL`       | secret | Optional webhook callback URL; empty/absent disables the channel                   |
+| `APP_ENV`                 | values | Label used in the email subject and webhook payload                                |
+| `SMTP_HOST` / `SMTP_PORT` | values | Mail relay (default `apps.smtp.gov.bc.ca:25`)                                      |
+| `SMTP_SENDER`             | values | From address (default `DoNotReplyCITZ@gov.bc.ca`)                                  |
+| `POLL_INTERVAL`           | values | Seconds between DNS lookups (default 5)                                            |
+| `ALERT_ON_STARTUP`        | values | `true` also notifies on the first resolution after a pod restart (default `false`) |
 
 To add or change a secret-supplied value:
 
@@ -223,12 +221,12 @@ Then restart the deployment to pick up the new value.
 
 ## Deployment
 
-| Aspect     | Detail                                                                    |
-| ---------- | ------------------------------------------------------------------------- |
-| Chart      | `helm/_dns-probe`, conditionally enabled via `dns-probe.enabled: true`     |
-| Enabled on | GoldDR overlays only (`values-*-golddr.yaml`)                              |
+| Aspect     | Detail                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chart      | `helm/_dns-probe`, conditionally enabled via `dns-probe.enabled: true`                                                                            |
+| Enabled on | GoldDR overlays only (`values-*-golddr.yaml`)                                                                                                     |
 | Image      | `ghcr.io/bcgov/chwf-dns-probe`, built from [`dns-probe/`](https://github.com/bcgov/common-hosted-workflow/tree/main/dns-probe) in this repository |
-| Service    | ClusterIP on port 8000 — `http://chwf-dns-probe:8000/status` (in-cluster only) |
+| Service    | ClusterIP on port 8000 — `http://chwf-dns-probe:8000/status` (in-cluster only)                                                                    |
 
 ## Local development
 
