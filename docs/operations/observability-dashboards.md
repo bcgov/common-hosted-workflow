@@ -401,14 +401,30 @@ Git and provisioned by Helm; they are locked against editing in the Grafana UI.
 
 Every alert rule includes a `team` label. Grafana routes notifications using that label:
 
-| Team label  | Recipient contact point | Alert scope                            |
-| ----------- | ----------------------- | -------------------------------------- |
-| `platform`  | `n8n-ops-email`         | n8n platform and infrastructure health |
-| `workflows` | `n8n-workflows-email`   | Workflow execution failures            |
+| Team label  | Recipient contact point | Webhook | Alert scope                            |
+| ----------- | ----------------------- | ------- | -------------------------------------- |
+| `platform`  | `n8n-ops-email`         | Yes     | n8n platform and infrastructure health |
+| `workflows` | `n8n-workflows-email`   | No      | Workflow execution failures            |
 
-The recipient addresses are supplied to Grafana through the deployment secret rather than
-stored in Git. Notifications are grouped by Grafana folder and alert name, wait 30 seconds
-before the first notification, and repeat every four hours while an alert remains firing.
+The recipient addresses and the webhook callback URL are supplied to Grafana through the
+deployment secret (`GRAFANA_ALERT_EMAIL_TO`, `GRAFANA_ALERT_EMAIL_WORKFLOWS`, and
+`GRAFANA_ALERT_WEBHOOK_URL` in the `chwf-grafana` secret) rather than stored in Git.
+Notifications are grouped by Grafana folder and alert name, wait 30 seconds before the first
+notification, and repeat every four hours while an alert remains firing.
+
+#### Webhook delivery
+
+`platform` alerts are additionally POSTed as JSON to the callback URL configured in
+`GRAFANA_ALERT_WEBHOOK_URL` — for example an n8n webhook node or an external-hooks route. The
+payload uses Grafana's standard webhook schema (`version: "1"`, Alertmanager-compatible) with
+top-level `receiver`, `status` (`firing`/`resolved`), `state`, `title`, `message`, and an
+`alerts[]` array. Each alert entry carries the rule's `labels` (including `team`, `severity`,
+and the namespace-injected `environment`), its rendered `annotations` (`summary`,
+`description`, and `error_messages` where present), and the breached metric value in `values`.
+Resolved notifications are delivered as well; workflow-failure alerts are email-only.
+
+See [Grafana Alert Notifications](grafana-alert-notifications.md) for the n8n workflow that
+turns these callbacks into Teams Adaptive Cards.
 
 ### System-log alerts
 
@@ -423,6 +439,37 @@ The following rules query the `n8n-system-logs` Loki stream via the **Loki Syste
 System-error emails include recent matching error messages and a link to the **n8n System
 Logs** dashboard around the alert time. Workflow alerts instead link to the **n8n Executions**
 dashboard and can include failed-workflow counts.
+
+### Health alerts
+
+The following rules query n8n runtime metrics from Mimir (Alloy scrapes the n8n `/metrics`
+endpoint every 30 seconds) and route to the `platform` team — by email and webhook callback:
+
+| Alert                           | Condition                                                                           | Evaluation                    |
+| ------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- |
+| **n8n Metrics Unavailable**     | The n8n `/metrics` scrape target is down, or its metric series disappears entirely. | Sustained for two minutes     |
+| **Bull Queue Failed Jobs**      | One or more permanently failed jobs in the Bull queue.                              | Sustained for five minutes    |
+| **Bull Queue Backlog Elevated** | More than 100 waiting jobs in the Bull queue.                                       | Sustained for fifteen minutes |
+| **Event Loop Lag High**         | p99 event-loop lag above 1 second.                                                  | Sustained for five minutes    |
+| **Heap Memory Pressure**        | Heap usage above 90% of allocated heap.                                             | Sustained for ten minutes     |
+| **CPU Usage Sustained High**    | More than 0.9 CPU cores.                                                            | Sustained for ten minutes     |
+| **Open File Descriptors High**  | More than 500 open file descriptors.                                                | Sustained for ten minutes     |
+
+`n8n Metrics Unavailable` is the guard rule for the group: every other Health metric goes
+silent when n8n is down or the Alloy→Mimir pipeline is broken, so it also fires when data is
+missing entirely (`noDataState: Alerting`). The Bull queue rules only receive data when n8n
+runs in queue mode; in single-process mode they stay silent. The warning thresholds (backlog
+100, FDs 500, 0.9 cores, 1 s lag) are starting points — tune them against production data
+before trusting the warning-level pages.
+
+### Workflow alerts
+
+| Alert                         | Condition                                                                                                                                     | Evaluation                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Workflow Execution Failed** | One or more non-manual workflow executions failed — webhook, trigger, integrated, and CLI modes are monitored; editor test runs are excluded. | Immediately on failure in the previous five minutes |
+
+Workflow alerts route to the `workflows` team by email only. The email includes a
+per-workflow failure count breakdown and links to the **n8n Executions** dashboard.
 
 ### Adding a team route
 
