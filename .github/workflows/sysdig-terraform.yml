@@ -29,7 +29,7 @@ jobs:
   terraform-plan:
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan')
     name: Terraform Plan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     environment: sysdig
     permissions:
@@ -88,7 +88,7 @@ jobs:
   terraform-apply:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
     name: Terraform Apply
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     environment: sysdig
     permissions:
