@@ -423,6 +423,9 @@ and the namespace-injected `environment`), its rendered `annotations` (`summary`
 `description`, and `error_messages` where present), and the breached metric value in `values`.
 Resolved notifications are delivered as well; workflow-failure alerts are email-only.
 
+See [Grafana Alert Notifications](grafana-alert-notifications.md) for the n8n workflow that
+turns these callbacks into Teams Adaptive Cards.
+
 ### System-log alerts
 
 The following rules query the `n8n-system-logs` Loki stream via the **Loki System Logs** datasource (`loki-system` tenant) and route to the `platform` team:
