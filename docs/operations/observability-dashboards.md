@@ -445,15 +445,15 @@ dashboard and can include failed-workflow counts.
 The following rules query n8n runtime metrics from Mimir (Alloy scrapes the n8n `/metrics`
 endpoint every 30 seconds) and route to the `platform` team — by email and webhook callback:
 
-| Alert                          | Condition                                                                           | Evaluation                     |
-| ------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------ |
-| **n8n Metrics Unavailable**    | The n8n `/metrics` scrape target is down, or its metric series disappears entirely. | Sustained for two minutes      |
-| **Bull Queue Failed Jobs**     | One or more permanently failed jobs in the Bull queue.                              | Sustained for five minutes     |
-| **Bull Queue Backlog Elevated**| More than 100 waiting jobs in the Bull queue.                                       | Sustained for fifteen minutes  |
-| **Event Loop Lag High**        | p99 event-loop lag above 1 second.                                                  | Sustained for five minutes     |
-| **Heap Memory Pressure**       | Heap usage above 90% of allocated heap.                                             | Sustained for ten minutes      |
-| **CPU Usage Sustained High**   | More than 0.9 CPU cores.                                                            | Sustained for ten minutes      |
-| **Open File Descriptors High** | More than 500 open file descriptors.                                                | Sustained for ten minutes      |
+| Alert                           | Condition                                                                           | Evaluation                    |
+| ------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- |
+| **n8n Metrics Unavailable**     | The n8n `/metrics` scrape target is down, or its metric series disappears entirely. | Sustained for two minutes     |
+| **Bull Queue Failed Jobs**      | One or more permanently failed jobs in the Bull queue.                              | Sustained for five minutes    |
+| **Bull Queue Backlog Elevated** | More than 100 waiting jobs in the Bull queue.                                       | Sustained for fifteen minutes |
+| **Event Loop Lag High**         | p99 event-loop lag above 1 second.                                                  | Sustained for five minutes    |
+| **Heap Memory Pressure**        | Heap usage above 90% of allocated heap.                                             | Sustained for ten minutes     |
+| **CPU Usage Sustained High**    | More than 0.9 CPU cores.                                                            | Sustained for ten minutes     |
+| **Open File Descriptors High**  | More than 500 open file descriptors.                                                | Sustained for ten minutes     |
 
 `n8n Metrics Unavailable` is the guard rule for the group: every other Health metric goes
 silent when n8n is down or the Alloy→Mimir pipeline is broken, so it also fires when data is
@@ -464,8 +464,8 @@ before trusting the warning-level pages.
 
 ### Workflow alerts
 
-| Alert                         | Condition                                                                                                                                   | Evaluation                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Alert                         | Condition                                                                                                                                     | Evaluation                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | **Workflow Execution Failed** | One or more non-manual workflow executions failed — webhook, trigger, integrated, and CLI modes are monitored; editor test runs are excluded. | Immediately on failure in the previous five minutes |
 
 Workflow alerts route to the `workflows` team by email only. The email includes a
