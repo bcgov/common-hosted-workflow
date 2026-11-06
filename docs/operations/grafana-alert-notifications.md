@@ -35,13 +35,13 @@ oc patch secret chwf-grafana -n <namespace> --type=merge \
   -p '{"stringData":{"GRAFANA_ALERT_WEBHOOK_URL":"https://<n8n-host>/webhook/<path>"}}'
 ```
 
-| Behaviour            | Detail                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Scope                | `team=platform` alerts only (System Log + Health alerts); workflow-failure alerts are email-only              |
-| Method / body        | `POST` with `Content-Type: application/json`                                                                  |
-| Resolved messages    | Sent too (`status: "resolved"`) — the card below renders them green                                            |
-| Authentication       | Optional `Authorization: Bearer` header via `GRAFANA_ALERT_WEBHOOK_SECRET` (see the commented settings in the contact point) |
-| Grouping             | One POST per folder + alert name; repeat reminders every 4 hours while firing                                 |
+| Behaviour         | Detail                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Scope             | `team=platform` alerts only (System Log + Health alerts); workflow-failure alerts are email-only                             |
+| Method / body     | `POST` with `Content-Type: application/json`                                                                                 |
+| Resolved messages | Sent too (`status: "resolved"`) — the card below renders them green                                                          |
+| Authentication    | Optional `Authorization: Bearer` header via `GRAFANA_ALERT_WEBHOOK_SECRET` (see the commented settings in the contact point) |
+| Grouping          | One POST per folder + alert name; repeat reminders every 4 hours while firing                                                |
 
 ## Payload reference
 
@@ -73,7 +73,7 @@ Alertmanager-compatible) — the same envelope for every rule. A firing example
       "startsAt": "2026-11-06T14:22:31.048102+00:00",
       "endsAt": "0001-01-01T00:00:00Z",
       "generatorURL": "https://grafana-workflow.apps.gold.devops.gov.bc.ca/alerting/n8n-queue-jobs-failed/edit",
-      "fingerprint": "6b3a1c9e02f4d877",
+      "fingerprint": "6b3a1c9e02f4d877", # pragma: allowlist secret
       "silenceURL": "https://grafana-workflow.apps.gold.devops.gov.bc.ca/alerting/silence/new?…",
       "values": { "A": 3, "B": 1 }
     }
@@ -91,36 +91,36 @@ Alertmanager-compatible) — the same envelope for every rule. A firing example
 }
 ```
 
-| Field                          | Source               | Notes                                                                                          |
-| ------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------- |
-| `receiver`                     | contact point        | Always `n8n-webhook`                                                                            |
-| `status` / `state`             | group lifecycle      | `firing`/`alerting` or `resolved`/`ok`                                                          |
-| `alerts[]`                     | alert instances      | One entry per instance in the group — iterate, don't assume exactly one                          |
-| `alerts[].labels`              | rule labels          | `alertname`, `severity`, `team`, `service`, `category`, `environment` (namespace injected at deploy time), `grafana_folder` |
-| `alerts[].annotations`         | rule annotations     | `summary`, `description` (already contains the breached value as text), `error_messages` (system-log rules list the matching error lines) |
-| `alerts[].values`              | query evaluation     | refId → value: `A` is the breached metric, `B` the threshold result (`1` = condition true)       |
-| `alerts[].startsAt` / `endsAt` | lifecycle timestamps | RFC3339; `endsAt` is zero-time (`0001-01-01T00:00:00Z`) while firing                            |
-| `alerts[].generatorURL`        | Grafana deep link    | Opens the alert rule in the editor                                                              |
-| `alerts[].silenceURL`          | Grafana deep link    | Pre-filled silence form for this alert                                                          |
-| `alerts[].fingerprint`         | labels hash          | Stable key for de-duplicating notifications per instance                                        |
-| `groupLabels`                  | notification policy  | Policy groups by `grafana_folder` + `alertname`                                                 |
-| `externalURL`                  | sending instance     | Base URL of the Grafana that sent the POST                                                      |
-| `title` / `message`            | `n8n.alert.*` templates | Same rendered subject/body as the ops emails                                                 |
-| `truncatedAlerts`              | payload              | `0` — no `maxAlerts` limit is configured                                                        |
+| Field                          | Source                  | Notes                                                                                                                                     |
+| ------------------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `receiver`                     | contact point           | Always `n8n-webhook`                                                                                                                      |
+| `status` / `state`             | group lifecycle         | `firing`/`alerting` or `resolved`/`ok`                                                                                                    |
+| `alerts[]`                     | alert instances         | One entry per instance in the group — iterate, don't assume exactly one                                                                   |
+| `alerts[].labels`              | rule labels             | `alertname`, `severity`, `team`, `service`, `category`, `environment` (namespace injected at deploy time), `grafana_folder`               |
+| `alerts[].annotations`         | rule annotations        | `summary`, `description` (already contains the breached value as text), `error_messages` (system-log rules list the matching error lines) |
+| `alerts[].values`              | query evaluation        | refId → value: `A` is the breached metric, `B` the threshold result (`1` = condition true)                                                |
+| `alerts[].startsAt` / `endsAt` | lifecycle timestamps    | RFC3339; `endsAt` is zero-time (`0001-01-01T00:00:00Z`) while firing                                                                      |
+| `alerts[].generatorURL`        | Grafana deep link       | Opens the alert rule in the editor                                                                                                        |
+| `alerts[].silenceURL`          | Grafana deep link       | Pre-filled silence form for this alert                                                                                                    |
+| `alerts[].fingerprint`         | labels hash             | Stable key for de-duplicating notifications per instance                                                                                  |
+| `groupLabels`                  | notification policy     | Policy groups by `grafana_folder` + `alertname`                                                                                           |
+| `externalURL`                  | sending instance        | Base URL of the Grafana that sent the POST                                                                                                |
+| `title` / `message`            | `n8n.alert.*` templates | Same rendered subject/body as the ops emails                                                                                              |
+| `truncatedAlerts`              | payload                 | `0` — no `maxAlerts` limit is configured                                                                                                  |
 
 ### Scenarios
 
-| Scenario                                             | `status`    | `state`    | `values`                    |
-| ---------------------------------------------------- | ----------- | ---------- | --------------------------- |
-| Rule breached                                        | `firing`    | `alerting` | `{ A: <metric>, B: 1 }`     |
-| Condition cleared                                    | `resolved`  | `ok`       | `{ A: <metric>, B: 0 }`     |
-| No-data firing (`n8n Metrics Unavailable` via `noDataState: Alerting`) | `firing` | `alerting` | `{}` — no query value; `description` still renders |
-| Several instances in one group                        | `firing`    | `alerting` | `alerts[]` carries N entries |
+| Scenario                                                               | `status`   | `state`    | `values`                                           |
+| ---------------------------------------------------------------------- | ---------- | ---------- | -------------------------------------------------- |
+| Rule breached                                                          | `firing`   | `alerting` | `{ A: <metric>, B: 1 }`                            |
+| Condition cleared                                                      | `resolved` | `ok`       | `{ A: <metric>, B: 0 }`                            |
+| No-data firing (`n8n Metrics Unavailable` via `noDataState: Alerting`) | `firing`   | `alerting` | `{}` — no query value; `description` still renders |
+| Several instances in one group                                         | `firing`   | `alerting` | `alerts[]` carries N entries                       |
 
 ## n8n workflow setup
 
 1. **Webhook node** — method **POST**. Use the **Production** URL in the secret (the test URL
-   is fine for manual tries from Grafana's contact-point *Send test notification* button). Its
+   is fine for manual tries from Grafana's contact-point _Send test notification_ button). Its
    output nests the payload under `body` (`{ headers, params, query, body }`).
 2. **Code node** — mode **Run Once for All Items**, paste the script below.
 3. **DevX Message Connector** — **Type: Adaptive Card**, **Payload: `{{ $json.cardJson }}`**,
@@ -140,9 +140,7 @@ string, and adds `card` (object) and `cardJson` (string) to each item.
 const formatTime = (value) => {
   if (!value) return 'unknown';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? String(value)
-    : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 };
 
 // `values` maps refIds to results — A is the Prometheus/Loki query result (the
@@ -224,10 +222,16 @@ return $input.all().map((item) => {
     return {
       type: 'Container',
       items: [
-        ...(showAlertTitles ? [{ type: 'TextBlock', text: String(labels.alertname || 'Alert'), weight: 'Bolder', wrap: true }] : []),
-        ...(ann.summary ? [{ type: 'TextBlock', text: String(ann.summary), isSubtle: true, size: 'Small', wrap: true }] : []),
+        ...(showAlertTitles
+          ? [{ type: 'TextBlock', text: String(labels.alertname || 'Alert'), weight: 'Bolder', wrap: true }]
+          : []),
+        ...(ann.summary
+          ? [{ type: 'TextBlock', text: String(ann.summary), isSubtle: true, size: 'Small', wrap: true }]
+          : []),
         ...(ann.description ? [{ type: 'TextBlock', text: String(ann.description), wrap: true }] : []),
-        ...(ann.error_messages ? [{ type: 'TextBlock', text: String(ann.error_messages), size: 'Small', wrap: true }] : []),
+        ...(ann.error_messages
+          ? [{ type: 'TextBlock', text: String(ann.error_messages), size: 'Small', wrap: true }]
+          : []),
         ...(facts.length ? [{ type: 'FactSet', facts }] : []),
       ],
     };
@@ -255,7 +259,13 @@ return $input.all().map((item) => {
         type: 'Container',
         style: state.style,
         items: [
-          { type: 'TextBlock', text: `${state.emoji} ${state.label} — ${alertname}`, weight: 'Bolder', size: 'Medium', wrap: true },
+          {
+            type: 'TextBlock',
+            text: `${state.emoji} ${state.label} — ${alertname}`,
+            weight: 'Bolder',
+            size: 'Medium',
+            wrap: true,
+          },
           { type: 'TextBlock', text: subtitle, isSubtle: true, size: 'Small', wrap: true },
         ],
       },
@@ -266,9 +276,12 @@ return $input.all().map((item) => {
   // Buttons: alert-rule deep link always; pre-filled silence while firing.
   const first = alerts[0] || {};
   const actions = [];
-  if (first.generatorURL) actions.push({ type: 'Action.OpenUrl', title: 'Open alert rule', url: String(first.generatorURL) });
-  if (!resolved && first.silenceURL) actions.push({ type: 'Action.OpenUrl', title: 'Silence in Grafana', url: String(first.silenceURL) });
-  if (!actions.length && p.externalURL) actions.push({ type: 'Action.OpenUrl', title: 'Open Grafana', url: String(p.externalURL) });
+  if (first.generatorURL)
+    actions.push({ type: 'Action.OpenUrl', title: 'Open alert rule', url: String(first.generatorURL) });
+  if (!resolved && first.silenceURL)
+    actions.push({ type: 'Action.OpenUrl', title: 'Silence in Grafana', url: String(first.silenceURL) });
+  if (!actions.length && p.externalURL)
+    actions.push({ type: 'Action.OpenUrl', title: 'Open Grafana', url: String(p.externalURL) });
   if (actions.length) card.actions = actions;
 
   return {
@@ -293,9 +306,9 @@ return $input.all().map((item) => {
   `error_messages` lines for system-log alerts, and a FactSet with severity, metric value, and
   started/resolved timestamps. The bold alert-name title is repeated inside sections only when
   a card holds several alerts — with a single alert the header band already names it.
-- **Buttons**: *Open alert rule* (from `generatorURL`), *Silence in Grafana* (pre-filled, only
-  while firing), falling back to *Open Grafana* when no deep links exist.
+- **Buttons**: _Open alert rule_ (from `generatorURL`), _Silence in Grafana_ (pre-filled, only
+  while firing), falling back to _Open Grafana_ when no deep links exist.
 
 Use **Mode: Preview** on the DevX Message Connector to render a card without posting it while
-testing — a quick way to see a real payload is Grafana's contact-point *Send test
-notification* button, which POSTs the same envelope with a sample alert.
+testing — a quick way to see a real payload is Grafana's contact-point _Send test
+notification_ button, which POSTs the same envelope with a sample alert.
