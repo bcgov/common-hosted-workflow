@@ -1,7 +1,10 @@
+import json
 import logging
 import smtplib
 import sys
 import threading
+import urllib.request
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 
 import uvicorn
@@ -59,6 +62,37 @@ def send_alert_email(
         logger.exception("Failed to send alert email")
 
 
+def send_alert_webhook(
+    previous_ip: str, current_ip: str, previous_routing: str, current_routing: str
+):
+    url = config["alert_webhook_url"]
+    if not url:
+        return
+
+    payload = {
+        "event": "dns_routing_change",
+        "domain": config["domain_name"],
+        "environment": config["app_env"],
+        "previous_ip": previous_ip or None,
+        "previous_routing": previous_routing,
+        "current_ip": current_ip,
+        "current_routing": current_routing,
+        "detected_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+    try:
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            logger.info("Alert webhook sent (HTTP %s)", response.status)
+    except Exception:
+        logger.exception("Failed to send alert webhook")
+
+
 def on_ip_change(
     previous_ip: str,
     current_ip: str,
@@ -76,11 +110,12 @@ def on_ip_change(
 
     if is_first and not config["alert_on_startup"]:
         logger.info(
-            "Skipping alert email on first resolution (set ALERT_ON_STARTUP=true to override)"
+            "Skipping alert on first resolution (set ALERT_ON_STARTUP=true to override)"
         )
         return
 
     send_alert_email(previous_ip, current_ip, previous_routing, current_routing)
+    send_alert_webhook(previous_ip, current_ip, previous_routing, current_routing)
 
 
 @app.get("/health")

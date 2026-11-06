@@ -20,6 +20,7 @@ def get_config():
             for e in os.environ.get("ALERT_EMAIL_RECIPIENTS", "").split(",")
             if e.strip()
         ],
+        "alert_webhook_url": os.environ.get("ALERT_WEBHOOK_URL", "").strip(),
         "smtp_host": os.environ.get("SMTP_HOST", "apps.smtp.gov.bc.ca"),
         "smtp_port": int(os.environ.get("SMTP_PORT", "25")),
         "smtp_sender": os.environ.get("SMTP_SENDER", "DoNotReplyCITZ@gov.bc.ca"),

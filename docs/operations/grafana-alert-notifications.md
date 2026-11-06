@@ -73,7 +73,7 @@ Alertmanager-compatible) — the same envelope for every rule. A firing example
       "startsAt": "2026-11-06T14:22:31.048102+00:00",
       "endsAt": "0001-01-01T00:00:00Z",
       "generatorURL": "https://grafana-workflow.apps.gold.devops.gov.bc.ca/alerting/n8n-queue-jobs-failed/edit",
-      "fingerprint": "6b3a1c9e02f4d877",
+      "fingerprint": "6b3a1c9e02f4d877", # pragma: allowlist secret
       "silenceURL": "https://grafana-workflow.apps.gold.devops.gov.bc.ca/alerting/silence/new?…",
       "values": { "A": 3, "B": 1 }
     }
