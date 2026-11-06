@@ -25,6 +25,31 @@ contactPoints:
           singleEmail: true
         disableResolveMessage: true
 
+  # Webhook receiver — POSTs Grafana's standard alert JSON (receiver, status,
+  # alerts[] with labels/annotations/values, title, message) to a callback URL,
+  # e.g. an n8n webhook node or the external-hooks API. Routed from
+  # notification-policies.yaml for every alert matching team=platform (all
+  # System Log and Health alerts), alongside the ops email.
+  - orgId: 1
+    name: n8n-webhook
+    receivers:
+      - uid: n8n-webhook
+        type: webhook
+        settings:
+          url: $__env{GRAFANA_ALERT_WEBHOOK_URL}
+          httpMethod: POST
+          # Deterministic title/message — the same templates the email contact
+          # points use (defined in notification-templates.yaml), so the callback
+          # receives the same [FIRING]/[RESOLVED] subject and 🔴/🟡/✅ formatted
+          # body instead of Grafana's version-dependent default rendering.
+          title: '{{ template "n8n.alert.subject" . }}'
+          message: '{{ template "n8n.alert.body" . }}'
+          # Optional shared-secret auth for the callback endpoint. To enable, add
+          # GRAFANA_ALERT_WEBHOOK_SECRET to the chwf-grafana secret, wire it via
+          # grafana.envValueFrom, then uncomment:
+          # authorization_credentials: $__env{GRAFANA_ALERT_WEBHOOK_SECRET}
+        disableResolveMessage: false
+
   # Template for adding a new team contact point:
   # - orgId: 1
   #   name: infra-team-email

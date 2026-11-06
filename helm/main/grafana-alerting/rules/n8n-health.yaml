@@ -1,0 +1,415 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: n8n Health Alerts
+    folder: n8n
+    interval: 1m
+    rules:
+
+      # Fires when Mimir stops receiving scrapes from the n8n /metrics endpoint
+      # (Alloy prometheus.scrape, job="n8n"). Covers n8n being fully down AND the
+      # Alloy→Mimir pipeline failing — every other Health rule goes silent in
+      # exactly that case, so this is the guard rule for the whole group.
+      # noDataState=Alerting also fires when the series disappears entirely
+      # (e.g. Alloy dead); the 2m `for` rides out a single missed scrape.
+      - uid: n8n-health-up
+        title: "n8n Metrics Unavailable"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max by (job) (up{job="n8n"})'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        isPaused: false
+        annotations:
+          summary: "The n8n /metrics endpoint is no longer being scraped."
+          description: "n8n is down or the Alloy→Mimir metrics pipeline is broken. All other n8n Health metrics are unreliable while this fires."
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: critical
+          team: platform
+
+      # Fires when n8n's Bull queue reports permanently failed jobs. Failed jobs
+      # stay in the failed set until retried/removed, so a single failure keeps
+      # this alert firing — treat it as a durable signal, not a spike alert.
+      - uid: n8n-queue-jobs-failed
+        title: "Bull Queue Failed Jobs"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max without(instance)(n8n_bull_queue_failed)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        isPaused: false
+        annotations:
+          summary: "n8n's Bull queue has permanently failed jobs."
+          description: '{{ $values.A.Value | printf "%.0f" }} job(s) have been in the failed set for 5+ minutes. Failed jobs are not retried automatically — inspect them from the n8n Health dashboard.'
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: critical
+          team: platform
+
+      # Fires when the queue backlog stays elevated for 15 minutes. A sustained
+      # waiting count means workers cannot keep up with enqueue rate.
+      - uid: n8n-queue-backlog
+        title: "Bull Queue Backlog Elevated"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max without(instance)(n8n_bull_queue_waiting)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [100]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: OK
+        for: 15m
+        isPaused: false
+        annotations:
+          summary: "The n8n Bull queue backlog is sustained above 100 waiting jobs."
+          description: '{{ $values.A.Value | printf "%.0f" }} jobs waiting for 15+ minutes — workers cannot keep up with the enqueue rate. Check worker health on the n8n Health dashboard.'
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: warning
+          team: platform
+
+      # Fires when event-loop p99 lag exceeds 1 second. High lag means the main
+      # process is blocking on CPU or synchronous work and delays everything
+      # from webhook handling to queue polling.
+      - uid: n8n-event-loop-lag
+        title: "Event Loop Lag High"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max without(instance)(n8n_nodejs_eventloop_lag_p99_seconds)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        isPaused: false
+        annotations:
+          summary: "n8n event loop p99 lag exceeds 1 second."
+          description: '{{ $values.A.Value | printf "%.2f" }}s p99 event-loop lag sustained for 5+ minutes. The process is blocking on CPU or synchronous work — correlate with CPU and GC panels on the n8n Health dashboard.'
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: warning
+          team: platform
+
+      # Fires when heap usage exceeds 90% of total heap for 10 minutes. Sustained
+      # pressure precedes GC thrash and OOM kills. A widening gap between used
+      # and total that survives GC is the classic leak signature.
+      - uid: n8n-heap-pressure
+        title: "Heap Memory Pressure"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max without(instance)(n8n_nodejs_heap_size_used_bytes) / clamp_min(max without(instance)(n8n_nodejs_heap_size_total_bytes), 1)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [0.9]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        isPaused: false
+        annotations:
+          summary: "n8n heap usage exceeds 90% of allocated heap."
+          description: 'Heap is at {{ $values.A.Value | humanizePercentage }} of total for 10+ minutes. Sustained pressure precedes GC thrash and OOM kills — check the Heap Memory Over Time panel for a leak signature.'
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: warning
+          team: platform
+
+      # Fires when n8n consumes more than ~0.9 CPU cores for 10 minutes.
+      # Sustained saturation delays event handling and execution scheduling.
+      - uid: n8n-cpu-high
+        title: "CPU Usage Sustained High"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max without(instance)(rate(n8n_process_cpu_seconds_total[5m]))'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [0.9]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        isPaused: false
+        annotations:
+          summary: "n8n CPU usage is sustained above 0.9 cores."
+          description: '{{ $values.A.Value | printf "%.2f" }} cores sustained for 10+ minutes. Check which workflows are hot on the n8n Executions dashboard.'
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: warning
+          team: platform
+
+      # Fires when open file descriptors exceed 500. A steadily rising count that
+      # never drops is a leak (sockets, streams, SQLite handles) heading toward
+      # EMFILE crashes.
+      - uid: n8n-open-fds
+        title: "Open File Descriptors High"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max without(instance)(n8n_process_open_fds)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [500]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: OK
+        for: 10m
+        isPaused: false
+        annotations:
+          summary: "n8n has more than 500 open file descriptors."
+          description: '{{ $values.A.Value | printf "%.0f" }} open file descriptors sustained for 10+ minutes. A rising count that never drops indicates a descriptor leak (sockets, streams) heading toward EMFILE crashes.'
+        labels:
+          category: infrastructure
+          environment: __NAMESPACE__
+          service: n8n
+          severity: warning
+          team: platform
