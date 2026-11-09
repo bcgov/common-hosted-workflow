@@ -16,7 +16,12 @@ seaweedfs:
 
   master:
     replicas: 1
-    volumeSizeLimitMB: 50
+    volumeSizeLimitMB: 25
+    # SeaweedFS creates 7 volumes per bucket by default, regardless of bucket size.
+    # Limit volume creation to one at a time to avoid unnecessary volume allocation.
+    config: |-
+      [master.volume_growth]
+      copy_1 = 1
     data:
       type: persistentVolumeClaim
       size: 512Mi
