@@ -293,9 +293,7 @@ describe('ProjectRateLimitService notifications', () => {
       const periodKey = listUpcomingWeeklyPeriodKeys(2)[1];
       const weekDescription = describeWeeklyPeriodKey(periodKey);
       expect(weekDescription).toBeTypeOf('string');
-      topupRepo.create.mockResolvedValue(
-        makeProjectTopupRow({ projectId: VALID_PROJECT_ID, periodKey, amount: 2000 }),
-      );
+      topupRepo.create.mockResolvedValue(makeProjectTopupRow({ projectId: VALID_PROJECT_ID, periodKey, amount: 2000 }));
 
       await service.createProjectTopup(
         VALID_PROJECT_ID,
