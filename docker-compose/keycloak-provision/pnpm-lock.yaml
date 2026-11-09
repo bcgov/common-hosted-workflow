@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@egose/keycloak-fluent':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ^0.14.0
+        version: 0.14.0
       wait-on:
         specifier: ^9.0.6
         version: 9.1.0(debug@4.4.3)
@@ -45,8 +45,8 @@ importers:
 
 packages:
 
-  '@egose/keycloak-fluent@0.11.0':
-    resolution: {integrity: sha512-A8tqFOt2GigBtZ6AA6QyLBiDCwlNWSLCjvbDHJAWfG0Ck8rHKDoJ3aBAiWcTfn+Ii0Aa8W5fkYvl3zMnY1lMzA==}
+  '@egose/keycloak-fluent@0.14.0':
+    resolution: {integrity: sha512-ZvdwJcG/xhztoOqendXkdFgaDE3SBDZ/MZvtbad2d6dGtAInC1RAJdOe69xzFBf9R1t+RdYU3PGFUOUm7Ps03Q==}
     engines: {node: '>=20'}
 
   '@esbuild/aix-ppc64@0.28.2':
@@ -837,7 +837,7 @@ packages:
 
 snapshots:
 
-  '@egose/keycloak-fluent@0.11.0':
+  '@egose/keycloak-fluent@0.14.0':
     dependencies:
       '@keycloak/keycloak-admin-client': 26.7.1
       lodash-es: 4.18.1
