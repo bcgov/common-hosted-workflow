@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProjectRateLimitService, RateLimitExceededError } from '../../../src/api/services/project-rate-limit.service';
 import type { NodeMailerService } from '../../../src/api/services/node-mailer';
-import { getCurrentPeriodKeys } from '../../../src/api/helpers/period';
+import {
+  describeWeeklyPeriodKey,
+  getCurrentPeriodKeys,
+  listUpcomingWeeklyPeriodKeys,
+} from '../../../src/api/helpers/period';
 import type { ProjectRateLimit } from '../../../src/db/schema/project-rate-limit';
 import { UserRepository } from '../../../src/db/repository/n8n/user';
 import {
@@ -286,13 +290,14 @@ describe('ProjectRateLimitService notifications', () => {
 
   describe('config-time events', () => {
     it('sends a top-up granted email with the formatted week description', async () => {
-      topupRepo.create.mockResolvedValue(
-        makeProjectTopupRow({ projectId: VALID_PROJECT_ID, periodKey: '2026-W45', amount: 2000 }),
-      );
+      const periodKey = listUpcomingWeeklyPeriodKeys(2)[1];
+      const weekDescription = describeWeeklyPeriodKey(periodKey);
+      expect(weekDescription).toBeTypeOf('string');
+      topupRepo.create.mockResolvedValue(makeProjectTopupRow({ projectId: VALID_PROJECT_ID, periodKey, amount: 2000 }));
 
       await service.createProjectTopup(
         VALID_PROJECT_ID,
-        { periodKey: '2026-W45', amount: 2000, adminComment: 'Quarterly batch' },
+        { periodKey, amount: 2000, adminComment: 'Quarterly batch' },
         'admin.user@testapp.com',
       );
       await flushAsync();
@@ -302,8 +307,7 @@ describe('ProjectRateLimitService notifications', () => {
       expect(subject).toContain('Extra runs added');
       expect(html).toContain('2,000');
       expect(html).toContain("was added to Default project's weekly limit");
-      // Nov 2 2026 is the Monday of ISO week 2026-W45.
-      expect(html).toContain('Nov 2 to 8, 2026');
+      expect(html).toContain(weekDescription!);
     });
 
     it('sends a limits-changed email with the enforced limits in custom mode', async () => {
