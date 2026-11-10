@@ -63,6 +63,12 @@ USER root
 RUN npm install -g pnpm@11.17.0
 RUN cd /community-nodes && pnpm install --frozen-lockfile --prod
 RUN cd /external-hooks && pnpm install --frozen-lockfile --prod
+
+# Add Content-MD5 to S3 DeleteObjects requests.
+# Fail the build if an n8n upgrade changes the code being patched.
+# Remove once the fix is included in an upstream n8n release.
+COPY n8n-patches/s3-delete-objects-content-md5.cjs /tmp/s3-delete-objects-content-md5.cjs
+RUN node /tmp/s3-delete-objects-content-md5.cjs && rm /tmp/s3-delete-objects-content-md5.cjs
 USER node
 
 # Keep Swagger UI disabled by default. Enable per environment.
