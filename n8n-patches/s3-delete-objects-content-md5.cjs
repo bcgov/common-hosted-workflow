@@ -15,13 +15,15 @@
  * It fails loudly (non-zero exit) if the expected line is not found exactly once, so a build never silently
  * ships an unpatched or half-patched file after an n8n upgrade.
  *
- * Usage: node s3-delete-objects-content-md5.cjs [path-to-object-store.service.ee.js]
+ * Usage: node s3-delete-objects-content-md5.cjs
+ *
+ * It takes no arguments and only ever touches the one fixed file below, so nothing outside the image's n8n
+ * installation can be read or written through it.
  */
 const fs = require('node:fs');
 
-const DEFAULT_TARGET =
+const target =
   '/usr/local/lib/node_modules/n8n/node_modules/@n8n/blob-storage/dist/object-store/object-store.service.ee.js';
-const target = process.argv[2] || DEFAULT_TARGET;
 
 const MARKER = 'addMD5ChecksumForDeleteObjects';
 const ORIGINAL = 'const { Errors: errors } = await this.s3Client.send(new client_s3_1.DeleteObjectsCommand(params));';
