@@ -1,3 +1,37 @@
+## [0.12.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.11.0...v0.12.0) (2026-11-10)
+
+### Features
+
+* **CCP-6135:** add default-limit mode to project rate limits ([bf3e4a8](https://github.com/bcgov/common-hosted-workflow/commit/bf3e4a81c9032642ab848a28d42375114c769053))
+* **CCP-6135:** add mcp-registry to disabled modules ([2149a95](https://github.com/bcgov/common-hosted-workflow/commit/2149a95697ee4e35627c5ab597cbaad05d096ecf))
+* **CCP-6135:** add rate-limit notification emails and persistence ([8c68acf](https://github.com/bcgov/common-hosted-workflow/commit/8c68acf1076a3f2408dc0f55a9fd20a0fbbb75a7))
+* **CCP-6135:** align disabled n8n modules across local and helm configs ([a53063c](https://github.com/bcgov/common-hosted-workflow/commit/a53063c47c19e2489a33d7e5441eecba314b74d0))
+* **CCP-6135:** align disabled n8n modules between dev Helm values ([b68abde](https://github.com/bcgov/common-hosted-workflow/commit/b68abde403faf0e2c7490f56cc0c40a954a499dc))
+* **CCP-6135:** split project reads into shared and admin routes ([afe3911](https://github.com/bcgov/common-hosted-workflow/commit/afe39115f87ea87e0f46e743bf2f26183f4ce96d))
+* **CCP-6289:** add deployment status webhook and rollout timeout ([9ebc83d](https://github.com/bcgov/common-hosted-workflow/commit/9ebc83d28747b32fd01ab01f420fac162769a65a))
+* **CCP-6289:** add n8n health alerts and webhook routing ([aa2bc99](https://github.com/bcgov/common-hosted-workflow/commit/aa2bc99000a725f428eec2d9cc8aeee613161879))
+* **CCP-6289:** add optional webhook notifications for dns probe ([04f6730](https://github.com/bcgov/common-hosted-workflow/commit/04f673010c89552d28fd5f27bdc03275280b9ce0))
+* **CCP-6289:** allow deploy workflows to pass webhook url input ([dd012db](https://github.com/bcgov/common-hosted-workflow/commit/dd012db0d3823da99713a332e61a230a177b8966))
+* **CCP-6289:** centralize deployment webhook secret handling ([c9608bb](https://github.com/bcgov/common-hosted-workflow/commit/c9608bb9c4ade7f9d653b1d3698234a05b436468))
+* **CCP-6289:** enable plugin updates in tool setup action ([0e7c1fa](https://github.com/bcgov/common-hosted-workflow/commit/0e7c1faafe2c6764a25ad4879b39fabfcee7c50b))
+* **CCP-6289:** install Linux build dependencies in tool setup ([0039d52](https://github.com/bcgov/common-hosted-workflow/commit/0039d52afa379d12e39e3d731820b68355456914))
+
+### Bug Fixes
+
+* **CCP-6129:** temporarily disable execution data pruning ([#554](https://github.com/bcgov/common-hosted-workflow/issues/554)) ([7fac1f6](https://github.com/bcgov/common-hosted-workflow/commit/7fac1f6a2778db37bac94e33c07b0c66b7fec5db))
+* **CCP-6289:** pin oc to 4.22.10 ([3a3d638](https://github.com/bcgov/common-hosted-workflow/commit/3a3d63893ca1da25c80e5b60091d1ec01dc984c6))
+* **CCP-6348:** add Content-MD5 to S3 DeleteObjects requests ([#602](https://github.com/bcgov/common-hosted-workflow/issues/602)) ([c964cb2](https://github.com/bcgov/common-hosted-workflow/commit/c964cb2b747eac2f7312728f5bf80a0117e2572f))
+* **CCP-6363:** optimize SeaweedFS volumes and exclude SharePoint trigger on GoldDR ([#599](https://github.com/bcgov/common-hosted-workflow/issues/599)) ([3fe70e7](https://github.com/bcgov/common-hosted-workflow/commit/3fe70e763d5cebd78fcbbff85dbb6c98004cea4a))
+
+### Documentation
+
+* **CCP-6135:** update user auth summary for project access changes ([b7db01f](https://github.com/bcgov/common-hosted-workflow/commit/b7db01fe28579db06153a3278d2ebdba96173918))
+* **CCP-6289:** add deployment status notification guide ([70a9bcb](https://github.com/bcgov/common-hosted-workflow/commit/70a9bcb8801f481d4188ab39ba1767cc78620066))
+* **CCP-6289:** add Grafana alert notification workflow docs ([2e06cba](https://github.com/bcgov/common-hosted-workflow/commit/2e06cba75d58d47831192af2f1509abe5c6a8262))
+* **CCP-6289:** clarify deployment notification formatting ([e771853](https://github.com/bcgov/common-hosted-workflow/commit/e771853ffb71be5fb470eb7760148ccb82da88bb))
+* **CCP-6289:** document webhook delivery and health alert behavior ([6d0fdc7](https://github.com/bcgov/common-hosted-workflow/commit/6d0fdc73eb60320e6691a3d4090bceeffadf0c0b))
+* **CCP-6289:** update Grafana alert webhook reference formatting ([1048f82](https://github.com/bcgov/common-hosted-workflow/commit/1048f821d041c9f30bf2edc3dd383bfd3a09a39b))
+
 ## [0.3.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.2.0...v0.3.0) (2026-08-21)
 
 ### Features
