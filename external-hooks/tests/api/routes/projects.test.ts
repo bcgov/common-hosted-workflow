@@ -224,7 +224,8 @@ describe('GET /ui-api/projects/:projectId', () => {
 
     expect(error).toBeNull();
     expect(assertUserProjectAccess).not.toHaveBeenCalled();
-    expect(getProjectById).toHaveBeenCalledWith(VALID_PROJECT_ID);
+    // Admins also get their membership role resolved (null when not a member).
+    expect(getProjectById).toHaveBeenCalledWith(VALID_PROJECT_ID, 'admin-n8n-user');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(item);
   });
@@ -243,7 +244,7 @@ describe('GET /ui-api/projects/:projectId', () => {
 
     expect(error).toBeNull();
     expect(assertUserProjectAccess).toHaveBeenCalledWith(VALID_PROJECT_ID, MEMBER_USER_ID);
-    expect(getProjectById).toHaveBeenCalledWith(VALID_PROJECT_ID);
+    expect(getProjectById).toHaveBeenCalledWith(VALID_PROJECT_ID, MEMBER_USER_ID);
     expect(res.json).toHaveBeenCalledWith(item);
   });
 
@@ -419,5 +420,144 @@ describe('GET /ui-api/projects/:projectId/topups', () => {
 
     expectNextAppError(next, 403);
     expect(listProjectTopups).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  POST /projects/:projectId/run-requests                             */
+/* ================================================================== */
+
+const RUN_REQUEST_BODY = {
+  requestKind: 'extra_runs',
+  extraRuns: 5_000,
+  periodKey: '2026-W46',
+  requestedWeeklyLimit: null,
+  requestedAnnualLimit: null,
+  reason: 'Fall intake started early',
+};
+
+describe('POST /ui-api/projects/:projectId/run-requests', () => {
+  it('asserts member access, then files the request with the session user id', async () => {
+    const request = { id: 'request-1', requestKind: 'extra_runs' };
+    const assertUserProjectAccess = vi.fn();
+    const createRunRequest = vi.fn().mockResolvedValue(request);
+    const { router } = createTestRouter({
+      projectTenant: { assertUserProjectAccess },
+      projectRateLimit: { createRunRequest },
+    });
+
+    const handlers = getRouteHandlers(router, 'post', '/:projectId/run-requests');
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      query: {},
+      body: RUN_REQUEST_BODY,
+      session: makeMemberSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(assertUserProjectAccess).toHaveBeenCalledWith(VALID_PROJECT_ID, MEMBER_USER_ID);
+    expect(createRunRequest).toHaveBeenCalledWith(
+      VALID_PROJECT_ID,
+      MEMBER_USER_ID,
+      expect.objectContaining({ requestKind: 'extra_runs', extraRuns: 5_000 }),
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Run request submitted', request });
+  });
+
+  it('skips the member access assertion for an admin session (service still membership-gates)', async () => {
+    const assertUserProjectAccess = vi.fn();
+    const createRunRequest = vi.fn().mockResolvedValue({ id: 'request-1' });
+    const { router } = createTestRouter({
+      projectTenant: { assertUserProjectAccess },
+      projectRateLimit: { createRunRequest },
+    });
+
+    const handlers = getRouteHandlers(router, 'post', '/:projectId/run-requests');
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      query: {},
+      body: RUN_REQUEST_BODY,
+      session: makeAdminSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(assertUserProjectAccess).not.toHaveBeenCalled();
+    expect(createRunRequest).toHaveBeenCalledWith(VALID_PROJECT_ID, 'admin-n8n-user', expect.anything());
+  });
+
+  it('surfaces service rejections (409 duplicate pending, 403 ineligible) to the error middleware', async () => {
+    const createRunRequest = vi
+      .fn()
+      .mockRejectedValue(new AppError(409, 'This project already has a request waiting for review'));
+    const { router } = createTestRouter({ projectRateLimit: { createRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', '/:projectId/run-requests');
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID },
+      query: {},
+      body: RUN_REQUEST_BODY,
+      session: makeMemberSession(),
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+    expectNextAppError(next, 409);
+  });
+});
+
+/* ================================================================== */
+/*  DELETE /projects/:projectId/run-requests/:requestId                */
+/* ================================================================== */
+
+describe('DELETE /ui-api/projects/:projectId/run-requests/:requestId', () => {
+  it('asserts member access, cancels the request, and answers 204', async () => {
+    const assertUserProjectAccess = vi.fn();
+    const cancelRunRequest = vi.fn();
+    const { router } = createTestRouter({
+      projectTenant: { assertUserProjectAccess },
+      projectRateLimit: { cancelRunRequest },
+    });
+
+    const handlers = getRouteHandlers(router, 'delete', '/:projectId/run-requests/:requestId');
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID, requestId: '11111111-1111-4111-8111-111111111111' },
+      query: {},
+      session: makeMemberSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(assertUserProjectAccess).toHaveBeenCalledWith(VALID_PROJECT_ID, MEMBER_USER_ID);
+    expect(cancelRunRequest).toHaveBeenCalledWith(
+      VALID_PROJECT_ID,
+      '11111111-1111-4111-8111-111111111111',
+      MEMBER_USER_ID,
+    );
+    expect(res.status).toHaveBeenCalledWith(204);
+  });
+
+  it('surfaces a 404 when there is nothing to cancel', async () => {
+    const cancelRunRequest = vi.fn().mockRejectedValue(new AppError(404, 'Pending request not found'));
+    const { router } = createTestRouter({ projectRateLimit: { cancelRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'delete', '/:projectId/run-requests/:requestId');
+    const req = createMockRequest({
+      params: { projectId: VALID_PROJECT_ID, requestId: '11111111-1111-4111-8111-111111111111' },
+      query: {},
+      session: makeMemberSession(),
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+    expectNextAppError(next, 404);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  MAX_RUN_REQUEST_HORIZON_WEEKS,
   MAX_TOPUP_HORIZON_WEEKS,
   ProjectRateLimitService,
   RateLimitExceededError,
@@ -1328,5 +1329,238 @@ describe('ProjectRateLimitService', () => {
       expect(topupRepo.getById).toHaveBeenCalledWith(VALID_PROJECT_ID, VALID_TOPUP_ID);
       expect(topupRepo.deleteById).toHaveBeenCalledWith(VALID_TOPUP_ID);
     });
+  });
+});
+
+/* ================================================================== */
+/*  Run requests (member "Request more runs" submissions)              */
+/* ================================================================== */
+
+describe('ProjectRateLimitService · run requests', () => {
+  const VALID_RUN_REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+
+  let requestRepo: {
+    getPendingByProjectId: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    cancelPending: ReturnType<typeof vi.fn>;
+  };
+  let runRequestService: ProjectRateLimitService;
+
+  const extraRunsBody = {
+    requestKind: 'extra_runs' as const,
+    extraRuns: 5_000,
+    periodKey: listUpcomingWeeklyPeriodKeys(1)[0],
+    reason: 'Fall intake started early',
+  };
+
+  /**
+   * Rebuilds the service around relation/personal-project mocks granting
+   * exactly the given membership: a relation role slug, or a personal project
+   * id for the personalOwner path (null id = no personal project).
+   */
+  function withAccess(relationRole: string | null, personalProjectId: string | null = VALID_PROJECT_ID) {
+    const n8n = createMockN8nRepositories();
+    (n8n.projectRelation.findProjectRole as ReturnType<typeof vi.fn>).mockResolvedValue(relationRole);
+    const personal = personalProjectId === null ? null : { id: personalProjectId };
+    (n8n.project.getPersonalProjectForUser as ReturnType<typeof vi.fn>).mockResolvedValue(personal);
+    (n8n.project.getPersonalProjectForUserOrFail as ReturnType<typeof vi.fn>).mockResolvedValue(personal);
+    runRequestService = new ProjectRateLimitService(
+      n8n as any,
+      {
+        projectRateLimit: createMockProjectRateLimitRepository(),
+        projectRateLimitDefault: createMockProjectRateLimitDefaultRepository(),
+        projectExecutionUsage: createMockProjectExecutionUsageRepository(),
+        workflowExecutionUsage: createMockWorkflowExecutionUsageRepository(),
+        projectTopup: createMockProjectTopupRepository(),
+        rateLimitRequest: requestRepo,
+      } as any,
+    );
+  }
+
+  beforeEach(() => {
+    requestRepo = {
+      getPendingByProjectId: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(async (values: Record<string, unknown>) => ({
+        id: VALID_RUN_REQUEST_ID,
+        projectId: values.projectId,
+        requestKind: values.requestKind,
+        extraRuns: values.extraRuns ?? null,
+        periodKey: values.periodKey ?? null,
+        requestedWeeklyLimit: values.requestedWeeklyLimit ?? null,
+        requestedAnnualLimit: values.requestedAnnualLimit ?? null,
+        reason: values.reason,
+        status: 'pending',
+        requestedBy: values.requestedBy,
+        createdAt: new Date('2026-11-10T10:14:00Z'),
+        updatedAt: new Date('2026-11-10T10:14:00Z'),
+      })),
+      cancelPending: vi.fn().mockResolvedValue({ id: VALID_RUN_REQUEST_ID }),
+    };
+    withAccess('project:editor');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('files an extra_runs request for a project editor and returns the serialized summary', async () => {
+    const summary = await runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody });
+
+    expect(requestRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: VALID_PROJECT_ID,
+        requestKind: 'extra_runs',
+        extraRuns: 5_000,
+        periodKey: extraRunsBody.periodKey,
+        requestedWeeklyLimit: null,
+        requestedAnnualLimit: null,
+        reason: 'Fall intake started early',
+        requestedBy: 'user-1',
+      }),
+    );
+    expect(summary).toEqual(
+      expect.objectContaining({
+        id: VALID_RUN_REQUEST_ID,
+        requestKind: 'extra_runs',
+        extraRuns: 5_000,
+        reason: 'Fall intake started early',
+        requestedBy: 'user-1',
+        createdAt: '2026-11-10T10:14:00.000Z',
+      }),
+    );
+  });
+
+  it('treats a personal-project owner without a relation as eligible', async () => {
+    withAccess(null);
+
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', {
+        requestKind: 'limit_increase',
+        requestedWeeklyLimit: 12_000,
+        reason: 'Three new ministries onboard in January',
+      }),
+    ).resolves.toMatchObject({ requestKind: 'limit_increase', requestedWeeklyLimit: 12_000 });
+  });
+
+  it('rejects a non-member with 403 (platform admins without a relation included)', async () => {
+    withAccess(null, 'someone-elses-personal-project');
+
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'admin-1', {
+        requestKind: 'extra_runs',
+        extraRuns: 5_000,
+        periodKey: extraRunsBody.periodKey,
+        reason: 'reason',
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(requestRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown project with 404', async () => {
+    await expect(
+      runRequestService.createRunRequest('unknown-project', 'user-1', { ...extraRunsBody }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(requestRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('enforces the extra-runs amount bounds and the week horizon', async () => {
+    const farWeek = listUpcomingWeeklyPeriodKeys(MAX_RUN_REQUEST_HORIZON_WEEKS + 1).at(-1)!;
+    const pastWeek = `${Number(extraRunsBody.periodKey.slice(0, 4)) - 1}-W01`;
+
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, extraRuns: 99 }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, extraRuns: 50_001 }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, periodKey: farWeek }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, periodKey: pastWeek }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(requestRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('requires kind/field coherence and at least one proposed limit for limit_increase', async () => {
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', {
+        requestKind: 'limit_increase',
+        reason: 'reason',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', {
+        requestKind: 'limit_increase',
+        extraRuns: 5_000,
+        reason: 'reason',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', {
+        requestKind: 'limit_increase',
+        requestedWeeklyLimit: 20_000,
+        requestedAnnualLimit: 10_000,
+        reason: 'reason',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(requestRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('fails with 409 when a pending request already exists', async () => {
+    requestRepo.getPendingByProjectId.mockResolvedValue({ id: VALID_RUN_REQUEST_ID, status: 'pending' });
+
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(requestRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('maps a unique violation from a concurrent submit to 409', async () => {
+    requestRepo.create.mockRejectedValue({ code: '23505' });
+
+    await expect(
+      runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('cancels only the requester own pending request and reports misses as 404', async () => {
+    await expect(
+      runRequestService.cancelRunRequest(VALID_PROJECT_ID, VALID_RUN_REQUEST_ID, 'user-1'),
+    ).resolves.toBeUndefined();
+    expect(requestRepo.cancelPending).toHaveBeenCalledWith(VALID_RUN_REQUEST_ID, VALID_PROJECT_ID, 'user-1');
+
+    requestRepo.cancelPending.mockResolvedValue(null);
+    await expect(
+      runRequestService.cancelRunRequest(VALID_PROJECT_ID, VALID_RUN_REQUEST_ID, 'user-1'),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('returns the pending summary for the detail payload', async () => {
+    requestRepo.getPendingByProjectId.mockResolvedValue({
+      id: VALID_RUN_REQUEST_ID,
+      requestKind: 'extra_runs',
+      extraRuns: 5_000,
+      periodKey: extraRunsBody.periodKey,
+      requestedWeeklyLimit: null,
+      requestedAnnualLimit: null,
+      reason: 'Fall intake',
+      status: 'pending',
+      requestedBy: 'user-1',
+      createdAt: new Date('2026-11-10T10:14:00Z'),
+    });
+
+    await expect(runRequestService.getPendingRunRequest(VALID_PROJECT_ID)).resolves.toMatchObject({
+      id: VALID_RUN_REQUEST_ID,
+      requestKind: 'extra_runs',
+      createdAt: '2026-11-10T10:14:00.000Z',
+    });
+  });
+
+  it('fails open when the pending row cannot be read (the detail page stays available)', async () => {
+    requestRepo.getPendingByProjectId.mockRejectedValue(new Error('table missing'));
+
+    await expect(runRequestService.getPendingRunRequest(VALID_PROJECT_ID)).resolves.toBeNull();
   });
 });

@@ -1,7 +1,11 @@
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
-import type { ProjectRateLimitEnrichment, ProjectRateLimitService } from './project-rate-limit.service';
-import { listProjectIdsAccessibleToUser, verifyCallerHasN8nProjectAccess } from './project-access';
+import type { PendingRunRequestSummary, ProjectRateLimitEnrichment, ProjectRateLimitService } from './project-rate-limit.service';
+import {
+  getViewerProjectRole,
+  listProjectIdsAccessibleToUser,
+  verifyCallerHasN8nProjectAccess,
+} from './project-access';
 import { AppError } from '../utils/errors';
 
 export type ProjectItem = {
@@ -9,6 +13,18 @@ export type ProjectItem = {
   projectName: string;
   projectType: string;
   tenantId: string | null;
+  /**
+   * The requesting user's n8n project role slug for this project, or null when
+   * they are not a member (including platform admins without a relation).
+   * Only set by the single-project detail endpoint, never by the list.
+   */
+  /**
+   * The project's pending "Request more runs" submission, or null when none
+   * is open. Only set by the single-project detail endpoint, never by the
+   * list — it drives the member-view review panel and banner note.
+   */
+  pendingRunRequest?: PendingRunRequestSummary | null;
+  viewerRole?: string | null;
 } & Partial<ProjectRateLimitEnrichment>;
 
 export type ProjectsPage = {
@@ -65,12 +81,13 @@ export class ProjectTenantService {
   }
 
   /**
-   * Returns a single project item with the same shape as one list entry.
-   * Throws AppError 404 when the project does not exist in n8n. Callers are
-   * responsible for access control (admins by role; members via
-   * `assertUserProjectAccess` first).
+   * Returns a single project item with the same shape as one list entry, plus
+   * `viewerRole` — the requesting user's membership role for role-scoped UI
+   * (request-more-runs affordances). Throws AppError 404 when the project does
+   * not exist in n8n. Callers are responsible for access control (admins by
+   * role; members via `assertUserProjectAccess` first).
    */
-  async getProjectById(projectId: string): Promise<ProjectItem> {
+  async getProjectById(projectId: string, viewerUserId?: string): Promise<ProjectItem> {
     const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
     if (!project) {
       throw new AppError(404, 'Project not found');
@@ -80,6 +97,17 @@ export class ProjectTenantService {
     const rateLimitEnrichment = await this.projectRateLimitService.enrichProjectsWithRateLimits([
       { projectId, projectType: project.type },
     ]);
+    const viewerRole = viewerUserId
+      ? await getViewerProjectRole(
+          this.n8nRepositories.project,
+          this.n8nRepositories.projectRelation,
+          viewerUserId,
+          projectId,
+        )
+      : null;
+    // Fail-open (the summary method catches its own errors): the review panel
+    // is an addition to the payload, never a reason to lose the detail page.
+    const pendingRunRequest = await this.projectRateLimitService.getPendingRunRequest(projectId);
 
     return {
       projectId: project.id,
@@ -87,6 +115,8 @@ export class ProjectTenantService {
       projectType: project.type,
       tenantId: tenantMap.get(project.id) ?? null,
       ...rateLimitEnrichment[project.id],
+      pendingRunRequest,
+      viewerRole,
     };
   }
 

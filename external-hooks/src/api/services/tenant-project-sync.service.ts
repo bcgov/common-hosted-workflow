@@ -9,42 +9,11 @@ import {
   isManagedProjectRole,
   type ManagedProjectRole,
 } from '../constants/project-roles';
+import { extractRoleSlug } from './project-access';
 import { FEATURE } from '../constants/feature-flag';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('TenantProjectSyncService');
-
-/**
- * Extracts the role slug from whatever shape n8n's findProjectRole returns.
- * n8n's findProjectRole uses findOneBy (no relation loading), so the `role` column
- * value is returned directly as a string (the slug), not a Role entity.
- */
-function extractRoleSlug(role: unknown): string | null {
-  // Direct string — the raw column value (most common case)
-  if (typeof role === 'string') {
-    return role;
-  }
-  if (!role || typeof role !== 'object') {
-    return null;
-  }
-  const record = role as Record<string, unknown>;
-  // Object with slug property (Role entity if relation was loaded)
-  if (typeof record.slug === 'string') {
-    return record.slug;
-  }
-  // Nested role.slug (defensive)
-  if (record.role && typeof record.role === 'object') {
-    const nested = record.role as Record<string, unknown>;
-    if (typeof nested.slug === 'string') {
-      return nested.slug;
-    }
-  }
-  // role field is itself a string (e.g. from raw relation column)
-  if (typeof record.role === 'string') {
-    return record.role;
-  }
-  return null;
-}
 
 export type SyncTenantsForUserParams = {
   ssoUserId: string;
