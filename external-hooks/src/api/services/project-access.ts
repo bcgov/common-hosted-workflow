@@ -3,6 +3,7 @@ import type { ProjectRepository } from '../../db/repository/n8n/project';
 import type { ProjectRelationRepository } from '../../db/repository/n8n/project-relation';
 import type { SharedWorkflowRepository } from '../../db/repository/n8n/shared-workflow';
 import { ExecutionRepository } from '../../db/repository/n8n/execution';
+import { PROJECT_ROLE_PERSONAL_OWNER } from '../constants/project-roles';
 import { AppError } from '../utils/errors';
 import { createLogger } from '../utils/logger';
 import { formatDbErrorForLog } from '../helpers/db-helper';
@@ -29,6 +30,58 @@ export async function listProjectIdsAccessibleToUser(
   const personal = await projectRepository.getPersonalProjectForUser(userId);
   if (personal?.id) ids.add(personal.id);
   return [...ids];
+}
+
+/**
+ * Extracts the role slug from whatever shape n8n's findProjectRole returns.
+ * n8n's findProjectRole uses findOneBy (no relation loading), so the `role` column
+ * value is returned directly as a string (the slug), not a Role entity.
+ */
+export function extractRoleSlug(role: unknown): string | null {
+  // Direct string — the raw column value (most common case)
+  if (typeof role === 'string') {
+    return role;
+  }
+  if (!role || typeof role !== 'object') {
+    return null;
+  }
+  const record = role as Record<string, unknown>;
+  // Object with slug property (Role entity if relation was loaded)
+  if (typeof record.slug === 'string') {
+    return record.slug;
+  }
+  // Nested role.slug (defensive)
+  if (record.role && typeof record.role === 'object') {
+    const nested = record.role as Record<string, unknown>;
+    if (typeof nested.slug === 'string') {
+      return nested.slug;
+    }
+  }
+  // role field is itself a string (e.g. from raw relation column)
+  if (typeof record.role === 'string') {
+    return record.role;
+  }
+  return null;
+}
+
+/**
+ * The viewer's n8n project role slug for one project: the `project_relation`
+ * role (project:admin / project:editor / project:viewer / project:personalOwner),
+ * or null when the viewer is not a member. Deliberately membership-based only —
+ * a platform admin without a relation gets null, so role-scoped UI affordances
+ * never light up from admin status alone.
+ */
+export async function getViewerProjectRole(
+  projectRepository: ProjectRepository,
+  projectRelationRepository: ProjectRelationRepository,
+  userId: string,
+  projectId: string,
+): Promise<string | null> {
+  const role = await projectRelationRepository.findProjectRole({ userId, projectId });
+  const roleSlug = extractRoleSlug(role);
+  if (roleSlug) return roleSlug;
+  const personal = await projectRepository.getPersonalProjectForUser(userId);
+  return personal?.id === projectId ? PROJECT_ROLE_PERSONAL_OWNER : null;
 }
 
 /**

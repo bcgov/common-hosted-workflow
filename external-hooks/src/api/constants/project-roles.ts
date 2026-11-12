@@ -9,6 +9,13 @@ export const PROJECT_ROLE_EDITOR = 'project:editor' as const;
 export const PROJECT_ROLE_VIEWER = 'project:viewer' as const;
 export const PROJECT_ROLE_ADMIN = 'project:admin' as const;
 
+/**
+ * n8n's implicit role for a personal project's owner — never assigned by the
+ * sync process, but stored on the project relation, so it can show up when
+ * reading a viewer's membership.
+ */
+export const PROJECT_ROLE_PERSONAL_OWNER = 'project:personalOwner' as const;
+
 /** Roles that can be assigned/managed by the tenant project sync process. */
 export const MANAGED_PROJECT_ROLES = [PROJECT_ROLE_EDITOR, PROJECT_ROLE_VIEWER] as const;
 export type ManagedProjectRole = (typeof MANAGED_PROJECT_ROLES)[number];

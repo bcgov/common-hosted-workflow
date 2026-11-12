@@ -144,3 +144,39 @@ export const updateRateLimitDefaultsSchema = z.object({
   }),
   query: z.record(z.string(), z.unknown()).optional(),
 });
+
+/**
+ * POST /ui-api/projects/:projectId/run-requests — a member submits a
+ * "Request more runs" entry: either a one-week top-up (`extra_runs`, with the
+ * amount and target week) or a lasting limit raise (`limit_increase`, with
+ * one or both proposed limits). Field-level bounds mirror the dialog copy;
+ * kind/field coherence and the week horizon are enforced by the service.
+ */
+export const createRunRequestSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+  }),
+  body: z.object({
+    requestKind: z.enum(['extra_runs', 'limit_increase']),
+    extraRuns: z.number().int().min(100).max(50_000).nullable().optional(),
+    periodKey: z
+      .string()
+      .regex(/^\d{4}-W\d{2}$/, { message: 'periodKey must match the weekly format YYYY-Www' })
+      .nullable()
+      .optional(),
+    requestedWeeklyLimit: z.number().int().min(1).max(1_000_000).nullable().optional(),
+    requestedAnnualLimit: z.number().int().min(1).max(100_000_000).nullable().optional(),
+    reason: z.string().trim().min(1, { message: 'reason is required' }).max(500),
+  }),
+  query: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** DELETE /ui-api/projects/:projectId/run-requests/:requestId — cancels the requester's own pending request. */
+export const cancelRunRequestSchema = z.object({
+  params: z.object({
+    projectId: z.string().min(1),
+    requestId: z.string().uuid({ message: 'requestId must be a valid UUID' }),
+  }),
+  body: z.record(z.string(), z.unknown()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+});

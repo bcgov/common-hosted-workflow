@@ -1,4 +1,5 @@
 import type { ProjectItem } from '../services/backend/projects';
+import { PROJECT_ROLE_ADMIN, PROJECT_ROLE_EDITOR, PROJECT_ROLE_PERSONAL_OWNER } from './roles';
 
 export type RateLimitStatus = 'within_limit' | 'limit_reached' | 'near_limit' | 'no_limit';
 
@@ -130,6 +131,43 @@ export function getHighestUsagePeriod(project: RateLimitUsage): UsagePeriod | nu
   return weeklyRatio >= yearlyRatio ? 'weekly' : 'yearly';
 }
 
+/**
+ * True when the viewer may see the "Request more runs" action: a project
+ * admin or editor, or a personal project's owner (the sole member, notified
+ * like admins and equally unable to raise limits themselves). All are
+ * membership-derived roles — a platform admin without a project relation
+ * does not qualify. The action is offered at any usage level — unlike the
+ * near-limit banner, its visibility is not tied to the 80% threshold.
+ */
+export function canRequestMoreRuns(viewerRole: string | null | undefined): boolean {
+  return (
+    viewerRole === PROJECT_ROLE_ADMIN ||
+    viewerRole === PROJECT_ROLE_EDITOR ||
+    viewerRole === PROJECT_ROLE_PERSONAL_OWNER
+  );
+}
+
+/**
+ * Projects when the weekly limit will be reached at the current pace: the
+ * elapsed share of the Mon–Sun week sets the run rate, and the returned
+ * instant is when that rate reaches the limit. Null when there is no
+ * meaningful projection: the limit is already met, there is no usage yet, the
+ * week just started, or the pace won't reach the limit within this week.
+ */
+export function getProjectedWeeklyPauseDate(params: { used: number; limit: number | null; now?: Date }): Date | null {
+  const { used, limit, now = new Date() } = params;
+  if (limit === null || limit <= 0 || used <= 0 || used >= limit) {
+    return null;
+  }
+  const weekStart = getCurrentWeekMonday(now);
+  const elapsed = getVancouverAnchor(now).getTime() - weekStart.getTime();
+  if (elapsed <= 0) {
+    return null;
+  }
+  const projected = weekStart.getTime() + (limit * elapsed) / used;
+  return projected < weekStart.getTime() + 7 * DAY_MS ? new Date(projected) : null;
+}
+
 const countFormat = new Intl.NumberFormat('en-CA');
 
 /** Full number with comma grouping, e.g. 12,345. */
@@ -176,9 +214,46 @@ export function formatShortDate(date: Date): string {
   return shortDateFormat.format(date);
 }
 
+const weekdayShortDateFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: VANCOUVER_TIME_ZONE,
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+
+/** "Mon, Nov 9" style weekday + short date, for compact reset mentions. */
+export function formatWeekdayShortDate(date: Date): string {
+  return weekdayShortDateFormat.format(date);
+}
+
+const resetWithWeekdayFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: VANCOUVER_TIME_ZONE,
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+/** "Mon, Nov 9, 2026" style reset date with its weekday (limit cards). */
+export function formatResetDateWithWeekday(date: Date): string {
+  return resetWithWeekdayFormat.format(date);
+}
+
 /** "Sep 2, 2026" style date, rendered in the Vancouver time zone. */
 export function formatResetDate(date: Date): string {
   return datedFormat.format(date);
+}
+
+const weekdayDateFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: VANCOUVER_TIME_ZONE,
+  weekday: 'long',
+  month: 'short',
+  day: 'numeric',
+});
+
+/** "Friday, Nov 6" style weekday date, rendered in the Vancouver time zone. */
+export function formatWeekdayDate(date: Date): string {
+  return weekdayDateFormat.format(date);
 }
 
 /**

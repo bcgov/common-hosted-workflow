@@ -83,6 +83,7 @@ function buildService({
       sumByProjectIds: vi.fn().mockResolvedValue(new Map()),
       sumByProjectIdsInWeeklyKeys: vi.fn().mockResolvedValue(new Map()),
     },
+    rateLimitRequest: { getPendingByProjectId: vi.fn().mockResolvedValue(null) },
   };
   const projectRateLimitService = new ProjectRateLimitService(n8nRepositories as any, customRepositories as any);
   const service = new ProjectTenantService(n8nRepositories as any, customRepositories as any, projectRateLimitService);
@@ -228,11 +229,14 @@ describe('ProjectTenantService', () => {
 
       const item = await service.getProjectById('proj-001');
 
+      // No viewer id passed → no membership lookup, viewerRole stays null.
       expect(item).toEqual({
         projectId: 'proj-001',
         projectName: 'Configured project',
         projectType: 'team',
         tenantId: 'tenant-1',
+        viewerRole: null,
+        pendingRunRequest: null,
         usesDefaultLimits: false,
         weeklyRateLimit: 10,
         yearlyRateLimit: 1000,
@@ -283,6 +287,7 @@ describe('ProjectTenantService', () => {
         projectRateLimit: { listByProjectIds: vi.fn().mockRejectedValue(new Error('custom DB outage')) },
         projectExecutionUsage: { listCountsByProjectIds: vi.fn().mockResolvedValue(new Map()) },
         projectTopup: { sumByProjectIds: vi.fn().mockResolvedValue(new Map()) },
+        rateLimitRequest: { getPendingByProjectId: vi.fn().mockResolvedValue(null) },
       };
       const service = new ProjectTenantService(
         n8nRepositories as any,
@@ -298,7 +303,79 @@ describe('ProjectTenantService', () => {
         projectType: 'team',
         tenantId: 'tenant-1',
         ...DEFAULT_ENRICHMENT,
+        pendingRunRequest: null,
+        viewerRole: null,
       });
+    });
+
+    it('resolves the viewer team-project role from the project relation', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-001', name: 'Shared project', type: 'team' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue('project:editor');
+
+      const item = await service.getProjectById('proj-001', 'user-77');
+
+      expect(item.viewerRole).toBe('project:editor');
+      expect(n8nRepositories.projectRelation.findProjectRole).toHaveBeenCalledWith({
+        userId: 'user-77',
+        projectId: 'proj-001',
+      });
+      expect(n8nRepositories.project.getPersonalProjectForUser).not.toHaveBeenCalled();
+    });
+
+    it('normalizes a Role-entity shaped relation result to the slug', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-001', name: 'Shared project', type: 'team' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      // n8n's findProjectRole returns the raw column value in practice, but the
+      // extractor also tolerates a loaded Role entity.
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue({ slug: 'project:admin' });
+
+      const item = await service.getProjectById('proj-001', 'user-77');
+
+      expect(item.viewerRole).toBe('project:admin');
+    });
+
+    it("falls back to the project:personalOwner slug for the viewer's personal project", async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-010', name: 'My personal project', type: 'personal' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue(null);
+      n8nRepositories.project.getPersonalProjectForUser.mockResolvedValue({ id: 'proj-010' });
+
+      const item = await service.getProjectById('proj-010', 'user-77');
+
+      expect(item.viewerRole).toBe('project:personalOwner');
+    });
+
+    it('returns null for a viewer without a membership — including platform admins', async () => {
+      const { service, n8nRepositories } = buildService({
+        projects: [{ id: 'proj-001', name: 'Shared project', type: 'team' }],
+        rateLimitRows: new Map(),
+        usageCounts: new Map(),
+        workflowCounts: new Map(),
+        tenantMap: new Map(),
+      });
+      n8nRepositories.projectRelation.findProjectRole.mockResolvedValue(null);
+      // Personal project exists but is a different one.
+      n8nRepositories.project.getPersonalProjectForUser.mockResolvedValue({ id: 'proj-999' });
+
+      const item = await service.getProjectById('proj-001', 'admin-n8n-user');
+
+      expect(item.viewerRole).toBeNull();
     });
   });
 

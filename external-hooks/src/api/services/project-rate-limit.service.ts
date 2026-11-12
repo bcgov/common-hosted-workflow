@@ -4,7 +4,9 @@ import type { ProjectRateLimit } from '../../db/schema/project-rate-limit';
 import type { ProjectRateLimitDefault } from '../../db/schema/project-rate-limit-default';
 import type { ProjectTopup } from '../../db/schema/project-topup';
 import type { RateLimitNotificationKind } from '../../db/schema/rate-limit-notification';
+import type { RunRequestKind } from '../../db/schema/rate-limit-request';
 import type { NodeMailerService } from './node-mailer';
+import { getViewerProjectRole } from './project-access';
 import { renderEmail } from './email-templates';
 import { UI_APP_BASE_URL } from '@config';
 import {
@@ -26,6 +28,14 @@ export const MAX_TOPUP_HORIZON_WEEKS = 26;
 
 /** Upper bound for a single top-up amount, in runs. */
 export const MAX_TOPUP_AMOUNT = 1_000_000;
+
+/**
+ * A run request's one-off top-up amount bounds (the dialog's "Between 100 and
+ * 50,000 runs") and week horizon: the current week plus the coming 8.
+ */
+export const RUN_REQUEST_MIN_EXTRA_RUNS = 100;
+export const RUN_REQUEST_MAX_EXTRA_RUNS = 50_000;
+export const MAX_RUN_REQUEST_HORIZON_WEEKS = 8;
 
 const WEEKLY_KEY_PATTERN = /^\d{4}-W\d{2}$/;
 
@@ -138,6 +148,14 @@ type LimitEvent = {
 
 /** Near-limit thresholds, highest severity first (matches the UI banner's 80%). */
 const NEAR_LIMIT_THRESHOLDS = [80, 50] as const;
+
+/**
+ * Project roles that may file (and cancel) a run request: team project admins
+ * and editors, plus a personal project's owner — the same membership set the
+ * UI button gate uses. Slugs match n8n's `role` table; the relation's `role`
+ * column stores the slug directly.
+ */
+const RUN_REQUEST_ROLE_SLUGS = ['project:admin', 'project:editor', 'project:personalOwner'] as const;
 
 /**
  * Project roles that receive rate-limit emails: team project admins and
@@ -306,6 +324,49 @@ function serializeTopup(row: ProjectTopup): ProjectTopupItem {
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** The project's pending run request, as surfaced on the project detail payload. */
+export type PendingRunRequestSummary = {
+  id: string;
+  requestKind: RunRequestKind;
+  extraRuns: number | null;
+  periodKey: string | null;
+  requestedWeeklyLimit: number | null;
+  requestedAnnualLimit: number | null;
+  reason: string;
+  /** n8n user id of the requester; the UI renders "by you" for a match. */
+  requestedBy: string;
+  createdAt: string;
+};
+
+function serializeRunRequest(row: {
+  id: string;
+  requestKind: string;
+  extraRuns: number | null;
+  periodKey: string | null;
+  requestedWeeklyLimit: number | null;
+  requestedAnnualLimit: number | null;
+  reason: string;
+  requestedBy: string;
+  createdAt: Date;
+}): PendingRunRequestSummary {
+  return {
+    id: row.id,
+    requestKind: row.requestKind as RunRequestKind,
+    extraRuns: row.extraRuns,
+    periodKey: row.periodKey,
+    requestedWeeklyLimit: row.requestedWeeklyLimit,
+    requestedAnnualLimit: row.requestedAnnualLimit,
+    reason: row.reason,
+    requestedBy: row.requestedBy,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** True for a PostgreSQL unique-violation error (used for the pending-per-project race). */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505';
 }
 
 /** Default limits for one project scope; a null limit means "no default" (uncapped). */
@@ -995,6 +1056,145 @@ export class ProjectRateLimitService {
     }
 
     await this.customRepositories.projectTopup.deleteById(topupId);
+  }
+
+  /**
+   * Returns the project's pending run request for the detail payload, or null
+   * when none is open. Fail-open: an unreadable table must not take the whole
+   * project detail endpoint down, so errors log and render no review panel.
+   */
+  async getPendingRunRequest(projectId: string): Promise<PendingRunRequestSummary | null> {
+    try {
+      const row = await this.customRepositories.rateLimitRequest.getPendingByProjectId(projectId);
+      return row ? serializeRunRequest(row) : null;
+    } catch (error) {
+      log.error('Failed to read the pending run request; rendering the detail page without it', {
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Files a member "Request more runs" submission. Membership-gated exactly
+   * like the UI button: team project admins/editors and personal owners may
+   * file; a platform admin without a project relation may not. One pending
+   * request per project — a concurrent or duplicate submit fails with 409.
+   * Throws AppError 404 (unknown project), 403 (not eligible), 400 (invalid
+   * kind/field coherence, bounds, or week horizon) and 409 (pending exists).
+   */
+  async createRunRequest(
+    projectId: string,
+    userId: string,
+    body: {
+      requestKind: RunRequestKind;
+      extraRuns?: number | null;
+      periodKey?: string | null;
+      requestedWeeklyLimit?: number | null;
+      requestedAnnualLimit?: number | null;
+      reason: string;
+    },
+  ): Promise<PendingRunRequestSummary> {
+    const project = await this.n8nRepositories.project.findOneBy({ id: projectId });
+    if (!project) {
+      throw new AppError(404, 'Project not found');
+    }
+    if (userId.trim() === '') {
+      throw new AppError(403, 'Only project admins, editors and personal owners can request more runs');
+    }
+    const viewerRole = await getViewerProjectRole(
+      this.n8nRepositories.project,
+      this.n8nRepositories.projectRelation,
+      userId,
+      projectId,
+    );
+    if (viewerRole === null || !(RUN_REQUEST_ROLE_SLUGS as readonly string[]).includes(viewerRole)) {
+      throw new AppError(403, 'Only project admins, editors and personal owners can request more runs');
+    }
+
+    const kind = body.requestKind;
+    const extraRuns = body.extraRuns ?? null;
+    const periodKey = body.periodKey ?? null;
+    const requestedWeeklyLimit = body.requestedWeeklyLimit ?? null;
+    const requestedAnnualLimit = body.requestedAnnualLimit ?? null;
+    const reason = body.reason.trim();
+
+    if (kind === 'extra_runs') {
+      if (
+        extraRuns === null ||
+        !Number.isInteger(extraRuns) ||
+        extraRuns < RUN_REQUEST_MIN_EXTRA_RUNS ||
+        extraRuns > RUN_REQUEST_MAX_EXTRA_RUNS
+      ) {
+        throw new AppError(
+          400,
+          `extraRuns must be a whole number between ${RUN_REQUEST_MIN_EXTRA_RUNS} and ${RUN_REQUEST_MAX_EXTRA_RUNS}`,
+        );
+      }
+      if (
+        periodKey === null ||
+        !WEEKLY_KEY_PATTERN.test(periodKey) ||
+        !listUpcomingWeeklyPeriodKeys(MAX_RUN_REQUEST_HORIZON_WEEKS).includes(periodKey)
+      ) {
+        throw new AppError(400, 'periodKey must be the current week or one of the coming 8 weeks');
+      }
+      if (requestedWeeklyLimit !== null || requestedAnnualLimit !== null) {
+        throw new AppError(400, 'Limit changes belong to the limit_increase request kind');
+      }
+    } else {
+      if (extraRuns !== null || periodKey !== null) {
+        throw new AppError(400, 'extraRuns and periodKey belong to the extra_runs request kind');
+      }
+      if (requestedWeeklyLimit === null && requestedAnnualLimit === null) {
+        throw new AppError(400, 'Propose at least one of requestedWeeklyLimit or requestedAnnualLimit');
+      }
+      if (
+        requestedWeeklyLimit !== null &&
+        requestedAnnualLimit !== null &&
+        requestedAnnualLimit < requestedWeeklyLimit
+      ) {
+        throw new AppError(400, 'requestedAnnualLimit must be at least the requestedWeeklyLimit');
+      }
+    }
+
+    const pending = await this.customRepositories.rateLimitRequest.getPendingByProjectId(projectId);
+    if (pending) {
+      throw new AppError(409, 'This project already has a request waiting for review');
+    }
+    try {
+      const created = await this.customRepositories.rateLimitRequest.create({
+        projectId,
+        requestKind: kind,
+        extraRuns,
+        periodKey,
+        requestedWeeklyLimit,
+        requestedAnnualLimit,
+        reason,
+        requestedBy: userId,
+      });
+      return serializeRunRequest(created);
+    } catch (error) {
+      // The partial unique index is the race-safe guard: a concurrent submit
+      // may have won between the pre-check and this insert.
+      if (isUniqueViolation(error)) {
+        throw new AppError(409, 'This project already has a request waiting for review');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Cancels the requester's own pending run request. Throws AppError 404 for
+   * unknown projects and for requests that are missing, already decided, or
+   * filed by someone else (those are indistinguishable to the requester).
+   */
+  async cancelRunRequest(projectId: string, requestId: string, userId: string): Promise<void> {
+    await this.assertProjectExists(projectId);
+    const cancelled = await this.customRepositories.rateLimitRequest.cancelPending(requestId, projectId, userId);
+    if (!cancelled) {
+      throw new AppError(404, 'Pending request not found');
+    }
   }
 
   /** Throws AppError 404 when the project does not exist in n8n. */

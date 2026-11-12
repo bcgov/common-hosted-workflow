@@ -20,21 +20,29 @@ import {
 import { EditRateLimitsDialog } from './edit-rate-limits-dialog';
 import { ManageTopupsDialog } from './manage-topups-dialog';
 import { ProjectTypeBadge, USAGE_BAR_TONE_CLASSES, USAGE_BAR_TRACK_CLASS } from './project-badges';
+import { PendingRunRequestPanel } from './pending-run-request-panel';
+import { RequestMoreRunsDialog } from './request-more-runs-dialog';
 import {
+  canRequestMoreRuns,
   formatCount,
-  formatResetDate,
+  formatResetDateWithWeekday,
   formatShortDate,
+  formatWeekdayDate,
   getEffectiveYearlyLimit,
   getEffectiveWeeklyLimit,
   getHighestUsagePeriod,
   getNextWeeklyReset,
   getNextYearlyReset,
+  getProjectedWeeklyPauseDate,
   getRateLimitStatus,
   getUsageBarTone,
   getUsagePercent,
   getUsageRatio,
   type UsageBarTone,
+  type UsagePeriod,
 } from '@/lib/rate-limit';
+import { getViewerRoleLabel } from '@/lib/roles';
+import { useSession } from '@/state/session';
 
 const WORKFLOW_PAGE_SIZE = 10;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -64,11 +72,29 @@ function getWhenReachedText(stopBehavior: RateLimitStopBehavior | null): string 
   return stopBehavior === 'soft_stop' ? 'When reached: keep running and alert admins' : 'When reached: pause new runs';
 }
 
+/** Call to action shown in the usage banner for every limit state. */
+const REQUEST_MORE_RUNS_SENTENCE = 'If your team needs more, request extra runs for this week or a higher limit.';
+
+/**
+ * Pause wording without a projected date — used when the pace projection is
+ * unavailable (no usage yet, the week just started, or the current pace won't
+ * reach the limit within the week).
+ */
+function getPauseWithoutDateText(project: ProjectItem, period: UsagePeriod): string {
+  const limit = period === 'weekly' ? getEffectiveWeeklyLimit(project) : getEffectiveYearlyLimit(project);
+  return limit !== null
+    ? `New runs pause once you reach your ${getPeriodLabel(period)} limit of ${formatCount(limit)}.`
+    : 'New runs pause once the limit is reached.';
+}
+
 export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) {
   const { projectId = '' } = useParams();
   const queryClient = useQueryClient();
+  const session = useSession();
+  const viewerUserId = session?.n8nUser?.id ?? null;
   const [isLimitsDialogOpen, setIsLimitsDialogOpen] = useState(false);
   const [isTopupsDialogOpen, setIsTopupsDialogOpen] = useState(false);
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [isEditingTenant, setIsEditingTenant] = useState(false);
   const [tenantValue, setTenantValue] = useState('');
   const [tenantError, setTenantError] = useState<string | null>(null);
@@ -241,6 +267,11 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
   const showBanner = status === 'near_limit' || status === 'limit_reached';
   const nextWeeklyReset = getNextWeeklyReset();
   const nextYearlyReset = getNextYearlyReset();
+  const viewerRoleLabel = getViewerRoleLabel(project.viewerRole);
+  // Member-view only: admins adjust limits directly, so they never see the
+  // request action — visibility is membership-based, not admin-based, and
+  // deliberately independent of current usage (the banner owns thresholds).
+  const showRequestButton = readOnly && canRequestMoreRuns(project.viewerRole);
 
   let bannerText: string | null = null;
   if (showBanner && bannerPeriod !== null) {
@@ -260,6 +291,30 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
       project.stopBehavior === 'soft_stop'
         ? ' Runs continue and admins are alerted.'
         : ' New runs pause until the limit resets.';
+  }
+
+  // Banner description: a near-limit week gets the projected pause date from
+  // the current pace; everything else gets plain pause wording (limit already
+  // met → none needed). Every state closes with either the request call to
+  // action or — when a request is waiting — the pending-review note.
+  const pendingRequest = readOnly ? (project.pendingRunRequest ?? null) : null;
+  const pendingSentence =
+    pendingRequest !== null
+      ? `Your request for ${
+          pendingRequest.requestKind === 'extra_runs' ? 'extra runs' : 'a higher limit'
+        } is waiting for review.`
+      : null;
+  let bannerDescription: string | null = null;
+  if (status === 'near_limit' && bannerPeriod !== null) {
+    const limit = bannerPeriod === 'weekly' ? getEffectiveWeeklyLimit(project) : getEffectiveYearlyLimit(project);
+    const projected =
+      bannerPeriod === 'weekly' ? getProjectedWeeklyPauseDate({ used: project.weeklyExecutionCount, limit }) : null;
+    const pauseText = projected
+      ? `At this pace new runs pause on ${formatWeekdayDate(projected)}.`
+      : getPauseWithoutDateText(project, bannerPeriod);
+    bannerDescription = `${pauseText} ${pendingSentence ?? REQUEST_MORE_RUNS_SENTENCE}`;
+  } else if (showBanner) {
+    bannerDescription = pendingSentence ?? REQUEST_MORE_RUNS_SENTENCE;
   }
 
   return (
@@ -357,10 +412,23 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
                     <span>{project.workflowCount} workflows</span>
                     <span aria-hidden="true">·</span>
                     <span>{project.membersCount} members</span>
+                    {viewerRoleLabel && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>{viewerRoleLabel}</span>
+                      </>
+                    )}
                   </>
                 )}
               </div>
             </div>
+            {showRequestButton && (
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button type="button" onClick={() => setIsRequestDialogOpen(true)}>
+                  Request more runs
+                </Button>
+              </div>
+            )}
             {!readOnly && (
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsTopupsDialogOpen(true)}>
@@ -377,12 +445,13 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
           {bannerText && (
             <Alert variant="warning">
               <AlertTitle>{bannerText}</AlertTitle>
-              <AlertDescription>
-                {project.weeklyTopupRuns > 0
-                  ? `Top-up: +${formatCount(project.weeklyTopupRuns)} runs this week`
-                  : 'Top-up: none this week'}
-              </AlertDescription>
+              {bannerDescription !== null && <AlertDescription>{bannerDescription}</AlertDescription>}
             </Alert>
+          )}
+
+          {/* Pending run request (member view): what was asked + cancel */}
+          {pendingRequest && (
+            <PendingRunRequestPanel project={project} request={pendingRequest} viewerUserId={viewerUserId} />
           )}
 
           {/* Limit cards */}
@@ -392,22 +461,32 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
               used={project.weeklyExecutionCount}
               limit={getEffectiveWeeklyLimit(project)}
               usesDefaultLimits={project.usesDefaultLimits}
-              topupRuns={project.weeklyTopupRuns}
               resetDate={nextWeeklyReset}
               changedAt={project.updatedAt}
               changedBy={project.updatedByName}
               stopBehavior={project.stopBehavior}
+              footerNote={
+                pendingRequest?.requestKind === 'extra_runs' && pendingRequest.extraRuns !== null
+                  ? `+${formatCount(pendingRequest.extraRuns)} requested, waiting for review`
+                  : (project.weeklyTopupRuns ?? 0) > 0
+                    ? `Includes +${formatCount(project.weeklyTopupRuns ?? 0)} top-up`
+                    : null
+              }
             />
             <LimitCard
               label="Annual limit"
               used={project.yearlyExecutionCount}
               limit={getEffectiveYearlyLimit(project)}
               usesDefaultLimits={project.usesDefaultLimits}
-              topupRuns={project.yearlyTopupRuns}
               resetDate={nextYearlyReset}
               changedAt={project.updatedAt}
               changedBy={project.updatedByName}
               stopBehavior={project.stopBehavior}
+              footerNote={
+                (project.yearlyTopupRuns ?? 0) > 0
+                  ? `Includes +${formatCount(project.yearlyTopupRuns ?? 0)} top-up`
+                  : 'No top-ups this year'
+              }
             />
           </div>
 
@@ -523,6 +602,9 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
       {!readOnly && (
         <ManageTopupsDialog project={project} open={isTopupsDialogOpen} onOpenChange={setIsTopupsDialogOpen} />
       )}
+
+      {/* Request more runs dialog (real member request flow) */}
+      <RequestMoreRunsDialog project={project} open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen} />
     </div>
   );
 }
@@ -533,12 +615,12 @@ interface LimitCardProps {
   limit: number | null;
   /** True when the shown limit comes from the scope's saved defaults. */
   usesDefaultLimits?: boolean;
-  /** Runs added by top-ups this week; shown on the weekly card only. */
-  topupRuns?: number;
   resetDate: Date;
   changedAt: string | null;
   changedBy: string | null;
   stopBehavior: RateLimitStopBehavior | null;
+  /** Right-hand footer note (top-up count or the pending-request status); null renders nothing. */
+  footerNote?: string | null;
 }
 
 function LimitCard({
@@ -546,11 +628,11 @@ function LimitCard({
   used,
   limit,
   usesDefaultLimits,
-  topupRuns,
   resetDate,
   changedAt,
   changedBy,
   stopBehavior,
+  footerNote,
 }: Readonly<LimitCardProps>) {
   const ratio = getUsageRatio(used, limit);
   const percent = getUsagePercent(used, limit);
@@ -589,16 +671,14 @@ function LimitCard({
       {tone !== null && (
         <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>{percent}% used</span>
-          <span>Resets {formatResetDate(resetDate)}</span>
+          <span>Resets {formatResetDateWithWeekday(resetDate)}</span>
         </div>
       )}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs">
         <span className="text-muted-foreground">
           {limit === null ? 'No limit configured' : getWhenReachedText(stopBehavior)}
         </span>
-        {topupRuns !== undefined && topupRuns > 0 && (
-          <span className="text-muted-foreground">Includes +{formatCount(topupRuns)} top-up</span>
-        )}
+        {footerNote != null && footerNote !== '' && <span className="text-muted-foreground">{footerNote}</span>}
       </div>
     </div>
   );

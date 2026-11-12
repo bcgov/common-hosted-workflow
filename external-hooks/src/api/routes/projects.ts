@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { type infer as zInfer } from 'zod';
-import { OkResponse } from './responses';
+import { CreatedResponse, OkResponse } from './responses';
 import type { ApiRouteContext } from '../types/routes';
 import type { UiApiRequest, UiApiTypedRequest } from '../types/ui-api';
 import { createRequestParser } from '../utils/validation';
 import {
   adminProjectsQuerySchema,
+  cancelRunRequestSchema,
+  createRunRequestSchema,
   getAdminProjectSchema,
   getProjectWorkflowUsageSchema,
   listProjectTopupsSchema,
@@ -56,7 +58,7 @@ export function buildProjectsRouter(routeContext: ApiRouteContext) {
       if (!isSessionAdmin(req)) {
         await services.projectTenant.assertUserProjectAccess(projectId, getSessionUserId(req));
       }
-      const result = await services.projectTenant.getProjectById(projectId);
+      const result = await services.projectTenant.getProjectById(projectId, getSessionUserId(req));
       OkResponse(res, result);
     },
   );
@@ -85,6 +87,41 @@ export function buildProjectsRouter(routeContext: ApiRouteContext) {
       }
       const result = await services.projectRateLimit.listProjectTopups(projectId, page, pageSize);
       OkResponse(res, result);
+    },
+  );
+
+  // Member "Request more runs" writes. Eligibility (project admins/editors and
+  // personal owners — never platform admins without a relation) is enforced
+  // inside the service via the project relation, so these routes stay shared:
+  // members pass the access assertion, admins skip it but still hit the
+  // membership gate.
+  router.post(
+    '/:projectId/run-requests',
+    createRequestParser(createRunRequestSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof createRunRequestSchema>>, res) => {
+      const { projectId } = req.parsed.params;
+      if (!isSessionAdmin(req)) {
+        await services.projectTenant.assertUserProjectAccess(projectId, getSessionUserId(req));
+      }
+      const request = await services.projectRateLimit.createRunRequest(
+        projectId,
+        getSessionUserId(req),
+        req.parsed.body,
+      );
+      CreatedResponse(res, { success: true, message: 'Run request submitted', request });
+    },
+  );
+
+  router.delete(
+    '/:projectId/run-requests/:requestId',
+    createRequestParser(cancelRunRequestSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof cancelRunRequestSchema>>, res) => {
+      const { projectId, requestId } = req.parsed.params;
+      if (!isSessionAdmin(req)) {
+        await services.projectTenant.assertUserProjectAccess(projectId, getSessionUserId(req));
+      }
+      await services.projectRateLimit.cancelRunRequest(projectId, requestId, getSessionUserId(req));
+      res.status(204).end();
     },
   );
 
