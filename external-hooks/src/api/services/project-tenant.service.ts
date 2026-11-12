@@ -1,6 +1,10 @@
 import type { CustomRepositories } from '../bootstrap/custom-repositories';
 import type { N8nRepositories } from '../bootstrap/n8n-repositories';
-import type { PendingRunRequestSummary, ProjectRateLimitEnrichment, ProjectRateLimitService } from './project-rate-limit.service';
+import type {
+  PendingRunRequestSummary,
+  ProjectRateLimitEnrichment,
+  ProjectRateLimitService,
+} from './project-rate-limit.service';
 import {
   getViewerProjectRole,
   listProjectIdsAccessibleToUser,

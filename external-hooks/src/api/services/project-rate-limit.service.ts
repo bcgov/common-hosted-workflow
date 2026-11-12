@@ -1149,7 +1149,11 @@ export class ProjectRateLimitService {
       if (requestedWeeklyLimit === null && requestedAnnualLimit === null) {
         throw new AppError(400, 'Propose at least one of requestedWeeklyLimit or requestedAnnualLimit');
       }
-      if (requestedWeeklyLimit !== null && requestedAnnualLimit !== null && requestedAnnualLimit < requestedWeeklyLimit) {
+      if (
+        requestedWeeklyLimit !== null &&
+        requestedAnnualLimit !== null &&
+        requestedAnnualLimit < requestedWeeklyLimit
+      ) {
         throw new AppError(400, 'requestedAnnualLimit must be at least the requestedWeeklyLimit');
       }
     }

@@ -42,7 +42,9 @@ export const rateLimitRequest = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex('uq_rlr_pending_project').on(table.projectId).where(sql`${table.status} = 'pending'`),
+    uniqueIndex('uq_rlr_pending_project')
+      .on(table.projectId)
+      .where(sql`${table.status} = 'pending'`),
     index('idx_rlr_project_created').on(table.projectId, table.createdAt),
     check('chk_rlr_kind', sql`${table.requestKind} IN ('extra_runs', 'limit_increase')`),
     check('chk_rlr_status', sql`${table.status} IN ('pending', 'approved', 'rejected', 'cancelled')`),
