@@ -25,6 +25,18 @@ export type ProjectItem = {
   yearlyTopupRuns: number;
   workflowCount: number;
   membersCount: number;
+  /**
+   * The requesting user's n8n project role for this project, or null when they
+   * are not a member (including platform admins without a relation). Only set
+   * by the single-project detail endpoint, never by the list.
+   */
+  viewerRole?: string | null;
+  /**
+   * The project's pending "Request more runs" submission, or null when none
+   * is open. Only set by the single-project detail endpoint, never by the
+   * list — it drives the member-view review panel and banner note.
+   */
+  pendingRunRequest?: PendingRunRequest | null;
   updatedAt: string | null;
   updatedByName: string | null;
 };
@@ -124,6 +136,39 @@ export type ProjectsResponse = {
   };
 };
 
+/** What the requester asks for: a one-week top-up or a lasting limit raise. */
+export type RunRequestKind = 'extra_runs' | 'limit_increase';
+
+/** The project's pending "Request more runs" submission (detail endpoint only). */
+export type PendingRunRequest = {
+  id: string;
+  requestKind: RunRequestKind;
+  extraRuns: number | null;
+  /** Target week 'YYYY-Www' of the extra runs (extra_runs kind only). */
+  periodKey: string | null;
+  requestedWeeklyLimit: number | null;
+  requestedAnnualLimit: number | null;
+  reason: string;
+  /** n8n user id of the requester; the UI renders "by you" on a match. */
+  requestedBy: string;
+  createdAt: string;
+};
+
+export type CreateRunRequestBody = {
+  requestKind: RunRequestKind;
+  extraRuns?: number | null;
+  periodKey?: string | null;
+  requestedWeeklyLimit?: number | null;
+  requestedAnnualLimit?: number | null;
+  reason: string;
+};
+
+export type CreateRunRequestResponse = {
+  success: true;
+  message: string;
+  request: PendingRunRequest;
+};
+
 /**
  * Lists projects from the shared read endpoint: admins get every n8n project,
  * members get only the projects they can access in n8n.
@@ -165,6 +210,20 @@ export function updateProjectRateLimit(projectId: string, body: UpdateProjectRat
 export function getProject(projectId: string, signal?: AbortSignal) {
   return instance
     .get<ProjectItem>(`/ui-api/projects/${encodeURIComponent(projectId)}`, { signal })
+    .then((res) => res.data);
+}
+
+/** Files a member "Request more runs" submission for the project. */
+export function createRunRequest(projectId: string, body: CreateRunRequestBody) {
+  return instance
+    .post<CreateRunRequestResponse>(`/ui-api/projects/${encodeURIComponent(projectId)}/run-requests`, body)
+    .then((res) => res.data);
+}
+
+/** Cancels the current user's own pending run request for the project. */
+export function cancelRunRequest(projectId: string, requestId: string) {
+  return instance
+    .delete<void>(`/ui-api/projects/${encodeURIComponent(projectId)}/run-requests/${encodeURIComponent(requestId)}`)
     .then((res) => res.data);
 }
 

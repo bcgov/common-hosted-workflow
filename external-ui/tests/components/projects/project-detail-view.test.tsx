@@ -170,13 +170,33 @@ describe('ProjectDetailView', () => {
     expect(screen.queryByText(/has used \d+% of its/)).not.toBeInTheDocument();
   });
 
-  it('shows the near-limit banner with no current-week top-up', async () => {
+  it('shows the near-limit banner with the request call to action', async () => {
     getProjectMock.mockResolvedValue(makeProject({ weeklyExecutionCount: 11_520 }));
 
     renderView();
 
     expect(await screen.findByText('DEVX Tenant has used 96% of its weekly limit')).toBeInTheDocument();
-    expect(screen.getByText('Top-up: none this week')).toBeInTheDocument();
+    // The pace projection (or its no-date fallback) always closes with the
+    // request action — the banner no longer repeats the top-up line, which
+    // lives on the weekly limit card.
+    expect(screen.getByText(/request extra runs for this week or a higher limit/)).toBeInTheDocument();
+  });
+
+  it('renders the projected pause date in the near-limit banner', async () => {
+    // Freeze the clock so the projection is deterministic: 80% used exactly
+    // 2 days into the Nov 2 week → breach projected on Wednesday, Nov 4.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-04T20:00:00Z'));
+    try {
+      getProjectMock.mockResolvedValue(makeProject({ weeklyExecutionCount: 9_600 }));
+
+      renderView({ readOnly: true });
+
+      expect(await screen.findByText('DEVX Tenant has used 80% of its weekly limit')).toBeInTheDocument();
+      expect(screen.getByText(/At this pace new runs pause on Wednesday, Nov 4\./)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows top-ups only on the weekly card and uses the effective weekly limit', async () => {
@@ -188,7 +208,6 @@ describe('ProjectDetailView', () => {
     expect(screen.getByText('of 14,000 runs')).toBeInTheDocument();
     expect(screen.getByText('of 500,000 runs')).toBeInTheDocument();
     expect(screen.getAllByText('Includes +2,000 top-up')).toHaveLength(1);
-    expect(screen.getByText('Top-up: +2,000 runs this week')).toBeInTheDocument();
   });
 
   it('explains that reached hard-stop limits pause new runs', async () => {
@@ -205,6 +224,90 @@ describe('ProjectDetailView', () => {
     renderView();
 
     expect(await screen.findByText(/Runs continue and admins are alerted/)).toBeInTheDocument();
+  });
+
+  it('offers the request action to a project editor at any usage level in member view', async () => {
+    getProjectMock.mockResolvedValue(makeProject({ viewerRole: 'project:editor', weeklyExecutionCount: 5_000 }));
+
+    renderView({ readOnly: true });
+
+    const user = userEvent.setup();
+    expect(await screen.findByRole('button', { name: 'Request more runs' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Request more runs' }));
+    // The real request form: usage summary, mode selection and reason.
+    expect(await screen.findByText(/A platform admin reviews every request/)).toBeInTheDocument();
+  });
+
+  it('shows the pending review panel and banner note while a request waits', async () => {
+    getProjectMock.mockResolvedValue(
+      makeProject({
+        viewerRole: 'project:editor',
+        weeklyExecutionCount: 10_000,
+        pendingRunRequest: {
+          id: '22222222-2222-4222-8222-222222222222',
+          requestKind: 'extra_runs',
+          extraRuns: 5_000,
+          periodKey: '2026-W46',
+          requestedWeeklyLimit: null,
+          requestedAnnualLimit: null,
+          reason: 'Fall intake started early',
+          requestedBy: 'member-1',
+          createdAt: '2026-11-10T18:14:00Z',
+        },
+      }),
+    );
+
+    renderView({ readOnly: true });
+
+    expect(await screen.findByText('Pending review')).toBeInTheDocument();
+    expect(screen.getByText(/You asked for 5,000 extra runs/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel request' })).toBeInTheDocument();
+    expect(screen.getByText(/Your request for extra runs is waiting for review\./)).toBeInTheDocument();
+    expect(screen.getByText('+5,000 requested, waiting for review')).toBeInTheDocument();
+  });
+
+  it('hides the request action for viewers and non-member admins regardless of usage', async () => {
+    getProjectMock.mockResolvedValue(makeProject({ viewerRole: 'project:viewer', weeklyExecutionCount: 11_520 }));
+
+    renderView({ readOnly: true });
+
+    await screen.findByText('Invoice QR intake');
+    expect(screen.queryByRole('button', { name: 'Request more runs' })).not.toBeInTheDocument();
+
+    // No relation at all — how a platform admin (or any non-member) arrives.
+    getProjectMock.mockResolvedValue(makeProject({ weeklyExecutionCount: 11_520 }));
+    renderView({ readOnly: true });
+
+    await screen.findAllByText('Invoice QR intake');
+    expect(screen.queryAllByRole('button', { name: 'Request more runs' })).toHaveLength(0);
+  });
+
+  it('keeps the direct limit controls in admin view without the request action', async () => {
+    getProjectMock.mockResolvedValue(makeProject({ viewerRole: 'project:editor', weeklyExecutionCount: 11_520 }));
+
+    renderView();
+
+    await screen.findByText('Invoice QR intake');
+    expect(screen.getByRole('button', { name: 'Manage top-ups' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit limits' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request more runs' })).not.toBeInTheDocument();
+  });
+
+  it('labels the viewer role in the meta line when the viewer is a member', async () => {
+    getProjectMock.mockResolvedValue(makeProject({ viewerRole: 'project:editor' }));
+
+    renderView({ readOnly: true });
+
+    await screen.findByText('Invoice QR intake');
+    expect(screen.getByText('You are an editor')).toBeInTheDocument();
+  });
+
+  it('omits the viewer-role label for non-members', async () => {
+    renderView();
+
+    await screen.findByText('Invoice QR intake');
+
+    expect(screen.queryByText(/You are an? /)).not.toBeInTheDocument();
   });
 
   it('renders the 404 state for unknown projects', async () => {

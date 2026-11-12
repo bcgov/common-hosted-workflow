@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canRequestMoreRuns,
   formatCompactCount,
   formatCount,
   formatResetDate,
   formatShortDate,
+  formatWeekdayDate,
   formatWeeklyKeyRange,
   formatWeeklyPeriodLabel,
   getEffectiveWeeklyLimit,
@@ -12,6 +14,7 @@ import {
   getHighestUsagePeriod,
   getNextWeeklyReset,
   getNextYearlyReset,
+  getProjectedWeeklyPauseDate,
   getRateLimitStatus,
   getUsageBarTone,
   getUsagePercent,
@@ -338,5 +341,77 @@ describe('top-up weekly period keys and options', () => {
       { value: '2027-W01', label: 'Jan 4 to 10' },
       { value: '2027-W02', label: 'Jan 11 to 17' },
     ]);
+  });
+});
+
+describe('formatWeekdayDate', () => {
+  it('formats a date as "Friday, Nov 6" in the Vancouver time zone', () => {
+    expect(formatWeekdayDate(new Date('2026-11-06T12:00:00Z'))).toBe('Friday, Nov 6');
+  });
+
+  it('formats a date whose Vancouver calendar day differs from UTC', () => {
+    // Nov 7, 02:00 UTC is still Nov 6 in Vancouver (PST = UTC-8).
+    expect(formatWeekdayDate(new Date('2026-11-07T02:00:00Z'))).toBe('Friday, Nov 6');
+  });
+});
+
+describe('getProjectedWeeklyPauseDate', () => {
+  it('projects the pause date from the elapsed share of the week', () => {
+    // Wednesday noon Vancouver, 2 days into the Nov 2 week; 50 of 100 used at
+    // that pace reaches the limit after 4 more days → Friday, Nov 6.
+    const projected = getProjectedWeeklyPauseDate({
+      used: 50,
+      limit: 100,
+      now: new Date('2026-11-04T20:00:00Z'),
+    });
+    expect(formatWeekdayDate(projected!)).toBe('Friday, Nov 6');
+  });
+
+  it('returns null when the current pace will not reach the limit within the week', () => {
+    // 10 of 100 by Wednesday → 20 days at this pace, past the week's end.
+    expect(getProjectedWeeklyPauseDate({ used: 10, limit: 100, now: new Date('2026-11-04T20:00:00Z') })).toBeNull();
+  });
+
+  it('returns null when the limit is already met', () => {
+    expect(getProjectedWeeklyPauseDate({ used: 100, limit: 100, now: new Date('2026-11-04T20:00:00Z') })).toBeNull();
+    expect(getProjectedWeeklyPauseDate({ used: 120, limit: 100, now: new Date('2026-11-04T20:00:00Z') })).toBeNull();
+  });
+
+  it('returns null without usage, without a limit, or with a zero limit', () => {
+    const now = new Date('2026-11-04T20:00:00Z');
+    expect(getProjectedWeeklyPauseDate({ used: 0, limit: 100, now })).toBeNull();
+    expect(getProjectedWeeklyPauseDate({ used: 30, limit: null, now })).toBeNull();
+    expect(getProjectedWeeklyPauseDate({ used: 0, limit: 0, now })).toBeNull();
+  });
+
+  it('returns null at the exact week start when nothing has elapsed yet', () => {
+    // Monday noon UTC anchor = the week's starting instant.
+    expect(getProjectedWeeklyPauseDate({ used: 5, limit: 100, now: new Date('2026-11-02T12:00:00Z') })).toBeNull();
+  });
+
+  it("projects a same-day pause on the week's final day for a late-week spike", () => {
+    // Sunday noon Vancouver, 6 days in; 90 of 100 used → breach ~16h later,
+    // still Sunday in Vancouver.
+    const projected = getProjectedWeeklyPauseDate({
+      used: 90,
+      limit: 100,
+      now: new Date('2026-11-08T20:00:00Z'),
+    });
+    expect(formatWeekdayDate(projected!)).toBe('Sunday, Nov 8');
+  });
+});
+
+describe('canRequestMoreRuns', () => {
+  it('is true for project admins, editors and personal owners at any usage level', () => {
+    expect(canRequestMoreRuns('project:editor')).toBe(true);
+    expect(canRequestMoreRuns('project:admin')).toBe(true);
+    expect(canRequestMoreRuns('project:personalOwner')).toBe(true);
+  });
+
+  it('is false for other roles and non-members', () => {
+    expect(canRequestMoreRuns('project:viewer')).toBe(false);
+    // A platform admin without a project relation has no role at all.
+    expect(canRequestMoreRuns(null)).toBe(false);
+    expect(canRequestMoreRuns(undefined)).toBe(false);
   });
 });
