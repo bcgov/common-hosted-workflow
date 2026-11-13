@@ -315,8 +315,12 @@ export function cancelRunRequest(projectId: string, requestId: string) {
     .then((res) => res.data);
 }
 
-/** Lists run requests for the admin review tab (pending is oldest-first; the rest newest-first). */
-export function listAdminRunRequests(params: {
+/**
+ * Lists run requests for the Projects page's "Run requests" tab. Admins get
+ * every request (the review queue); members get only requests belonging to
+ * their accessible projects. Pending is oldest-first, the rest newest-first.
+ */
+export function listRunRequests(params: {
   status: AdminRunRequestStatusFilter;
   search?: string;
   page: number;
@@ -325,7 +329,7 @@ export function listAdminRunRequests(params: {
 }) {
   const { signal, search, ...rest } = params;
   return instance
-    .get<AdminRunRequestsPage>('/ui-api/admin/projects/run-requests', {
+    .get<AdminRunRequestsPage>('/ui-api/projects/run-requests', {
       params: { ...rest, ...(search && search.trim() ? { search: search.trim() } : {}) },
       signal,
     })

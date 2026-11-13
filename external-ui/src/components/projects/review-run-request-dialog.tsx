@@ -189,15 +189,26 @@ export interface ReviewRunRequestDialogProps {
   request: AdminRunRequestItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Member view: shows what was asked without the approve/deny decision
+   * form — decisions stay with platform admins.
+   */
+  readOnly?: boolean;
 }
 
 /**
  * The admin "Review {project}'s request" dialog: what the member asked for,
  * the usage snapshot from when they asked, and the approve/deny decision
  * (runs to grant, new limits, optional note, required deny reason). Decided
- * requests open the same dialog read-only with the decision recorded.
+ * requests open the same dialog read-only with the decision recorded, and
+ * members always get it read-only.
  */
-export function ReviewRunRequestDialog({ request, open, onOpenChange }: Readonly<ReviewRunRequestDialogProps>) {
+export function ReviewRunRequestDialog({
+  request,
+  open,
+  onOpenChange,
+  readOnly = false,
+}: Readonly<ReviewRunRequestDialogProps>) {
   const queryClient = useQueryClient();
   const isDecided = request.status !== 'pending';
 
@@ -224,7 +235,7 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange }: Readonly
   }, [open, request.id]);
 
   function invalidateAfterDecision() {
-    void queryClient.invalidateQueries({ queryKey: ['admin-run-requests'] });
+    void queryClient.invalidateQueries({ queryKey: ['run-requests'] });
     void queryClient.invalidateQueries({ queryKey: ['projects', 'all'] });
     void queryClient.invalidateQueries({ queryKey: ['project', request.projectId] });
   }
@@ -357,7 +368,9 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange }: Readonly
           </Button>
         </DialogClose>
         <DialogHeader>
-          <DialogTitle>Review {request.projectName}'s request</DialogTitle>
+          <DialogTitle>
+            {readOnly ? `${request.projectName}'s request` : `Review ${request.projectName}'s request`}
+          </DialogTitle>
           <DialogDescription>
             From {request.requestedByName} ({request.requestedByRoleLabel ?? 'member'}) · sent{' '}
             {formatSentAt(request.createdAt)}
@@ -454,6 +467,8 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange }: Readonly
 
         {isDecided ? (
           <DecidedPanel request={request} firstName={firstName} onOpenChange={onOpenChange} />
+        ) : readOnly ? (
+          <MemberPendingPanel firstName={firstName} onOpenChange={onOpenChange} />
         ) : (
           <>
             {/* Decision radios */}
@@ -664,6 +679,22 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange }: Readonly
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The read-only view a member gets for their project's pending request. */
+function MemberPendingPanel({ firstName, onOpenChange }: { firstName: string; onOpenChange: (open: boolean) => void }) {
+  return (
+    <div className="space-y-3">
+      <p className="rounded-card border border-[#c1ddfc] bg-[#f1f8fe] p-3 text-sm text-foreground">
+        A platform admin reviews this request. We'll email {firstName} when they decide.
+      </p>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Close
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }
 

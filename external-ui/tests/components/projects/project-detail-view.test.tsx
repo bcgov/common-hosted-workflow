@@ -264,6 +264,14 @@ describe('ProjectDetailView', () => {
     expect(screen.getByRole('button', { name: 'Cancel request' })).toBeInTheDocument();
     expect(screen.getByText(/Your request for extra runs is waiting for review\./)).toBeInTheDocument();
     expect(screen.getByText('+5,000 requested, waiting for review')).toBeInTheDocument();
+
+    // The request action stays visible but is disabled while a request waits.
+    const requestButton = screen.getByRole('button', { name: 'Request more runs' });
+    expect(requestButton).toBeDisabled();
+    expect(requestButton).toHaveAttribute(
+      'title',
+      'You already have a request waiting for review. Cancel it before making another.',
+    );
   });
 
   it('hides the request action for viewers and non-member admins regardless of usage', async () => {
