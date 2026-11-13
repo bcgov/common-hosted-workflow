@@ -5,13 +5,11 @@ const express_1 = require('express');
 const _config_1 = require('@config');
 const readonly_1 = require('../constants/readonly');
 function refuse(_req, res) {
-  res
-    .status(503)
-    .json({
-      code: 503,
-      message: readonly_1.READONLY_EDIT_MESSAGE,
-      details: { code: readonly_1.READONLY_MAINTENANCE_CODE },
-    });
+  res.status(503).json({
+    code: 503,
+    message: readonly_1.READONLY_EDIT_MESSAGE,
+    details: { code: readonly_1.READONLY_MAINTENANCE_CODE },
+  });
 }
 // Management operations that no before-hook covers.
 // Keep the paths and HTTP methods aligned with n8n's route definitions.
