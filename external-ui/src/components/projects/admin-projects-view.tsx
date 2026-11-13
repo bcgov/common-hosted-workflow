@@ -582,14 +582,9 @@ function RunRequestsTab({ readOnly = false }: { readOnly?: boolean }) {
               <>
                 <p className="mt-3 text-lg font-bold text-foreground">No requests waiting</p>
                 <p className="mt-1 max-w-md text-sm leading-5 text-muted-foreground">
-<<<<<<< HEAD
                   {readOnly
                     ? 'When someone on one of your projects asks for more runs, the request shows up here. Decided requests are under Approved, Denied and Cancelled.'
                     : 'When a project admin or editor asks for more runs, the request shows up here and we email you. Decided requests are under Approved, Denied and Cancelled.'}
-=======
-                  When a project admin or editor asks for more runs, the request shows up here and we email you. Decided
-                  requests are under Approved, Denied and Cancelled.
->>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
                 </p>
                 <Button
                   type="button"
@@ -624,11 +619,7 @@ function RunRequestsTab({ readOnly = false }: { readOnly?: boolean }) {
             </TableHeader>
             <TableBody>
               {items.map((item) => (
-<<<<<<< HEAD
                 <RequestRow key={item.id} item={item} readOnly={readOnly} onReview={() => setReviewing(item)} />
-=======
-                <RequestRow key={item.id} item={item} onReview={() => setReviewing(item)} />
->>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
               ))}
             </TableBody>
           </Table>
