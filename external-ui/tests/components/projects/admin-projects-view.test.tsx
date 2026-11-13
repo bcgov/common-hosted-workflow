@@ -8,7 +8,7 @@ import { AdminProjectsView } from '@/components/projects/admin-projects-view';
 import {
   fetchAllProjects,
   getRateLimitDefaults,
-  listAdminRunRequests,
+  listRunRequests,
   type AdminRunRequestItem,
   type AdminRunRequestStatusFilter,
   type AdminRunRequestsPage,
@@ -17,12 +17,12 @@ import {
 
 vi.mock('@/services/backend/projects', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/projects')>('@/services/backend/projects');
-  return { ...actual, fetchAllProjects: vi.fn(), getRateLimitDefaults: vi.fn(), listAdminRunRequests: vi.fn() };
+  return { ...actual, fetchAllProjects: vi.fn(), getRateLimitDefaults: vi.fn(), listRunRequests: vi.fn() };
 });
 
 const fetchAllMock = vi.mocked(fetchAllProjects);
 const getRateLimitDefaultsMock = vi.mocked(getRateLimitDefaults);
-const listAdminRunRequestsMock = vi.mocked(listAdminRunRequests);
+const listRunRequestsMock = vi.mocked(listRunRequests);
 
 /** An empty run-requests page (what the stat tile and tab count read when nothing is pending). */
 const EMPTY_RUN_REQUESTS_PAGE: AdminRunRequestsPage = {
@@ -126,8 +126,8 @@ describe('AdminProjectsView', () => {
       team: { weeklyRateLimit: null, yearlyRateLimit: null },
       personal: { weeklyRateLimit: null, yearlyRateLimit: null },
     });
-    listAdminRunRequestsMock.mockReset();
-    listAdminRunRequestsMock.mockResolvedValue(EMPTY_RUN_REQUESTS_PAGE);
+    listRunRequestsMock.mockReset();
+    listRunRequestsMock.mockResolvedValue(EMPTY_RUN_REQUESTS_PAGE);
   });
 
   it('aggregates stat cards over every fetched project', async () => {
@@ -417,7 +417,7 @@ describe('AdminProjectsView run requests tab', () => {
   }
 
   function mockRequestsList(items: AdminRunRequestItem[]) {
-    listAdminRunRequestsMock.mockImplementation((params) => {
+    listRunRequestsMock.mockImplementation((params) => {
       // Chip counts use pageSize-1 probes per filter; the table uses the real page.
       if (params.pageSize === 1) {
         return Promise.resolve(makePage([], COUNTS[params.status]));
@@ -442,8 +442,8 @@ describe('AdminProjectsView run requests tab', () => {
       team: { weeklyRateLimit: null, yearlyRateLimit: null },
       personal: { weeklyRateLimit: null, yearlyRateLimit: null },
     });
-    listAdminRunRequestsMock.mockReset();
-    listAdminRunRequestsMock.mockResolvedValue(EMPTY_RUN_REQUESTS_PAGE);
+    listRunRequestsMock.mockReset();
+    listRunRequestsMock.mockResolvedValue(EMPTY_RUN_REQUESTS_PAGE);
   });
 
   it('renders the pending queue with chips, summaries and review rows', async () => {
@@ -501,5 +501,27 @@ describe('AdminProjectsView run requests tab', () => {
     expect(await screen.findByText('No requests match “zzz”')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(await screen.findByText('CITZ Tenant')).toBeInTheDocument();
+  });
+
+  it('offers the tab to members and keeps the rows read-only', async () => {
+    const user = userEvent.setup();
+    mockRequestsList([EXTRA_RUNS_REQUEST]);
+    renderView(['/projects?tab=requests'], { readOnly: true });
+
+    expect(await screen.findByRole('tab', { name: 'Run requests (2)' })).toBeInTheDocument();
+    expect(screen.getByText('CITZ Tenant')).toBeInTheDocument();
+    // Members view, they do not review: no "Review" action label.
+    expect(screen.getAllByRole('button', { name: 'View' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Review' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('cell', { name: /CITZ Tenant/ }));
+
+    // The member read-only dialog: no decision radios, just the note + close.
+    expect(await screen.findByText("CITZ Tenant's request")).toBeInTheDocument();
+    expect(screen.getByText(/A platform admin reviews this request/)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Deny' })).not.toBeInTheDocument();
+    // The footer Close button (plus the dialog's corner X, sharing the label).
+    expect(screen.getAllByRole('button', { name: 'Close' }).length).toBeGreaterThanOrEqual(1);
   });
 });

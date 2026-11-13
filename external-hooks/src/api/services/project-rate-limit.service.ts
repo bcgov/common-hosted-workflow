@@ -6,7 +6,7 @@ import type { ProjectTopup } from '../../db/schema/project-topup';
 import type { RateLimitNotificationKind } from '../../db/schema/rate-limit-notification';
 import type { RateLimitRequest, RunRequestKind, RunRequestStatus } from '../../db/schema/rate-limit-request';
 import type { NodeMailerService } from './node-mailer';
-import { extractRoleSlug, getViewerProjectRole } from './project-access';
+import { extractRoleSlug, getViewerProjectRole, listProjectIdsAccessibleToUser } from './project-access';
 import { renderEmail } from './email-templates';
 import { UI_APP_BASE_URL } from '@config';
 import {
@@ -1323,14 +1323,18 @@ export class ProjectRateLimitService {
    * requests sort oldest-first (review-queue order); every other status — and
    * the 'all' filter — sorts newest-first. Search matches project name or the
    * requester's name/email. The pending counts are returned regardless of the
-   * filter so the stat tile stays live.
+   * filter so the stat tile stays live. `projectIds` scopes every row and the
+   * pending stats to those projects (the member view's accessible projects).
    */
-  async listRunRequestsForAdmin(query: {
-    status: AdminRunRequestStatusFilter;
-    search?: string | null;
-    page: number;
-    pageSize: number;
-  }): Promise<AdminRunRequestsPage> {
+  async listRunRequestsForAdmin(
+    query: {
+      status: AdminRunRequestStatusFilter;
+      search?: string | null;
+      page: number;
+      pageSize: number;
+    },
+    projectIds?: string[],
+  ): Promise<AdminRunRequestsPage> {
     const dbStatuses: RunRequestStatus[] =
       query.status === 'all'
         ? ['pending', 'approved', 'rejected', 'cancelled']
@@ -1338,8 +1342,8 @@ export class ProjectRateLimitService {
           ? ['rejected']
           : [query.status];
     const [rows, pendingRows] = await Promise.all([
-      this.customRepositories.rateLimitRequest.listByStatuses(dbStatuses),
-      this.customRepositories.rateLimitRequest.listByStatuses(['pending']),
+      this.customRepositories.rateLimitRequest.listByStatuses(dbStatuses, projectIds),
+      this.customRepositories.rateLimitRequest.listByStatuses(['pending'], projectIds),
     ]);
 
     // Pending keeps the queue's oldest-first order; everything else is newest-first.
@@ -1381,6 +1385,42 @@ export class ProjectRateLimitService {
         oldestCreatedAt: oldestPending ? oldestPending.toISOString() : null,
       },
     };
+  }
+
+  /**
+   * Lists run requests visible to a non-admin member: only requests belonging
+   * to projects the user can access in n8n (their personal project plus team
+   * relations), with the identical payload shape and ordering as the admin
+   * list. Members of no project get an empty page without touching the
+   * request table.
+   */
+  async listRunRequestsForUser(
+    userId: string,
+    query: {
+      status: AdminRunRequestStatusFilter;
+      search?: string | null;
+      page: number;
+      pageSize: number;
+    },
+  ): Promise<AdminRunRequestsPage> {
+    const accessibleIds = await listProjectIdsAccessibleToUser(
+      this.n8nRepositories.project,
+      this.n8nRepositories.projectRelation,
+      userId,
+    );
+    if (accessibleIds.length === 0) {
+      return {
+        data: [],
+        pagination: {
+          page: Math.max(1, Math.floor(query.page)),
+          pageSize: Math.max(1, Math.floor(query.pageSize)),
+          totalItems: 0,
+          totalPages: 1,
+        },
+        pending: { count: 0, oldestCreatedAt: null },
+      };
+    }
+    return this.listRunRequestsForAdmin(query, accessibleIds);
   }
 
   /**
