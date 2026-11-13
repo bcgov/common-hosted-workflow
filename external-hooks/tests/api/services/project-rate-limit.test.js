@@ -1,0 +1,1438 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const vitest_1 = require("vitest");
+const project_rate_limit_service_1 = require("../../../src/api/services/project-rate-limit.service");
+const errors_1 = require("../../../src/api/utils/errors");
+const period_1 = require("../../../src/api/helpers/period");
+const user_1 = require("../../../src/db/repository/n8n/user");
+const mocks_1 = require("../../helpers/mocks");
+/** Captures the rejection reason; fails the test when the promise resolves. */
+async function captureRejection(promise) {
+    return promise.then(() => {
+        throw new Error('Expected the call to reject');
+    }, (error) => error);
+}
+function makeConfigRow(overrides = {}) {
+    return {
+        projectId: mocks_1.VALID_PROJECT_ID,
+        // Existing tests exercise custom mode (own values enforced); default-mode
+        // tests override this to true.
+        usesDefaultLimits: false,
+        weeklyRateLimit: null,
+        yearlyRateLimit: null,
+        lastAdminComment: null,
+        stopBehavior: 'hard_stop',
+        updatedBy: null,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+        ...overrides,
+    };
+}
+(0, vitest_1.describe)('ProjectRateLimitService', () => {
+    let n8nRepos;
+    let rateLimitRepo;
+    let defaultsRepo;
+    let usageRepo;
+    let workflowUsageRepo;
+    let topupRepo;
+    let service;
+    let warnSpy;
+    let errorSpy;
+    let periodKeys;
+    (0, vitest_1.beforeEach)(() => {
+        n8nRepos = (0, mocks_1.createMockN8nRepositories)();
+        rateLimitRepo = (0, mocks_1.createMockProjectRateLimitRepository)();
+        defaultsRepo = (0, mocks_1.createMockProjectRateLimitDefaultRepository)();
+        usageRepo = (0, mocks_1.createMockProjectExecutionUsageRepository)();
+        workflowUsageRepo = (0, mocks_1.createMockWorkflowExecutionUsageRepository)();
+        topupRepo = (0, mocks_1.createMockProjectTopupRepository)();
+        // The real user repository is wrapped around the raw mock so enrichment
+        // exercises the metadata-driven display-name lookup.
+        service = new project_rate_limit_service_1.ProjectRateLimitService({ ...n8nRepos, user: new user_1.UserRepository(n8nRepos.user) }, {
+            projectRateLimit: rateLimitRepo,
+            projectRateLimitDefault: defaultsRepo,
+            projectExecutionUsage: usageRepo,
+            workflowExecutionUsage: workflowUsageRepo,
+            projectTopup: topupRepo,
+        });
+        warnSpy = vitest_1.vi.spyOn(console, 'warn').mockImplementation(() => { });
+        errorSpy = vitest_1.vi.spyOn(console, 'error').mockImplementation(() => { });
+        periodKeys = (0, period_1.getCurrentPeriodKeys)();
+    });
+    (0, vitest_1.afterEach)(() => {
+        vitest_1.vi.restoreAllMocks();
+    });
+    (0, vitest_1.describe)('enforceExecution', () => {
+        (0, vitest_1.describe)('exempt modes', () => {
+            vitest_1.it.each(['manual', 'internal', 'evaluation', 'eval_manual'])('allows %s runs without any repository access', async (mode) => {
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode, countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(n8nRepos.sharedWorkflow.findProjectIds).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(rateLimitRepo.get).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(usageRepo.getCounts).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(n8nRepos.sharedWorkflow.countByProjectIds).not.toHaveBeenCalled();
+            });
+        });
+        (0, vitest_1.it)('allows orphan workflows without counting usage', async () => {
+            n8nRepos.sharedWorkflow.findProjectIds.mockResolvedValue([]);
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(n8nRepos.sharedWorkflow.findProjectIds).toHaveBeenCalledWith(mocks_1.VALID_WORKFLOW_ID);
+            (0, vitest_1.expect)(rateLimitRepo.get).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(usageRepo.getCounts).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('rate limits against the first project when a workflow is shared with several', async () => {
+            n8nRepos.sharedWorkflow.findProjectIds.mockResolvedValue(['proj-001', 'proj-999']);
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 10, yearlyCount: 0 });
+            const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+            (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+            (0, vitest_1.expect)(rateLimitRepo.get).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(rateLimitRepo.get).toHaveBeenCalledWith('proj-001');
+            (0, vitest_1.expect)(warnSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('multiple projects'));
+        });
+        (0, vitest_1.it)('allows unconfigured projects and counts both periods', async () => {
+            rateLimitRepo.get.mockResolvedValue(null);
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(usageRepo.getCounts).toHaveBeenCalledWith(mocks_1.VALID_PROJECT_ID, periodKeys.weekly, periodKeys.yearly);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenNthCalledWith(1, mocks_1.VALID_PROJECT_ID, 'weekly', periodKeys.weekly);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenNthCalledWith(2, mocks_1.VALID_PROJECT_ID, 'yearly', periodKeys.yearly);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenNthCalledWith(1, mocks_1.VALID_PROJECT_ID, mocks_1.VALID_WORKFLOW_ID, 'weekly', periodKeys.weekly);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenNthCalledWith(2, mocks_1.VALID_PROJECT_ID, mocks_1.VALID_WORKFLOW_ID, 'yearly', periodKeys.yearly);
+        });
+        (0, vitest_1.it)('allows executions under the configured limits and counts both periods', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 100, yearlyRateLimit: 1000 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5, yearlyCount: 50 });
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'webhook', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenNthCalledWith(1, mocks_1.VALID_PROJECT_ID, 'weekly', periodKeys.weekly);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenNthCalledWith(2, mocks_1.VALID_PROJECT_ID, 'yearly', periodKeys.yearly);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenNthCalledWith(1, mocks_1.VALID_PROJECT_ID, mocks_1.VALID_WORKFLOW_ID, 'weekly', periodKeys.weekly);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenNthCalledWith(2, mocks_1.VALID_PROJECT_ID, mocks_1.VALID_WORKFLOW_ID, 'yearly', periodKeys.yearly);
+        });
+        (0, vitest_1.it)('rejects with RateLimitExceededError when the weekly limit is reached (hard stop, no increments)', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10, yearlyRateLimit: 1000 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 10, yearlyCount: 50 });
+            const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+            (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+            (0, vitest_1.expect)(error.message).toContain(mocks_1.VALID_PROJECT_ID);
+            (0, vitest_1.expect)(error.message).toContain('Weekly');
+            (0, vitest_1.expect)(error.message).toContain('limit 10');
+            (0, vitest_1.expect)(error.message).toContain('used 10');
+            (0, vitest_1.expect)(error.message).toContain(periodKeys.weekly);
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('rejects with RateLimitExceededError when the yearly limit is exceeded (hard stop, no increments)', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 100, yearlyRateLimit: 100 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5, yearlyCount: 150 });
+            const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+            (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+            (0, vitest_1.expect)(error.message).toContain(mocks_1.VALID_PROJECT_ID);
+            (0, vitest_1.expect)(error.message).toContain('Yearly');
+            (0, vitest_1.expect)(error.message).toContain('limit 100');
+            (0, vitest_1.expect)(error.message).toContain('used 150');
+            (0, vitest_1.expect)(error.message).toContain(periodKeys.yearly);
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('allows over-limit executions with soft stop, counting usage and warning', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10, stopBehavior: 'soft_stop' }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 12, yearlyCount: 0 });
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(warnSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('Soft stop configured — execution continues'));
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenNthCalledWith(1, mocks_1.VALID_PROJECT_ID, 'weekly', periodKeys.weekly);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenNthCalledWith(2, mocks_1.VALID_PROJECT_ID, 'yearly', periodKeys.yearly);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenNthCalledWith(1, mocks_1.VALID_PROJECT_ID, mocks_1.VALID_WORKFLOW_ID, 'weekly', periodKeys.weekly);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenNthCalledWith(2, mocks_1.VALID_PROJECT_ID, mocks_1.VALID_WORKFLOW_ID, 'yearly', periodKeys.yearly);
+        });
+        (0, vitest_1.it)('rejects over-limit executions without counting when countUsage is false (check-only)', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 12, yearlyCount: 0 });
+            const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: false })));
+            (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('allows under-limit executions without counting when countUsage is false', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 100, yearlyRateLimit: 1000 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5, yearlyCount: 50 });
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: false })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('fails open when the config repository rejects', async () => {
+            rateLimitRepo.get.mockRejectedValue(new Error('custom DB unreachable'));
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('failing open'));
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining(mocks_1.VALID_WORKFLOW_ID));
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('fails open when the workflow usage repository rejects after project counts', async () => {
+            workflowUsageRepo.increment.mockRejectedValue(new Error('workflow usage table unavailable'));
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('failing open'));
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenCalledTimes(1);
+        });
+        (0, vitest_1.it)('adds the current-week top-up sum to the effective weekly limit', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 11, yearlyCount: 0 });
+            topupRepo.sumByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 2]]));
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(topupRepo.sumByProjectIds).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(topupRepo.sumByProjectIds).toHaveBeenCalledWith([mocks_1.VALID_PROJECT_ID], periodKeys.weekly);
+            (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            (0, vitest_1.expect)(workflowUsageRepo.increment).toHaveBeenCalledTimes(2);
+        });
+        (0, vitest_1.it)('reports the top-up-adjusted limit in a weekly breach message', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10, yearlyRateLimit: 1000 }));
+            usageRepo.getCounts.mockResolvedValue({ weeklyCount: 12, yearlyCount: 50 });
+            topupRepo.sumByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 2]]));
+            const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+            (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+            (0, vitest_1.expect)(error.message).toContain('limit 12 (base 10 + 2 top-up)');
+            (0, vitest_1.expect)(error.message).toContain('used 12');
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('does not query top-ups when no weekly limit is configured', async () => {
+            rateLimitRepo.get.mockResolvedValue(null);
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(topupRepo.sumByProjectIds).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(topupRepo.sumByProjectIdsInWeeklyKeys).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.describe)('yearly top-up aggregation', () => {
+            (0, vitest_1.it)('adds the sum of in-year weekly top-ups to the effective yearly limit', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 100000, yearlyRateLimit: 1000 }));
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 1500 });
+                // Two weekly top-ups of 400 + 600 for weeks inside the current year.
+                topupRepo.sumByProjectIdsInWeeklyKeys.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 1000]]));
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(topupRepo.sumByProjectIdsInWeeklyKeys).toHaveBeenCalledWith([mocks_1.VALID_PROJECT_ID], vitest_1.expect.arrayContaining([periodKeys.weekly]));
+                (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            });
+            (0, vitest_1.it)('rejects on a yearly breach and reports the aggregated top-up in the message', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 100000, yearlyRateLimit: 1000 }));
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 2000 });
+                topupRepo.sumByProjectIdsInWeeklyKeys.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 1000]]));
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+                (0, vitest_1.expect)(error.message).toContain('Yearly');
+                (0, vitest_1.expect)(error.message).toContain('limit 2000 (base 1000 + 1000 top-up)');
+                (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            });
+            (0, vitest_1.it)('queries the yearly sum, but not the weekly sum, when only a yearly base is enforced', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: null, yearlyRateLimit: 1000 }));
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 });
+                topupRepo.sumByProjectIdsInWeeklyKeys.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 500]]));
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(topupRepo.sumByProjectIds).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(topupRepo.sumByProjectIdsInWeeklyKeys).toHaveBeenCalledTimes(1);
+            });
+        });
+        (0, vitest_1.it)('fails open when the top-up repository rejects', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10 }));
+            topupRepo.sumByProjectIds.mockRejectedValue(new Error('top-up table unavailable'));
+            await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('failing open'));
+            (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.increment).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.describe)('scope defaults fallback', () => {
+            const TEAM_DEFAULTS = (0, mocks_1.makeProjectRateLimitDefaultRow)({
+                projectKind: 'team',
+                weeklyRateLimit: 5000,
+                yearlyRateLimit: 250000,
+            });
+            const PERSONAL_DEFAULTS = (0, mocks_1.makeProjectRateLimitDefaultRow)({
+                projectKind: 'personal',
+                weeklyRateLimit: 2500,
+                yearlyRateLimit: 100000,
+            });
+            (0, vitest_1.it)('rejects on a weekly breach when an unconfigured project falls back to its team default', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                n8nRepos.project.findOneBy.mockResolvedValue({ id: mocks_1.VALID_PROJECT_ID, name: 'Team project', type: 'team' });
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5000, yearlyCount: 0 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+                (0, vitest_1.expect)(error.message).toContain('Weekly');
+                (0, vitest_1.expect)(error.message).toContain('limit 5000');
+                (0, vitest_1.expect)(defaultsRepo.get).toHaveBeenCalledWith('team');
+                (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            });
+            (0, vitest_1.it)('uses the personal defaults for personal projects', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                defaultsRepo.get.mockResolvedValue(PERSONAL_DEFAULTS);
+                // The mock n8n project already is a personal project.
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 100000 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error.message).toContain('Yearly');
+                (0, vitest_1.expect)(error.message).toContain('limit 100000');
+                (0, vitest_1.expect)(defaultsRepo.get).toHaveBeenCalledWith('personal');
+            });
+            (0, vitest_1.it)('treats unknown project types as team', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                n8nRepos.project.findOneBy.mockResolvedValue({ id: mocks_1.VALID_PROJECT_ID, name: 'Odd', type: 'something-new' });
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 });
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(defaultsRepo.get).toHaveBeenCalledWith('team');
+            });
+            (0, vitest_1.it)('combines own-config and defaults per period (own weekly wins, yearly falls back)', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10 }));
+                defaultsRepo.get.mockResolvedValue(PERSONAL_DEFAULTS);
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5, yearlyCount: 100000 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error.message).toContain('Yearly');
+                (0, vitest_1.expect)(error.message).toContain('limit 100000');
+                // Own weekly limit stays enforced (5 runs under 10): the weekly breach is the default only.
+                (0, vitest_1.expect)(error.message).not.toContain('Weekly');
+            });
+            (0, vitest_1.it)('keeps uncapped projects uncapped when their scope has no defaults, counting usage', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                defaultsRepo.get.mockResolvedValue(null);
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+                (0, vitest_1.expect)(topupRepo.sumByProjectIds).not.toHaveBeenCalled();
+            });
+            (0, vitest_1.it)('does not consult defaults when the project has both of its own limits', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10, yearlyRateLimit: 1000 }));
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 0, yearlyCount: 0 });
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(n8nRepos.project.findOneBy).not.toHaveBeenCalled();
+                (0, vitest_1.expect)(defaultsRepo.get).not.toHaveBeenCalled();
+            });
+            (0, vitest_1.it)('adds top-up runs on a default weekly base and mentions them in the breach', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                topupRepo.sumByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 2000]]));
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 7000, yearlyCount: 0 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error.message).toContain('limit 7000 (base 5000 + 2000 top-up)');
+            });
+            (0, vitest_1.it)('applies the project soft-stop behavior to a default-based breach', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ stopBehavior: 'soft_stop' }));
+                defaultsRepo.get.mockResolvedValue(PERSONAL_DEFAULTS);
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 2500, yearlyCount: 0 });
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(warnSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('Soft stop configured — execution continues'));
+                (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            });
+            (0, vitest_1.it)('hard-stops a default-based breach when the project has no configuration row', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 6000, yearlyCount: 0 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+                (0, vitest_1.expect)(error.message).toContain('Execution rejected');
+            });
+            (0, vitest_1.it)('degrades to uncapped when the project-kind lookup fails (fail open path)', async () => {
+                rateLimitRepo.get.mockResolvedValue(null);
+                n8nRepos.project.findOneBy.mockRejectedValue(new Error('n8n db gone'));
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('failing open'));
+                (0, vitest_1.expect)(usageRepo.increment).not.toHaveBeenCalled();
+            });
+        });
+        (0, vitest_1.describe)('default limits mode (usesDefaultLimits)', () => {
+            const TEAM_DEFAULTS = (0, mocks_1.makeProjectRateLimitDefaultRow)({
+                projectKind: 'team',
+                weeklyRateLimit: 5000,
+                yearlyRateLimit: 250000,
+            });
+            (0, vitest_1.it)('ignores the row’s own values and enforces the scope defaults', async () => {
+                // Custom values that would breach immediately are inert in default mode.
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ usesDefaultLimits: true, weeklyRateLimit: 10 }));
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                n8nRepos.project.findOneBy.mockResolvedValue({ id: mocks_1.VALID_PROJECT_ID, name: 'DEVX', type: 'team' });
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 20, yearlyCount: 0 });
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(defaultsRepo.get).toHaveBeenCalledWith('team');
+                (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+            });
+            (0, vitest_1.it)('rejects on a default breach even though the stored custom values are higher', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ usesDefaultLimits: true, weeklyRateLimit: 100000, yearlyRateLimit: 100000 }));
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                n8nRepos.project.findOneBy.mockResolvedValue({ id: mocks_1.VALID_PROJECT_ID, name: 'DEVX', type: 'team' });
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 5000, yearlyCount: 0 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+                (0, vitest_1.expect)(error.message).toContain('limit 5000');
+            });
+            (0, vitest_1.it)('hard-stops in default mode even when the row recorded soft stop', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ usesDefaultLimits: true, stopBehavior: 'soft_stop' }));
+                defaultsRepo.get.mockResolvedValue(TEAM_DEFAULTS);
+                n8nRepos.project.findOneBy.mockResolvedValue({ id: mocks_1.VALID_PROJECT_ID, name: 'DEVX', type: 'team' });
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 6000, yearlyCount: 0 });
+                const error = (await captureRejection(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })));
+                (0, vitest_1.expect)(error).toBeInstanceOf(project_rate_limit_service_1.RateLimitExceededError);
+                (0, vitest_1.expect)(warnSpy).not.toHaveBeenCalledWith(vitest_1.expect.stringContaining('Soft stop configured'));
+            });
+            (0, vitest_1.it)('stays uncapped in default mode when the scope has no defaults, counting usage', async () => {
+                rateLimitRepo.get.mockResolvedValue(makeConfigRow({ usesDefaultLimits: true, weeklyRateLimit: 10, yearlyRateLimit: 10 }));
+                defaultsRepo.get.mockResolvedValue(null);
+                n8nRepos.project.findOneBy.mockResolvedValue({ id: mocks_1.VALID_PROJECT_ID, name: 'DEVX', type: 'team' });
+                usageRepo.getCounts.mockResolvedValue({ weeklyCount: 50, yearlyCount: 50 });
+                await (0, vitest_1.expect)(service.enforceExecution({ workflowId: mocks_1.VALID_WORKFLOW_ID, mode: 'trigger', countUsage: true })).resolves.toBeUndefined();
+                (0, vitest_1.expect)(usageRepo.increment).toHaveBeenCalledTimes(2);
+                (0, vitest_1.expect)(topupRepo.sumByProjectIds).not.toHaveBeenCalled();
+            });
+        });
+    });
+    (0, vitest_1.describe)('updateRateLimit', () => {
+        const body = {
+            usesDefaultLimits: false,
+            weeklyRateLimit: 10,
+            yearlyRateLimit: 1000,
+            lastAdminComment: 'Cap for FY',
+            stopBehavior: 'hard_stop',
+        };
+        (0, vitest_1.it)('throws AppError 404 for an unknown project', async () => {
+            const error = (await captureRejection(service.updateRateLimit('unknown-project', body, 'admin@example.com')));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(404);
+            (0, vitest_1.expect)(error.message).toBe('Project not found');
+            (0, vitest_1.expect)(rateLimitRepo.upsert).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('upserts the configuration for a known project and returns the stored row', async () => {
+            const stored = makeConfigRow(body);
+            rateLimitRepo.get.mockResolvedValue(stored);
+            const result = await service.updateRateLimit(mocks_1.VALID_PROJECT_ID, body, 'admin@example.com');
+            (0, vitest_1.expect)(result).toBe(stored);
+            (0, vitest_1.expect)(rateLimitRepo.upsert).toHaveBeenCalledWith({
+                projectId: mocks_1.VALID_PROJECT_ID,
+                ...body,
+                updatedBy: 'admin@example.com',
+            });
+            (0, vitest_1.expect)(rateLimitRepo.get).toHaveBeenCalledWith(mocks_1.VALID_PROJECT_ID);
+        });
+        (0, vitest_1.it)('normalizes a default-mode save to the unconfigured shape, keeping the comment', async () => {
+            const stored = makeConfigRow({ usesDefaultLimits: true });
+            rateLimitRepo.get.mockResolvedValue(stored);
+            const result = await service.updateRateLimit(mocks_1.VALID_PROJECT_ID, {
+                usesDefaultLimits: true,
+                weeklyRateLimit: 10,
+                yearlyRateLimit: 1000,
+                lastAdminComment: 'Back to defaults',
+                stopBehavior: 'soft_stop',
+            }, 'admin@example.com');
+            (0, vitest_1.expect)(result).toBe(stored);
+            (0, vitest_1.expect)(rateLimitRepo.upsert).toHaveBeenCalledWith({
+                projectId: mocks_1.VALID_PROJECT_ID,
+                usesDefaultLimits: true,
+                weeklyRateLimit: null,
+                yearlyRateLimit: null,
+                lastAdminComment: 'Back to defaults',
+                stopBehavior: 'hard_stop',
+                updatedBy: 'admin@example.com',
+            });
+        });
+        (0, vitest_1.it)('marks custom-mode saves with usesDefaultLimits false', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow(body));
+            await service.updateRateLimit(mocks_1.VALID_PROJECT_ID, body, 'admin@example.com');
+            (0, vitest_1.expect)(rateLimitRepo.upsert).toHaveBeenCalledWith(vitest_1.expect.objectContaining({ usesDefaultLimits: false, weeklyRateLimit: 10, yearlyRateLimit: 1000 }));
+        });
+        (0, vitest_1.it)('trims surrounding whitespace from the recorded admin email', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow(body));
+            await service.updateRateLimit(mocks_1.VALID_PROJECT_ID, body, '  admin@example.com  ');
+            (0, vitest_1.expect)(rateLimitRepo.upsert).toHaveBeenCalledWith(vitest_1.expect.objectContaining({ updatedBy: 'admin@example.com' }));
+        });
+        (0, vitest_1.it)('stores null when the admin email is empty or whitespace only', async () => {
+            rateLimitRepo.get.mockResolvedValue(makeConfigRow(body));
+            await service.updateRateLimit(mocks_1.VALID_PROJECT_ID, body, '   ');
+            (0, vitest_1.expect)(rateLimitRepo.upsert).toHaveBeenCalledWith(vitest_1.expect.objectContaining({ updatedBy: null }));
+        });
+    });
+    (0, vitest_1.describe)('rate-limit defaults (per scope)', () => {
+        (0, vitest_1.it)('returns nulls for scopes without saved defaults rows', async () => {
+            defaultsRepo.getAll.mockResolvedValue([]);
+            await (0, vitest_1.expect)(service.getRateLimitDefaults()).resolves.toEqual({
+                team: { weeklyRateLimit: null, yearlyRateLimit: null },
+                personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+            });
+        });
+        (0, vitest_1.it)('maps saved rows by project kind and returns them', async () => {
+            defaultsRepo.getAll.mockResolvedValue([
+                (0, mocks_1.makeProjectRateLimitDefaultRow)({
+                    projectKind: 'team',
+                    weeklyRateLimit: 5000,
+                    yearlyRateLimit: 250000,
+                    updatedBy: 'admin@example.com',
+                }),
+                (0, mocks_1.makeProjectRateLimitDefaultRow)({ projectKind: 'personal', weeklyRateLimit: 2500, yearlyRateLimit: null }),
+            ]);
+            await (0, vitest_1.expect)(service.getRateLimitDefaults()).resolves.toEqual({
+                team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+                personal: { weeklyRateLimit: 2500, yearlyRateLimit: null },
+            });
+        });
+        (0, vitest_1.it)('upserts both scopes with the trimmed acting admin and echoes the saved values', async () => {
+            const body = {
+                team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+                personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+            };
+            const result = await service.updateRateLimitDefaults(body, '  admin@example.com  ');
+            (0, vitest_1.expect)(defaultsRepo.upsertBoth).toHaveBeenCalledWith({
+                team: { weeklyRateLimit: 5000, yearlyRateLimit: 250000 },
+                personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+                updatedBy: 'admin@example.com',
+            });
+            (0, vitest_1.expect)(result).toEqual(body);
+        });
+        (0, vitest_1.it)('stores a blank actor email as null', async () => {
+            const body = {
+                team: { weeklyRateLimit: null, yearlyRateLimit: null },
+                personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+            };
+            await service.updateRateLimitDefaults(body, '   ');
+            (0, vitest_1.expect)(defaultsRepo.upsertBoth).toHaveBeenCalledWith({
+                team: { weeklyRateLimit: null, yearlyRateLimit: null },
+                personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+                updatedBy: null,
+            });
+        });
+    });
+    (0, vitest_1.describe)('enrichProjectsWithRateLimits', () => {
+        (0, vitest_1.it)('returns merged enrichment from one batched query per source', async () => {
+            const configRow = makeConfigRow({
+                weeklyRateLimit: 10,
+                yearlyRateLimit: 1000,
+                lastAdminComment: 'Cap for FY',
+                stopBehavior: 'soft_stop',
+            });
+            rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, configRow]]));
+            usageRepo.listCountsByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, { weeklyCount: 3, yearlyCount: 30 }]]));
+            n8nRepos.sharedWorkflow.countByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 5]]));
+            n8nRepos.projectRelation.countMembersByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 2]]));
+            const result = await service.enrichProjectsWithRateLimits([
+                { projectId: 'proj-001', projectType: 'team' },
+                { projectId: 'proj-002', projectType: 'personal' },
+            ]);
+            (0, vitest_1.expect)(rateLimitRepo.listByProjectIds).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(rateLimitRepo.listByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002']);
+            (0, vitest_1.expect)(usageRepo.listCountsByProjectIds).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(usageRepo.listCountsByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002'], periodKeys.weekly, periodKeys.yearly);
+            (0, vitest_1.expect)(n8nRepos.sharedWorkflow.countByProjectIds).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(n8nRepos.sharedWorkflow.countByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002']);
+            (0, vitest_1.expect)(n8nRepos.projectRelation.countMembersByProjectIds).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(n8nRepos.projectRelation.countMembersByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002']);
+            (0, vitest_1.expect)(topupRepo.sumByProjectIds).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(topupRepo.sumByProjectIds).toHaveBeenCalledWith(['proj-001', 'proj-002'], periodKeys.weekly);
+            (0, vitest_1.expect)(result['proj-001']).toEqual({
+                usesDefaultLimits: false,
+                weeklyRateLimit: 10,
+                yearlyRateLimit: 1000,
+                stopBehavior: 'soft_stop',
+                lastAdminComment: 'Cap for FY',
+                weeklyExecutionCount: 3,
+                yearlyExecutionCount: 30,
+                weeklyTopupRuns: 0,
+                yearlyTopupRuns: 0,
+                workflowCount: 5,
+                membersCount: 2,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+                updatedByName: null,
+            });
+            (0, vitest_1.expect)(result['proj-002']).toEqual({
+                usesDefaultLimits: true,
+                weeklyRateLimit: null,
+                yearlyRateLimit: null,
+                stopBehavior: null,
+                lastAdminComment: null,
+                weeklyExecutionCount: 0,
+                yearlyExecutionCount: 0,
+                weeklyTopupRuns: 0,
+                yearlyTopupRuns: 0,
+                workflowCount: 0,
+                membersCount: 0,
+                updatedAt: null,
+                updatedByName: null,
+            });
+            (0, vitest_1.expect)(n8nRepos.user.manager.query).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('resolves the enforced limits from the scope defaults for default-mode projects', async () => {
+            defaultsRepo.getAll.mockResolvedValue([
+                (0, mocks_1.makeProjectRateLimitDefaultRow)({ projectKind: 'team', weeklyRateLimit: 5000, yearlyRateLimit: 250000 }),
+                (0, mocks_1.makeProjectRateLimitDefaultRow)({ projectKind: 'personal', weeklyRateLimit: 2500, yearlyRateLimit: 100000 }),
+            ]);
+            const result = await service.enrichProjectsWithRateLimits([
+                { projectId: 'proj-team', projectType: 'team' },
+                { projectId: 'proj-personal', projectType: 'personal' },
+                { projectId: 'proj-odd', projectType: 'something-new' },
+            ]);
+            (0, vitest_1.expect)(result['proj-team']).toMatchObject({
+                usesDefaultLimits: true,
+                weeklyRateLimit: 5000,
+                yearlyRateLimit: 250000,
+                stopBehavior: null,
+            });
+            (0, vitest_1.expect)(result['proj-personal']).toMatchObject({
+                usesDefaultLimits: true,
+                weeklyRateLimit: 2500,
+                yearlyRateLimit: 100000,
+            });
+            // Unknown types resolve to the team scope, like enforcement does.
+            (0, vitest_1.expect)(result['proj-odd']).toMatchObject({ weeklyRateLimit: 5000, yearlyRateLimit: 250000 });
+        });
+        (0, vitest_1.it)('falls back per period to the scope defaults for custom rows with unset limits', async () => {
+            defaultsRepo.getAll.mockResolvedValue([
+                (0, mocks_1.makeProjectRateLimitDefaultRow)({ projectKind: 'personal', weeklyRateLimit: 2500, yearlyRateLimit: 100000 }),
+            ]);
+            rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, makeConfigRow({ yearlyRateLimit: 1000 })]]));
+            const result = await service.enrichProjectsWithRateLimits([
+                { projectId: mocks_1.VALID_PROJECT_ID, projectType: 'personal' },
+            ]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]).toMatchObject({
+                usesDefaultLimits: false,
+                weeklyRateLimit: 2500,
+                yearlyRateLimit: 1000,
+                stopBehavior: 'hard_stop',
+            });
+        });
+        (0, vitest_1.it)('carries the current-week top-up sum into the enrichment', async () => {
+            topupRepo.sumByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 2000]]));
+            const result = await service.enrichProjectsWithRateLimits([{ projectId: mocks_1.VALID_PROJECT_ID, projectType: 'team' }]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]?.weeklyTopupRuns).toBe(2000);
+        });
+        (0, vitest_1.it)('carries the current-year top-up sum from the overlapping weekly keys into the enrichment', async () => {
+            topupRepo.sumByProjectIdsInWeeklyKeys.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, 3000]]));
+            const result = await service.enrichProjectsWithRateLimits([{ projectId: mocks_1.VALID_PROJECT_ID, projectType: 'team' }]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]?.yearlyTopupRuns).toBe(3000);
+            (0, vitest_1.expect)(topupRepo.sumByProjectIdsInWeeklyKeys).toHaveBeenCalledWith([mocks_1.VALID_PROJECT_ID], vitest_1.expect.arrayContaining([periodKeys.weekly]));
+        });
+        (0, vitest_1.it)('resolves editor display names by email and formats them as F. Last', async () => {
+            const configRow = makeConfigRow({
+                updatedBy: 'Ada.Lovelace@Example.com',
+                updatedAt: new Date('2026-03-05T10:00:00Z'),
+            });
+            rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, configRow]]));
+            n8nRepos.user.manager.query.mockResolvedValue([
+                { email: 'ada.lovelace@example.com', firstName: 'Ada', lastName: 'Lovelace' },
+            ]);
+            const result = await service.enrichProjectsWithRateLimits([{ projectId: mocks_1.VALID_PROJECT_ID, projectType: 'team' }]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]).toEqual({
+                usesDefaultLimits: false,
+                weeklyRateLimit: null,
+                yearlyRateLimit: null,
+                stopBehavior: 'hard_stop',
+                lastAdminComment: null,
+                weeklyExecutionCount: 0,
+                yearlyExecutionCount: 0,
+                weeklyTopupRuns: 0,
+                yearlyTopupRuns: 0,
+                workflowCount: 0,
+                membersCount: 0,
+                updatedAt: '2026-03-05T10:00:00.000Z',
+                updatedByName: 'A. Lovelace',
+            });
+            (0, vitest_1.expect)(n8nRepos.user.manager.query).toHaveBeenCalledTimes(1);
+            (0, vitest_1.expect)(n8nRepos.user.manager.query).toHaveBeenCalledWith(vitest_1.expect.any(String), [['ada.lovelace@example.com']]);
+        });
+        (0, vitest_1.it)('falls back to the raw stored email when no n8n user matches it', async () => {
+            rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, makeConfigRow({ updatedBy: 'ghost@example.com' })]]));
+            n8nRepos.user.manager.query.mockResolvedValue([]);
+            const result = await service.enrichProjectsWithRateLimits([{ projectId: mocks_1.VALID_PROJECT_ID, projectType: 'team' }]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]?.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]?.updatedByName).toBe('ghost@example.com');
+        });
+        (0, vitest_1.it)('degrades only the editor name to null when the user lookup fails', async () => {
+            rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, makeConfigRow({ weeklyRateLimit: 7, updatedBy: 'admin@example.com' })]]));
+            n8nRepos.user.manager.query.mockRejectedValue(new Error('user lookup failed'));
+            const result = await service.enrichProjectsWithRateLimits([{ projectId: mocks_1.VALID_PROJECT_ID, projectType: 'team' }]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]).toEqual({
+                usesDefaultLimits: false,
+                weeklyRateLimit: 7,
+                yearlyRateLimit: null,
+                stopBehavior: 'hard_stop',
+                lastAdminComment: null,
+                weeklyExecutionCount: 0,
+                yearlyExecutionCount: 0,
+                weeklyTopupRuns: 0,
+                yearlyTopupRuns: 0,
+                workflowCount: 0,
+                membersCount: 0,
+                updatedAt: '2026-01-01T00:00:00.000Z',
+                updatedByName: null,
+            });
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('display names'));
+        });
+        (0, vitest_1.it)('skips the name lookup when no config row records an editor email', async () => {
+            rateLimitRepo.listByProjectIds.mockResolvedValue(new Map([[mocks_1.VALID_PROJECT_ID, makeConfigRow({ updatedBy: '   ' })]]));
+            const result = await service.enrichProjectsWithRateLimits([{ projectId: mocks_1.VALID_PROJECT_ID, projectType: 'team' }]);
+            (0, vitest_1.expect)(result[mocks_1.VALID_PROJECT_ID]?.updatedByName).toBeNull();
+            (0, vitest_1.expect)(n8nRepos.user.manager.query).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('returns default enrichment when a source throws so the project list keeps working', async () => {
+            rateLimitRepo.listByProjectIds.mockRejectedValue(new Error('custom DB outage'));
+            const result = await service.enrichProjectsWithRateLimits([
+                { projectId: 'proj-001', projectType: 'team' },
+                { projectId: 'proj-002', projectType: 'personal' },
+            ]);
+            const fallback = {
+                usesDefaultLimits: true,
+                weeklyRateLimit: null,
+                yearlyRateLimit: null,
+                stopBehavior: null,
+                lastAdminComment: null,
+                weeklyExecutionCount: 0,
+                yearlyExecutionCount: 0,
+                weeklyTopupRuns: 0,
+                yearlyTopupRuns: 0,
+                workflowCount: 0,
+                membersCount: 0,
+                updatedAt: null,
+                updatedByName: null,
+            };
+            (0, vitest_1.expect)(result['proj-001']).toEqual(fallback);
+            (0, vitest_1.expect)(result['proj-002']).toEqual(fallback);
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledWith(vitest_1.expect.stringContaining('rate-limit data'));
+        });
+        (0, vitest_1.it)('returns an empty record without querying when there are no items', async () => {
+            const result = await service.enrichProjectsWithRateLimits([]);
+            (0, vitest_1.expect)(result).toEqual({});
+            (0, vitest_1.expect)(rateLimitRepo.listByProjectIds).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(usageRepo.listCountsByProjectIds).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(n8nRepos.sharedWorkflow.countByProjectIds).not.toHaveBeenCalled();
+        });
+    });
+    (0, vitest_1.describe)('getProjectWorkflowUsage', () => {
+        (0, vitest_1.it)('throws AppError 404 for an unknown project', async () => {
+            const error = (await captureRejection(service.getProjectWorkflowUsage('unknown-project')));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(404);
+            (0, vitest_1.expect)(error.message).toBe('Project not found');
+            (0, vitest_1.expect)(n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(workflowUsageRepo.listCountsByWorkflowIds).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('returns per-workflow current-period usage sorted by workflow name', async () => {
+            n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds.mockResolvedValue([
+                { workflowId: 'wf-200', workflowName: 'Zeta workflow', projectId: mocks_1.VALID_PROJECT_ID },
+                { workflowId: 'wf-100', workflowName: 'Alpha workflow', projectId: mocks_1.VALID_PROJECT_ID },
+            ]);
+            workflowUsageRepo.listCountsByWorkflowIds.mockResolvedValue(new Map([
+                ['wf-100', { weeklyCount: 3, yearlyCount: 30 }],
+                ['wf-200', { weeklyCount: 1, yearlyCount: 10 }],
+            ]));
+            const result = await service.getProjectWorkflowUsage(mocks_1.VALID_PROJECT_ID);
+            (0, vitest_1.expect)(n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds).toHaveBeenCalledWith([mocks_1.VALID_PROJECT_ID]);
+            (0, vitest_1.expect)(workflowUsageRepo.listCountsByWorkflowIds).toHaveBeenCalledWith(mocks_1.VALID_PROJECT_ID, ['wf-200', 'wf-100'], periodKeys.weekly, periodKeys.yearly);
+            (0, vitest_1.expect)(result).toEqual({
+                projectId: mocks_1.VALID_PROJECT_ID,
+                weeklyPeriodKey: periodKeys.weekly,
+                yearlyPeriodKey: periodKeys.yearly,
+                workflows: [
+                    { workflowId: 'wf-100', workflowName: 'Alpha workflow', weeklyCount: 3, yearlyCount: 30 },
+                    { workflowId: 'wf-200', workflowName: 'Zeta workflow', weeklyCount: 1, yearlyCount: 10 },
+                ],
+            });
+        });
+        (0, vitest_1.it)('zero-fills workflows without usage and drops usage rows for workflows no longer in the project', async () => {
+            n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds.mockResolvedValue([
+                { workflowId: 'wf-100', workflowName: 'Alpha workflow', projectId: mocks_1.VALID_PROJECT_ID },
+            ]);
+            workflowUsageRepo.listCountsByWorkflowIds.mockResolvedValue(new Map([
+                ['wf-100', { weeklyCount: 0, yearlyCount: 0 }],
+                ['wf-999', { weeklyCount: 99, yearlyCount: 99 }],
+            ]));
+            const result = await service.getProjectWorkflowUsage(mocks_1.VALID_PROJECT_ID);
+            (0, vitest_1.expect)(result.workflows).toEqual([
+                { workflowId: 'wf-100', workflowName: 'Alpha workflow', weeklyCount: 0, yearlyCount: 0 },
+            ]);
+        });
+        (0, vitest_1.it)('returns an empty workflow list when the project has no workflows', async () => {
+            n8nRepos.sharedWorkflow.findWorkflowRowsByProjectIds.mockResolvedValue([]);
+            const result = await service.getProjectWorkflowUsage(mocks_1.VALID_PROJECT_ID);
+            (0, vitest_1.expect)(result.workflows).toEqual([]);
+            (0, vitest_1.expect)(workflowUsageRepo.listCountsByWorkflowIds).toHaveBeenCalledWith(mocks_1.VALID_PROJECT_ID, [], periodKeys.weekly, periodKeys.yearly);
+        });
+    });
+    (0, vitest_1.describe)('listProjectTopups', () => {
+        (0, vitest_1.it)('throws AppError 404 for an unknown project', async () => {
+            const error = (await captureRejection(service.listProjectTopups('unknown-project', 1, 4)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(404);
+            (0, vitest_1.expect)(error.message).toBe('Project not found');
+            (0, vitest_1.expect)(topupRepo.list).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('returns stored rows serialized with page metadata', async () => {
+            topupRepo.list.mockResolvedValue({ rows: [(0, mocks_1.makeProjectTopupRow)()], totalItems: 5 });
+            const result = await service.listProjectTopups(mocks_1.VALID_PROJECT_ID, 2, 4);
+            (0, vitest_1.expect)(topupRepo.list).toHaveBeenCalledWith(mocks_1.VALID_PROJECT_ID, 2, 4);
+            (0, vitest_1.expect)(result.data).toEqual([
+                {
+                    id: mocks_1.VALID_TOPUP_ID,
+                    projectId: mocks_1.VALID_PROJECT_ID,
+                    periodKey: '2026-W44',
+                    amount: 2000,
+                    adminComment: 'Extra runs for the quarterly batch',
+                    createdBy: 'test@example.com',
+                    createdAt: '2025-06-01T12:00:00.000Z',
+                },
+            ]);
+            (0, vitest_1.expect)(result.pagination).toEqual({ page: 2, pageSize: 4, totalItems: 5, totalPages: 2 });
+        });
+        (0, vitest_1.it)('reports at least one total page for a project without top-ups', async () => {
+            const result = await service.listProjectTopups(mocks_1.VALID_PROJECT_ID, 1, 4);
+            (0, vitest_1.expect)(result).toEqual({
+                data: [],
+                pagination: { page: 1, pageSize: 4, totalItems: 0, totalPages: 1 },
+            });
+        });
+    });
+    (0, vitest_1.describe)('createProjectTopup', () => {
+        (0, vitest_1.it)('throws AppError 404 for an unknown project', async () => {
+            const error = (await captureRejection(service.createProjectTopup('unknown-project', { periodKey: periodKeys.weekly, amount: 100, adminComment: 'Extra runs' }, 'admin@example.com')));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(404);
+            (0, vitest_1.expect)(error.message).toBe('Project not found');
+            (0, vitest_1.expect)(topupRepo.create).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('stores the top-up with a trimmed comment and creator email and returns the stored row', async () => {
+            const stored = (0, mocks_1.makeProjectTopupRow)({ periodKey: periodKeys.weekly, amount: 100 });
+            topupRepo.create.mockResolvedValue(stored);
+            const result = await service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: periodKeys.weekly, amount: 100, adminComment: '  Extra runs  ' }, '  admin@example.com  ');
+            (0, vitest_1.expect)(result).toBe(stored);
+            (0, vitest_1.expect)(topupRepo.create).toHaveBeenCalledWith({
+                projectId: mocks_1.VALID_PROJECT_ID,
+                periodKey: periodKeys.weekly,
+                amount: 100,
+                adminComment: 'Extra runs',
+                createdBy: 'admin@example.com',
+            });
+        });
+        (0, vitest_1.it)('stores null when the creator email is empty or whitespace only', async () => {
+            await service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: periodKeys.weekly, amount: 100, adminComment: 'Extra runs' }, '   ');
+            (0, vitest_1.expect)(topupRepo.create).toHaveBeenCalledWith(vitest_1.expect.objectContaining({ createdBy: null }));
+        });
+        (0, vitest_1.it)('accepts the current week and the far edge of the top-up horizon', async () => {
+            const keys = (0, period_1.listUpcomingWeeklyPeriodKeys)(project_rate_limit_service_1.MAX_TOPUP_HORIZON_WEEKS);
+            await (0, vitest_1.expect)(service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: keys[0], amount: 1, adminComment: 'why' }, null)).resolves.toBeTruthy();
+            await (0, vitest_1.expect)(service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: keys[keys.length - 1], amount: 1_000_000, adminComment: 'why' }, null)).resolves.toBeTruthy();
+            (0, vitest_1.expect)(topupRepo.create).toHaveBeenCalledTimes(2);
+        });
+        (0, vitest_1.it)('throws AppError 400 for a period key beyond the top-up horizon', async () => {
+            const beyondHorizon = (0, period_1.getWeeklyPeriodKey)(new Date(Date.now() + (project_rate_limit_service_1.MAX_TOPUP_HORIZON_WEEKS + 1) * 7 * 86_400_000));
+            const error = (await captureRejection(service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: beyondHorizon, amount: 100, adminComment: 'Extra runs' }, null)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(400);
+            (0, vitest_1.expect)(error.message).toBe('periodKey must be the current week or a coming week within the top-up horizon');
+            (0, vitest_1.expect)(topupRepo.create).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('throws AppError 400 for a malformed period key', async () => {
+            const error = (await captureRejection(service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: '2026-10-27', amount: 100, adminComment: 'Extra runs' }, null)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(400);
+            (0, vitest_1.expect)(error.message).toBe('periodKey must match the weekly format YYYY-Www');
+            (0, vitest_1.expect)(topupRepo.create).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('accepts the minimum and maximum amounts', async () => {
+            await service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: periodKeys.weekly, amount: 1, adminComment: 'why' }, null);
+            await service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: periodKeys.weekly, amount: 1_000_000, adminComment: 'why' }, null);
+            (0, vitest_1.expect)(topupRepo.create).toHaveBeenLastCalledWith(vitest_1.expect.objectContaining({ amount: 1_000_000 }));
+            (0, vitest_1.expect)(topupRepo.create).toHaveBeenCalledTimes(2);
+        });
+        vitest_1.it.each([0, -5, 1.5, 1_000_001])('throws AppError 400 for an amount of %s', async (amount) => {
+            const error = (await captureRejection(service.createProjectTopup(mocks_1.VALID_PROJECT_ID, { periodKey: periodKeys.weekly, amount, adminComment: 'Extra runs' }, null)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(400);
+            (0, vitest_1.expect)(error.message).toBe('amount must be a whole number between 1 and 1000000');
+            (0, vitest_1.expect)(topupRepo.create).not.toHaveBeenCalled();
+        });
+    });
+    (0, vitest_1.describe)('deleteProjectTopup', () => {
+        (0, vitest_1.it)('throws AppError 404 for an unknown project', async () => {
+            const error = (await captureRejection(service.deleteProjectTopup('unknown-project', mocks_1.VALID_TOPUP_ID)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(404);
+            (0, vitest_1.expect)(error.message).toBe('Project not found');
+            (0, vitest_1.expect)(topupRepo.getById).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(topupRepo.deleteById).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('throws AppError 404 when the top-up row does not exist', async () => {
+            topupRepo.getById.mockResolvedValue(null);
+            const error = (await captureRejection(service.deleteProjectTopup(mocks_1.VALID_PROJECT_ID, mocks_1.VALID_TOPUP_ID)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(404);
+            (0, vitest_1.expect)(error.message).toBe('Top-up not found');
+            (0, vitest_1.expect)(topupRepo.deleteById).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('throws AppError 409 when the target week has already started', async () => {
+            topupRepo.getById.mockResolvedValue((0, mocks_1.makeProjectTopupRow)({ periodKey: '2020-W01' }));
+            const error = (await captureRejection(service.deleteProjectTopup(mocks_1.VALID_PROJECT_ID, mocks_1.VALID_TOPUP_ID)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(409);
+            (0, vitest_1.expect)(error.message).toBe('Top-ups for the current or past weeks cannot be deleted');
+            (0, vitest_1.expect)(topupRepo.deleteById).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('throws AppError 409 when the target week is the current week', async () => {
+            topupRepo.getById.mockResolvedValue((0, mocks_1.makeProjectTopupRow)({ periodKey: periodKeys.weekly }));
+            const error = (await captureRejection(service.deleteProjectTopup(mocks_1.VALID_PROJECT_ID, mocks_1.VALID_TOPUP_ID)));
+            (0, vitest_1.expect)(error).toBeInstanceOf(errors_1.AppError);
+            (0, vitest_1.expect)(error.statusCode).toBe(409);
+            (0, vitest_1.expect)(topupRepo.deleteById).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('deletes a top-up whose target week has not started', async () => {
+            const nextWeek = (0, period_1.listUpcomingWeeklyPeriodKeys)(2)[1];
+            topupRepo.getById.mockResolvedValue((0, mocks_1.makeProjectTopupRow)({ periodKey: nextWeek }));
+            await (0, vitest_1.expect)(service.deleteProjectTopup(mocks_1.VALID_PROJECT_ID, mocks_1.VALID_TOPUP_ID)).resolves.toBeUndefined();
+            (0, vitest_1.expect)(topupRepo.getById).toHaveBeenCalledWith(mocks_1.VALID_PROJECT_ID, mocks_1.VALID_TOPUP_ID);
+            (0, vitest_1.expect)(topupRepo.deleteById).toHaveBeenCalledWith(mocks_1.VALID_TOPUP_ID);
+        });
+    });
+});
+/* ================================================================== */
+/*  Run requests (member "Request more runs" submissions)              */
+/* ================================================================== */
+(0, vitest_1.describe)('ProjectRateLimitService · run requests', () => {
+    const VALID_RUN_REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+    let requestRepo;
+    let runRequestService;
+    const extraRunsBody = {
+        requestKind: 'extra_runs',
+        extraRuns: 5_000,
+        periodKey: (0, period_1.listUpcomingWeeklyPeriodKeys)(1)[0],
+        reason: 'Fall intake started early',
+    };
+    /**
+     * Rebuilds the service around relation/personal-project mocks granting
+     * exactly the given membership: a relation role slug, or a personal project
+     * id for the personalOwner path (null id = no personal project).
+     */
+    function withAccess(relationRole, personalProjectId = mocks_1.VALID_PROJECT_ID) {
+        const n8n = (0, mocks_1.createMockN8nRepositories)();
+        n8n.projectRelation.findProjectRole.mockResolvedValue(relationRole);
+        const personal = personalProjectId === null ? null : { id: personalProjectId };
+        n8n.project.getPersonalProjectForUser.mockResolvedValue(personal);
+        n8n.project.getPersonalProjectForUserOrFail.mockResolvedValue(personal);
+        runRequestService = new project_rate_limit_service_1.ProjectRateLimitService(n8n, {
+            projectRateLimit: (0, mocks_1.createMockProjectRateLimitRepository)(),
+            projectRateLimitDefault: (0, mocks_1.createMockProjectRateLimitDefaultRepository)(),
+            projectExecutionUsage: (0, mocks_1.createMockProjectExecutionUsageRepository)(),
+            workflowExecutionUsage: (0, mocks_1.createMockWorkflowExecutionUsageRepository)(),
+            projectTopup: (0, mocks_1.createMockProjectTopupRepository)(),
+            rateLimitRequest: requestRepo,
+        });
+    }
+    (0, vitest_1.beforeEach)(() => {
+        requestRepo = {
+            getPendingByProjectId: vitest_1.vi.fn().mockResolvedValue(null),
+            create: vitest_1.vi.fn().mockImplementation(async (values) => ({
+                id: VALID_RUN_REQUEST_ID,
+                projectId: values.projectId,
+                requestKind: values.requestKind,
+                extraRuns: values.extraRuns ?? null,
+                periodKey: values.periodKey ?? null,
+                requestedWeeklyLimit: values.requestedWeeklyLimit ?? null,
+                requestedAnnualLimit: values.requestedAnnualLimit ?? null,
+                reason: values.reason,
+                status: 'pending',
+                requestedBy: values.requestedBy,
+                createdAt: new Date('2026-11-10T10:14:00Z'),
+                updatedAt: new Date('2026-11-10T10:14:00Z'),
+            })),
+            cancelPending: vitest_1.vi.fn().mockResolvedValue({ id: VALID_RUN_REQUEST_ID }),
+        };
+        withAccess('project:editor');
+        vitest_1.vi.spyOn(console, 'error').mockImplementation(() => { });
+    });
+    (0, vitest_1.afterEach)(() => {
+        vitest_1.vi.restoreAllMocks();
+    });
+    (0, vitest_1.it)('files an extra_runs request for a project editor and returns the serialized summary', async () => {
+        const summary = await runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody });
+        (0, vitest_1.expect)(requestRepo.create).toHaveBeenCalledWith(vitest_1.expect.objectContaining({
+            projectId: mocks_1.VALID_PROJECT_ID,
+            requestKind: 'extra_runs',
+            extraRuns: 5_000,
+            periodKey: extraRunsBody.periodKey,
+            requestedWeeklyLimit: null,
+            requestedAnnualLimit: null,
+            reason: 'Fall intake started early',
+            requestedBy: 'user-1',
+        }));
+        (0, vitest_1.expect)(summary).toEqual(vitest_1.expect.objectContaining({
+            id: VALID_RUN_REQUEST_ID,
+            requestKind: 'extra_runs',
+            extraRuns: 5_000,
+            reason: 'Fall intake started early',
+            requestedBy: 'user-1',
+            createdAt: '2026-11-10T10:14:00.000Z',
+        }));
+    });
+    (0, vitest_1.it)('treats a personal-project owner without a relation as eligible', async () => {
+        withAccess(null);
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', {
+            requestKind: 'limit_increase',
+            requestedWeeklyLimit: 12_000,
+            reason: 'Three new ministries onboard in January',
+        })).resolves.toMatchObject({ requestKind: 'limit_increase', requestedWeeklyLimit: 12_000 });
+    });
+    (0, vitest_1.it)('rejects a non-member with 403 (platform admins without a relation included)', async () => {
+        withAccess(null, 'someone-elses-personal-project');
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'admin-1', {
+            requestKind: 'extra_runs',
+            extraRuns: 5_000,
+            periodKey: extraRunsBody.periodKey,
+            reason: 'reason',
+        })).rejects.toMatchObject({ statusCode: 403 });
+        (0, vitest_1.expect)(requestRepo.create).not.toHaveBeenCalled();
+    });
+    (0, vitest_1.it)('rejects an unknown project with 404', async () => {
+        await (0, vitest_1.expect)(runRequestService.createRunRequest('unknown-project', 'user-1', { ...extraRunsBody })).rejects.toMatchObject({ statusCode: 404 });
+        (0, vitest_1.expect)(requestRepo.create).not.toHaveBeenCalled();
+    });
+    (0, vitest_1.it)('enforces the extra-runs amount bounds and the week horizon', async () => {
+        const farWeek = (0, period_1.listUpcomingWeeklyPeriodKeys)(project_rate_limit_service_1.MAX_RUN_REQUEST_HORIZON_WEEKS + 1).at(-1);
+        const pastWeek = `${Number(extraRunsBody.periodKey.slice(0, 4)) - 1}-W01`;
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, extraRuns: 99 })).rejects.toMatchObject({ statusCode: 400 });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, extraRuns: 50_001 })).rejects.toMatchObject({ statusCode: 400 });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, periodKey: farWeek })).rejects.toMatchObject({ statusCode: 400 });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, periodKey: pastWeek })).rejects.toMatchObject({ statusCode: 400 });
+        (0, vitest_1.expect)(requestRepo.create).not.toHaveBeenCalled();
+    });
+    (0, vitest_1.it)('requires kind/field coherence and at least one proposed limit for limit_increase', async () => {
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', {
+            requestKind: 'limit_increase',
+            reason: 'reason',
+        })).rejects.toMatchObject({ statusCode: 400 });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', {
+            requestKind: 'limit_increase',
+            extraRuns: 5_000,
+            reason: 'reason',
+        })).rejects.toMatchObject({ statusCode: 400 });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', {
+            requestKind: 'limit_increase',
+            requestedWeeklyLimit: 20_000,
+            requestedAnnualLimit: 10_000,
+            reason: 'reason',
+        })).rejects.toMatchObject({ statusCode: 400 });
+        (0, vitest_1.expect)(requestRepo.create).not.toHaveBeenCalled();
+    });
+    (0, vitest_1.it)('fails with 409 when a pending request already exists', async () => {
+        requestRepo.getPendingByProjectId.mockResolvedValue({ id: VALID_RUN_REQUEST_ID, status: 'pending' });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody })).rejects.toMatchObject({ statusCode: 409 });
+        (0, vitest_1.expect)(requestRepo.create).not.toHaveBeenCalled();
+    });
+    (0, vitest_1.it)('maps a unique violation from a concurrent submit to 409', async () => {
+        requestRepo.create.mockRejectedValue({ code: '23505' });
+        await (0, vitest_1.expect)(runRequestService.createRunRequest(mocks_1.VALID_PROJECT_ID, 'user-1', { ...extraRunsBody })).rejects.toMatchObject({ statusCode: 409 });
+    });
+    (0, vitest_1.it)('cancels only the requester own pending request and reports misses as 404', async () => {
+        await (0, vitest_1.expect)(runRequestService.cancelRunRequest(mocks_1.VALID_PROJECT_ID, VALID_RUN_REQUEST_ID, 'user-1')).resolves.toBeUndefined();
+        (0, vitest_1.expect)(requestRepo.cancelPending).toHaveBeenCalledWith(VALID_RUN_REQUEST_ID, mocks_1.VALID_PROJECT_ID, 'user-1');
+        requestRepo.cancelPending.mockResolvedValue(null);
+        await (0, vitest_1.expect)(runRequestService.cancelRunRequest(mocks_1.VALID_PROJECT_ID, VALID_RUN_REQUEST_ID, 'user-1')).rejects.toMatchObject({ statusCode: 404 });
+    });
+    (0, vitest_1.it)('returns the pending summary for the detail payload', async () => {
+        requestRepo.getPendingByProjectId.mockResolvedValue({
+            id: VALID_RUN_REQUEST_ID,
+            requestKind: 'extra_runs',
+            extraRuns: 5_000,
+            periodKey: extraRunsBody.periodKey,
+            requestedWeeklyLimit: null,
+            requestedAnnualLimit: null,
+            reason: 'Fall intake',
+            status: 'pending',
+            requestedBy: 'user-1',
+            createdAt: new Date('2026-11-10T10:14:00Z'),
+        });
+        await (0, vitest_1.expect)(runRequestService.getPendingRunRequest(mocks_1.VALID_PROJECT_ID)).resolves.toMatchObject({
+            id: VALID_RUN_REQUEST_ID,
+            requestKind: 'extra_runs',
+            createdAt: '2026-11-10T10:14:00.000Z',
+        });
+    });
+    (0, vitest_1.it)('fails open when the pending row cannot be read (the detail page stays available)', async () => {
+        requestRepo.getPendingByProjectId.mockRejectedValue(new Error('table missing'));
+        await (0, vitest_1.expect)(runRequestService.getPendingRunRequest(mocks_1.VALID_PROJECT_ID)).resolves.toBeNull();
+    });
+});
+/* ================================================================== */
+/*  Admin review of run requests (list + approve/deny)                 */
+/* ================================================================== */
+(0, vitest_1.describe)('ProjectRateLimitService · admin run-request review', () => {
+    const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+    const ADMIN_EMAIL = 'admin@example.com';
+    let n8nRepos;
+    let rateLimitRepo;
+    let defaultsRepo;
+    let usageRepo;
+    let workflowUsageRepo;
+    let topupRepo;
+    let requestRepo;
+    let service;
+    let mailer;
+    function makeRunRequestRow(overrides = {}) {
+        return {
+            id: REQUEST_ID,
+            projectId: mocks_1.VALID_PROJECT_ID,
+            requestKind: 'extra_runs',
+            extraRuns: 5_000,
+            periodKey: '2026-W47',
+            requestedWeeklyLimit: null,
+            requestedAnnualLimit: null,
+            reason: 'Fall intake started early',
+            status: 'pending',
+            requestedBy: 'requester-1',
+            grantedRuns: null,
+            decidedWeeklyLimit: null,
+            decidedAnnualLimit: null,
+            decisionNote: null,
+            decidedBy: null,
+            decidedAt: null,
+            createdAt: new Date('2026-11-10T10:14:00Z'),
+            updatedAt: new Date('2026-11-10T10:14:00Z'),
+            ...overrides,
+        };
+    }
+    function makeDecidedRow(overrides = {}) {
+        return makeRunRequestRow({
+            status: 'approved',
+            grantedRuns: 5_000,
+            decisionNote: 'Enjoy the extra headroom',
+            decidedBy: ADMIN_EMAIL,
+            decidedAt: new Date('2026-11-11T09:00:00Z'),
+            ...overrides,
+        });
+    }
+    function buildService(withMailer = false) {
+        mailer = withMailer ? { sendMail: vitest_1.vi.fn().mockResolvedValue(undefined) } : null;
+        service = new project_rate_limit_service_1.ProjectRateLimitService({ ...n8nRepos, user: new user_1.UserRepository(n8nRepos.user) }, {
+            projectRateLimit: rateLimitRepo,
+            projectRateLimitDefault: defaultsRepo,
+            projectExecutionUsage: usageRepo,
+            workflowExecutionUsage: workflowUsageRepo,
+            projectTopup: topupRepo,
+            rateLimitRequest: requestRepo,
+        }, mailer);
+    }
+    (0, vitest_1.beforeEach)(() => {
+        n8nRepos = (0, mocks_1.createMockN8nRepositories)();
+        n8nRepos.projectRelation.findProjectRole.mockResolvedValue('project:editor');
+        n8nRepos.user.findOne.mockResolvedValue({
+            id: 'requester-1',
+            email: 'jordan.lee@example.com',
+            firstName: 'Jordan',
+            lastName: 'Lee',
+            role: { slug: 'global:member' },
+        });
+        rateLimitRepo = (0, mocks_1.createMockProjectRateLimitRepository)();
+        defaultsRepo = (0, mocks_1.createMockProjectRateLimitDefaultRepository)();
+        usageRepo = (0, mocks_1.createMockProjectExecutionUsageRepository)();
+        workflowUsageRepo = (0, mocks_1.createMockWorkflowExecutionUsageRepository)();
+        topupRepo = (0, mocks_1.createMockProjectTopupRepository)();
+        requestRepo = {
+            getById: vitest_1.vi.fn().mockResolvedValue(null),
+            listByStatuses: vitest_1.vi.fn().mockResolvedValue([]),
+            approveAsTopup: vitest_1.vi.fn().mockImplementation(async (_id, decision) => makeDecidedRow(decision)),
+            approveAsLimitChange: vitest_1.vi.fn().mockImplementation(async (_id, decision) => makeRunRequestRow({
+                requestKind: 'limit_increase',
+                extraRuns: null,
+                periodKey: null,
+                requestedWeeklyLimit: 10_000,
+                status: 'approved',
+                decidedWeeklyLimit: decision.decidedWeeklyLimit ?? null,
+                decidedAnnualLimit: decision.decidedAnnualLimit ?? null,
+                decisionNote: decision.decisionNote ?? null,
+                decidedBy: decision.decidedBy ?? null,
+                decidedAt: new Date('2026-11-11T09:00:00Z'),
+            })),
+            rejectPending: vitest_1.vi.fn().mockImplementation(async (_id, decision) => makeRunRequestRow({
+                status: 'rejected',
+                decisionNote: decision.decisionNote ?? null,
+                decidedBy: decision.decidedBy ?? null,
+                decidedAt: new Date('2026-11-11T09:00:00Z'),
+            })),
+        };
+        buildService();
+        vitest_1.vi.spyOn(console, 'error').mockImplementation(() => { });
+        vitest_1.vi.spyOn(console, 'warn').mockImplementation(() => { });
+    });
+    (0, vitest_1.afterEach)(() => {
+        vitest_1.vi.restoreAllMocks();
+    });
+    (0, vitest_1.describe)('listRunRequestsForAdmin', () => {
+        (0, vitest_1.it)('lists pending requests oldest-first with enrichment and pending stats', async () => {
+            const older = makeRunRequestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', createdAt: new Date('2026-11-01T09:00:00Z') });
+            const newer = makeRunRequestRow();
+            // The repo returns pending rows oldest-first.
+            requestRepo.listByStatuses.mockResolvedValue([older, newer]);
+            const page = await service.listRunRequestsForAdmin({ status: 'pending', page: 1, pageSize: 25 });
+            (0, vitest_1.expect)(page.pagination).toEqual({ page: 1, pageSize: 25, totalItems: 2, totalPages: 1 });
+            (0, vitest_1.expect)(page.pending).toEqual({ count: 2, oldestCreatedAt: '2026-11-01T09:00:00.000Z' });
+            (0, vitest_1.expect)(page.data.map((item) => item.id)).toEqual([older.id, newer.id]);
+            (0, vitest_1.expect)(page.data[0]).toMatchObject({
+                projectId: mocks_1.VALID_PROJECT_ID,
+                projectName: 'Default project',
+                projectType: 'personal',
+                requestKind: 'extra_runs',
+                status: 'pending',
+                requestedByName: 'Jordan Lee',
+                requestedByEmail: 'jordan.lee@example.com',
+                requestedByRoleLabel: 'Editor',
+                weeklyUsedWhenSent: 0,
+                yearlyUsedWhenSent: 0,
+                weeklyUsedNow: 0,
+                currentWeeklyLimit: null,
+                lastTopup: null,
+                decidedAt: null,
+            });
+        });
+        (0, vitest_1.it)('maps the denied filter to rejected rows surfaced as denied, newest-first', async () => {
+            const rejected = makeRunRequestRow({
+                status: 'rejected',
+                decisionNote: 'Not enough platform quota',
+                decidedBy: ADMIN_EMAIL,
+                decidedAt: new Date('2026-11-11T09:00:00Z'),
+            });
+            requestRepo.listByStatuses.mockImplementation(async (statuses) => statuses.includes('rejected') ? [rejected] : []);
+            const page = await service.listRunRequestsForAdmin({ status: 'denied', page: 1, pageSize: 25 });
+            (0, vitest_1.expect)(requestRepo.listByStatuses).toHaveBeenCalledWith(['rejected']);
+            (0, vitest_1.expect)(page.data).toHaveLength(1);
+            (0, vitest_1.expect)(page.data[0]).toMatchObject({
+                status: 'denied',
+                decisionNote: 'Not enough platform quota',
+                decidedByName: ADMIN_EMAIL,
+                decidedAt: '2026-11-11T09:00:00.000Z',
+            });
+            (0, vitest_1.expect)(page.pending).toEqual({ count: 0, oldestCreatedAt: null });
+        });
+        (0, vitest_1.it)('sorts the all filter newest-first and enriches decided rows with the decision fields', async () => {
+            const olderDecision = makeDecidedRow({
+                id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                createdAt: new Date('2026-11-01T09:00:00Z'),
+            });
+            const newerDecision = makeDecidedRow({ status: 'rejected', decisionNote: 'Not enough quota', decidedAt: new Date('2026-11-12T08:00:00Z') });
+            requestRepo.listByStatuses.mockImplementation(async (statuses) => statuses.length === 1 && statuses[0] === 'pending'
+                ? []
+                : [olderDecision, newerDecision]);
+            const page = await service.listRunRequestsForAdmin({ status: 'all', page: 1, pageSize: 25 });
+            (0, vitest_1.expect)(requestRepo.listByStatuses).toHaveBeenCalledWith(['pending', 'approved', 'rejected', 'cancelled']);
+            (0, vitest_1.expect)(page.data.map((item) => item.id)).toEqual([newerDecision.id, olderDecision.id]);
+            (0, vitest_1.expect)(page.data[0]).toMatchObject({
+                status: 'denied',
+                decisionNote: 'Not enough quota',
+                decidedBy: ADMIN_EMAIL,
+                decidedByName: ADMIN_EMAIL,
+                decidedAt: '2026-11-12T08:00:00.000Z',
+                grantedRuns: 5_000,
+            });
+        });
+        (0, vitest_1.it)('searches by project name and by requester name', async () => {
+            const row = makeRunRequestRow();
+            requestRepo.listByStatuses.mockResolvedValue([row]);
+            const byProject = await service.listRunRequestsForAdmin({ status: 'pending', search: 'default', page: 1, pageSize: 25 });
+            const byRequester = await service.listRunRequestsForAdmin({ status: 'pending', search: 'jordan', page: 1, pageSize: 25 });
+            const noMatch = await service.listRunRequestsForAdmin({ status: 'pending', search: 'nothing', page: 1, pageSize: 25 });
+            (0, vitest_1.expect)(byProject.data).toHaveLength(1);
+            (0, vitest_1.expect)(byRequester.data).toHaveLength(1);
+            (0, vitest_1.expect)(noMatch.data).toHaveLength(0);
+            (0, vitest_1.expect)(noMatch.pagination.totalItems).toBe(0);
+        });
+        (0, vitest_1.it)('paginates the enriched list', async () => {
+            requestRepo.listByStatuses.mockResolvedValue([makeRunRequestRow()]);
+            const page2 = await service.listRunRequestsForAdmin({ status: 'pending', page: 2, pageSize: 1 });
+            (0, vitest_1.expect)(page2.pagination).toEqual({ page: 2, pageSize: 1, totalItems: 1, totalPages: 1 });
+            (0, vitest_1.expect)(page2.data).toHaveLength(0);
+        });
+    });
+    (0, vitest_1.describe)('approveRunRequest · extra_runs', () => {
+        (0, vitest_1.it)('approves with the default grant, fulfills the top-up and returns the decided row', async () => {
+            const row = makeRunRequestRow();
+            requestRepo.getById.mockResolvedValue(row);
+            const decided = makeDecidedRow();
+            requestRepo.approveAsTopup.mockResolvedValue(decided);
+            const item = await service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL);
+            (0, vitest_1.expect)(requestRepo.approveAsTopup).toHaveBeenCalledWith(REQUEST_ID, { grantedRuns: 5_000, decisionNote: null, decidedBy: ADMIN_EMAIL }, { projectId: mocks_1.VALID_PROJECT_ID, periodKey: '2026-W47', adminComment: "Approved from Jordan's run request" });
+            (0, vitest_1.expect)(item).toMatchObject({
+                id: REQUEST_ID,
+                status: 'approved',
+                grantedRuns: 5_000,
+                decisionNote: 'Enjoy the extra headroom',
+                requestedByName: 'Jordan Lee',
+            });
+            (0, vitest_1.expect)(topupRepo.create).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('allows lowering the grant below the ask', async () => {
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            await service.approveRunRequest(REQUEST_ID, { grantedRuns: 3_000, note: 'Partial for now' }, ADMIN_EMAIL);
+            (0, vitest_1.expect)(requestRepo.approveAsTopup).toHaveBeenCalledWith(REQUEST_ID, { grantedRuns: 3_000, decisionNote: 'Partial for now', decidedBy: ADMIN_EMAIL }, { projectId: mocks_1.VALID_PROJECT_ID, periodKey: '2026-W47', adminComment: 'Partial for now' });
+        });
+        vitest_1.it.each([
+            ['above the ask', { grantedRuns: 6_000 }],
+            ['below the minimum', { grantedRuns: 50 }],
+        ])('rejects grants %s with 400', async (_label, body) => {
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, body, ADMIN_EMAIL)).rejects.toMatchObject({
+                statusCode: 400,
+            });
+            (0, vitest_1.expect)(requestRepo.approveAsTopup).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('throws 404 for an unknown request', async () => {
+            requestRepo.getById.mockResolvedValue(null);
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({ statusCode: 404 });
+        });
+        (0, vitest_1.it)('maps decided and cancelled races to distinct 409 messages', async () => {
+            requestRepo.getById.mockResolvedValue(makeDecidedRow());
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({
+                statusCode: 409,
+                message: 'This request has already been decided',
+            });
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow({ status: 'cancelled' }));
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({
+                statusCode: 409,
+                message: 'This request was cancelled by the requester',
+            });
+        });
+        (0, vitest_1.it)('maps a lost decide race (repo returns null) to 409 after refetching the row', async () => {
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            requestRepo.approveAsTopup.mockResolvedValue(null);
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({ statusCode: 409 });
+            (0, vitest_1.expect)(requestRepo.getById).toHaveBeenCalledTimes(2);
+        });
+    });
+    (0, vitest_1.describe)('approveRunRequest · limit_increase', () => {
+        const limitRow = () => makeRunRequestRow({
+            requestKind: 'limit_increase',
+            extraRuns: null,
+            periodKey: null,
+            requestedWeeklyLimit: 10_000,
+            requestedAnnualLimit: 500_000,
+        });
+        function mockCurrentLimits(overrides = {}) {
+            rateLimitRepo.get.mockResolvedValue({
+                projectId: mocks_1.VALID_PROJECT_ID,
+                usesDefaultLimits: false,
+                weeklyRateLimit: 8_000,
+                yearlyRateLimit: 400_000,
+                lastAdminComment: null,
+                stopBehavior: 'hard_stop',
+                updatedBy: ADMIN_EMAIL,
+                createdAt: new Date('2026-01-01T00:00:00Z'),
+                updatedAt: new Date('2026-06-01T00:00:00Z'),
+                ...overrides,
+            });
+        }
+        (0, vitest_1.it)('approves the asked limits, applies the upsert and returns the decided row', async () => {
+            requestRepo.getById.mockResolvedValue(limitRow());
+            mockCurrentLimits();
+            const item = await service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 10_000, newAnnualLimit: 500_000, note: 'Backfill quota' }, ADMIN_EMAIL);
+            (0, vitest_1.expect)(requestRepo.approveAsLimitChange).toHaveBeenCalledWith(REQUEST_ID, { decidedWeeklyLimit: 10_000, decidedAnnualLimit: 500_000, decisionNote: 'Backfill quota', decidedBy: ADMIN_EMAIL }, { projectId: mocks_1.VALID_PROJECT_ID, lastAdminComment: 'Backfill quota' });
+            (0, vitest_1.expect)(item).toMatchObject({
+                status: 'approved',
+                requestedWeeklyLimit: 10_000,
+                decidedWeeklyLimit: 10_000,
+                decidedAnnualLimit: 500_000,
+            });
+        });
+        vitest_1.it.each([
+            ['above the ask', { newWeeklyLimit: 11_000 }],
+            ['below the current limit', { newWeeklyLimit: 7_000 }],
+            ['annual below the new weekly', { newWeeklyLimit: 9_000, newAnnualLimit: 8_000 }],
+            ['without an actual change', { newWeeklyLimit: 8_000, newAnnualLimit: 400_000 }],
+        ])('rejects grants %s with 400', async (_label, body) => {
+            requestRepo.getById.mockResolvedValue(limitRow());
+            mockCurrentLimits();
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, body, ADMIN_EMAIL)).rejects.toMatchObject({
+                statusCode: 400,
+            });
+            (0, vitest_1.expect)(requestRepo.approveAsLimitChange).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('rejects changes to a period the requester did not ask about', async () => {
+            const row = limitRow();
+            row.requestedWeeklyLimit = null;
+            requestRepo.getById.mockResolvedValue(row);
+            mockCurrentLimits();
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, { newAnnualLimit: 500_000, newWeeklyLimit: 9_000 }, ADMIN_EMAIL)).rejects.toMatchObject({ statusCode: 400 });
+            (0, vitest_1.expect)(requestRepo.approveAsLimitChange).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('resolves current limits from scope defaults when the project is in default mode', async () => {
+            requestRepo.getById.mockResolvedValue(limitRow());
+            rateLimitRepo.get.mockResolvedValue(null);
+            defaultsRepo.get.mockResolvedValue({
+                projectKind: 'personal',
+                weeklyRateLimit: 4,
+                yearlyRateLimit: 200,
+                updatedBy: null,
+                createdAt: new Date('2026-01-01T00:00:00Z'),
+                updatedAt: new Date('2026-01-01T00:00:00Z'),
+            });
+            // Weekly below the default of 4 → refused.
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 3 }, ADMIN_EMAIL)).rejects.toMatchObject({ statusCode: 400 });
+            // At/above the default and an actual change → allowed.
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 10_000, newAnnualLimit: 500_000 }, ADMIN_EMAIL)).resolves.toMatchObject({ status: 'approved' });
+        });
+    });
+    (0, vitest_1.describe)('denyRunRequest', () => {
+        (0, vitest_1.it)('denies with the required reason and returns the rejected row', async () => {
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            const rejected = makeRunRequestRow({
+                status: 'rejected',
+                decisionNote: 'Not enough platform quota this quarter. Please ask again in January.',
+                decidedBy: ADMIN_EMAIL,
+                decidedAt: new Date('2026-11-11T09:00:00Z'),
+            });
+            requestRepo.rejectPending.mockResolvedValue(rejected);
+            const item = await service.denyRunRequest(REQUEST_ID, { reason: 'Not enough platform quota this quarter. Please ask again in January.' }, ADMIN_EMAIL);
+            (0, vitest_1.expect)(requestRepo.rejectPending).toHaveBeenCalledWith(REQUEST_ID, {
+                decisionNote: 'Not enough platform quota this quarter. Please ask again in January.',
+                decidedBy: ADMIN_EMAIL,
+            });
+            (0, vitest_1.expect)(item).toMatchObject({ status: 'denied', decidedByName: ADMIN_EMAIL });
+            (0, vitest_1.expect)(topupRepo.create).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(rateLimitRepo.upsert).not.toHaveBeenCalled();
+        });
+        vitest_1.it.each([
+            ['too short', 'too short'],
+            ['too long', 'x'.repeat(501)],
+        ])('rejects a %s reason with 400', async (_label, reason) => {
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            await (0, vitest_1.expect)(service.denyRunRequest(REQUEST_ID, { reason }, ADMIN_EMAIL)).rejects.toMatchObject({
+                statusCode: 400,
+            });
+            (0, vitest_1.expect)(requestRepo.rejectPending).not.toHaveBeenCalled();
+        });
+        (0, vitest_1.it)('throws 404 for an unknown request', async () => {
+            requestRepo.getById.mockResolvedValue(null);
+            await (0, vitest_1.expect)(service.denyRunRequest(REQUEST_ID, { reason: 'A sufficiently long reason here' }, ADMIN_EMAIL)).rejects.toMatchObject({
+                statusCode: 404,
+            });
+        });
+    });
+    (0, vitest_1.describe)('decision emails', () => {
+        (0, vitest_1.it)('emails the requester when an extra-runs request is approved', async () => {
+            buildService(true);
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            await service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL);
+            (0, vitest_1.expect)(mailer.sendMail).toHaveBeenCalledTimes(1);
+            const { to, subject, html } = mailer.sendMail.mock.calls[0][0];
+            (0, vitest_1.expect)(to).toBe('jordan.lee@example.com');
+            (0, vitest_1.expect)(subject).toContain('approved');
+            (0, vitest_1.expect)(html).toContain('5,000');
+        });
+        (0, vitest_1.it)('emails the requester the deny reason word for word', async () => {
+            buildService(true);
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            const reason = 'Not enough platform quota this quarter. Please ask again in January.';
+            requestRepo.rejectPending.mockResolvedValue(makeRunRequestRow({ status: 'rejected', decisionNote: reason, decidedBy: ADMIN_EMAIL, decidedAt: new Date() }));
+            await service.denyRunRequest(REQUEST_ID, { reason }, ADMIN_EMAIL);
+            (0, vitest_1.expect)(mailer.sendMail).toHaveBeenCalledTimes(1);
+            const { html } = mailer.sendMail.mock.calls[0][0];
+            (0, vitest_1.expect)(html).toContain(reason);
+        });
+        (0, vitest_1.it)('skips the email when no mailer is configured', async () => {
+            requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+            await (0, vitest_1.expect)(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).resolves.toMatchObject({ status: 'approved' });
+        });
+    });
+});
