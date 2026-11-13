@@ -88,7 +88,17 @@ function getSendErrorMessage(error: unknown): string {
 }
 
 /** One usage cell of the "right now" summary card (bar + used/limit + reset). */
-function UsageCell({ label, used, limit, resetText }: { label: string; used: number; limit: number | null; resetText: string }) {
+function UsageCell({
+  label,
+  used,
+  limit,
+  resetText,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+  resetText: string;
+}) {
   const ratio = getUsageRatio(used, limit);
   const percent = getUsagePercent(used, limit);
   const tone: UsageBarTone | null = ratio === null ? null : getUsageBarTone(ratio);
@@ -276,9 +286,14 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
   if (requestMode === 'extra_runs') {
     if (effectiveWeeklyLimit === null) {
       approvedTitle = 'Your project has no weekly limit';
-      approvedDescription = 'Extra runs add to a weekly limit, but this project has none. Ask for a higher limit instead.';
+      approvedDescription =
+        'Extra runs add to a weekly limit, but this project has none. Ask for a higher limit instead.';
       sendBlocked = 'Extra runs need a weekly limit to add to.';
-    } else if (parsedExtraRuns !== undefined && parsedExtraRuns >= MIN_EXTRA_RUNS && parsedExtraRuns <= MAX_EXTRA_RUNS) {
+    } else if (
+      parsedExtraRuns !== undefined &&
+      parsedExtraRuns >= MIN_EXTRA_RUNS &&
+      parsedExtraRuns <= MAX_EXTRA_RUNS
+    ) {
       approvedTitle = `If approved: up to ${formatCount(effectiveWeeklyLimit + parsedExtraRuns)} runs for ${formatWeeklyKeyRange(periodKey)}`;
       approvedDescription = `That is your ${formatCount(effectiveWeeklyLimit)} weekly limit plus the ${formatCount(parsedExtraRuns)} you asked for. Extra runs also count toward your annual limit.`;
     } else {
@@ -315,7 +330,9 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
         </DialogClose>
         <DialogHeader>
           <DialogTitle>Request more runs for {project.projectName}</DialogTitle>
-          <DialogDescription>A platform admin reviews every request. We'll email you when they decide.</DialogDescription>
+          <DialogDescription>
+            A platform admin reviews every request. We'll email you when they decide.
+          </DialogDescription>
         </DialogHeader>
 
         {hasPendingRequest && (
@@ -416,7 +433,9 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
                 label="New weekly limit"
                 htmlFor="run-request-weekly"
                 description={
-                  effectiveWeeklyLimit === null ? 'No weekly limit today.' : `Now ${formatCount(effectiveWeeklyLimit)} runs a week.`
+                  effectiveWeeklyLimit === null
+                    ? 'No weekly limit today.'
+                    : `Now ${formatCount(effectiveWeeklyLimit)} runs a week.`
                 }
                 error={errors.weekly}
               >
@@ -437,7 +456,9 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
                 label="New annual limit"
                 htmlFor="run-request-annual"
                 description={
-                  effectiveYearlyLimit === null ? 'No annual limit today.' : `Now ${formatCount(effectiveYearlyLimit)} runs a year.`
+                  effectiveYearlyLimit === null
+                    ? 'No annual limit today.'
+                    : `Now ${formatCount(effectiveYearlyLimit)} runs a year.`
                 }
                 error={errors.annual}
               >
@@ -455,7 +476,9 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
                 />
               </Field>
             </div>
-            <p className="text-xs text-muted-foreground">Change one or both. A limit you leave as it is stays the same.</p>
+            <p className="text-xs text-muted-foreground">
+              Change one or both. A limit you leave as it is stays the same.
+            </p>
           </div>
         )}
 

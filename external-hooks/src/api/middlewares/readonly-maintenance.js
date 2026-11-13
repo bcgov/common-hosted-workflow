@@ -1,9 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.createReadOnlyMiddleware = createReadOnlyMiddleware;
-const _config_1 = require("@config");
-const readonly_1 = require("../constants/readonly");
-const errors_1 = require("../utils/errors");
+const _config_1 = require('@config');
+const readonly_1 = require('../constants/readonly');
+const errors_1 = require('../utils/errors');
 // Advisory only: tells clients when it is reasonable to retry.
 const RETRY_AFTER_SECONDS = '300';
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -18,14 +18,17 @@ const WORKFLOW_RUNTIME_PATH = /^\/(multi-webhook-wait\/|chefs\/submissions\/regi
  * In read-only mode, refuses writes to the WIL and custom-integration routes with a 503.
  */
 function createReadOnlyMiddleware(isReadOnly = _config_1.READONLY_MODE) {
-    return (req, res, next) => {
-        const isAllowed = READ_METHODS.has(req.method) ||
-            (req.method === 'POST' && req.path.endsWith(READ_ONLY_POST_SUFFIX)) ||
-            WORKFLOW_RUNTIME_PATH.test(req.path);
-        if (!isReadOnly || isAllowed) {
-            return next();
-        }
-        res.setHeader('Retry-After', RETRY_AFTER_SECONDS);
-        return next(new errors_1.AppError(503, readonly_1.READONLY_WRITE_MESSAGE, { code: readonly_1.READONLY_MAINTENANCE_CODE }));
-    };
+  return (req, res, next) => {
+    const isAllowed =
+      READ_METHODS.has(req.method) ||
+      (req.method === 'POST' && req.path.endsWith(READ_ONLY_POST_SUFFIX)) ||
+      WORKFLOW_RUNTIME_PATH.test(req.path);
+    if (!isReadOnly || isAllowed) {
+      return next();
+    }
+    res.setHeader('Retry-After', RETRY_AFTER_SECONDS);
+    return next(
+      new errors_1.AppError(503, readonly_1.READONLY_WRITE_MESSAGE, { code: readonly_1.READONLY_MAINTENANCE_CODE }),
+    );
+  };
 }

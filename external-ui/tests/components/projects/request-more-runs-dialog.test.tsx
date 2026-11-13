@@ -113,9 +113,7 @@ describe('RequestMoreRunsDialog', () => {
     await user.type(screen.getByLabelText(/How many extra runs\?/), '5,000');
 
     expect(screen.getByText('If approved: up to 15,000 runs for Nov 9 to 15')).toBeInTheDocument();
-    expect(
-      screen.getByText(/That is your 10,000 weekly limit plus the 5,000 you asked for/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/That is your 10,000 weekly limit plus the 5,000 you asked for/)).toBeInTheDocument();
   });
 
   it('requires a reason and shows the field error', async () => {
@@ -146,7 +144,9 @@ describe('RequestMoreRunsDialog', () => {
         reason: 'Fall intake started early',
       }),
     );
-    await waitFor(() => expect(successToastMock).toHaveBeenCalledWith("Request sent. We'll email you when an admin decides."));
+    await waitFor(() =>
+      expect(successToastMock).toHaveBeenCalledWith("Request sent. We'll email you when an admin decides."),
+    );
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 

@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 /**
  * Startup guard for n8n's compiled internals.
  *
@@ -15,19 +15,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
  *
  * Re-verify / extend the manifest on every n8n base-image bump.
  */
-const n8n_internals_check_1 = require("./api/helpers/n8n-internals-check");
+const n8n_internals_check_1 = require('./api/helpers/n8n-internals-check');
 function main() {
-    const { ok, results } = (0, n8n_internals_check_1.verifyN8nInternals)((path) => require(path));
-    console.log('Verifying n8n runtime internals:');
-    for (const result of results)
-        console.log((0, n8n_internals_check_1.formatCheckResult)(result));
-    if (!ok) {
-        const failed = results.filter((result) => !result.ok).map((result) => result.path);
-        console.error(`\nn8n internals check FAILED for ${failed.length} module(s). This build is incompatible with the ` +
-            `installed n8n version. Update src/api/constants/n8n-paths.ts (N8N_INTERNAL_MODULES) to match n8n, ` +
-            `then re-verify the credentials and WIL Trigger runner integration.`);
-        process.exit(1);
-    }
-    console.log('\nAll n8n runtime internals resolved.');
+  const { ok, results } = (0, n8n_internals_check_1.verifyN8nInternals)((path) => require(path));
+  console.log('Verifying n8n runtime internals:');
+  for (const result of results) console.log((0, n8n_internals_check_1.formatCheckResult)(result));
+  if (!ok) {
+    const failed = results.filter((result) => !result.ok).map((result) => result.path);
+    console.error(
+      `\nn8n internals check FAILED for ${failed.length} module(s). This build is incompatible with the ` +
+        `installed n8n version. Update src/api/constants/n8n-paths.ts (N8N_INTERNAL_MODULES) to match n8n, ` +
+        `then re-verify the credentials and WIL Trigger runner integration.`,
+    );
+    process.exit(1);
+  }
+  console.log('\nAll n8n runtime internals resolved.');
 }
 main();

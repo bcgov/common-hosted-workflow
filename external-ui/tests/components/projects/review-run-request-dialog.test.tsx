@@ -138,9 +138,9 @@ describe('ReviewRunRequestDialog', () => {
     expect(screen.getByText('3,000 runs')).toBeInTheDocument();
     expect(screen.getByText('Nov 2 to 8 (this week)')).toBeInTheDocument();
     expect(screen.getByText('We have a big batch load this week.')).toBeInTheDocument();
-    expect(
-      screen.getByText(/approved by N\. McInnis on /),
-    ).toHaveTextContent(`approved by N. McInnis on ${sentStamp(BASE_REQUEST.lastTopup.createdAt)}`);
+    expect(screen.getByText(/approved by N\. McInnis on /)).toHaveTextContent(
+      `approved by N. McInnis on ${sentStamp(BASE_REQUEST.lastTopup.createdAt)}`,
+    );
     expect(screen.getByText('CITZ Tenant when Jordan asked')).toBeInTheDocument();
     expect(screen.getByText(`${sentStamp(BASE_REQUEST.createdAt)}. Now 5,200 this week (43%)`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve 3,000 runs' })).toBeInTheDocument();
@@ -177,7 +177,9 @@ describe('ReviewRunRequestDialog', () => {
     expect(screen.getByText('Weekly limit for Nov 2 to 8')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Approve 1,500 runs' }));
 
-    await waitFor(() => expect(approveMock).toHaveBeenCalledWith('req-1', { grantedRuns: 1_500, note: 'Half for now.' }));
+    await waitFor(() =>
+      expect(approveMock).toHaveBeenCalledWith('req-1', { grantedRuns: 1_500, note: 'Half for now.' }),
+    );
     await waitFor(() =>
       expect(successToastMock).toHaveBeenCalledWith(
         'Approved · CITZ Tenant gets 1,500 extra runs for Nov 2 to 8. We emailed Jordan Lee.',
@@ -194,9 +196,7 @@ describe('ReviewRunRequestDialog', () => {
     await user.type(grantInput, '50');
     await user.click(screen.getByRole('button', { name: 'Approve 50 runs' }));
 
-    expect(
-      screen.getByText('Enter a whole number of at least 100 runs, or choose Deny'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Enter a whole number of at least 100 runs, or choose Deny')).toBeInTheDocument();
     expect(approveMock).not.toHaveBeenCalled();
 
     await user.clear(grantInput);
@@ -217,9 +217,7 @@ describe('ReviewRunRequestDialog', () => {
     await user.type(screen.getByLabelText('Reason for denying'), 'Too short');
     await user.click(screen.getByRole('button', { name: 'Deny request' }));
 
-    expect(
-      screen.getByText('Tell Jordan why, so they know what to change before asking again.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Tell Jordan why, so they know what to change before asking again.')).toBeInTheDocument();
     expect(denyMock).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText('Reason for denying'), ' until usage drops');
@@ -243,9 +241,9 @@ describe('ReviewRunRequestDialog', () => {
     expect(screen.getByText('800,000 asked, now 500,000')).toBeInTheDocument();
     expect(screen.getByLabelText('New weekly limit')).toHaveValue('20,000');
     expect(screen.getByLabelText('New annual limit')).toHaveValue('800,000');
-    expect(
-      screen.getByText(/Limits set /),
-    ).toHaveTextContent(`Limits set ${sentStamp(LIMIT_REQUEST.lastLimitChange.at)} by N. McInnis`);
+    expect(screen.getByText(/Limits set /)).toHaveTextContent(
+      `Limits set ${sentStamp(LIMIT_REQUEST.lastLimitChange.at)} by N. McInnis`,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Approve 20,000 a week and 800,000 a year' }));
 
@@ -282,7 +280,9 @@ describe('ReviewRunRequestDialog', () => {
     await user.type(annualInput, '500,000');
     await user.click(screen.getByRole('button', { name: 'Approve 12,000 a week and 500,000 a year' }));
 
-    expect(screen.getByText('Grant at least one limit above the current values, or deny the request')).toBeInTheDocument();
+    expect(
+      screen.getByText('Grant at least one limit above the current values, or deny the request'),
+    ).toBeInTheDocument();
     expect(approveMock).not.toHaveBeenCalled();
   });
 

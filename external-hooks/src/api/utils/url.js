@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.buildPath = buildPath;
 exports.extractOrigin = extractOrigin;
 /**
@@ -14,7 +14,7 @@ exports.extractOrigin = extractOrigin;
  * // => "users/user%20with%20spaces/tenants"
  */
 function buildPath(...segments) {
-    return segments.map((s) => encodeURIComponent(s)).join('/');
+  return segments.map((s) => encodeURIComponent(s)).join('/');
 }
 /**
  * Extracts the scheme + host (origin) from an absolute URL, discarding any path,
@@ -29,10 +29,9 @@ function buildPath(...segments) {
  * // => null
  */
 function extractOrigin(url) {
-    try {
-        return new URL(url).origin;
-    }
-    catch {
-        return null;
-    }
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 }

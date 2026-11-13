@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.parseFeatureFlagConfig = parseFeatureFlagConfig;
 /**
  * Parses a comma-separated list of enabled feature flag names into a typed registry.
@@ -10,14 +10,13 @@ exports.parseFeatureFlagConfig = parseFeatureFlagConfig;
  * Example: "wil,project" → { wil: true, project: true }
  */
 function parseFeatureFlagConfig(raw) {
-    if (!raw.trim())
-        return {};
-    const registry = {};
-    for (const entry of raw.split(',')) {
-        const flag = entry.trim();
-        if (flag) {
-            registry[flag] = true;
-        }
+  if (!raw.trim()) return {};
+  const registry = {};
+  for (const entry of raw.split(',')) {
+    const flag = entry.trim();
+    if (flag) {
+      registry[flag] = true;
     }
-    return registry;
+  }
+  return registry;
 }

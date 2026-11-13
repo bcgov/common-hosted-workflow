@@ -1,12 +1,19 @@
-"use strict";
+'use strict';
 /**
  * Action lifecycle state machine.
  *
  * Defines valid status transitions and shared-actor-type checks.
  * Used by ClaimService and ActionService.updateStatus() (External UI path only).
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ACTOR_TYPE_GROUP = exports.ACTOR_TYPE_ROLE = exports.ACTION_STATUS_CANCELLED = exports.ACTION_STATUS_COMPLETED = exports.ACTION_STATUS_IN_PROGRESS = exports.ACTION_STATUS_CLAIMED = exports.ACTION_STATUS_PENDING = void 0;
+Object.defineProperty(exports, '__esModule', { value: true });
+exports.ACTOR_TYPE_GROUP =
+  exports.ACTOR_TYPE_ROLE =
+  exports.ACTION_STATUS_CANCELLED =
+  exports.ACTION_STATUS_COMPLETED =
+  exports.ACTION_STATUS_IN_PROGRESS =
+  exports.ACTION_STATUS_CLAIMED =
+  exports.ACTION_STATUS_PENDING =
+    void 0;
 exports.isValidTransition = isValidTransition;
 exports.isSharedActorType = isSharedActorType;
 /** Named status constants — avoids magic strings across the claim lifecycle. */
@@ -33,22 +40,26 @@ exports.ACTOR_TYPE_GROUP = 'group';
  * - completed and cancelled are terminal states with no outbound transitions
  */
 const ALLOWED_TRANSITIONS = {
-    [exports.ACTION_STATUS_PENDING]: [
-        exports.ACTION_STATUS_CLAIMED,
-        exports.ACTION_STATUS_IN_PROGRESS,
-        exports.ACTION_STATUS_COMPLETED,
-        exports.ACTION_STATUS_CANCELLED,
-    ],
-    [exports.ACTION_STATUS_CLAIMED]: [exports.ACTION_STATUS_IN_PROGRESS, exports.ACTION_STATUS_PENDING, exports.ACTION_STATUS_CANCELLED],
-    [exports.ACTION_STATUS_IN_PROGRESS]: [exports.ACTION_STATUS_COMPLETED, exports.ACTION_STATUS_CANCELLED],
-    [exports.ACTION_STATUS_COMPLETED]: [],
-    [exports.ACTION_STATUS_CANCELLED]: [],
+  [exports.ACTION_STATUS_PENDING]: [
+    exports.ACTION_STATUS_CLAIMED,
+    exports.ACTION_STATUS_IN_PROGRESS,
+    exports.ACTION_STATUS_COMPLETED,
+    exports.ACTION_STATUS_CANCELLED,
+  ],
+  [exports.ACTION_STATUS_CLAIMED]: [
+    exports.ACTION_STATUS_IN_PROGRESS,
+    exports.ACTION_STATUS_PENDING,
+    exports.ACTION_STATUS_CANCELLED,
+  ],
+  [exports.ACTION_STATUS_IN_PROGRESS]: [exports.ACTION_STATUS_COMPLETED, exports.ACTION_STATUS_CANCELLED],
+  [exports.ACTION_STATUS_COMPLETED]: [],
+  [exports.ACTION_STATUS_CANCELLED]: [],
 };
 /** Returns true if transitioning from `from` to `to` is a valid state change. */
 function isValidTransition(from, to) {
-    return (ALLOWED_TRANSITIONS[from] ?? []).includes(to);
+  return (ALLOWED_TRANSITIONS[from] ?? []).includes(to);
 }
 /** Returns true if the actor type requires the claim ceremony (role or group). */
 function isSharedActorType(actorType) {
-    return actorType === exports.ACTOR_TYPE_ROLE || actorType === exports.ACTOR_TYPE_GROUP;
+  return actorType === exports.ACTOR_TYPE_ROLE || actorType === exports.ACTOR_TYPE_GROUP;
 }

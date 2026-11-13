@@ -1,5 +1,5 @@
-"use strict";
+'use strict';
 /**
  * Types representing CSTAR API responses for tenant/user management.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+Object.defineProperty(exports, '__esModule', { value: true });

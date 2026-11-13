@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.READONLY_EDIT_MESSAGE = exports.READONLY_WRITE_MESSAGE = exports.READONLY_MAINTENANCE_CODE = void 0;
 /** Identifies read-only refusals so callers can distinguish them from other 503 responses. */
 exports.READONLY_MAINTENANCE_CODE = 'READONLY_MODE';

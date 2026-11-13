@@ -1,100 +1,104 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.UiWorkflowQueryService = void 0;
-const project_access_1 = require("./project-access");
-const ui_workflows_1 = require("../mappers/ui-workflows");
+const project_access_1 = require('./project-access');
+const ui_workflows_1 = require('../mappers/ui-workflows');
 function canViewAllWorkflows(roleSlug) {
-    return roleSlug === 'global:owner' || roleSlug === 'global:admin';
+  return roleSlug === 'global:owner' || roleSlug === 'global:admin';
 }
 class UiWorkflowQueryService {
-    n8nRepositories;
-    userRepository;
-    projectRelationRepository;
-    sharedWorkflowRepository;
-    constructor(n8nRepositories) {
-        this.n8nRepositories = n8nRepositories;
-        this.userRepository = n8nRepositories.user;
-        this.projectRelationRepository = n8nRepositories.projectRelation;
-        this.sharedWorkflowRepository = n8nRepositories.sharedWorkflow;
+  n8nRepositories;
+  userRepository;
+  projectRelationRepository;
+  sharedWorkflowRepository;
+  constructor(n8nRepositories) {
+    this.n8nRepositories = n8nRepositories;
+    this.userRepository = n8nRepositories.user;
+    this.projectRelationRepository = n8nRepositories.projectRelation;
+    this.sharedWorkflowRepository = n8nRepositories.sharedWorkflow;
+  }
+  async getWhoami(email) {
+    if (!email) {
+      return null;
     }
-    async getWhoami(email) {
-        if (!email) {
-            return null;
-        }
-        return await this.userRepository.findByEmail(email, ['role']);
+    return await this.userRepository.findByEmail(email, ['role']);
+  }
+  async getWorkflows(email) {
+    const context = await this.loadUserContext(email);
+    return {
+      n8nUser: context.n8nUser,
+      accessibleProjectIds: context.accessibleProjectIds,
+      projects: context.projects,
+      workflows: context.workflows,
+    };
+  }
+  async loadUserContext(email) {
+    if (!email) {
+      return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
     }
-    async getWorkflows(email) {
-        const context = await this.loadUserContext(email);
-        return {
-            n8nUser: context.n8nUser,
-            accessibleProjectIds: context.accessibleProjectIds,
-            projects: context.projects,
-            workflows: context.workflows,
-        };
+    const n8nUser = await this.userRepository.findByEmail(email, ['role']);
+    if (!n8nUser) {
+      return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
     }
-    async loadUserContext(email) {
-        if (!email) {
-            return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
-        }
-        const n8nUser = await this.userRepository.findByEmail(email, ['role']);
-        if (!n8nUser) {
-            return { n8nUser: null, accessibleProjectIds: [], projects: [], workflows: [] };
-        }
-        // Disabled users keep their identity (so sessions can report access-request state)
-        // but must never receive n8n-derived data, including administrator-wide workflow lists.
-        if (n8nUser.disabled) {
-            return { n8nUser, accessibleProjectIds: [], projects: [], workflows: [] };
-        }
-        const [personalProject, accessibleProjectIds] = await Promise.all([
-            this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
-            (0, project_access_1.listProjectIdsAccessibleToUser)(this.n8nRepositories.project, this.n8nRepositories.projectRelation, n8nUser.id),
-        ]);
-        const projects = await this.loadAccessibleProjects(accessibleProjectIds);
-        const workflowRows = canViewAllWorkflows(n8nUser.role?.slug)
-            ? await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds()
-            : await this.loadVisibleWorkflowRows(accessibleProjectIds);
-        const projectEmailMap = await this.loadProjectEmailMap(workflowRows, personalProject?.id, n8nUser.email);
-        return {
-            n8nUser,
-            accessibleProjectIds,
-            projects,
-            workflows: (0, ui_workflows_1.buildWorkflowSummaries)(workflowRows, projectEmailMap),
-        };
+    // Disabled users keep their identity (so sessions can report access-request state)
+    // but must never receive n8n-derived data, including administrator-wide workflow lists.
+    if (n8nUser.disabled) {
+      return { n8nUser, accessibleProjectIds: [], projects: [], workflows: [] };
     }
-    async loadWorkflowRows(workflowId) {
-        return await this.sharedWorkflowRepository.findRowsByWorkflowId(workflowId);
+    const [personalProject, accessibleProjectIds] = await Promise.all([
+      this.n8nRepositories.project.getPersonalProjectForUser(n8nUser.id),
+      (0, project_access_1.listProjectIdsAccessibleToUser)(
+        this.n8nRepositories.project,
+        this.n8nRepositories.projectRelation,
+        n8nUser.id,
+      ),
+    ]);
+    const projects = await this.loadAccessibleProjects(accessibleProjectIds);
+    const workflowRows = canViewAllWorkflows(n8nUser.role?.slug)
+      ? await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds()
+      : await this.loadVisibleWorkflowRows(accessibleProjectIds);
+    const projectEmailMap = await this.loadProjectEmailMap(workflowRows, personalProject?.id, n8nUser.email);
+    return {
+      n8nUser,
+      accessibleProjectIds,
+      projects,
+      workflows: (0, ui_workflows_1.buildWorkflowSummaries)(workflowRows, projectEmailMap),
+    };
+  }
+  async loadWorkflowRows(workflowId) {
+    return await this.sharedWorkflowRepository.findRowsByWorkflowId(workflowId);
+  }
+  async loadVisibleWorkflowRows(accessibleProjectIds) {
+    const visibleWorkflowRows = await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds(accessibleProjectIds);
+    const workflowIds = [...new Set(visibleWorkflowRows.map((row) => row.workflowId))];
+    if (!workflowIds.length) {
+      return [];
     }
-    async loadVisibleWorkflowRows(accessibleProjectIds) {
-        const visibleWorkflowRows = await this.sharedWorkflowRepository.findWorkflowRowsByProjectIds(accessibleProjectIds);
-        const workflowIds = [...new Set(visibleWorkflowRows.map((row) => row.workflowId))];
-        if (!workflowIds.length) {
-            return [];
-        }
-        return await this.sharedWorkflowRepository.findRowsByWorkflowIds(workflowIds);
+    return await this.sharedWorkflowRepository.findRowsByWorkflowIds(workflowIds);
+  }
+  async loadAccessibleProjects(projectIds) {
+    const projects = await Promise.all(
+      projectIds.map(async (projectId) => await this.n8nRepositories.project.findOneBy({ id: projectId })),
+    );
+    return projects.filter((project) => project !== null);
+  }
+  async loadProjectEmailMap(workflowRows, personalProjectId, userEmail) {
+    const workflowProjectIds = [...new Set(workflowRows.map((row) => row.projectId))];
+    const projectEmailRows = workflowProjectIds.length
+      ? await this.projectRelationRepository.listUserEmailsByProjectIds(workflowProjectIds)
+      : [];
+    const projectEmailMap = new Map();
+    for (const row of projectEmailRows) {
+      const projectId = String(row.projectId);
+      const emailValue = String(row.email);
+      if (!projectEmailMap.has(projectId)) projectEmailMap.set(projectId, new Set());
+      projectEmailMap.get(projectId)?.add(emailValue);
     }
-    async loadAccessibleProjects(projectIds) {
-        const projects = await Promise.all(projectIds.map(async (projectId) => await this.n8nRepositories.project.findOneBy({ id: projectId })));
-        return projects.filter((project) => project !== null);
+    if (personalProjectId) {
+      if (!projectEmailMap.has(personalProjectId)) projectEmailMap.set(personalProjectId, new Set());
+      projectEmailMap.get(personalProjectId)?.add(userEmail);
     }
-    async loadProjectEmailMap(workflowRows, personalProjectId, userEmail) {
-        const workflowProjectIds = [...new Set(workflowRows.map((row) => row.projectId))];
-        const projectEmailRows = workflowProjectIds.length
-            ? await this.projectRelationRepository.listUserEmailsByProjectIds(workflowProjectIds)
-            : [];
-        const projectEmailMap = new Map();
-        for (const row of projectEmailRows) {
-            const projectId = String(row.projectId);
-            const emailValue = String(row.email);
-            if (!projectEmailMap.has(projectId))
-                projectEmailMap.set(projectId, new Set());
-            projectEmailMap.get(projectId)?.add(emailValue);
-        }
-        if (personalProjectId) {
-            if (!projectEmailMap.has(personalProjectId))
-                projectEmailMap.set(personalProjectId, new Set());
-            projectEmailMap.get(personalProjectId)?.add(userEmail);
-        }
-        return projectEmailMap;
-    }
+    return projectEmailMap;
+  }
 }
 exports.UiWorkflowQueryService = UiWorkflowQueryService;

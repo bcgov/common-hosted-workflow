@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.setRedisClientForTests = setRedisClientForTests;
 exports.clearRedisClientForTests = clearRedisClientForTests;
 exports.setRedisClientPromiseForTests = setRedisClientPromiseForTests;
@@ -31,30 +31,28 @@ exports.setUiTenantGroups = setUiTenantGroups;
 exports.getUiTenantGroups = getUiTenantGroups;
 exports.deleteUiTenantGroups = deleteUiTenantGroups;
 exports.getUiOidcAccessTokenByEmail = getUiOidcAccessTokenByEmail;
-const crypto_1 = require("crypto");
-const redis_1 = require("redis");
-const _config_1 = require("@config");
-const logger_1 = require("../utils/logger");
+const crypto_1 = require('crypto');
+const redis_1 = require('redis');
+const _config_1 = require('@config');
+const logger_1 = require('../utils/logger');
 const storeLog = (0, logger_1.createLogger)('UiOidcStore');
 const REFRESH_TOKEN_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ID_TOKEN_DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const TENANT_ROLES_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 const TENANT_GROUPS_DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 function extractJwtExpiryMs(token) {
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 3)
-            return undefined;
-        let base64 = parts[1].replaceAll('-', '+').replaceAll('_', '/');
-        while (base64.length % 4) {
-            base64 += '=';
-        }
-        const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
-        return typeof payload.exp === 'number' ? payload.exp * 1000 : undefined;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return undefined;
+    let base64 = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+    while (base64.length % 4) {
+      base64 += '=';
     }
-    catch {
-        return undefined;
-    }
+    const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : undefined;
+  } catch {
+    return undefined;
+  }
 }
 let redisClientPromise = null;
 // Smallest injectable store boundary — tests can inject a fake client
@@ -63,67 +61,64 @@ let redisClientPromise = null;
 // and real Redis when UI_OIDC_REDIS_URL points at a real instance.
 let redisClientOverride = null;
 function setRedisClientForTests(client) {
-    redisClientOverride = Promise.resolve(client);
+  redisClientOverride = Promise.resolve(client);
 }
 function clearRedisClientForTests() {
-    redisClientOverride = null;
-    redisClientPromise = null;
+  redisClientOverride = null;
+  redisClientPromise = null;
 }
 function setRedisClientPromiseForTests(promise) {
-    redisClientOverride = promise;
+  redisClientOverride = promise;
 }
 // Runtime validation for persisted JSON — fail closed on malformed.
 function isNonEmptyString(v) {
-    return typeof v === 'string' && v.length > 0;
+  return typeof v === 'string' && v.length > 0;
 }
 function isValidUiSessionExchangeRecord(v) {
-    return typeof v === 'object' && v !== null && 'token' in v && isNonEmptyString(v.token);
+  return typeof v === 'object' && v !== null && 'token' in v && isNonEmptyString(v.token);
 }
 function isValidUiLogoutHandleRecord(v) {
-    if (typeof v !== 'object' || v === null)
-        return false;
-    const r = v;
-    return isNonEmptyString(r.email) && String(r.email).includes('@') && typeof r.returnTo === 'string';
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v;
+  return isNonEmptyString(r.email) && String(r.email).includes('@') && typeof r.returnTo === 'string';
 }
 function isValidRefreshTokenRecord(v) {
-    if (typeof v !== 'object' || v === null)
-        return false;
-    const r = v;
-    if (!isNonEmptyString(r.token))
-        return false;
-    if ('expiresAt' in r && r.expiresAt !== undefined && typeof r.expiresAt !== 'number')
-        return false;
-    return true;
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v;
+  if (!isNonEmptyString(r.token)) return false;
+  if ('expiresAt' in r && r.expiresAt !== undefined && typeof r.expiresAt !== 'number') return false;
+  return true;
 }
 function isValidAccessTokenRecord(v) {
-    if (typeof v !== 'object' || v === null)
-        return false;
-    const r = v;
-    if (!isNonEmptyString(r.email))
-        return false;
-    if ('expiresAt' in r && r.expiresAt !== undefined && typeof r.expiresAt !== 'number')
-        return false;
-    return true;
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v;
+  if (!isNonEmptyString(r.email)) return false;
+  if ('expiresAt' in r && r.expiresAt !== undefined && typeof r.expiresAt !== 'number') return false;
+  return true;
 }
 function isValidTenantRoleArray(v) {
-    if (!Array.isArray(v))
-        return false;
-    return v.every((e) => typeof e === 'object' &&
-        e !== null &&
-        isNonEmptyString(e.tenantId) &&
-        typeof e.tenantName === 'string' &&
-        Array.isArray(e.roles) &&
-        e.roles.every((r) => typeof r === 'string'));
+  if (!Array.isArray(v)) return false;
+  return v.every(
+    (e) =>
+      typeof e === 'object' &&
+      e !== null &&
+      isNonEmptyString(e.tenantId) &&
+      typeof e.tenantName === 'string' &&
+      Array.isArray(e.roles) &&
+      e.roles.every((r) => typeof r === 'string'),
+  );
 }
 function isValidTenantGroupArray(v) {
-    if (!Array.isArray(v))
-        return false;
-    return v.every((e) => typeof e === 'object' &&
-        e !== null &&
-        isNonEmptyString(e.tenantId) &&
-        typeof e.tenantName === 'string' &&
-        Array.isArray(e.groups) &&
-        e.groups.every((r) => typeof r === 'string'));
+  if (!Array.isArray(v)) return false;
+  return v.every(
+    (e) =>
+      typeof e === 'object' &&
+      e !== null &&
+      isNonEmptyString(e.tenantId) &&
+      typeof e.tenantName === 'string' &&
+      Array.isArray(e.groups) &&
+      e.groups.every((r) => typeof r === 'string'),
+  );
 }
 /**
  * Per-email in-process mutex for store mutations.
@@ -137,26 +132,27 @@ function isValidTenantGroupArray(v) {
  */
 const perEmailStoreLocks = new Map();
 async function withPerEmailStoreLock(email, fn) {
-    const key = normalizeUiIdentityEmail(email);
-    const prev = perEmailStoreLocks.get(key) ?? Promise.resolve();
-    let release;
-    const next = new Promise((r) => (release = r));
-    perEmailStoreLocks.set(key, prev.then(() => next));
-    await prev;
-    try {
-        return await fn();
-    }
-    finally {
-        release();
-        if (perEmailStoreLocks.get(key) === next)
-            perEmailStoreLocks.delete(key);
-    }
+  const key = normalizeUiIdentityEmail(email);
+  const prev = perEmailStoreLocks.get(key) ?? Promise.resolve();
+  let release;
+  const next = new Promise((r) => (release = r));
+  perEmailStoreLocks.set(
+    key,
+    prev.then(() => next),
+  );
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (perEmailStoreLocks.get(key) === next) perEmailStoreLocks.delete(key);
+  }
 }
 function clearPerEmailStoreLocksForTests() {
-    perEmailStoreLocks.clear();
+  perEmailStoreLocks.clear();
 }
 function getSessionExchangeKey(sessionHandle) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}session:${sessionHandle}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}session:${sessionHandle}`;
 }
 /**
  * Normalize an identity email before it is used as (part of) a Redis key so
@@ -164,69 +160,66 @@ function getSessionExchangeKey(sessionHandle) {
  * surrounding whitespace.
  */
 function normalizeUiIdentityEmail(email) {
-    return email.trim().toLowerCase();
+  return email.trim().toLowerCase();
 }
 function getRefreshTokenKey(email) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}reftoken:${normalizeUiIdentityEmail(email)}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}reftoken:${normalizeUiIdentityEmail(email)}`;
 }
 function getIdTokenKey(email) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}idtoken:${normalizeUiIdentityEmail(email)}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}idtoken:${normalizeUiIdentityEmail(email)}`;
 }
 function getAccessTokenByEmailKey(email) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}acctoken:${normalizeUiIdentityEmail(email)}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}acctoken:${normalizeUiIdentityEmail(email)}`;
 }
 function getAccessTokenRecordKey(token) {
-    const digest = (0, crypto_1.createHash)('sha256').update(token).digest('hex');
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}tokenemail:${digest}`;
+  const digest = (0, crypto_1.createHash)('sha256').update(token).digest('hex');
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}tokenemail:${digest}`;
 }
 function getTenantRolesKey(email) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}tenantroles:${normalizeUiIdentityEmail(email)}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}tenantroles:${normalizeUiIdentityEmail(email)}`;
 }
 function getTenantGroupsKey(email) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}tenantgroups:${normalizeUiIdentityEmail(email)}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}tenantgroups:${normalizeUiIdentityEmail(email)}`;
 }
 function getSessionIssueIdKey(email) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}sessionissue:${normalizeUiIdentityEmail(email)}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}sessionissue:${normalizeUiIdentityEmail(email)}`;
 }
 function getLogoutHandleKey(handle) {
-    return `${_config_1.UI_OIDC_REDIS_PREFIX}logout:${handle}`;
+  return `${_config_1.UI_OIDC_REDIS_PREFIX}logout:${handle}`;
 }
 async function getRedisClient() {
-    if (redisClientOverride)
-        return redisClientOverride;
-    if (!redisClientPromise) {
-        const client = (0, redis_1.createClient)({
-            url: _config_1.UI_OIDC_REDIS_URL,
-            ...(_config_1.UI_OIDC_REDIS_PASSWORD ? { password: _config_1.UI_OIDC_REDIS_PASSWORD } : {}),
-        });
-        client.on('error', () => { });
-        redisClientPromise = client.connect().then(() => client);
-    }
-    return redisClientPromise;
+  if (redisClientOverride) return redisClientOverride;
+  if (!redisClientPromise) {
+    const client = (0, redis_1.createClient)({
+      url: _config_1.UI_OIDC_REDIS_URL,
+      ...(_config_1.UI_OIDC_REDIS_PASSWORD ? { password: _config_1.UI_OIDC_REDIS_PASSWORD } : {}),
+    });
+    client.on('error', () => {});
+    redisClientPromise = client.connect().then(() => client);
+  }
+  return redisClientPromise;
 }
 async function setUiSessionExchange(sessionHandle, token, ttlMs) {
-    const client = await getRedisClient();
-    await client.set(getSessionExchangeKey(sessionHandle), JSON.stringify({ token }), {
-        PX: ttlMs,
-    });
+  const client = await getRedisClient();
+  await client.set(getSessionExchangeKey(sessionHandle), JSON.stringify({ token }), {
+    PX: ttlMs,
+  });
 }
 async function consumeUiSessionExchange(sessionHandle) {
-    const client = await getRedisClient();
-    const raw = await client.getDel(getSessionExchangeKey(sessionHandle));
-    if (!raw)
-        return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (!isValidUiSessionExchangeRecord(parsed)) {
-            storeLog.warn('Malformed UiSessionExchangeRecord, failing closed', { sessionHandle });
-            return null;
-        }
-        return parsed;
+  const client = await getRedisClient();
+  const raw = await client.getDel(getSessionExchangeKey(sessionHandle));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isValidUiSessionExchangeRecord(parsed)) {
+      storeLog.warn('Malformed UiSessionExchangeRecord, failing closed', { sessionHandle });
+      return null;
     }
-    catch {
-        storeLog.warn('Invalid JSON UiSessionExchangeRecord, failing closed', { sessionHandle });
-        return null;
-    }
+    return parsed;
+  } catch {
+    storeLog.warn('Invalid JSON UiSessionExchangeRecord, failing closed', { sessionHandle });
+    return null;
+  }
 }
 /**
  * Idempotent delete of a session exchange handle. Used for compensating
@@ -235,32 +228,30 @@ async function consumeUiSessionExchange(sessionHandle) {
  * must not mask the original issuance error.
  */
 async function deleteUiSessionExchange(sessionHandle) {
-    const client = await getRedisClient();
-    await client.del(getSessionExchangeKey(sessionHandle));
+  const client = await getRedisClient();
+  await client.del(getSessionExchangeKey(sessionHandle));
 }
 async function setUiLogoutHandle(handle, record, ttlMs) {
-    const client = await getRedisClient();
-    const normalized = { ...record, email: normalizeUiIdentityEmail(record.email) };
-    await client.set(getLogoutHandleKey(handle), JSON.stringify(normalized), { PX: ttlMs });
+  const client = await getRedisClient();
+  const normalized = { ...record, email: normalizeUiIdentityEmail(record.email) };
+  await client.set(getLogoutHandleKey(handle), JSON.stringify(normalized), { PX: ttlMs });
 }
 /** Atomically read-and-delete a logout handle so it can only be used once. */
 async function consumeUiLogoutHandle(handle) {
-    const client = await getRedisClient();
-    const raw = await client.getDel(getLogoutHandleKey(handle));
-    if (!raw)
-        return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (!isValidUiLogoutHandleRecord(parsed)) {
-            storeLog.warn('Malformed UiLogoutHandleRecord, failing closed', { handle });
-            return null;
-        }
-        return { email: normalizeUiIdentityEmail(parsed.email), returnTo: parsed.returnTo };
+  const client = await getRedisClient();
+  const raw = await client.getDel(getLogoutHandleKey(handle));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isValidUiLogoutHandleRecord(parsed)) {
+      storeLog.warn('Malformed UiLogoutHandleRecord, failing closed', { handle });
+      return null;
     }
-    catch {
-        storeLog.warn('Invalid JSON UiLogoutHandleRecord, failing closed', { handle });
-        return null;
-    }
+    return { email: normalizeUiIdentityEmail(parsed.email), returnTo: parsed.returnTo };
+  } catch {
+    storeLog.warn('Invalid JSON UiLogoutHandleRecord, failing closed', { handle });
+    return null;
+  }
 }
 /**
  * Store the per-session issue identifier for an email. In separate-JWT mode
@@ -269,13 +260,13 @@ async function consumeUiLogoutHandle(handle) {
  * makes UI sessions server-revocable at logout.
  */
 async function setUiSessionIssueId(email, sessionId, ttlMs) {
-    const client = await getRedisClient();
-    const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
-    await client.set(getSessionIssueIdKey(email), sessionId, { PX: effectiveTtl });
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  await client.set(getSessionIssueIdKey(email), sessionId, { PX: effectiveTtl });
 }
 async function getUiSessionIssueId(email) {
-    const client = await getRedisClient();
-    return await client.get(getSessionIssueIdKey(email));
+  const client = await getRedisClient();
+  return await client.get(getSessionIssueIdKey(email));
 }
 /**
  * Idempotent delete of the per-email session issue id. DEL is idempotent;
@@ -284,87 +275,82 @@ async function getUiSessionIssueId(email) {
  * issuance (handle or n8n token) failed.
  */
 async function deleteUiSessionIssueId(email) {
-    const client = await getRedisClient();
-    await client.del(getSessionIssueIdKey(email));
+  const client = await getRedisClient();
+  await client.del(getSessionIssueIdKey(email));
 }
 async function setUiOidcRefreshToken(email, refreshToken, ttlMs) {
-    const client = await getRedisClient();
-    const requestedTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
-    const effectiveTtl = Math.min(Math.max(requestedTtl, 1), REFRESH_TOKEN_MAX_TTL_MS);
-    await client.set(getRefreshTokenKey(email), refreshToken, { PX: effectiveTtl });
+  const client = await getRedisClient();
+  const requestedTtl = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+  const effectiveTtl = Math.min(Math.max(requestedTtl, 1), REFRESH_TOKEN_MAX_TTL_MS);
+  await client.set(getRefreshTokenKey(email), refreshToken, { PX: effectiveTtl });
 }
 async function setUiOidcRefreshTokenWithExpiry(email, refreshToken, expiresAt, ttlMs) {
-    const client = await getRedisClient();
-    let effectiveTtl;
-    if (typeof expiresAt === 'number') {
-        const remainingMs = expiresAt - Date.now();
-        const cappedRemaining = Math.min(remainingMs, REFRESH_TOKEN_MAX_TTL_MS);
-        // Remaining validity may be negative if already expired — expire quickly
-        const safeRemaining = Math.max(cappedRemaining, 1);
-        const requested = ttlMs ?? safeRemaining;
-        effectiveTtl = Math.min(requested, safeRemaining, REFRESH_TOKEN_MAX_TTL_MS);
-    }
-    else {
-        const requested = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
-        effectiveTtl = Math.min(Math.max(requested, 1), REFRESH_TOKEN_MAX_TTL_MS);
-    }
-    const record = { token: refreshToken, expiresAt };
-    await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
+  const client = await getRedisClient();
+  let effectiveTtl;
+  if (typeof expiresAt === 'number') {
+    const remainingMs = expiresAt - Date.now();
+    const cappedRemaining = Math.min(remainingMs, REFRESH_TOKEN_MAX_TTL_MS);
+    // Remaining validity may be negative if already expired — expire quickly
+    const safeRemaining = Math.max(cappedRemaining, 1);
+    const requested = ttlMs ?? safeRemaining;
+    effectiveTtl = Math.min(requested, safeRemaining, REFRESH_TOKEN_MAX_TTL_MS);
+  } else {
+    const requested = ttlMs ?? REFRESH_TOKEN_MAX_TTL_MS;
+    effectiveTtl = Math.min(Math.max(requested, 1), REFRESH_TOKEN_MAX_TTL_MS);
+  }
+  const record = { token: refreshToken, expiresAt };
+  await client.set(getRefreshTokenKey(email), JSON.stringify(record), { PX: effectiveTtl });
 }
 async function getUiOidcRefreshTokenRecord(email) {
-    const client = await getRedisClient();
-    const raw = await client.get(getRefreshTokenKey(email));
-    if (!raw)
+  const client = await getRedisClient();
+  const raw = await client.get(getRefreshTokenKey(email));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'string') {
+      if (!isNonEmptyString(parsed)) {
+        storeLog.warn('Malformed RefreshTokenRecord string, failing closed', {
+          email: normalizeUiIdentityEmail(email),
+        });
         return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (typeof parsed === 'string') {
-            if (!isNonEmptyString(parsed)) {
-                storeLog.warn('Malformed RefreshTokenRecord string, failing closed', {
-                    email: normalizeUiIdentityEmail(email),
-                });
-                return null;
-            }
-            return { token: parsed };
-        }
-        if (!isValidRefreshTokenRecord(parsed)) {
-            storeLog.warn('Malformed RefreshTokenRecord, failing closed', { email: normalizeUiIdentityEmail(email) });
-            return null;
-        }
-        return parsed;
+      }
+      return { token: parsed };
     }
-    catch {
-        // raw is not JSON — treat as legacy plain token string; validate non-empty
-        if (!isNonEmptyString(raw)) {
-            storeLog.warn('Malformed legacy refresh token, failing closed', { email: normalizeUiIdentityEmail(email) });
-            return null;
-        }
-        // Legacy format: plain token string without JSON wrapper — accept but warn
-        return { token: raw };
+    if (!isValidRefreshTokenRecord(parsed)) {
+      storeLog.warn('Malformed RefreshTokenRecord, failing closed', { email: normalizeUiIdentityEmail(email) });
+      return null;
     }
+    return parsed;
+  } catch {
+    // raw is not JSON — treat as legacy plain token string; validate non-empty
+    if (!isNonEmptyString(raw)) {
+      storeLog.warn('Malformed legacy refresh token, failing closed', { email: normalizeUiIdentityEmail(email) });
+      return null;
+    }
+    // Legacy format: plain token string without JSON wrapper — accept but warn
+    return { token: raw };
+  }
 }
 async function getUiOidcRefreshToken(email) {
-    const record = await getUiOidcRefreshTokenRecord(email);
-    return record?.token ?? null;
+  const record = await getUiOidcRefreshTokenRecord(email);
+  return record?.token ?? null;
 }
 async function isRefreshTokenExpiredByEmail(email) {
-    const record = await getUiOidcRefreshTokenRecord(email);
-    if (!record)
-        return true;
-    if (!record.expiresAt)
-        return false;
-    return Date.now() > record.expiresAt;
+  const record = await getUiOidcRefreshTokenRecord(email);
+  if (!record) return true;
+  if (!record.expiresAt) return false;
+  return Date.now() > record.expiresAt;
 }
 async function setUiOidcIdToken(email, idToken, ttlMs) {
-    const client = await getRedisClient();
-    const tokenExpiryMs = extractJwtExpiryMs(idToken);
-    const now = Date.now();
-    const effectiveTtl = ttlMs ?? (tokenExpiryMs ? Math.max(tokenExpiryMs - now, 60_000) : ID_TOKEN_DEFAULT_TTL_MS);
-    await client.set(getIdTokenKey(email), idToken, { PX: effectiveTtl });
+  const client = await getRedisClient();
+  const tokenExpiryMs = extractJwtExpiryMs(idToken);
+  const now = Date.now();
+  const effectiveTtl = ttlMs ?? (tokenExpiryMs ? Math.max(tokenExpiryMs - now, 60_000) : ID_TOKEN_DEFAULT_TTL_MS);
+  await client.set(getIdTokenKey(email), idToken, { PX: effectiveTtl });
 }
 async function getUiOidcIdToken(email) {
-    const client = await getRedisClient();
-    return await client.get(getIdTokenKey(email));
+  const client = await getRedisClient();
+  return await client.get(getIdTokenKey(email));
 }
 /**
  * Atomic forward/reverse replacement.
@@ -413,72 +399,69 @@ end
 return 1
 `;
 async function setUiOidcAccessTokenRecord(email, accessToken, expiresAt) {
-    return withPerEmailStoreLock(email, async () => {
-        const client = await getRedisClient();
-        const forwardKey = getAccessTokenByEmailKey(email);
-        const newReverseKey = getAccessTokenRecordKey(accessToken);
-        const ttlMs = expiresAt ? Math.max(expiresAt - Date.now() + 5 * 60 * 1000, 5 * 60 * 1000) : undefined;
-        const payload = JSON.stringify({ email: normalizeUiIdentityEmail(email), expiresAt });
-        const ttlArg = ttlMs ? String(ttlMs) : '';
-        const previousToken = await client.get(forwardKey);
-        const oldReverseKey = previousToken ? getAccessTokenRecordKey(previousToken) : forwardKey; // dummy when no prev, Lua ignores DEL when expectedPrev==""
-        const expectedPrev = previousToken ?? '';
-        // Try Lua atomic path if client supports eval
-        const maybeEval = client.eval;
-        if (typeof maybeEval === 'function') {
-            try {
-                const res = await client.eval(SET_ACCESS_TOKEN_LUA, {
-                    keys: [forwardKey, oldReverseKey, newReverseKey],
-                    arguments: [accessToken, payload, ttlArg, expectedPrev],
-                });
-                if (res === 0) {
-                    // Stale writer: forward moved since snapshot, fail closed without deleting newer state
-                    return;
-                }
-                return;
-            }
-            catch {
-                // Fall through to conditional fallback
-            }
+  return withPerEmailStoreLock(email, async () => {
+    const client = await getRedisClient();
+    const forwardKey = getAccessTokenByEmailKey(email);
+    const newReverseKey = getAccessTokenRecordKey(accessToken);
+    const ttlMs = expiresAt ? Math.max(expiresAt - Date.now() + 5 * 60 * 1000, 5 * 60 * 1000) : undefined;
+    const payload = JSON.stringify({ email: normalizeUiIdentityEmail(email), expiresAt });
+    const ttlArg = ttlMs ? String(ttlMs) : '';
+    const previousToken = await client.get(forwardKey);
+    const oldReverseKey = previousToken ? getAccessTokenRecordKey(previousToken) : forwardKey; // dummy when no prev, Lua ignores DEL when expectedPrev==""
+    const expectedPrev = previousToken ?? '';
+    // Try Lua atomic path if client supports eval
+    const maybeEval = client.eval;
+    if (typeof maybeEval === 'function') {
+      try {
+        const res = await client.eval(SET_ACCESS_TOKEN_LUA, {
+          keys: [forwardKey, oldReverseKey, newReverseKey],
+          arguments: [accessToken, payload, ttlArg, expectedPrev],
+        });
+        if (res === 0) {
+          // Stale writer: forward moved since snapshot, fail closed without deleting newer state
+          return;
         }
-        // Fallback: conditional check to prevent deleting newer mapping, fail closed on mismatch
-        if (previousToken) {
-            const currentBeforeDel = await client.get(forwardKey);
-            if (currentBeforeDel !== previousToken) {
-                return;
-            }
-            await client.del(getAccessTokenRecordKey(previousToken));
-            // Re-check before overwriting forward to avoid resurrecting stale token
-            const currentBeforeSet = await client.get(forwardKey);
-            if (currentBeforeSet !== previousToken) {
-                return;
-            }
-        }
-        await client.set(forwardKey, accessToken);
-        if (ttlMs) {
-            await client.set(newReverseKey, payload, { PX: ttlMs });
-            return;
-        }
-        await client.set(newReverseKey, payload);
-    });
+        return;
+      } catch {
+        // Fall through to conditional fallback
+      }
+    }
+    // Fallback: conditional check to prevent deleting newer mapping, fail closed on mismatch
+    if (previousToken) {
+      const currentBeforeDel = await client.get(forwardKey);
+      if (currentBeforeDel !== previousToken) {
+        return;
+      }
+      await client.del(getAccessTokenRecordKey(previousToken));
+      // Re-check before overwriting forward to avoid resurrecting stale token
+      const currentBeforeSet = await client.get(forwardKey);
+      if (currentBeforeSet !== previousToken) {
+        return;
+      }
+    }
+    await client.set(forwardKey, accessToken);
+    if (ttlMs) {
+      await client.set(newReverseKey, payload, { PX: ttlMs });
+      return;
+    }
+    await client.set(newReverseKey, payload);
+  });
 }
 async function getUiOidcAccessTokenRecord(accessToken) {
-    const client = await getRedisClient();
-    const raw = await client.get(getAccessTokenRecordKey(accessToken));
-    if (!raw)
-        return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (!isValidAccessTokenRecord(parsed)) {
-            storeLog.warn('Malformed AccessTokenRecord, failing closed', {});
-            return null;
-        }
-        return parsed;
+  const client = await getRedisClient();
+  const raw = await client.get(getAccessTokenRecordKey(accessToken));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isValidAccessTokenRecord(parsed)) {
+      storeLog.warn('Malformed AccessTokenRecord, failing closed', {});
+      return null;
     }
-    catch {
-        storeLog.warn('Invalid JSON AccessTokenRecord, failing closed', {});
-        return null;
-    }
+    return parsed;
+  } catch {
+    storeLog.warn('Invalid JSON AccessTokenRecord, failing closed', {});
+    return null;
+  }
 }
 /**
  * Race-safe logout delete.
@@ -495,65 +478,61 @@ async function getUiOidcAccessTokenRecord(accessToken) {
  * forward was deleted but before reverse was set (see set's fallback order).
  */
 async function deleteUiOidcTokens(email) {
-    return withPerEmailStoreLock(email, async () => {
-        const client = await getRedisClient();
-        const forwardKey = getAccessTokenByEmailKey(email);
-        const normalized = normalizeUiIdentityEmail(email);
-        for (let attempt = 0; attempt < 3; attempt++) {
-            const currentAccessToken = await client.get(forwardKey);
-            const keys = [
-                getRefreshTokenKey(email),
-                getIdTokenKey(email),
-                forwardKey,
-                getSessionIssueIdKey(email),
-                getTenantRolesKey(email),
-                getTenantGroupsKey(email),
-            ];
-            if (currentAccessToken) {
-                keys.push(getAccessTokenRecordKey(currentAccessToken));
-            }
-            await client.del(keys);
-            const after = await client.get(forwardKey);
-            if (!after) {
-                if (currentAccessToken) {
-                    const reverseAfter = await client.get(getAccessTokenRecordKey(currentAccessToken));
-                    if (reverseAfter) {
-                        await client.del(getAccessTokenRecordKey(currentAccessToken));
-                    }
-                }
-                // Sweep orphan reverses that may have been created after we deleted forward
-                // but before their reverse was set (fallback sets forward first). In real Redis
-                // this is rare due to Lua atomicity; in the fake we can scan.
-                const maybeKeys = client.keys;
-                if (typeof maybeKeys === 'function') {
-                    try {
-                        const all = await maybeKeys(`${_config_1.UI_OIDC_REDIS_PREFIX}tokenemail:*`);
-                        for (const k of all) {
-                            const raw = await client.get(k);
-                            if (!raw)
-                                continue;
-                            try {
-                                const rec = JSON.parse(raw);
-                                if (rec.email === normalized)
-                                    await client.del(k);
-                            }
-                            catch (_e) {
-                                void 0;
-                            }
-                        }
-                    }
-                    catch (_e) {
-                        void 0;
-                    }
-                }
-                break;
-            }
-            if (attempt === 2) {
-                const lastKeys = [forwardKey, getAccessTokenRecordKey(after)];
-                await client.del(lastKeys);
-            }
+  return withPerEmailStoreLock(email, async () => {
+    const client = await getRedisClient();
+    const forwardKey = getAccessTokenByEmailKey(email);
+    const normalized = normalizeUiIdentityEmail(email);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const currentAccessToken = await client.get(forwardKey);
+      const keys = [
+        getRefreshTokenKey(email),
+        getIdTokenKey(email),
+        forwardKey,
+        getSessionIssueIdKey(email),
+        getTenantRolesKey(email),
+        getTenantGroupsKey(email),
+      ];
+      if (currentAccessToken) {
+        keys.push(getAccessTokenRecordKey(currentAccessToken));
+      }
+      await client.del(keys);
+      const after = await client.get(forwardKey);
+      if (!after) {
+        if (currentAccessToken) {
+          const reverseAfter = await client.get(getAccessTokenRecordKey(currentAccessToken));
+          if (reverseAfter) {
+            await client.del(getAccessTokenRecordKey(currentAccessToken));
+          }
         }
-    });
+        // Sweep orphan reverses that may have been created after we deleted forward
+        // but before their reverse was set (fallback sets forward first). In real Redis
+        // this is rare due to Lua atomicity; in the fake we can scan.
+        const maybeKeys = client.keys;
+        if (typeof maybeKeys === 'function') {
+          try {
+            const all = await maybeKeys(`${_config_1.UI_OIDC_REDIS_PREFIX}tokenemail:*`);
+            for (const k of all) {
+              const raw = await client.get(k);
+              if (!raw) continue;
+              try {
+                const rec = JSON.parse(raw);
+                if (rec.email === normalized) await client.del(k);
+              } catch (_e) {
+                void 0;
+              }
+            }
+          } catch (_e) {
+            void 0;
+          }
+        }
+        break;
+      }
+      if (attempt === 2) {
+        const lastKeys = [forwardKey, getAccessTokenRecordKey(after)];
+        await client.del(lastKeys);
+      }
+    }
+  });
 }
 /**
  * Delete only the OIDC token records (refresh, id, access forward+reverse)
@@ -563,104 +542,96 @@ async function deleteUiOidcTokens(email) {
  * Uses same verify-after-DEL loop as deleteUiOidcTokens for race-safety.
  */
 async function deleteUiOidcTokenRecords(email) {
-    return withPerEmailStoreLock(email, async () => {
-        const client = await getRedisClient();
-        const forwardKey = getAccessTokenByEmailKey(email);
-        const normalized = normalizeUiIdentityEmail(email);
-        for (let attempt = 0; attempt < 3; attempt++) {
-            const currentAccessToken = await client.get(forwardKey);
-            const keys = [getRefreshTokenKey(email), getIdTokenKey(email), forwardKey];
-            if (currentAccessToken) {
-                keys.push(getAccessTokenRecordKey(currentAccessToken));
+  return withPerEmailStoreLock(email, async () => {
+    const client = await getRedisClient();
+    const forwardKey = getAccessTokenByEmailKey(email);
+    const normalized = normalizeUiIdentityEmail(email);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const currentAccessToken = await client.get(forwardKey);
+      const keys = [getRefreshTokenKey(email), getIdTokenKey(email), forwardKey];
+      if (currentAccessToken) {
+        keys.push(getAccessTokenRecordKey(currentAccessToken));
+      }
+      await client.del(keys);
+      const after = await client.get(forwardKey);
+      if (!after) {
+        const maybeKeys = client.keys;
+        if (typeof maybeKeys === 'function') {
+          try {
+            const all = await maybeKeys(`${_config_1.UI_OIDC_REDIS_PREFIX}tokenemail:*`);
+            for (const k of all) {
+              const raw = await client.get(k);
+              if (!raw) continue;
+              try {
+                const rec = JSON.parse(raw);
+                if (rec.email === normalized) await client.del(k);
+              } catch (_e) {
+                void 0;
+              }
             }
-            await client.del(keys);
-            const after = await client.get(forwardKey);
-            if (!after) {
-                const maybeKeys = client.keys;
-                if (typeof maybeKeys === 'function') {
-                    try {
-                        const all = await maybeKeys(`${_config_1.UI_OIDC_REDIS_PREFIX}tokenemail:*`);
-                        for (const k of all) {
-                            const raw = await client.get(k);
-                            if (!raw)
-                                continue;
-                            try {
-                                const rec = JSON.parse(raw);
-                                if (rec.email === normalized)
-                                    await client.del(k);
-                            }
-                            catch (_e) {
-                                void 0;
-                            }
-                        }
-                    }
-                    catch (_e) {
-                        void 0;
-                    }
-                }
-                break;
-            }
-            if (attempt === 2) {
-                await client.del([forwardKey, getAccessTokenRecordKey(after)]);
-            }
+          } catch (_e) {
+            void 0;
+          }
         }
-    });
+        break;
+      }
+      if (attempt === 2) {
+        await client.del([forwardKey, getAccessTokenRecordKey(after)]);
+      }
+    }
+  });
 }
 async function setUiTenantRoles(email, roles, ttlMs) {
-    const client = await getRedisClient();
-    const effectiveTtl = ttlMs ?? TENANT_ROLES_DEFAULT_TTL_MS;
-    await client.set(getTenantRolesKey(email), JSON.stringify(roles), { PX: effectiveTtl });
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? TENANT_ROLES_DEFAULT_TTL_MS;
+  await client.set(getTenantRolesKey(email), JSON.stringify(roles), { PX: effectiveTtl });
 }
 async function getUiTenantRoles(email) {
-    const client = await getRedisClient();
-    const raw = await client.get(getTenantRolesKey(email));
-    if (!raw)
-        return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (!isValidTenantRoleArray(parsed)) {
-            storeLog.warn('Malformed TenantRole array, failing closed', { email: normalizeUiIdentityEmail(email) });
-            return null;
-        }
-        return parsed;
+  const client = await getRedisClient();
+  const raw = await client.get(getTenantRolesKey(email));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isValidTenantRoleArray(parsed)) {
+      storeLog.warn('Malformed TenantRole array, failing closed', { email: normalizeUiIdentityEmail(email) });
+      return null;
     }
-    catch {
-        storeLog.warn('Invalid JSON TenantRole array, failing closed', { email: normalizeUiIdentityEmail(email) });
-        return null;
-    }
+    return parsed;
+  } catch {
+    storeLog.warn('Invalid JSON TenantRole array, failing closed', { email: normalizeUiIdentityEmail(email) });
+    return null;
+  }
 }
 async function deleteUiTenantRoles(email) {
-    const client = await getRedisClient();
-    await client.del(getTenantRolesKey(email));
+  const client = await getRedisClient();
+  await client.del(getTenantRolesKey(email));
 }
 async function setUiTenantGroups(email, groups, ttlMs) {
-    const client = await getRedisClient();
-    const effectiveTtl = ttlMs ?? TENANT_GROUPS_DEFAULT_TTL_MS;
-    await client.set(getTenantGroupsKey(email), JSON.stringify(groups), { PX: effectiveTtl });
+  const client = await getRedisClient();
+  const effectiveTtl = ttlMs ?? TENANT_GROUPS_DEFAULT_TTL_MS;
+  await client.set(getTenantGroupsKey(email), JSON.stringify(groups), { PX: effectiveTtl });
 }
 async function getUiTenantGroups(email) {
-    const client = await getRedisClient();
-    const raw = await client.get(getTenantGroupsKey(email));
-    if (!raw)
-        return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (!isValidTenantGroupArray(parsed)) {
-            storeLog.warn('Malformed TenantGroup array, failing closed', { email: normalizeUiIdentityEmail(email) });
-            return null;
-        }
-        return parsed;
+  const client = await getRedisClient();
+  const raw = await client.get(getTenantGroupsKey(email));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isValidTenantGroupArray(parsed)) {
+      storeLog.warn('Malformed TenantGroup array, failing closed', { email: normalizeUiIdentityEmail(email) });
+      return null;
     }
-    catch {
-        storeLog.warn('Invalid JSON TenantGroup array, failing closed', { email: normalizeUiIdentityEmail(email) });
-        return null;
-    }
+    return parsed;
+  } catch {
+    storeLog.warn('Invalid JSON TenantGroup array, failing closed', { email: normalizeUiIdentityEmail(email) });
+    return null;
+  }
 }
 async function deleteUiTenantGroups(email) {
-    const client = await getRedisClient();
-    await client.del(getTenantGroupsKey(email));
+  const client = await getRedisClient();
+  await client.del(getTenantGroupsKey(email));
 }
 async function getUiOidcAccessTokenByEmail(email) {
-    const client = await getRedisClient();
-    return await client.get(getAccessTokenByEmailKey(email));
+  const client = await getRedisClient();
+  return await client.get(getAccessTokenByEmailKey(email));
 }

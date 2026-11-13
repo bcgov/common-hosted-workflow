@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.messageCreatePathPattern = exports.workflowInteractionInternalPostPathPattern = void 0;
 /**
  * Internal-only POST creates for workflow-interaction layer: messages or action requests.

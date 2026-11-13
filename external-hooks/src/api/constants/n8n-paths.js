@@ -1,6 +1,23 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.N8N_INTERNAL_MODULES = exports.N8N_WORKFLOW_PUBLISHED_DATA_PATH = exports.N8N_ACTIVE_EXECUTIONS_PATH = exports.N8N_WORKFLOW_RUNNER_PATH = exports.N8N_CONFIG_PATH = exports.N8N_WORKFLOW_PATH = exports.N8N_EVENT_SERVICE_PATH = exports.N8N_PROJECT_SERVICE_PATH = exports.N8N_CREDENTIALS_FINDER_SERVICE_PATH = exports.N8N_CREDENTIALS_SERVICE_PATH = exports.N8N_AUTH_SERVICE_PATH = exports.N8N_NODE_MAILER_PATH = exports.N8N_USER_SERVICE_PATH = exports.N8N_JWT_SERVICE_PATH = exports.N8N_CORE_PATH = exports.N8N_DB_PATH = exports.N8N_DI_PATH = void 0;
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
+exports.N8N_INTERNAL_MODULES =
+  exports.N8N_WORKFLOW_PUBLISHED_DATA_PATH =
+  exports.N8N_ACTIVE_EXECUTIONS_PATH =
+  exports.N8N_WORKFLOW_RUNNER_PATH =
+  exports.N8N_CONFIG_PATH =
+  exports.N8N_WORKFLOW_PATH =
+  exports.N8N_EVENT_SERVICE_PATH =
+  exports.N8N_PROJECT_SERVICE_PATH =
+  exports.N8N_CREDENTIALS_FINDER_SERVICE_PATH =
+  exports.N8N_CREDENTIALS_SERVICE_PATH =
+  exports.N8N_AUTH_SERVICE_PATH =
+  exports.N8N_NODE_MAILER_PATH =
+  exports.N8N_USER_SERVICE_PATH =
+  exports.N8N_JWT_SERVICE_PATH =
+  exports.N8N_CORE_PATH =
+  exports.N8N_DB_PATH =
+  exports.N8N_DI_PATH =
+    void 0;
 exports.N8N_DI_PATH = '/usr/local/lib/node_modules/n8n/node_modules/@n8n/di';
 exports.N8N_DB_PATH = '/usr/local/lib/node_modules/n8n/node_modules/@n8n/db';
 // The Cipher/Credentials classes live in the `n8n-core` package (npm name is
@@ -39,32 +56,32 @@ exports.N8N_WORKFLOW_PUBLISHED_DATA_PATH = `${N8N_BACKEND_SERVICES_DIST}/workflo
  * constant appears as a key below.
  */
 exports.N8N_INTERNAL_MODULES = {
-    [exports.N8N_DI_PATH]: ['Container'],
-    [exports.N8N_DB_PATH]: [
-        'withTransaction',
-        'UserRepository',
-        'ProjectRepository',
-        'ProjectRelationRepository',
-        'WorkflowRepository',
-        'SharedWorkflowRepository',
-        'CredentialsRepository',
-        'SharedCredentialsRepository',
-        'ExecutionRepository',
-        'GLOBAL_OWNER_ROLE',
-        'GLOBAL_ADMIN_ROLE',
-    ],
-    [exports.N8N_CORE_PATH]: ['Credentials'],
-    [exports.N8N_JWT_SERVICE_PATH]: ['JwtService'],
-    [exports.N8N_USER_SERVICE_PATH]: ['UserService'],
-    [exports.N8N_NODE_MAILER_PATH]: ['NodeMailer'],
-    [exports.N8N_AUTH_SERVICE_PATH]: ['AuthService'],
-    [exports.N8N_CREDENTIALS_SERVICE_PATH]: ['CredentialsService'],
-    [exports.N8N_CREDENTIALS_FINDER_SERVICE_PATH]: ['CredentialsFinderService'],
-    [exports.N8N_PROJECT_SERVICE_PATH]: ['ProjectService'],
-    [exports.N8N_EVENT_SERVICE_PATH]: ['EventService'],
-    [exports.N8N_WORKFLOW_PATH]: ['createRunExecutionData', 'CREDENTIAL_BLANKING_VALUE'],
-    [exports.N8N_CONFIG_PATH]: ['WorkflowsConfig'],
-    [exports.N8N_WORKFLOW_RUNNER_PATH]: ['WorkflowRunner'],
-    [exports.N8N_ACTIVE_EXECUTIONS_PATH]: ['ActiveExecutions'],
-    [exports.N8N_WORKFLOW_PUBLISHED_DATA_PATH]: ['WorkflowPublishedDataService'],
+  [exports.N8N_DI_PATH]: ['Container'],
+  [exports.N8N_DB_PATH]: [
+    'withTransaction',
+    'UserRepository',
+    'ProjectRepository',
+    'ProjectRelationRepository',
+    'WorkflowRepository',
+    'SharedWorkflowRepository',
+    'CredentialsRepository',
+    'SharedCredentialsRepository',
+    'ExecutionRepository',
+    'GLOBAL_OWNER_ROLE',
+    'GLOBAL_ADMIN_ROLE',
+  ],
+  [exports.N8N_CORE_PATH]: ['Credentials'],
+  [exports.N8N_JWT_SERVICE_PATH]: ['JwtService'],
+  [exports.N8N_USER_SERVICE_PATH]: ['UserService'],
+  [exports.N8N_NODE_MAILER_PATH]: ['NodeMailer'],
+  [exports.N8N_AUTH_SERVICE_PATH]: ['AuthService'],
+  [exports.N8N_CREDENTIALS_SERVICE_PATH]: ['CredentialsService'],
+  [exports.N8N_CREDENTIALS_FINDER_SERVICE_PATH]: ['CredentialsFinderService'],
+  [exports.N8N_PROJECT_SERVICE_PATH]: ['ProjectService'],
+  [exports.N8N_EVENT_SERVICE_PATH]: ['EventService'],
+  [exports.N8N_WORKFLOW_PATH]: ['createRunExecutionData', 'CREDENTIAL_BLANKING_VALUE'],
+  [exports.N8N_CONFIG_PATH]: ['WorkflowsConfig'],
+  [exports.N8N_WORKFLOW_RUNNER_PATH]: ['WorkflowRunner'],
+  [exports.N8N_ACTIVE_EXECUTIONS_PATH]: ['ActiveExecutions'],
+  [exports.N8N_WORKFLOW_PUBLISHED_DATA_PATH]: ['WorkflowPublishedDataService'],
 };

@@ -1,5 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.resolveActorMatchers = resolveActorMatchers;
 /**
  * Resolves actor matchers for the current user session within a specific tenant.
@@ -11,12 +11,12 @@ exports.resolveActorMatchers = resolveActorMatchers;
  * - groupNames: group names the user belongs to in this tenant
  */
 function resolveActorMatchers(session, tenantId) {
-    const tenantRoleEntry = session.tenantRoles.find((tr) => tr.tenantId === tenantId);
-    const tenantGroupEntry = session.tenantGroups.find((tg) => tg.tenantId === tenantId);
-    return {
-        userId: session.email,
-        userFallback: session.subject,
-        roleNames: tenantRoleEntry?.roles ?? [],
-        groupNames: tenantGroupEntry?.groups ?? [],
-    };
+  const tenantRoleEntry = session.tenantRoles.find((tr) => tr.tenantId === tenantId);
+  const tenantGroupEntry = session.tenantGroups.find((tg) => tg.tenantId === tenantId);
+  return {
+    userId: session.email,
+    userFallback: session.subject,
+    roleNames: tenantRoleEntry?.roles ?? [],
+    groupNames: tenantGroupEntry?.groups ?? [],
+  };
 }

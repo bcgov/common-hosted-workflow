@@ -1652,9 +1652,9 @@ describe('ProjectRateLimitService · admin run-request review', () => {
     requestRepo = {
       getById: vi.fn().mockResolvedValue(null),
       listByStatuses: vi.fn().mockResolvedValue([]),
-      approveAsTopup: vi.fn().mockImplementation(async (_id: string, decision: Record<string, unknown>) =>
-        makeDecidedRow(decision),
-      ),
+      approveAsTopup: vi
+        .fn()
+        .mockImplementation(async (_id: string, decision: Record<string, unknown>) => makeDecidedRow(decision)),
       approveAsLimitChange: vi.fn().mockImplementation(async (_id: string, decision: Record<string, unknown>) =>
         makeRunRequestRow({
           requestKind: 'limit_increase',
@@ -1689,7 +1689,10 @@ describe('ProjectRateLimitService · admin run-request review', () => {
 
   describe('listRunRequestsForAdmin', () => {
     it('lists pending requests oldest-first with enrichment and pending stats', async () => {
-      const older = makeRunRequestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', createdAt: new Date('2026-11-01T09:00:00Z') });
+      const older = makeRunRequestRow({
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        createdAt: new Date('2026-11-01T09:00:00Z'),
+      });
       const newer = makeRunRequestRow();
       // The repo returns pending rows oldest-first.
       requestRepo.listByStatuses.mockResolvedValue([older, newer]);
@@ -1746,16 +1749,21 @@ describe('ProjectRateLimitService · admin run-request review', () => {
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         createdAt: new Date('2026-11-01T09:00:00Z'),
       });
-      const newerDecision = makeDecidedRow({ status: 'rejected', decisionNote: 'Not enough quota', decidedAt: new Date('2026-11-12T08:00:00Z') });
+      const newerDecision = makeDecidedRow({
+        status: 'rejected',
+        decisionNote: 'Not enough quota',
+        decidedAt: new Date('2026-11-12T08:00:00Z'),
+      });
       requestRepo.listByStatuses.mockImplementation(async (statuses: string[]) =>
-        statuses.length === 1 && statuses[0] === 'pending'
-          ? []
-          : [olderDecision, newerDecision],
+        statuses.length === 1 && statuses[0] === 'pending' ? [] : [olderDecision, newerDecision],
       );
 
       const page = await service.listRunRequestsForAdmin({ status: 'all', page: 1, pageSize: 25 });
 
-      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['pending', 'approved', 'rejected', 'cancelled'], undefined);
+      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(
+        ['pending', 'approved', 'rejected', 'cancelled'],
+        undefined,
+      );
       expect(page.data.map((item) => item.id)).toEqual([newerDecision.id, olderDecision.id]);
       expect(page.data[0]).toMatchObject({
         status: 'denied',
@@ -1771,9 +1779,24 @@ describe('ProjectRateLimitService · admin run-request review', () => {
       const row = makeRunRequestRow();
       requestRepo.listByStatuses.mockResolvedValue([row]);
 
-      const byProject = await service.listRunRequestsForAdmin({ status: 'pending', search: 'default', page: 1, pageSize: 25 });
-      const byRequester = await service.listRunRequestsForAdmin({ status: 'pending', search: 'jordan', page: 1, pageSize: 25 });
-      const noMatch = await service.listRunRequestsForAdmin({ status: 'pending', search: 'nothing', page: 1, pageSize: 25 });
+      const byProject = await service.listRunRequestsForAdmin({
+        status: 'pending',
+        search: 'default',
+        page: 1,
+        pageSize: 25,
+      });
+      const byRequester = await service.listRunRequestsForAdmin({
+        status: 'pending',
+        search: 'jordan',
+        page: 1,
+        pageSize: 25,
+      });
+      const noMatch = await service.listRunRequestsForAdmin({
+        status: 'pending',
+        search: 'nothing',
+        page: 1,
+        pageSize: 25,
+      });
 
       expect(byProject.data).toHaveLength(1);
       expect(byRequester.data).toHaveLength(1);
@@ -1937,7 +1960,12 @@ describe('ProjectRateLimitService · admin run-request review', () => {
 
       expect(requestRepo.approveAsLimitChange).toHaveBeenCalledWith(
         REQUEST_ID,
-        { decidedWeeklyLimit: 10_000, decidedAnnualLimit: 500_000, decisionNote: 'Backfill quota', decidedBy: ADMIN_EMAIL },
+        {
+          decidedWeeklyLimit: 10_000,
+          decidedAnnualLimit: 500_000,
+          decisionNote: 'Backfill quota',
+          decidedBy: ADMIN_EMAIL,
+        },
         { projectId: VALID_PROJECT_ID, lastAdminComment: 'Backfill quota' },
       );
       expect(item).toMatchObject({
@@ -1988,9 +2016,9 @@ describe('ProjectRateLimitService · admin run-request review', () => {
       });
 
       // Weekly below the default of 4 → refused.
-      await expect(
-        service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 3 }, ADMIN_EMAIL),
-      ).rejects.toMatchObject({ statusCode: 400 });
+      await expect(service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 3 }, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 400,
+      });
 
       // At/above the default and an actual change → allowed.
       await expect(
@@ -2040,7 +2068,9 @@ describe('ProjectRateLimitService · admin run-request review', () => {
     it('throws 404 for an unknown request', async () => {
       requestRepo.getById.mockResolvedValue(null);
 
-      await expect(service.denyRunRequest(REQUEST_ID, { reason: 'A sufficiently long reason here' }, ADMIN_EMAIL)).rejects.toMatchObject({
+      await expect(
+        service.denyRunRequest(REQUEST_ID, { reason: 'A sufficiently long reason here' }, ADMIN_EMAIL),
+      ).rejects.toMatchObject({
         statusCode: 404,
       });
     });
@@ -2078,7 +2108,9 @@ describe('ProjectRateLimitService · admin run-request review', () => {
     it('skips the email when no mailer is configured', async () => {
       requestRepo.getById.mockResolvedValue(makeRunRequestRow());
 
-      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).resolves.toMatchObject({ status: 'approved' });
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).resolves.toMatchObject({
+        status: 'approved',
+      });
     });
   });
 });

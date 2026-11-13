@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 // ---------------------------------------------------------------------------
 // Centralized environment configuration
 //
@@ -6,9 +6,67 @@
 // here (or be derived from values here). This provides a single lookup for all
 // environment variables, their defaults, and processed / derived values.
 // ---------------------------------------------------------------------------
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AUTHZ_CLIENT_ID = exports.AUTHZ_TOKEN_ENDPOINT = exports.AUTHZ_ENVIRONMENT = exports.AUTHZ_INTEGRATION_ID = exports.AUTHZ_SERVICE_URL = exports.CHEFS_ALLOWED_ORIGINS = exports.CHEFS_GATEWAY_URL = exports.CHEFS_BASE_URL = exports.CSTAR_API_BASE_URL = exports.CSTAR_BASE_URL = exports.OIDC_PROVIDER_TIMEOUT_MS = exports.SSO_RESTRICT_NO_ROLE = exports.OIDC_ROLES_CLAIM = exports.OIDC_SCOPES = exports.OIDC_REDIRECT_URI = exports.OIDC_CLIENT_SECRET = exports.OIDC_CLIENT_ID = exports.OIDC_USE_MANUAL_ENDPOINTS = exports.OIDC_END_SESSION_ENDPOINT = exports.OIDC_JWKS_URI = exports.OIDC_USERINFO_ENDPOINT = exports.OIDC_TOKEN_ENDPOINT = exports.OIDC_AUTHORIZATION_ENDPOINT = exports.OIDC_ISSUER = exports.N8N_USER_MANAGEMENT_JWT_SECRET = exports.UI_AUTH_USE_SEPARATE_TOKEN = exports.UI_AUTH_JWT_AUDIENCE = exports.UI_AUTH_JWT_ISSUER = exports.UI_AUTH_JWT_SECRET = exports.UI_OIDC_REDIS_PREFIX = exports.UI_OIDC_REDIS_PASSWORD = exports.UI_OIDC_REDIS_URL = exports.UI_API_BASE_URL = exports.UI_APP_BASE_URL = exports.EXTERNAL_HOOK_ASSETS_PATH = exports.EXTERNAL_UI_ENABLED = exports.EXTERNAL_UI_PATH = exports.FEATURES_ENABLED = exports.ENABLE_SWAGGER_UI = exports.READONLY_MODE = exports.CLUSTER = exports.IS_DEVELOPMENT = exports.IS_PRODUCTION = exports.N8N_BASE_URL = exports.INTERNAL_AUTH_TOKEN = exports.N8N_ENCRYPTION_KEY = exports.N8N_PROTOCOL = exports.CUSTOM_DATABASE_URL = exports.LOG_LEVEL = exports.NODE_ENV = void 0;
-exports.WIL_TRIGGER_NODE_TYPES = exports.WIL_N8N_NODE_TRIGGERS_ENABLED = exports.EXECUTIONS_MODE = exports.RATE_LIMIT_ENFORCEMENT_ENABLED = exports.RATE_LIMIT_TIMEZONE = exports.GRAFANA_PROJECTS_SECRET = exports.OIDC_COOKIE_SECRET_BASE = exports.AUTHZ_CLIENT_SECRET = void 0;
+Object.defineProperty(exports, '__esModule', { value: true });
+exports.AUTHZ_CLIENT_ID =
+  exports.AUTHZ_TOKEN_ENDPOINT =
+  exports.AUTHZ_ENVIRONMENT =
+  exports.AUTHZ_INTEGRATION_ID =
+  exports.AUTHZ_SERVICE_URL =
+  exports.CHEFS_ALLOWED_ORIGINS =
+  exports.CHEFS_GATEWAY_URL =
+  exports.CHEFS_BASE_URL =
+  exports.CSTAR_API_BASE_URL =
+  exports.CSTAR_BASE_URL =
+  exports.OIDC_PROVIDER_TIMEOUT_MS =
+  exports.SSO_RESTRICT_NO_ROLE =
+  exports.OIDC_ROLES_CLAIM =
+  exports.OIDC_SCOPES =
+  exports.OIDC_REDIRECT_URI =
+  exports.OIDC_CLIENT_SECRET =
+  exports.OIDC_CLIENT_ID =
+  exports.OIDC_USE_MANUAL_ENDPOINTS =
+  exports.OIDC_END_SESSION_ENDPOINT =
+  exports.OIDC_JWKS_URI =
+  exports.OIDC_USERINFO_ENDPOINT =
+  exports.OIDC_TOKEN_ENDPOINT =
+  exports.OIDC_AUTHORIZATION_ENDPOINT =
+  exports.OIDC_ISSUER =
+  exports.N8N_USER_MANAGEMENT_JWT_SECRET =
+  exports.UI_AUTH_USE_SEPARATE_TOKEN =
+  exports.UI_AUTH_JWT_AUDIENCE =
+  exports.UI_AUTH_JWT_ISSUER =
+  exports.UI_AUTH_JWT_SECRET =
+  exports.UI_OIDC_REDIS_PREFIX =
+  exports.UI_OIDC_REDIS_PASSWORD =
+  exports.UI_OIDC_REDIS_URL =
+  exports.UI_API_BASE_URL =
+  exports.UI_APP_BASE_URL =
+  exports.EXTERNAL_HOOK_ASSETS_PATH =
+  exports.EXTERNAL_UI_ENABLED =
+  exports.EXTERNAL_UI_PATH =
+  exports.FEATURES_ENABLED =
+  exports.ENABLE_SWAGGER_UI =
+  exports.READONLY_MODE =
+  exports.CLUSTER =
+  exports.IS_DEVELOPMENT =
+  exports.IS_PRODUCTION =
+  exports.N8N_BASE_URL =
+  exports.INTERNAL_AUTH_TOKEN =
+  exports.N8N_ENCRYPTION_KEY =
+  exports.N8N_PROTOCOL =
+  exports.CUSTOM_DATABASE_URL =
+  exports.LOG_LEVEL =
+  exports.NODE_ENV =
+    void 0;
+exports.WIL_TRIGGER_NODE_TYPES =
+  exports.WIL_N8N_NODE_TRIGGERS_ENABLED =
+  exports.EXECUTIONS_MODE =
+  exports.RATE_LIMIT_ENFORCEMENT_ENABLED =
+  exports.RATE_LIMIT_TIMEZONE =
+  exports.GRAFANA_PROJECTS_SECRET =
+  exports.OIDC_COOKIE_SECRET_BASE =
+  exports.AUTHZ_CLIENT_SECRET =
+    void 0;
 // Core / Infrastructure
 exports.NODE_ENV = process.env.NODE_ENV ?? '';
 exports.LOG_LEVEL = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
@@ -82,9 +140,9 @@ exports.CHEFS_GATEWAY_URL = exports.CHEFS_BASE_URL ? `${exports.CHEFS_BASE_URL}/
  * the configured env value — an unvalidated origin here is a stored-XSS hole.
  */
 exports.CHEFS_ALLOWED_ORIGINS = (process.env.CHEFS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 // CSS SSO / AuthZ – all required; missing any disables CSS SSO
 exports.AUTHZ_SERVICE_URL = process.env.AUTHZ_SERVICE_URL || '';
 exports.AUTHZ_INTEGRATION_ID = process.env.AUTHZ_INTEGRATION_ID || '';
@@ -114,6 +172,6 @@ exports.WIL_N8N_NODE_TRIGGERS_ENABLED = (process.env.WIL_N8N_NODE_TRIGGERS_ENABL
  * `community-nodes` for the installed package, so both are accepted. Override with a comma-separated list.
  */
 exports.WIL_TRIGGER_NODE_TYPES = (process.env.WIL_TRIGGER_NODE_TYPES || 'CUSTOM.wilTrigger,community-nodes.wilTrigger')
-    .split(',')
-    .map((type) => type.trim())
-    .filter(Boolean);
+  .split(',')
+  .map((type) => type.trim())
+  .filter(Boolean);

@@ -1266,7 +1266,11 @@ export class ProjectRateLimitService {
       if (requestedWeeklyLimit === null && requestedAnnualLimit === null) {
         throw new AppError(400, 'Propose at least one of requestedWeeklyLimit or requestedAnnualLimit');
       }
-      if (requestedWeeklyLimit !== null && requestedAnnualLimit !== null && requestedAnnualLimit < requestedWeeklyLimit) {
+      if (
+        requestedWeeklyLimit !== null &&
+        requestedAnnualLimit !== null &&
+        requestedAnnualLimit < requestedWeeklyLimit
+      ) {
         throw new AppError(400, 'requestedAnnualLimit must be at least the requestedWeeklyLimit');
       }
     }
@@ -1407,7 +1411,12 @@ export class ProjectRateLimitService {
     if (accessibleIds.length === 0) {
       return {
         data: [],
-        pagination: { page: Math.max(1, Math.floor(query.page)), pageSize: Math.max(1, Math.floor(query.pageSize)), totalItems: 0, totalPages: 1 },
+        pagination: {
+          page: Math.max(1, Math.floor(query.page)),
+          pageSize: Math.max(1, Math.floor(query.pageSize)),
+          totalItems: 0,
+          totalPages: 1,
+        },
         pending: { count: 0, oldestCreatedAt: null },
       };
     }
@@ -1455,7 +1464,9 @@ export class ProjectRateLimitService {
           `Runs to grant must be a whole number between ${RUN_REQUEST_MIN_EXTRA_RUNS} and ${formatRuns(asked)} (the number asked for)`,
         );
       }
-      const requester = (await this.n8nRepositories.user.findByIdWithRole(row.requestedBy)) as RunRequestUserEntity | null;
+      const requester = (await this.n8nRepositories.user.findByIdWithRole(
+        row.requestedBy,
+      )) as RunRequestUserEntity | null;
       const firstName = requester?.firstName?.trim() ?? '';
       const decided = await this.customRepositories.rateLimitRequest.approveAsTopup(
         requestId,
@@ -1512,7 +1523,10 @@ export class ProjectRateLimitService {
         throw new AppError(400, `The new ${label} limit cannot be higher than the ${formatRuns(asked)} asked for`);
       }
       if (current !== null && granted < current) {
-        throw new AppError(400, `The new ${label} limit cannot be lower than the current limit of ${formatRuns(current)}`);
+        throw new AppError(
+          400,
+          `The new ${label} limit cannot be lower than the current limit of ${formatRuns(current)}`,
+        );
       }
     }
     if (newWeekly !== null && newAnnual !== null && newAnnual < newWeekly) {
@@ -1632,7 +1646,9 @@ export class ProjectRateLimitService {
         }
         let requester = requesterCache.get(row.requestedBy);
         if (requester === undefined) {
-          requester = (await this.n8nRepositories.user.findByIdWithRole(row.requestedBy)) as RunRequestUserEntity | null;
+          requester = (await this.n8nRepositories.user.findByIdWithRole(
+            row.requestedBy,
+          )) as RunRequestUserEntity | null;
           requesterCache.set(row.requestedBy, requester);
         }
         const roleKey = `${row.requestedBy}:${row.projectId}`;
@@ -1751,7 +1767,9 @@ export class ProjectRateLimitService {
           log.warn('Project not found when sending the run-request decision email', { requestId: row.id });
           return;
         }
-        const requester = (await this.n8nRepositories.user.findByIdWithRole(row.requestedBy)) as RunRequestUserEntity | null;
+        const requester = (await this.n8nRepositories.user.findByIdWithRole(
+          row.requestedBy,
+        )) as RunRequestUserEntity | null;
         const to = requester?.email?.trim() ?? null;
         if (!to) {
           log.warn('No requester email resolved for the run-request decision email', { requestId: row.id });
@@ -1765,7 +1783,7 @@ export class ProjectRateLimitService {
           html = renderEmail('rateLimitRequestTopupApproved', {
             projectName: context.projectName,
             amount: formatRuns(row.grantedRuns ?? 0),
-            weekDescription: describeWeeklyPeriodKey(row.periodKey ?? '') ?? (row.periodKey ?? ''),
+            weekDescription: describeWeeklyPeriodKey(row.periodKey ?? '') ?? row.periodKey ?? '',
             adminNote: row.decisionNote ?? undefined,
             decidedByName,
             projectUrl: context.projectUrl,

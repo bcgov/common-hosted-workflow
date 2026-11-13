@@ -1,8 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+'use strict';
+Object.defineProperty(exports, '__esModule', { value: true });
 exports.runPostLoginTenantWork = runPostLoginTenantWork;
 exports.runPostLoginTenantWorkAsync = runPostLoginTenantWorkAsync;
-const logger_1 = require("../utils/logger");
+const logger_1 = require('../utils/logger');
 const log = (0, logger_1.createLogger)('PostLoginTenant');
 /**
  * One post-login operation for tenant role/group pre-warming and
@@ -21,47 +21,55 @@ const log = (0, logger_1.createLogger)('PostLoginTenant');
  *   promise resolves after both complete (or log failures).
  */
 async function runPostLoginTenantWork(params) {
-    const { email, ssoUserId, accessToken, n8nUserId, tenantService, tenantProjectSyncService, cstarService, tenants: preFetchedTenants, } = params;
-    if (!accessToken) {
-        log.debug('Post-login tenant work skipped: no access token', { email });
-        return;
+  const {
+    email,
+    ssoUserId,
+    accessToken,
+    n8nUserId,
+    tenantService,
+    tenantProjectSyncService,
+    cstarService,
+    tenants: preFetchedTenants,
+  } = params;
+  if (!accessToken) {
+    log.debug('Post-login tenant work skipped: no access token', { email });
+    return;
+  }
+  if (!cstarService.isConfigured()) {
+    log.debug('Post-login tenant work skipped: CSTAR not configured', { email });
+    return;
+  }
+  let tenants = preFetchedTenants;
+  if (!tenants) {
+    try {
+      tenants = await cstarService.getUserTenants({ ssoUserId, accessToken });
+    } catch (error) {
+      log.error('Tenant post-login: failed to fetch tenants', { email, ssoUserId, error: String(error) });
+      return;
     }
-    if (!cstarService.isConfigured()) {
-        log.debug('Post-login tenant work skipped: CSTAR not configured', { email });
-        return;
-    }
-    let tenants = preFetchedTenants;
-    if (!tenants) {
-        try {
-            tenants = await cstarService.getUserTenants({ ssoUserId, accessToken });
-        }
-        catch (error) {
-            log.error('Tenant post-login: failed to fetch tenants', { email, ssoUserId, error: String(error) });
-            return;
-        }
-    }
-    const results = await Promise.allSettled([
-        tenantService.prewarmTenantRolesAndGroups({ email, ssoUserId, accessToken, tenants }).catch((err) => {
-            // Defensive: prewarm already propagates rejection, but ensure it is captured as settled
-            throw err;
-        }),
-        tenantProjectSyncService.syncTenantsForUser({ ssoUserId, n8nUserId, accessToken, tenants }),
-    ]);
-    const [prewarmResult, syncResult] = results;
-    if (prewarmResult.status === 'rejected') {
-        log.error('Tenant roles pre-warm failed', { email, error: String(prewarmResult.reason) });
-    }
-    if (syncResult.status === 'rejected') {
-        log.error('Tenant project sync failed', { email, error: String(syncResult.reason) });
-    }
+  }
+  const results = await Promise.allSettled([
+    tenantService.prewarmTenantRolesAndGroups({ email, ssoUserId, accessToken, tenants }).catch((err) => {
+      // Defensive: prewarm already propagates rejection, but ensure it is captured as settled
+      throw err;
+    }),
+    tenantProjectSyncService.syncTenantsForUser({ ssoUserId, n8nUserId, accessToken, tenants }),
+  ]);
+  const [prewarmResult, syncResult] = results;
+  if (prewarmResult.status === 'rejected') {
+    log.error('Tenant roles pre-warm failed', { email, error: String(prewarmResult.reason) });
+  }
+  if (syncResult.status === 'rejected') {
+    log.error('Tenant project sync failed', { email, error: String(syncResult.reason) });
+  }
 }
 /**
  * Fire-and-forget wrapper with consistent error logging.
  * Use from login coordinator where tenant work must not block login.
  */
 function runPostLoginTenantWorkAsync(params) {
-    runPostLoginTenantWork(params).catch((err) => {
-        // Should already be logged via settled handling, but catch unexpected throw
-        log.error('Tenant post-login work unexpected failure', { email: params.email, error: String(err) });
-    });
+  runPostLoginTenantWork(params).catch((err) => {
+    // Should already be logged via settled handling, but catch unexpected throw
+    log.error('Tenant post-login work unexpected failure', { email: params.email, error: String(err) });
+  });
 }
