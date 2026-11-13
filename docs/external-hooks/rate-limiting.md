@@ -48,16 +48,18 @@ For the layered architecture these components live in, see [`architecture.md`](.
 | `external-hooks/drizzle/0016_add_project_uses_default_limits.sql`       | Additive-only migration: `project_rate_limit.uses_default_limits` (defaults mode; backfills legacy rows as custom)                                                                                                          |
 | `external-hooks/drizzle/0017_add_rate_limit_notification.sql`           | Additive-only migration: `rate_limit_notification` claim table (send-once notification dedup)                                                                                                                               |
 | `external-hooks/drizzle/0018_add_rate_limit_request.sql`                | Additive-only migration: `rate_limit_request` member request table (one pending request per project via partial unique index)                                                                                               |
+
 <<<<<<< HEAD
-| `external-hooks/drizzle/0019_add_run_request_decision.sql`              | Additive-only migration: decision columns on `rate_limit_request` (`granted_runs`, `decided_weekly_limit`, `decided_annual_limit`, `decision_note`, `decided_by`, `decided_at`) + status/period checks                      |
+| `external-hooks/drizzle/0019_add_run_request_decision.sql` | Additive-only migration: decision columns on `rate_limit_request` (`granted_runs`, `decided_weekly_limit`, `decided_annual_limit`, `decision_note`, `decided_by`, `decided_at`) + status/period checks |
 =======
->>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
-| `external-ui/src/components/projects/manage-topups-dialog.tsx`          | Weekly top-up form, paged history and future-week removal                                                                                                                                                                   |
-| `external-ui/src/components/projects/review-run-request-dialog.tsx`     | Admin review dialog: asked-for details, usage snapshot, approve/deny decision (runs to grant, new limits, optional note, required deny reason), read-only decided view; exports the shared `formatSentAt`/`formatSentStamp` |
-| `external-ui/src/lib/limit-input.ts`                                    | Shared limit parsing/validation for both dialogs (empty input → `null`, annual ≥ weekly, shared bounds)                                                                                                                     |
-| `external-ui/src/components/projects/default-limits-dialog.tsx`         | Default-limits dialog: team/personal weekly + annual inputs; PUT full-replace body                                                                                                                                          |
-| `external-ui/src/lib/rate-limit.ts`                                     | Effective weekly/yearly limits, status/usage calculations and Vancouver week-key/range helpers                                                                                                                              |
-| `helm/_n8n/templates/deployments/worker.yaml`                           | Worker pods receive the custom-database env block                                                                                                                                                                           |
+
+> > > > > > > 47fde43c088815ccf932359bfd3fde9b0356b3f6
+> > > > > > > | `external-ui/src/components/projects/manage-topups-dialog.tsx` | Weekly top-up form, paged history and future-week removal |
+> > > > > > > | `external-ui/src/components/projects/review-run-request-dialog.tsx` | Admin review dialog: asked-for details, usage snapshot, approve/deny decision (runs to grant, new limits, optional note, required deny reason), read-only decided view; exports the shared `formatSentAt`/`formatSentStamp` |
+> > > > > > > | `external-ui/src/lib/limit-input.ts` | Shared limit parsing/validation for both dialogs (empty input → `null`, annual ≥ weekly, shared bounds) |
+> > > > > > > | `external-ui/src/components/projects/default-limits-dialog.tsx` | Default-limits dialog: team/personal weekly + annual inputs; PUT full-replace body |
+> > > > > > > | `external-ui/src/lib/rate-limit.ts` | Effective weekly/yearly limits, status/usage calculations and Vancouver week-key/range helpers |
+> > > > > > > | `helm/_n8n/templates/deployments/worker.yaml` | Worker pods receive the custom-database env block |
 
 ---
 
@@ -176,28 +178,30 @@ The **unique constraint on `(project_id, period_key, event_kind)`** is the whole
 
 ### `rate_limit_request` — member run requests
 
-| Column                    | Type         | Constraints                                                                            | Meaning                                                                           |
-| ------------------------- | ------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `id`                      | uuid         | Primary key, `gen_random_uuid()`                                                       | Request id                                                                        |
-| `project_id`              | varchar(50)  | `NOT NULL`; partial unique index where `status = 'pending'`                            | n8n project id — **at most one pending request per project**                      |
-| `request_kind`            | varchar(30)  | `NOT NULL`; CHECK `IN ('extra_runs','limit_increase')`                                 | One-week top-up ask or lasting limit raise                                        |
-| `extra_runs`              | integer      | nullable; CHECK `≥ 0` (`extra_runs` kind only)                                         | Requested one-off runs (100–50,000, enforced by the service)                      |
-| `period_key`              | varchar(10)  | nullable; CHECK weekly `'YYYY-Www'` format (`extra_runs` kind only)                    | Target week of the extra runs (current week + 8 ahead, enforced by the service)   |
-| `requested_weekly_limit`  | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind)                                          | Proposed weekly limit; `NULL` = leave unchanged                                   |
-| `requested_annual_limit`  | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind)                                          | Proposed annual limit; `NULL` = leave unchanged; ≥ weekly when both set           |
-| `reason`                  | varchar(500) | `NOT NULL`; CHECK `length ≥ 1`                                                         | Free-text justification shown to the reviewing admin                              |
-| `status`                  | varchar(20)  | `NOT NULL DEFAULT 'pending'`; CHECK `IN ('pending','approved','rejected','cancelled')` | Lifecycle; `cancelled` is member-initiated, `approved`/`rejected` admin decisions |
-| `requested_by`            | varchar(36)  | `NOT NULL`                                                                             | n8n user id of the requesting member                                              |
+| Column                   | Type         | Constraints                                                                            | Meaning                                                                           |
+| ------------------------ | ------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `id`                     | uuid         | Primary key, `gen_random_uuid()`                                                       | Request id                                                                        |
+| `project_id`             | varchar(50)  | `NOT NULL`; partial unique index where `status = 'pending'`                            | n8n project id — **at most one pending request per project**                      |
+| `request_kind`           | varchar(30)  | `NOT NULL`; CHECK `IN ('extra_runs','limit_increase')`                                 | One-week top-up ask or lasting limit raise                                        |
+| `extra_runs`             | integer      | nullable; CHECK `≥ 0` (`extra_runs` kind only)                                         | Requested one-off runs (100–50,000, enforced by the service)                      |
+| `period_key`             | varchar(10)  | nullable; CHECK weekly `'YYYY-Www'` format (`extra_runs` kind only)                    | Target week of the extra runs (current week + 8 ahead, enforced by the service)   |
+| `requested_weekly_limit` | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind)                                          | Proposed weekly limit; `NULL` = leave unchanged                                   |
+| `requested_annual_limit` | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind)                                          | Proposed annual limit; `NULL` = leave unchanged; ≥ weekly when both set           |
+| `reason`                 | varchar(500) | `NOT NULL`; CHECK `length ≥ 1`                                                         | Free-text justification shown to the reviewing admin                              |
+| `status`                 | varchar(20)  | `NOT NULL DEFAULT 'pending'`; CHECK `IN ('pending','approved','rejected','cancelled')` | Lifecycle; `cancelled` is member-initiated, `approved`/`rejected` admin decisions |
+| `requested_by`           | varchar(36)  | `NOT NULL`                                                                             | n8n user id of the requesting member                                              |
+
 <<<<<<< HEAD
-| `granted_runs`            | integer      | nullable; CHECK `≥ 1` (`extra_runs` kind, approved)                                    | Runs actually granted (≤ the ask, enforced by the service)                        |
-| `decided_weekly_limit`    | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind, approved)                                | Weekly limit in force after approval; `NULL` = unchanged/not approved             |
-| `decided_annual_limit`    | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind, approved)                                | Annual limit in force after approval; `NULL` = unchanged/not approved             |
-| `decision_note`           | varchar(500) | nullable                                                                               | Admin note on approval, or the deny reason shown to the requester verbatim        |
-| `decided_by`              | varchar(255) | nullable                                                                               | n8n user id of the deciding admin                                                 |
-| `decided_at`              | timestamptz  | nullable                                                                               | Decision timestamp                                                                |
+| `granted_runs` | integer | nullable; CHECK `≥ 1` (`extra_runs` kind, approved) | Runs actually granted (≤ the ask, enforced by the service) |
+| `decided_weekly_limit` | integer | nullable; CHECK `≥ 1` (`limit_increase` kind, approved) | Weekly limit in force after approval; `NULL` = unchanged/not approved |
+| `decided_annual_limit` | integer | nullable; CHECK `≥ 1` (`limit_increase` kind, approved) | Annual limit in force after approval; `NULL` = unchanged/not approved |
+| `decision_note` | varchar(500) | nullable | Admin note on approval, or the deny reason shown to the requester verbatim |
+| `decided_by` | varchar(255) | nullable | n8n user id of the deciding admin |
+| `decided_at` | timestamptz | nullable | Decision timestamp |
 =======
->>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
-| `created_at`/`updated_at` | timestamptz  | `NOT NULL DEFAULT now()`; `(project_id, created_at)` indexed                           | Convention timestamps                                                             |
+
+> > > > > > > 47fde43c088815ccf932359bfd3fde9b0356b3f6
+> > > > > > > | `created_at`/`updated_at` | timestamptz | `NOT NULL DEFAULT now()`; `(project_id, created_at)` indexed | Convention timestamps |
 
 The **partial unique index on `project_id` where `status = 'pending'`** enforces one in-review request per project at the storage layer: a duplicate submit fails with 23505 and the service surfaces it as **409**, so concurrent submissions can never both queue. Filing requires the same membership the UI button uses (`project:admin` / `project:editor` / `project:personalOwner` — derived from the project relation, never from admin status). The fulfillment flow (an admin approving → top-up grant or limit change, with the review inbox and decision emails) ships with the request & approval system; until then pending requests simply wait and members may cancel their own.
 
