@@ -5,15 +5,31 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminProjectsView } from '@/components/projects/admin-projects-view';
-import { fetchAllProjects, getRateLimitDefaults, type ProjectItem } from '@/services/backend/projects';
+import {
+  fetchAllProjects,
+  getRateLimitDefaults,
+  listAdminRunRequests,
+  type AdminRunRequestItem,
+  type AdminRunRequestStatusFilter,
+  type AdminRunRequestsPage,
+  type ProjectItem,
+} from '@/services/backend/projects';
 
 vi.mock('@/services/backend/projects', async () => {
   const actual = await vi.importActual<typeof import('@/services/backend/projects')>('@/services/backend/projects');
-  return { ...actual, fetchAllProjects: vi.fn(), getRateLimitDefaults: vi.fn() };
+  return { ...actual, fetchAllProjects: vi.fn(), getRateLimitDefaults: vi.fn(), listAdminRunRequests: vi.fn() };
 });
 
 const fetchAllMock = vi.mocked(fetchAllProjects);
 const getRateLimitDefaultsMock = vi.mocked(getRateLimitDefaults);
+const listAdminRunRequestsMock = vi.mocked(listAdminRunRequests);
+
+/** An empty run-requests page (what the stat tile and tab count read when nothing is pending). */
+const EMPTY_RUN_REQUESTS_PAGE: AdminRunRequestsPage = {
+  data: [],
+  pagination: { page: 1, pageSize: 1, totalItems: 0, totalPages: 0 },
+  pending: { count: 0, oldestCreatedAt: null },
+};
 
 function makeProject(overrides: Partial<ProjectItem> = {}): ProjectItem {
   return {
@@ -110,6 +126,8 @@ describe('AdminProjectsView', () => {
       team: { weeklyRateLimit: null, yearlyRateLimit: null },
       personal: { weeklyRateLimit: null, yearlyRateLimit: null },
     });
+    listAdminRunRequestsMock.mockReset();
+    listAdminRunRequestsMock.mockResolvedValue(EMPTY_RUN_REQUESTS_PAGE);
   });
 
   it('aggregates stat cards over every fetched project', async () => {
@@ -123,7 +141,7 @@ describe('AdminProjectsView', () => {
     expect(statCardText('Close to a weekly or annual limit')).toBe(
       'Near limit (80%+)1Close to a weekly or annual limit',
     );
-    expect(statCardText('Runs are not capped')).toBe('No limit set1Runs are not capped');
+    expect(statCardText('Nothing waiting')).toBe('Run requests waiting0Nothing waiting');
   });
 
   it('offers the period selector as a single, current-week option', async () => {
@@ -321,5 +339,167 @@ describe('AdminProjectsView in read-only (non-admin) mode', () => {
     expect(viewLinks).toHaveLength(3);
     expect(viewLinks[0]).toHaveAttribute('href', '/projects/p-citz');
     expect(screen.queryByRole('link', { name: 'Manage' })).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminProjectsView run requests tab', () => {
+  const EXTRA_RUNS_REQUEST: AdminRunRequestItem = {
+    id: 'req-a',
+    projectId: 'p-citz',
+    projectName: 'CITZ Tenant',
+    projectType: 'team',
+    requestKind: 'extra_runs',
+    status: 'pending',
+    extraRuns: 3_000,
+    periodKey: '2026-W45',
+    requestedWeeklyLimit: null,
+    requestedAnnualLimit: null,
+    reason: 'We have a big batch load this week.',
+    requestedBy: 'user-1',
+    requestedByName: 'Jordan Lee',
+    requestedByEmail: 'jordan@testapp.com',
+    requestedByRoleLabel: 'Editor',
+    createdAt: '2026-11-04T23:52:00Z',
+    weeklyUsedWhenSent: 5_000,
+    yearlyUsedWhenSent: 120_000,
+    weeklyUsedNow: 5_200,
+    yearlyUsedNow: 121_500,
+    currentWeeklyLimit: 12_000,
+    currentAnnualLimit: 500_000,
+    lastTopup: null,
+    lastLimitChange: null,
+    grantedRuns: null,
+    decidedWeeklyLimit: null,
+    decidedAnnualLimit: null,
+    decisionNote: null,
+    decidedBy: null,
+    decidedByName: null,
+    decidedAt: null,
+  };
+
+  const LIMIT_REQUEST: AdminRunRequestItem = {
+    ...EXTRA_RUNS_REQUEST,
+    id: 'req-b',
+    projectId: 'p-devx',
+    projectName: 'DEVX Tenant',
+    projectType: 'personal',
+    requestKind: 'limit_increase',
+    extraRuns: null,
+    periodKey: null,
+    requestedWeeklyLimit: 20_000,
+    requestedAnnualLimit: 800_000,
+    reason: 'Automation volume grew past the cap.',
+    requestedByName: 'Riley Chen',
+    requestedByEmail: 'riley@testapp.com',
+    requestedByRoleLabel: 'Admin',
+    createdAt: '2026-11-02T20:00:00Z',
+    weeklyUsedWhenSent: 11_900,
+    yearlyUsedWhenSent: 470_000,
+    weeklyUsedNow: 12_400,
+    yearlyUsedNow: 480_000,
+    lastTopup: null,
+  };
+
+  const COUNTS: Record<AdminRunRequestStatusFilter, number> = {
+    pending: 2,
+    approved: 5,
+    denied: 1,
+    cancelled: 0,
+    all: 8,
+  };
+
+  function makePage(items: AdminRunRequestItem[], totalItems: number): AdminRunRequestsPage {
+    return {
+      data: items,
+      pagination: { page: 1, pageSize: 25, totalItems, totalPages: 1 },
+      pending: { count: COUNTS.pending, oldestCreatedAt: '2026-11-02T20:00:00Z' },
+    };
+  }
+
+  function mockRequestsList(items: AdminRunRequestItem[]) {
+    listAdminRunRequestsMock.mockImplementation((params) => {
+      // Chip counts use pageSize-1 probes per filter; the table uses the real page.
+      if (params.pageSize === 1) {
+        return Promise.resolve(makePage([], COUNTS[params.status]));
+      }
+      const search = params.search?.trim().toLowerCase() ?? '';
+      const filtered = search
+        ? items.filter((item) =>
+            `${item.projectName} ${item.requestedByName ?? ''} ${item.requestedByEmail ?? ''}`
+              .toLowerCase()
+              .includes(search),
+          )
+        : items;
+      return Promise.resolve(makePage(filtered, filtered.length === items.length ? COUNTS[params.status] : 0));
+    });
+  }
+
+  beforeEach(() => {
+    fetchAllMock.mockReset();
+    fetchAllMock.mockResolvedValue(PROJECTS);
+    getRateLimitDefaultsMock.mockReset();
+    getRateLimitDefaultsMock.mockResolvedValue({
+      team: { weeklyRateLimit: null, yearlyRateLimit: null },
+      personal: { weeklyRateLimit: null, yearlyRateLimit: null },
+    });
+    listAdminRunRequestsMock.mockReset();
+    listAdminRunRequestsMock.mockResolvedValue(EMPTY_RUN_REQUESTS_PAGE);
+  });
+
+  it('renders the pending queue with chips, summaries and review rows', async () => {
+    mockRequestsList([LIMIT_REQUEST, EXTRA_RUNS_REQUEST]);
+    renderView(['/projects?tab=requests']);
+
+    expect(await screen.findByRole('tab', { name: 'Run requests (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pending (2)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Approved (5)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Denied (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelled (0)' })).toBeInTheDocument();
+    expect(screen.getByText('2 requests waiting · oldest first')).toBeInTheDocument();
+
+    expect(screen.getByText('CITZ Tenant')).toBeInTheDocument();
+    expect(screen.getByText('+3,000 runs')).toBeInTheDocument();
+    expect(screen.getByText('Extra runs for Nov 2 to 8')).toBeInTheDocument();
+    expect(screen.getByText('Jordan Lee')).toBeInTheDocument();
+    expect(screen.getByText(/Editor · sent /)).toBeInTheDocument();
+    expect(screen.getByText('20,000 a week · 800,000 a year')).toBeInTheDocument();
+    expect(screen.getByText('Higher limit, now 12,000')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Review' })).toHaveLength(2);
+    const pendingBadges = screen.getAllByText('Pending');
+    expect(pendingBadges.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('opens the review dialog when a row is clicked', async () => {
+    const user = userEvent.setup();
+    mockRequestsList([EXTRA_RUNS_REQUEST]);
+    renderView(['/projects?tab=requests']);
+
+    await screen.findByText('CITZ Tenant');
+    await user.click(screen.getByRole('cell', { name: /CITZ Tenant/ }));
+
+    expect(await screen.findByText("Review CITZ Tenant's request")).toBeInTheDocument();
+  });
+
+  it('shows the pending empty state with a path to the other filters', async () => {
+    const user = userEvent.setup();
+    renderView(['/projects?tab=requests']);
+
+    expect(await screen.findByText('No requests waiting')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'See all requests' }));
+
+    expect(await screen.findByText('No all requests yet.')).toBeInTheDocument();
+  });
+
+  it('shows the no-match empty state with a clear action', async () => {
+    const user = userEvent.setup();
+    mockRequestsList([EXTRA_RUNS_REQUEST]);
+    renderView(['/projects?tab=requests']);
+
+    await screen.findByText('CITZ Tenant');
+    await user.type(screen.getByLabelText('Search run requests'), 'zzz');
+
+    expect(await screen.findByText('No requests match “zzz”')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(await screen.findByText('CITZ Tenant')).toBeInTheDocument();
   });
 });

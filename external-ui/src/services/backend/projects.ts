@@ -169,6 +169,94 @@ export type CreateRunRequestResponse = {
   request: PendingRunRequest;
 };
 
+/** Status filter values for the admin run-requests list ('denied' = DB 'rejected'). */
+export type AdminRunRequestStatusFilter = 'pending' | 'approved' | 'denied' | 'cancelled' | 'all';
+
+/** UI-facing request status (DB 'rejected' surfaces as 'denied'). */
+export type AdminRunRequestStatus = 'pending' | 'approved' | 'denied' | 'cancelled';
+
+/** One admin review row: the request enriched with requester, usage and decision context. */
+export type AdminRunRequestItem = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectType: string;
+  requestKind: RunRequestKind;
+  status: AdminRunRequestStatus;
+  extraRuns: number | null;
+  periodKey: string | null;
+  requestedWeeklyLimit: number | null;
+  requestedAnnualLimit: number | null;
+  reason: string;
+  requestedBy: string;
+  /** "Jordan Lee" (falls back to the requester's email). */
+  requestedByName: string | null;
+  requestedByEmail: string | null;
+  /** Requester's project-role label, e.g. 'Editor'. */
+  requestedByRoleLabel: string | null;
+  createdAt: string;
+  /** Usage in the week/year the request was sent (the list's "week used" column). */
+  weeklyUsedWhenSent: number | null;
+  yearlyUsedWhenSent: number | null;
+  /** Usage in the current week/year (the review dialog's "now" figure). */
+  weeklyUsedNow: number;
+  yearlyUsedNow: number;
+  /** Limits in force right now (defaults mode resolves the scope defaults). */
+  currentWeeklyLimit: number | null;
+  currentAnnualLimit: number | null;
+  /** Most recent top-up before review, for context in the dialog. */
+  lastTopup: { amount: number; periodKey: string; createdAt: string; createdByName: string | null } | null;
+  /** Most recent limits change before review, for context in the dialog. */
+  lastLimitChange: { at: string; byName: string | null } | null;
+  grantedRuns: number | null;
+  decidedWeeklyLimit: number | null;
+  decidedAnnualLimit: number | null;
+  /** The admin's note on approval, or the deny reason. */
+  decisionNote: string | null;
+  decidedBy: string | null;
+  decidedByName: string | null;
+  decidedAt: string | null;
+};
+
+export type AdminRunRequestsPage = {
+  data: AdminRunRequestItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  /** Drives the "Run requests waiting" stat tile and the Pending chip. */
+  pending: { count: number; oldestCreatedAt: string | null };
+};
+
+export type ApproveRunRequestBody = {
+  /** extra_runs: runs to grant (defaults to the asked amount; may be lowered, never raised). */
+  grantedRuns?: number | null;
+  /** limit_increase: the new limits (only the asked periods may change). */
+  newWeeklyLimit?: number | null;
+  newAnnualLimit?: number | null;
+  /** Optional note shown to the requester in the email. */
+  note?: string | null;
+};
+
+export type ApproveRunRequestResponse = {
+  success: true;
+  message: string;
+  request: AdminRunRequestItem;
+};
+
+export type DenyRunRequestBody = {
+  /** 10–500 characters, shown to the requester word for word. */
+  reason: string;
+};
+
+export type DenyRunRequestResponse = {
+  success: true;
+  message: string;
+  request: AdminRunRequestItem;
+};
+
 /**
  * Lists projects from the shared read endpoint: admins get every n8n project,
  * members get only the projects they can access in n8n.
@@ -224,6 +312,40 @@ export function createRunRequest(projectId: string, body: CreateRunRequestBody) 
 export function cancelRunRequest(projectId: string, requestId: string) {
   return instance
     .delete<void>(`/ui-api/projects/${encodeURIComponent(projectId)}/run-requests/${encodeURIComponent(requestId)}`)
+    .then((res) => res.data);
+}
+
+/** Lists run requests for the admin review tab (pending is oldest-first; the rest newest-first). */
+export function listAdminRunRequests(params: {
+  status: AdminRunRequestStatusFilter;
+  search?: string;
+  page: number;
+  pageSize: number;
+  signal?: AbortSignal;
+}) {
+  const { signal, search, ...rest } = params;
+  return instance
+    .get<AdminRunRequestsPage>('/ui-api/admin/projects/run-requests', {
+      params: { ...rest, ...(search && search.trim() ? { search: search.trim() } : {}) },
+      signal,
+    })
+    .then((res) => res.data);
+}
+
+/** Approves (and fulfills) a pending run request. */
+export function approveRunRequest(requestId: string, body: ApproveRunRequestBody) {
+  return instance
+    .post<ApproveRunRequestResponse>(
+      `/ui-api/admin/projects/run-requests/${encodeURIComponent(requestId)}/approve`,
+      body,
+    )
+    .then((res) => res.data);
+}
+
+/** Denies a pending run request with a required reason. */
+export function denyRunRequest(requestId: string, body: DenyRunRequestBody) {
+  return instance
+    .post<DenyRunRequestResponse>(`/ui-api/admin/projects/run-requests/${encodeURIComponent(requestId)}/deny`, body)
     .then((res) => res.data);
 }
 
