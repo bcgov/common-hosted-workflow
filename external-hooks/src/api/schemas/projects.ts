@@ -216,11 +216,7 @@ export const denyRunRequestSchema = z.object({
     requestId: z.string().uuid({ message: 'requestId must be a valid UUID' }),
   }),
   body: z.object({
-    reason: z
-      .string()
-      .trim()
-      .min(10, { message: 'reason must be between 10 and 500 characters' })
-      .max(500),
+    reason: z.string().trim().min(10, { message: 'reason must be between 10 and 500 characters' }).max(500),
   }),
   query: z.record(z.string(), z.unknown()).optional(),
 });

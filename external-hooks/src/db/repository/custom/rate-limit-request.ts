@@ -155,33 +155,30 @@ export class RateLimitRequestRepository {
     },
     limits: { projectId: string; lastAdminComment: string | null },
   ): Promise<RateLimitRequest | null> {
-    return this.decidePending(
-      requestId,
-      { status: 'approved', grantedRuns: null, ...decision },
-      (tx) =>
-        tx
-          .insert(projectRateLimit)
-          .values({
-            projectId: limits.projectId,
+    return this.decidePending(requestId, { status: 'approved', grantedRuns: null, ...decision }, (tx) =>
+      tx
+        .insert(projectRateLimit)
+        .values({
+          projectId: limits.projectId,
+          usesDefaultLimits: false,
+          weeklyRateLimit: decision.decidedWeeklyLimit,
+          yearlyRateLimit: decision.decidedAnnualLimit,
+          lastAdminComment: limits.lastAdminComment,
+          stopBehavior: 'hard_stop',
+          updatedBy: decision.decidedBy,
+        })
+        .onConflictDoUpdate({
+          target: projectRateLimit.projectId,
+          set: {
             usesDefaultLimits: false,
             weeklyRateLimit: decision.decidedWeeklyLimit,
             yearlyRateLimit: decision.decidedAnnualLimit,
             lastAdminComment: limits.lastAdminComment,
             stopBehavior: 'hard_stop',
             updatedBy: decision.decidedBy,
-          })
-          .onConflictDoUpdate({
-            target: projectRateLimit.projectId,
-            set: {
-              usesDefaultLimits: false,
-              weeklyRateLimit: decision.decidedWeeklyLimit,
-              yearlyRateLimit: decision.decidedAnnualLimit,
-              lastAdminComment: limits.lastAdminComment,
-              stopBehavior: 'hard_stop',
-              updatedBy: decision.decidedBy,
-              updatedAt: new Date(),
-            },
-          }),
+            updatedAt: new Date(),
+          },
+        }),
     );
   }
 
