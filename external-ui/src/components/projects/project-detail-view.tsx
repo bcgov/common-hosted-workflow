@@ -271,6 +271,8 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
   // Member-view only: admins adjust limits directly, so they never see the
   // request action — visibility is membership-based, not admin-based, and
   // deliberately independent of current usage (the banner owns thresholds).
+  // While a request is pending the button stays visible but disabled: one
+  // in-review request per project, and the pending panel owns the cancel.
   const showRequestButton = readOnly && canRequestMoreRuns(project.viewerRole);
 
   let bannerText: string | null = null;
@@ -424,7 +426,16 @@ export function ProjectDetailView({ readOnly = false }: { readOnly?: boolean }) 
             </div>
             {showRequestButton && (
               <div className="flex shrink-0 flex-wrap gap-2">
-                <Button type="button" onClick={() => setIsRequestDialogOpen(true)}>
+                <Button
+                  type="button"
+                  onClick={() => setIsRequestDialogOpen(true)}
+                  disabled={pendingRequest !== null}
+                  title={
+                    pendingRequest !== null
+                      ? 'You already have a request waiting for review. Cancel it before making another.'
+                      : undefined
+                  }
+                >
                   Request more runs
                 </Button>
               </div>

@@ -11,6 +11,7 @@ import {
   getAdminProjectSchema,
   getProjectWorkflowUsageSchema,
   listProjectTopupsSchema,
+  listRunRequestsSchema,
 } from '../schemas/projects';
 
 /**
@@ -32,6 +33,23 @@ export function buildProjectsRouter(routeContext: ApiRouteContext) {
   function getSessionUserId(req: UiApiRequest): string {
     return req.session.n8nUser?.id ?? '';
   }
+
+  // Run-request list for the Projects page's "Run requests" tab, shared by
+  // admins and members. Admins get every request (the review queue); members
+  // get only requests belonging to projects they can access in n8n — read
+  // only, decisions stay under /ui-api/admin. The literal path is registered
+  // ahead of '/:projectId' below so Express cannot match it as a project id
+  // (same literal-first convention as the admin sub-router).
+  router.get(
+    '/run-requests',
+    createRequestParser(listRunRequestsSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof listRunRequestsSchema>>, res) => {
+      const result = isSessionAdmin(req)
+        ? await services.projectRateLimit.listRunRequestsForAdmin(req.parsed.query)
+        : await services.projectRateLimit.listRunRequestsForUser(getSessionUserId(req), req.parsed.query);
+      OkResponse(res, result);
+    },
+  );
 
   router.get(
     '/',

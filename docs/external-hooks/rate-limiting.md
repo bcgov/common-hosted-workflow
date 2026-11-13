@@ -321,6 +321,8 @@ Reads and writes are split by audience. **Read endpoints** (list, detail, workfl
 
 The run-request review endpoints sit on the same admin router: `GET /ui-api/admin/projects/run-requests` (query: `status` — `pending` default / `approved` / `denied` / `cancelled` / `all`, `search`, `page`, `pageSize`; pending rows come back oldest-first, the rest newest-first, with a `pending` block for the stat tile), `POST /ui-api/admin/projects/run-requests/:id/approve` (body: `grantedRuns` for extra_runs — defaults to the ask, may be lowered, never raised — and `newWeeklyLimit`/`newAnnualLimit` for limit_increase, plus optional `note`) and `POST /ui-api/admin/projects/run-requests/:id/deny` (body: `reason`, 10–500 chars, shown to the requester verbatim). Deciding an already-decided or cancelled request returns **409**.
 
+The **list** is also exposed member-side on the shared router as `GET /ui-api/projects/run-requests` (registered ahead of `/:projectId`, same query parameters and payload): admins get the full review queue, members get only requests belonging to the projects they can access in n8n, and the `pending` block is scoped the same way. Decisions stay admin-only.
+
 ### `GET /ui-api/projects`
 
 Query parameters: `page` (default 1), `pageSize` (default 25, max 100), `search`, `type` (`team`/`personal`). Each item keeps `projectId`, `projectName`, `projectType`, `tenantId` and:
@@ -409,6 +411,10 @@ Example body (mirroring the dialog's output where personal fields were left blan
 ### `GET /ui-api/projects/:projectId`
 
 Same item shape as the list, enrichment included — plus `viewerRole`, the requesting user's n8n project role for the project (`project:admin` / `project:editor` / `project:viewer` / `project:personalOwner`), or `null` when they are not a member (including platform admins without a relation; the field is derived from the project relation only, never from admin status) — and `pendingRunRequest`, the project's pending member request (see below), or `null` when none is open. Both fields are detail-only; the list endpoint never sets them. Backs the project detail page for admins and members — the role-scoped member affordances (the "Request more runs" action, the "You are an editor" meta label, the pending-review panel) key off these fields. Admins may read any project; a non-admin gets **403** unless they can access the project in n8n (project relation or personal-project owner). **404** (`Project not found`) when the project does not exist.
+
+#### `GET /ui-api/projects/run-requests`
+
+Member-visible request list backing the Projects page's "Run requests" tab (the admin route above stays for the review queue; the UI calls this one for both audiences). Same query parameters, item shape and ordering as the admin list; admins get every request, non-admins only those belonging to projects they can access in n8n (`listProjectIdsAccessibleToUser` — personal project plus team relations; members of no project get an empty page without touching the request table). The `pending` block is scoped identically, so the tab count reflects the member's projects only.
 
 #### `POST /ui-api/projects/:projectId/run-requests`
 

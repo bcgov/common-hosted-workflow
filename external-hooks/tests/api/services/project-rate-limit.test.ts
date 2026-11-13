@@ -1730,7 +1730,7 @@ describe('ProjectRateLimitService · admin run-request review', () => {
 
       const page = await service.listRunRequestsForAdmin({ status: 'denied', page: 1, pageSize: 25 });
 
-      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['rejected']);
+      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['rejected'], undefined);
       expect(page.data).toHaveLength(1);
       expect(page.data[0]).toMatchObject({
         status: 'denied',
@@ -1755,7 +1755,7 @@ describe('ProjectRateLimitService · admin run-request review', () => {
 
       const page = await service.listRunRequestsForAdmin({ status: 'all', page: 1, pageSize: 25 });
 
-      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['pending', 'approved', 'rejected', 'cancelled']);
+      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['pending', 'approved', 'rejected', 'cancelled'], undefined);
       expect(page.data.map((item) => item.id)).toEqual([newerDecision.id, olderDecision.id]);
       expect(page.data[0]).toMatchObject({
         status: 'denied',
@@ -1788,6 +1788,36 @@ describe('ProjectRateLimitService · admin run-request review', () => {
 
       expect(page2.pagination).toEqual({ page: 2, pageSize: 1, totalItems: 1, totalPages: 1 });
       expect(page2.data).toHaveLength(0);
+    });
+  });
+
+  describe('listRunRequestsForUser', () => {
+    it('scopes rows and pending stats to the projects the user can access', async () => {
+      const row = makeRunRequestRow();
+      requestRepo.listByStatuses.mockResolvedValue([row]);
+
+      const page = await service.listRunRequestsForUser('member-1', { status: 'pending', page: 1, pageSize: 25 });
+
+      // The accessible set is the user's relations plus their personal project
+      // (both default to VALID_PROJECT_ID in the mock).
+      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['pending'], [VALID_PROJECT_ID]);
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]).toMatchObject({ id: row.id, projectName: 'Default project' });
+      expect(page.pending).toEqual({ count: 1, oldestCreatedAt: row.createdAt.toISOString() });
+    });
+
+    it('returns an empty page without touching the request table when the member has no projects', async () => {
+      n8nRepos.projectRelation.findAllByUser.mockResolvedValue([]);
+      n8nRepos.project.getPersonalProjectForUser.mockResolvedValue(null);
+
+      const page = await service.listRunRequestsForUser('member-1', { status: 'all', page: 1, pageSize: 25 });
+
+      expect(page).toEqual({
+        data: [],
+        pagination: { page: 1, pageSize: 25, totalItems: 0, totalPages: 1 },
+        pending: { count: 0, oldestCreatedAt: null },
+      });
+      expect(requestRepo.listByStatuses).not.toHaveBeenCalled();
     });
   });
 

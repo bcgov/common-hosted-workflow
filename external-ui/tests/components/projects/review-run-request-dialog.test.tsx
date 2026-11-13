@@ -99,13 +99,13 @@ const DECIDED_REQUEST: AdminRunRequestItem = {
   decidedAt: '2026-11-05T19:00:00Z',
 };
 
-function renderDialog(request: AdminRunRequestItem = BASE_REQUEST) {
+function renderDialog(request: AdminRunRequestItem = BASE_REQUEST, options: { readOnly?: boolean } = {}) {
   const onOpenChange = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const view = (
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <ReviewRunRequestDialog request={request} open onOpenChange={onOpenChange} />
+        <ReviewRunRequestDialog request={request} open onOpenChange={onOpenChange} {...options} />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -300,5 +300,26 @@ describe('ReviewRunRequestDialog', () => {
     expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /Approve/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Reason for denying')).not.toBeInTheDocument();
+  });
+
+  it('renders a pending request read-only for members without any decision affordances', () => {
+    renderDialog(BASE_REQUEST, { readOnly: true });
+
+    // The member title drops the "Review" prefix, and the what-was-asked
+    // details stay visible.
+    expect(screen.getByText("CITZ Tenant's request")).toBeInTheDocument();
+    expect(screen.queryByText("Review CITZ Tenant's request")).not.toBeInTheDocument();
+    expect(screen.getByText('Extra runs for one week')).toBeInTheDocument();
+    expect(screen.getByText('3,000 runs')).toBeInTheDocument();
+
+    // No decision form: just the "an admin decides" note and close.
+    expect(screen.getByText(/A platform admin reviews this request/)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Deny' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Runs to grant')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Reason for denying')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deny request' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(2);
   });
 });

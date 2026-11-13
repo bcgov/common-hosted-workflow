@@ -63,15 +63,25 @@ export class RateLimitRequestRepository {
     return rows[0] ?? null;
   }
 
-  /** All request rows for the given statuses, oldest first. Request volume is small, so the admin list enriches, filters and paginates in the service. */
-  async listByStatuses(statuses: RunRequestStatus[]): Promise<RateLimitRequest[]> {
-    if (statuses.length === 0) {
+  /**
+   * All request rows for the given statuses (optionally scoped to project IDs),
+   * oldest first. Request volume is small, so the list consumers enrich,
+   * filter and paginate in the service. `projectIds` scopes the rows to the
+   * caller's accessible projects (member view); an empty array short-circuits
+   * to no rows, `undefined` means unscoped (admin view).
+   */
+  async listByStatuses(statuses: RunRequestStatus[], projectIds?: string[]): Promise<RateLimitRequest[]> {
+    if (statuses.length === 0 || (projectIds !== undefined && projectIds.length === 0)) {
       return [];
+    }
+    const conditions = [inArray(rateLimitRequest.status, statuses)];
+    if (projectIds !== undefined) {
+      conditions.push(inArray(rateLimitRequest.projectId, projectIds));
     }
     return this.db
       .select()
       .from(rateLimitRequest)
-      .where(inArray(rateLimitRequest.status, statuses))
+      .where(and(...conditions))
       .orderBy(rateLimitRequest.createdAt, rateLimitRequest.id);
   }
 

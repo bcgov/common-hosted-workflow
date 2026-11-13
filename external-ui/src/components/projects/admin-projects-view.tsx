@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   fetchAllProjects,
-  listAdminRunRequests,
+  listRunRequests,
   type AdminRunRequestItem,
   type AdminRunRequestStatus,
   type AdminRunRequestStatusFilter,
@@ -152,11 +152,13 @@ export function AdminProjectsView({ readOnly = false }: { readOnly?: boolean }) 
 
   const totalWeeklyRuns = useMemo(() => projects.reduce((sum, p) => sum + p.weeklyExecutionCount, 0), [projects]);
 
-  // Pending run requests: drives the stat tile and the Run requests tab count.
+  // Pending run requests: drives the stat tile (admins) and the Run requests
+  // tab count. Shared endpoint: admins see every pending request, members see
+  // their accessible projects'.
   const pendingQuery = useQuery({
-    queryKey: ['admin-run-requests', 'pending', '', 1],
-    queryFn: ({ signal }) => listAdminRunRequests({ status: 'pending', page: 1, pageSize: 1, signal }),
-    enabled: !readOnly && tab !== 'requests',
+    queryKey: ['run-requests', 'pending', '', 1],
+    queryFn: ({ signal }) => listRunRequests({ status: 'pending', page: 1, pageSize: 1, signal }),
+    enabled: tab !== 'requests',
   });
   const pendingCount = pendingQuery.data?.pending.count ?? 0;
   const pendingOldestAt = pendingQuery.data?.pending.oldestCreatedAt ?? null;
@@ -291,17 +293,15 @@ export function AdminProjectsView({ readOnly = false }: { readOnly?: boolean }) 
           label={getTabLabel('personal', personalCount)}
           onClick={() => selectTab('personal')}
         />
-        {!readOnly && (
-          <TabButton
-            active={tab === 'requests'}
-            label={getTabLabel('requests', pendingCount)}
-            onClick={() => selectTab('requests')}
-          />
-        )}
+        <TabButton
+          active={tab === 'requests'}
+          label={getTabLabel('requests', pendingCount)}
+          onClick={() => selectTab('requests')}
+        />
       </div>
 
       {tab === 'requests' ? (
-        <RunRequestsTab />
+        <RunRequestsTab readOnly={readOnly} />
       ) : (
         <>
           {/* Filter row */}
@@ -416,7 +416,7 @@ export function AdminProjectsView({ readOnly = false }: { readOnly?: boolean }) 
 }
 
 /* ================================================================== */
-/*  Run requests tab (admin review queue)                              */
+/*  Run requests tab (admin review queue / member read-only view)      */
 /* ================================================================== */
 
 /** One status chip ("Pending (3)") on the Run requests tab. */
@@ -452,20 +452,22 @@ function RequestStatusChip({
 }
 
 /**
- * The admin run-request review tab: status chips, search, the review table
- * and the review dialog. Pending lists oldest-first (the queue order);
- * every other filter lists newest-first.
+ * The run-requests tab: status chips, search, the request table and the
+ * request dialog. Admins review (the dialog carries approve/deny); members
+ * get the same list read-only, scoped to their accessible projects. Pending
+ * lists oldest-first (the queue order); every other filter lists
+ * newest-first.
  */
-function RunRequestsTab() {
+function RunRequestsTab({ readOnly = false }: { readOnly?: boolean }) {
   const [statusFilter, setStatusFilter] = useState<AdminRunRequestStatusFilter>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [reviewing, setReviewing] = useState<AdminRunRequestItem | null>(null);
 
   const listQuery = useQuery({
-    queryKey: ['admin-run-requests', statusFilter, searchQuery.trim(), page],
+    queryKey: ['run-requests', statusFilter, searchQuery.trim(), page],
     queryFn: ({ signal }) =>
-      listAdminRunRequests({
+      listRunRequests({
         status: statusFilter,
         search: searchQuery.trim() || undefined,
         page,
@@ -476,11 +478,11 @@ function RunRequestsTab() {
 
   // Chip counts: one lightweight query per filter (totalItems at pageSize 1).
   const countsQuery = useQuery({
-    queryKey: ['admin-run-requests', 'counts'],
+    queryKey: ['run-requests', 'counts'],
     queryFn: async ({ signal }) => {
       const results = await Promise.all(
         REQUEST_FILTERS.map(async (filter) => {
-          const result = await listAdminRunRequests({ status: filter, page: 1, pageSize: 1, signal });
+          const result = await listRunRequests({ status: filter, page: 1, pageSize: 1, signal });
           return [filter, result.pagination.totalItems] as const;
         }),
       );
@@ -577,8 +579,9 @@ function RunRequestsTab() {
               <>
                 <p className="mt-3 text-lg font-bold text-foreground">No requests waiting</p>
                 <p className="mt-1 max-w-md text-sm leading-5 text-muted-foreground">
-                  When a project admin or editor asks for more runs, the request shows up here and we email you.
-                  Decided requests are under Approved, Denied and Cancelled.
+                  {readOnly
+                    ? 'When someone on one of your projects asks for more runs, the request shows up here. Decided requests are under Approved, Denied and Cancelled.'
+                    : 'When a project admin or editor asks for more runs, the request shows up here and we email you. Decided requests are under Approved, Denied and Cancelled.'}
                 </p>
                 <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => setStatusFilter('all')}>
                   See all requests
@@ -610,6 +613,7 @@ function RunRequestsTab() {
                 <RequestRow
                   key={item.id}
                   item={item}
+                  readOnly={readOnly}
                   onReview={() => setReviewing(item)}
                 />
               ))}
@@ -649,14 +653,27 @@ function RunRequestsTab() {
       </div>
 
       {reviewing && (
-        <ReviewRunRequestDialog request={reviewing} open onOpenChange={(open) => !open && setReviewing(null)} />
+        <ReviewRunRequestDialog
+          request={reviewing}
+          readOnly={readOnly}
+          open
+          onOpenChange={(open) => !open && setReviewing(null)}
+        />
       )}
     </div>
   );
 }
 
 /** One row of the review table; the whole row opens the review dialog. */
-function RequestRow({ item, onReview }: { item: AdminRunRequestItem; onReview: () => void }) {
+function RequestRow({
+  item,
+  readOnly = false,
+  onReview,
+}: {
+  item: AdminRunRequestItem;
+  readOnly?: boolean;
+  onReview: () => void;
+}) {
   const request = getRequestSummary(item);
   const isPending = item.status === 'pending';
   return (
@@ -701,7 +718,7 @@ function RequestRow({ item, onReview }: { item: AdminRunRequestItem; onReview: (
           }}
           className="text-sm font-medium text-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#255a90]"
         >
-          {isPending ? 'Review' : 'View'}
+          {isPending && !readOnly ? 'Review' : 'View'}
         </button>
       </TableCell>
     </TableRow>

@@ -424,6 +424,60 @@ describe('GET /ui-api/projects/:projectId/topups', () => {
 });
 
 /* ================================================================== */
+/*  GET /projects/run-requests                                         */
+/* ================================================================== */
+
+describe('GET /ui-api/projects/run-requests', () => {
+  it('lists every request for an admin session (review-queue pass-through)', async () => {
+    const page = { data: [], pagination: { page: 1, pageSize: 25, totalItems: 0, totalPages: 1 }, pending: { count: 0, oldestCreatedAt: null } };
+    const listRunRequestsForAdmin = vi.fn().mockResolvedValue(page);
+    const { router } = createTestRouter({
+      projectRateLimit: { listRunRequestsForAdmin, listRunRequestsForUser: vi.fn() },
+    });
+
+    const handlers = getRouteHandlers(router, 'get', '/run-requests');
+    const req = createMockRequest({
+      query: { status: 'pending', page: '1', pageSize: '25' },
+      session: makeAdminSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(listRunRequestsForAdmin).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'pending', page: 1, pageSize: 25 }),
+    );
+    expect(listRunRequestsForAdmin.mock.calls[0][1]).toBeUndefined();
+    expect(res.json).toHaveBeenCalledWith(page);
+  });
+
+  it('scopes the list to the member session user (service resolves accessible projects)', async () => {
+    const page = { data: [], pagination: { page: 1, pageSize: 25, totalItems: 0, totalPages: 1 }, pending: { count: 0, oldestCreatedAt: null } };
+    const listRunRequestsForUser = vi.fn().mockResolvedValue(page);
+    const { router } = createTestRouter({
+      projectRateLimit: { listRunRequestsForAdmin: vi.fn(), listRunRequestsForUser },
+    });
+
+    const handlers = getRouteHandlers(router, 'get', '/run-requests');
+    const req = createMockRequest({
+      query: { status: 'all', search: 'devx', page: '2', pageSize: '25' },
+      session: makeMemberSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(listRunRequestsForUser).toHaveBeenCalledWith(
+      MEMBER_USER_ID,
+      expect.objectContaining({ status: 'all', search: 'devx', page: 2, pageSize: 25 }),
+    );
+    expect(res.json).toHaveBeenCalledWith(page);
+  });
+});
+
+/* ================================================================== */
 /*  POST /projects/:projectId/run-requests                             */
 /* ================================================================== */
 
