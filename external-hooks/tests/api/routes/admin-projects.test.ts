@@ -95,6 +95,9 @@ function createTestRouter(serviceOverrides: Record<string, any> = {}) {
     deleteProjectTopup: vi.fn(),
     getRateLimitDefaults: vi.fn(),
     updateRateLimitDefaults: vi.fn(),
+    listRunRequestsForAdmin: vi.fn(),
+    approveRunRequest: vi.fn(),
+    denyRunRequest: vi.fn(),
     ...serviceOverrides.projectRateLimit,
   };
 
@@ -584,5 +587,236 @@ describe(`PUT /ui-api/admin${DEFAULTS_ROUTE}`, () => {
 
     expectNextAppError(next, 400);
     expect(updateRateLimitDefaults).not.toHaveBeenCalled();
+  });
+});
+
+/* ================================================================== */
+/*  Admin run-request review routes                                    */
+/* ================================================================== */
+
+const RUN_REQUESTS_ROUTE = '/projects/run-requests';
+const RUN_REQUEST_APPROVE_ROUTE = '/projects/run-requests/:requestId/approve';
+const RUN_REQUEST_DENY_ROUTE = '/projects/run-requests/:requestId/deny';
+const VALID_RUN_REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+
+function makeRunRequestItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: VALID_RUN_REQUEST_ID,
+    projectId: VALID_PROJECT_ID,
+    projectName: 'Default project',
+    projectType: 'personal',
+    requestKind: 'extra_runs',
+    status: 'pending',
+    extraRuns: 5000,
+    periodKey: '2026-W47',
+    requestedWeeklyLimit: null,
+    requestedAnnualLimit: null,
+    reason: 'Fall intake started early',
+    requestedBy: 'requester-1',
+    requestedByName: 'Jordan Lee',
+    requestedByEmail: 'jordan.lee@example.com',
+    requestedByRoleLabel: 'Editor',
+    createdAt: '2026-11-10T10:14:00.000Z',
+    weeklyUsedWhenSent: 0,
+    yearlyUsedWhenSent: 0,
+    weeklyUsedNow: 0,
+    yearlyUsedNow: 0,
+    currentWeeklyLimit: null,
+    currentAnnualLimit: null,
+    lastTopup: null,
+    lastLimitChange: null,
+    grantedRuns: null,
+    decidedWeeklyLimit: null,
+    decidedAnnualLimit: null,
+    decisionNote: null,
+    decidedBy: null,
+    decidedByName: null,
+    decidedAt: null,
+    ...overrides,
+  };
+}
+
+describe(`GET /ui-api/admin${RUN_REQUESTS_ROUTE}`, () => {
+  it('lists run requests with the parser defaults (pending, page 1, pageSize 25)', async () => {
+    const result = {
+      data: [makeRunRequestItem()],
+      pagination: { page: 1, pageSize: 25, totalItems: 1, totalPages: 1 },
+      pending: { count: 1, oldestCreatedAt: '2026-11-10T10:14:00.000Z' },
+    };
+    const listRunRequestsForAdmin = vi.fn().mockResolvedValue(result);
+    const { router } = createTestRouter({ projectRateLimit: { listRunRequestsForAdmin } });
+
+    const handlers = getRouteHandlers(router, 'get', RUN_REQUESTS_ROUTE);
+    const req = createMockRequest({ query: {}, session: makeSession() });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(listRunRequestsForAdmin).toHaveBeenCalledWith({
+      status: 'pending',
+      search: undefined,
+      page: 1,
+      pageSize: 25,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(result);
+  });
+
+  it('passes the status, search and paging query through with coercion', async () => {
+    const listRunRequestsForAdmin = vi.fn().mockResolvedValue({ data: [], pagination: {}, pending: {} });
+    const { router } = createTestRouter({ projectRateLimit: { listRunRequestsForAdmin } });
+
+    const handlers = getRouteHandlers(router, 'get', RUN_REQUESTS_ROUTE);
+    const req = createMockRequest({
+      query: { status: 'all', search: 'devx', page: '2', pageSize: '10' },
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(listRunRequestsForAdmin).toHaveBeenCalledWith({ status: 'all', search: 'devx', page: 2, pageSize: 10 });
+  });
+
+  it('rejects an unknown status filter (400)', async () => {
+    const listRunRequestsForAdmin = vi.fn();
+    const { router } = createTestRouter({ projectRateLimit: { listRunRequestsForAdmin } });
+
+    const handlers = getRouteHandlers(router, 'get', RUN_REQUESTS_ROUTE);
+    const req = createMockRequest({ query: { status: 'maybe' }, session: makeSession() });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(listRunRequestsForAdmin).not.toHaveBeenCalled();
+  });
+});
+
+describe(`POST /ui-api/admin${RUN_REQUEST_APPROVE_ROUTE}`, () => {
+  it('approves a request and responds with the decided row', async () => {
+    const decided = makeRunRequestItem({ status: 'approved', grantedRuns: 3000, decidedBy: 'admin@example.com' });
+    const approveRunRequest = vi.fn().mockResolvedValue(decided);
+    const { router } = createTestRouter({ projectRateLimit: { approveRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', RUN_REQUEST_APPROVE_ROUTE);
+    const req = createMockRequest({
+      params: { requestId: VALID_RUN_REQUEST_ID },
+      body: { grantedRuns: 3000, note: 'Partial for now' },
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(approveRunRequest).toHaveBeenCalledWith(
+      VALID_RUN_REQUEST_ID,
+      { grantedRuns: 3000, note: 'Partial for now' },
+      'admin@example.com',
+    );
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Request approved', request: decided });
+  });
+
+  it('passes null as the decider when the session has no n8n user', async () => {
+    const approveRunRequest = vi.fn().mockResolvedValue(makeRunRequestItem());
+    const { router } = createTestRouter({ projectRateLimit: { approveRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', RUN_REQUEST_APPROVE_ROUTE);
+    const req = createMockRequest({
+      params: { requestId: VALID_RUN_REQUEST_ID },
+      body: {},
+      query: {},
+      session: makeSession({ n8nUser: null }),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(approveRunRequest).toHaveBeenCalledWith(VALID_RUN_REQUEST_ID, {}, null);
+  });
+
+  it('rejects grants below the minimum (400)', async () => {
+    const approveRunRequest = vi.fn();
+    const { router } = createTestRouter({ projectRateLimit: { approveRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', RUN_REQUEST_APPROVE_ROUTE);
+    const req = createMockRequest({
+      params: { requestId: VALID_RUN_REQUEST_ID },
+      body: { grantedRuns: 50 },
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(approveRunRequest).not.toHaveBeenCalled();
+  });
+
+  it('propagates service errors (409 already decided)', async () => {
+    const approveRunRequest = vi.fn().mockRejectedValue(new AppError(409, 'This request has already been decided'));
+    const { router } = createTestRouter({ projectRateLimit: { approveRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', RUN_REQUEST_APPROVE_ROUTE);
+    const req = createMockRequest({
+      params: { requestId: VALID_RUN_REQUEST_ID },
+      body: {},
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 409);
+  });
+});
+
+describe(`POST /ui-api/admin${RUN_REQUEST_DENY_ROUTE}`, () => {
+  it('denies a request with the reason and responds with the rejected row', async () => {
+    const reason = 'Not enough platform quota this quarter. Please ask again in January.';
+    const rejected = makeRunRequestItem({ status: 'denied', decisionNote: reason });
+    const denyRunRequest = vi.fn().mockResolvedValue(rejected);
+    const { router } = createTestRouter({ projectRateLimit: { denyRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', RUN_REQUEST_DENY_ROUTE);
+    const req = createMockRequest({
+      params: { requestId: VALID_RUN_REQUEST_ID },
+      body: { reason },
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const error = await runHandlerChain(handlers!, req, res);
+
+    expect(error).toBeNull();
+    expect(denyRunRequest).toHaveBeenCalledWith(VALID_RUN_REQUEST_ID, { reason }, 'admin@example.com');
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Request denied', request: rejected });
+  });
+
+  it('rejects a too-short reason (400)', async () => {
+    const denyRunRequest = vi.fn();
+    const { router } = createTestRouter({ projectRateLimit: { denyRunRequest } });
+
+    const handlers = getRouteHandlers(router, 'post', RUN_REQUEST_DENY_ROUTE);
+    const req = createMockRequest({
+      params: { requestId: VALID_RUN_REQUEST_ID },
+      body: { reason: 'too short' },
+      query: {},
+      session: makeSession(),
+    });
+    const res = createMockResponse();
+
+    const next = await runHandlerChainCapturingErrors(handlers!, req, res);
+
+    expectNextAppError(next, 400);
+    expect(denyRunRequest).not.toHaveBeenCalled();
   });
 });

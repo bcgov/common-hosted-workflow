@@ -40,7 +40,7 @@ For the layered architecture these components live in, see [`architecture.md`](.
 | `external-hooks/src/db/repository/custom/project-rate-limit-default.ts` | Defaults repository: `get` per scope, `getAll`, atomic `upsertBoth` (one transaction)                                                                                                                                       |
 | `external-hooks/src/api/schemas/projects.ts`                            | Zod validation for project reads, rate-limit changes and top-up list/create/delete                                                                                                                                          |
 | `external-hooks/src/api/routes/projects.ts`                             | Shared project read endpoints (`/ui-api/projects`): admins get all projects, members their own                                                                                                                              |
-| `external-hooks/src/api/routes/admin-projects.ts`                       | Admin project writes (limits, tenant mapping, top-ups) and the defaults endpoints                                                                                                                                           |
+| `external-hooks/src/api/routes/admin-projects.ts`                       | Admin project writes (limits, tenant mapping, top-ups), the defaults endpoints and the run-request review endpoints (`/ui-api/admin/projects/run-requests*`)                                                                |
 | `external-hooks/drizzle/0011_add_project_rate_limit_tables.sql`         | Additive-only migration: the two rate-limit tables (applied by the existing `node migrate.cjs` step)                                                                                                                        |
 | `external-hooks/drizzle/0013_add_workflow_usage_and_updated_by.sql`     | Additive-only migration: `workflow_execution_usage` + `project_rate_limit.updated_by`                                                                                                                                       |
 | `external-hooks/drizzle/0014_add_project_topup.sql`                     | Additive-only migration: `project_topup`                                                                                                                                                                                    |
@@ -49,6 +49,7 @@ For the layered architecture these components live in, see [`architecture.md`](.
 | `external-hooks/drizzle/0017_add_rate_limit_notification.sql`           | Additive-only migration: `rate_limit_notification` claim table (send-once notification dedup)                                                                                                                               |
 | `external-hooks/drizzle/0018_add_rate_limit_request.sql`                | Additive-only migration: `rate_limit_request` member request table (one pending request per project via partial unique index)                                                                                               |
 | `external-ui/src/components/projects/manage-topups-dialog.tsx`          | Weekly top-up form, paged history and future-week removal                                                                                                                                                                   |
+| `external-ui/src/components/projects/review-run-request-dialog.tsx`     | Admin review dialog: asked-for details, usage snapshot, approve/deny decision (runs to grant, new limits, optional note, required deny reason), read-only decided view; exports the shared `formatSentAt`/`formatSentStamp` |
 | `external-ui/src/lib/limit-input.ts`                                    | Shared limit parsing/validation for both dialogs (empty input → `null`, annual ≥ weekly, shared bounds)                                                                                                                     |
 | `external-ui/src/components/projects/default-limits-dialog.tsx`         | Default-limits dialog: team/personal weekly + annual inputs; PUT full-replace body                                                                                                                                          |
 | `external-ui/src/lib/rate-limit.ts`                                     | Effective weekly/yearly limits, status/usage calculations and Vancouver week-key/range helpers                                                                                                                              |
@@ -77,7 +78,7 @@ The admin UI also generates week options and renders date ranges in `America/Van
 
 ## Data model
 
-Five tables in the custom database. `0011_add_project_rate_limit_tables.sql` created the rate-limit configuration and the per-project counters; `0013_add_workflow_usage_and_updated_by.sql` added the per-workflow counters and `project_rate_limit.updated_by`; `0014_add_project_topup.sql` adds weekly top-ups; `0015_add_project_rate_limit_default.sql` adds the per-scope defaults table. These are additive-only migrations, applied by the existing `node migrate.cjs` step. The workflow-usage migration was renumbered from 0012 to 0013 during the CCP-6033 merge because main claimed the 0012 slot.
+Seven tables in the custom database. `0011_add_project_rate_limit_tables.sql` created the rate-limit configuration and the per-project counters; `0013_add_workflow_usage_and_updated_by.sql` added the per-workflow counters and `project_rate_limit.updated_by`; `0014_add_project_topup.sql` adds weekly top-ups; `0015_add_project_rate_limit_default.sql` adds the per-scope defaults table; `0019_add_run_request_decision.sql` adds the decision columns on `rate_limit_request` (what an admin granted/decided and who decided it). These are additive-only migrations, applied by the existing `node migrate.cjs` step. The workflow-usage migration was renumbered from 0012 to 0013 during the CCP-6033 merge because main claimed the 0012 slot.
 
 ### `project_rate_limit` — per-project configuration
 
@@ -253,16 +254,17 @@ Rate-limit events notify the people affected by email, reusing the access-reques
 
 ### Events
 
-| Event kind                          | Fires when                                   | Recipients                               | Deduplicated per        |
-| ----------------------------------- | -------------------------------------------- | ---------------------------------------- | ----------------------- |
-| `weekly_reached_hard`               | First run rejected by the weekly limit       | Project admins/editors + platform admins | project + week          |
-| `weekly_reached_soft`               | First run at/over the weekly soft limit      | Project admins/editors                   | project + week          |
-| `yearly_reached_hard`               | First run rejected by the yearly limit       | Project admins/editors + platform admins | project + year          |
-| `yearly_reached_soft`               | First run at/over the yearly soft limit      | Project admins/editors                   | project + year          |
-| `weekly_near_80` / `weekly_near_50` | First run past 80% / 50% of the weekly limit | Project admins/editors                   | project + week          |
-| `yearly_near_80` / `yearly_near_50` | First run past 80% / 50% of the yearly limit | Project admins/editors                   | project + year          |
-| `topup_granted` (no claim row)      | Admin adds a top-up                          | Project admins/editors                   | — (one email per grant) |
-| `limits_changed` (no claim row)     | Admin saves the project's limits             | Project admins/editors                   | — (one email per save)  |
+| Event kind                          | Fires when                                   | Recipients                               | Deduplicated per           |
+| ----------------------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------- |
+| `weekly_reached_hard`               | First run rejected by the weekly limit       | Project admins/editors + platform admins | project + week             |
+| `weekly_reached_soft`               | First run at/over the weekly soft limit      | Project admins/editors                   | project + week             |
+| `yearly_reached_hard`               | First run rejected by the yearly limit       | Project admins/editors + platform admins | project + year             |
+| `yearly_reached_soft`               | First run at/over the yearly soft limit      | Project admins/editors                   | project + year             |
+| `weekly_near_80` / `weekly_near_50` | First run past 80% / 50% of the weekly limit | Project admins/editors                   | project + week             |
+| `yearly_near_80` / `yearly_near_50` | First run past 80% / 50% of the yearly limit | Project admins/editors                   | project + year             |
+| `topup_granted` (no claim row)      | Admin adds a top-up                          | Project admins/editors                   | — (one email per grant)    |
+| `limits_changed` (no claim row)     | Admin saves the project's limits             | Project admins/editors                   | — (one email per save)     |
+| run request decided (no claim row)  | Admin approves or denies a run request       | The requester only                       | — (one email per decision) |
 
 - **Recipients.** Project admins and editors — n8n relations with role slug `project:admin` or `project:editor`, plus `project:personalOwner` (a personal project's owner is its only member). Disabled users and users without an email are skipped. Platform admins (global owner/admin, via `findAdminEmails`) are added **only for hard-stop reached events** — a fully paused project is an incident. Soft-stop and near-limit emails go to the project's admins/editors only.
 - **Percentages use the effective limit** (base + top-ups), matching the UI banner. Default-capped projects get the same emails — their effective limits come from the scope defaults, with no special casing.
@@ -276,6 +278,7 @@ Rate-limit events notify the people affected by email, reusing the access-reques
 - **Fire-and-forget.** The dispatch is spawned (`void`) before a hard-stop throw and never awaited by enforcement: SMTP latency never delays a run, and a rejected run still triggers its notification.
 - **Notifications are optional.** Without a mailer (nullable `NodeMailerService` — e.g. a worker process where n8n did not register the mailer), the service skips sending entirely; enforcement is unaffected. Claims only exist when an email is actually attempted.
 - **Config-time emails are not claimed** — each top-up grant or limits save is a deliberate admin action and sends one email. They fire from the main-process API path, where the mailer is always available.
+- **Run-request decision emails** go to the requester only, fire once per decision (`notifyRunRequestDecided`), and pick one of three templates: `rateLimitRequestTopupApproved` (granted amount + week + optional admin note), `rateLimitRequestLimitsApproved` (the new weekly/annual limits, "unchanged" for untouched periods, + note) or `rateLimitRequestDenied` (the deny reason verbatim). Each carries the deciding admin's display name and a link to the project page. If the requester's email cannot be resolved the decision still succeeds and the skip is logged.
 - **Retention.** `pruneOlderThan` deletes old claim rows (they double as the sent-record); pruning is safe because a pruned period can never be current again.
 
 ### Operational notes for notifications
@@ -306,6 +309,8 @@ The webhook process creates and enqueues the execution record **before** the wor
 ## Projects API
 
 Reads and writes are split by audience. **Read endpoints** (list, detail, workflow usage, top-up history) live on a shared router mounted at **`/ui-api/projects`** and serve admins and non-admins alike — the mount enforces the UI session + `canManageProject`, and the handlers branch on the session's admin flag: admins get every n8n project, members get only the projects they can access in n8n (their personal project plus team project relations), with identical payloads. **Write endpoints** (limits, tenant mapping, top-up create/delete, defaults) remain on **`/ui-api/admin`** behind the full guard chain (`requireUiRequestContext` + `canManageProject` + `global:owner`/`global:admin`), so a non-admin can never reach them regardless of the UI. (The `/rest/admin/...` prefixes still present in some source JSDoc comments are legacy — `/ui-api/...` is the real path.)
+
+The run-request review endpoints sit on the same admin router: `GET /ui-api/admin/projects/run-requests` (query: `status` — `pending` default / `approved` / `denied` / `cancelled` / `all`, `search`, `page`, `pageSize`; pending rows come back oldest-first, the rest newest-first, with a `pending` block for the stat tile), `POST /ui-api/admin/projects/run-requests/:id/approve` (body: `grantedRuns` for extra_runs — defaults to the ask, may be lowered, never raised — and `newWeeklyLimit`/`newAnnualLimit` for limit_increase, plus optional `note`) and `POST /ui-api/admin/projects/run-requests/:id/deny` (body: `reason`, 10–500 chars, shown to the requester verbatim). Deciding an already-decided or cancelled request returns **409**.
 
 ### `GET /ui-api/projects`
 
