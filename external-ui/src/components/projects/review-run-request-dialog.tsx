@@ -203,7 +203,12 @@ export interface ReviewRunRequestDialogProps {
  * requests open the same dialog read-only with the decision recorded, and
  * members always get it read-only.
  */
-export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly = false }: Readonly<ReviewRunRequestDialogProps>) {
+export function ReviewRunRequestDialog({
+  request,
+  open,
+  onOpenChange,
+  readOnly = false,
+}: Readonly<ReviewRunRequestDialogProps>) {
   const queryClient = useQueryClient();
   const isDecided = request.status !== 'pending';
 
@@ -255,10 +260,15 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
     onSuccess: () => {
       invalidateAfterDecision();
       onOpenChange(false);
-      toast.success(`Denied · ${getFirstName(request.requestedByName)} will see your reason on the project page and in the email.`);
+      toast.success(
+        `Denied · ${getFirstName(request.requestedByName)} will see your reason on the project page and in the email.`,
+      );
     },
     onError: (error) =>
-      setErrors((prev) => ({ ...prev, form: getDecisionErrorMessage(error, 'Could not deny the request. Try again.') })),
+      setErrors((prev) => ({
+        ...prev,
+        form: getDecisionErrorMessage(error, 'Could not deny the request. Try again.'),
+      })),
   });
 
   const isSaving = approveMutation.isPending || denyMutation.isPending;
@@ -362,7 +372,8 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
             {readOnly ? `${request.projectName}'s request` : `Review ${request.projectName}'s request`}
           </DialogTitle>
           <DialogDescription>
-            From {request.requestedByName} ({request.requestedByRoleLabel ?? 'member'}) · sent {formatSentAt(request.createdAt)}
+            From {request.requestedByName} ({request.requestedByRoleLabel ?? 'member'}) · sent{' '}
+            {formatSentAt(request.createdAt)}
           </DialogDescription>
         </DialogHeader>
 
@@ -385,7 +396,9 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
           {request.requestKind === 'extra_runs' ? (
             <>
               <AskedRow term="Request">Extra runs for one week</AskedRow>
-              <AskedRow term="Amount">{request.extraRuns !== null ? `${formatCount(request.extraRuns)} runs` : '—'}</AskedRow>
+              <AskedRow term="Amount">
+                {request.extraRuns !== null ? `${formatCount(request.extraRuns)} runs` : '—'}
+              </AskedRow>
               <AskedRow term="Week">
                 {request.periodKey ? formatWeeklyKeyRange(request.periodKey) : '—'}
                 {isThisWeek ? ' (this week)' : ''}
@@ -430,7 +443,10 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
             </p>
             <p className="text-xs text-muted-foreground">
               {formatSentStamp(request.createdAt)}. Now {formatCount(request.weeklyUsedNow)} this week (
-              {request.currentWeeklyLimit === null ? 'no limit' : `${getUsagePercent(request.weeklyUsedNow, request.currentWeeklyLimit)}%`})
+              {request.currentWeeklyLimit === null
+                ? 'no limit'
+                : `${getUsagePercent(request.weeklyUsedNow, request.currentWeeklyLimit)}%`}
+              )
             </p>
           </div>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -494,7 +510,9 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
                       label="Runs to grant"
                       htmlFor="run-request-grant"
                       description={
-                        request.extraRuns !== null ? `They asked for ${formatCount(request.extraRuns)}. You can grant less.` : undefined
+                        request.extraRuns !== null
+                          ? `They asked for ${formatCount(request.extraRuns)}. You can grant less.`
+                          : undefined
                       }
                       error={errors.granted}
                     >
@@ -511,7 +529,9 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
                       />
                     </Field>
                     <div className="space-y-3">
-                      <Label htmlFor="run-request-weekly-total">Weekly limit for {request.periodKey ? formatWeeklyKeyRange(request.periodKey) : 'that week'}</Label>
+                      <Label htmlFor="run-request-weekly-total">
+                        Weekly limit for {request.periodKey ? formatWeeklyKeyRange(request.periodKey) : 'that week'}
+                      </Label>
                       <p className="text-xl font-bold text-foreground" id="run-request-weekly-total">
                         {weeklyLimitForGrant === null ? '—' : formatCount(weeklyLimitForGrant)}{' '}
                         <span className="text-sm font-normal text-muted-foreground">runs</span>
@@ -585,7 +605,8 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
                     disabled={isSaving}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Shown on {request.projectName}'s project page and in the email. Worth adding when you grant less than asked.
+                    Shown on {request.projectName}'s project page and in the email. Worth adding when you grant less
+                    than asked.
                   </p>
                 </div>
 
@@ -644,7 +665,9 @@ export function ReviewRunRequestDialog({ request, open, onOpenChange, readOnly =
               </Button>
               {decisionMode === 'approve' ? (
                 <Button type="button" onClick={handleApprove} disabled={isSaving}>
-                  {isSaving ? 'Approving...' : getApproveButtonLabel(request, parsedGrantedRuns, parsedWeeklyLimit, parsedAnnualLimit)}
+                  {isSaving
+                    ? 'Approving...'
+                    : getApproveButtonLabel(request, parsedGrantedRuns, parsedWeeklyLimit, parsedAnnualLimit)}
                 </Button>
               ) : (
                 <Button type="button" variant="destructive" onClick={handleDeny} disabled={isSaving}>
@@ -708,21 +731,21 @@ function DecidedPanel({
               : ''}
           </AskedRow>
         )}
-        {request.status === 'approved' && request.requestKind === 'limit_increase' && request.decidedWeeklyLimit !== null && (
-          <AskedRow term="New weekly limit">{formatCount(request.decidedWeeklyLimit)} runs a week</AskedRow>
-        )}
-        {request.status === 'approved' && request.requestKind === 'limit_increase' && request.decidedAnnualLimit !== null && (
-          <AskedRow term="New annual limit">{formatCount(request.decidedAnnualLimit)} runs a year</AskedRow>
-        )}
+        {request.status === 'approved' &&
+          request.requestKind === 'limit_increase' &&
+          request.decidedWeeklyLimit !== null && (
+            <AskedRow term="New weekly limit">{formatCount(request.decidedWeeklyLimit)} runs a week</AskedRow>
+          )}
+        {request.status === 'approved' &&
+          request.requestKind === 'limit_increase' &&
+          request.decidedAnnualLimit !== null && (
+            <AskedRow term="New annual limit">{formatCount(request.decidedAnnualLimit)} runs a year</AskedRow>
+          )}
         {request.decisionNote && (
-          <AskedRow term={request.status === 'denied' ? 'Reason for denying' : 'Note'}>
-            {request.decisionNote}
-          </AskedRow>
+          <AskedRow term={request.status === 'denied' ? 'Reason for denying' : 'Note'}>{request.decisionNote}</AskedRow>
         )}
       </dl>
-      <p className="text-xs text-muted-foreground">
-        {firstName} sees this on the project page and in the email.
-      </p>
+      <p className="text-xs text-muted-foreground">{firstName} sees this on the project page and in the email.</p>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
           Close

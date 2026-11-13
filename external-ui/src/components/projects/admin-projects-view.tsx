@@ -65,7 +65,10 @@ const REQUEST_FILTER_LABELS: Record<AdminRunRequestStatusFilter, string> = {
   all: 'All',
 };
 
-const REQUEST_STATUS_BADGE_VARIANTS: Record<AdminRunRequestStatus, 'warning' | 'success' | 'destructive' | 'secondary'> = {
+const REQUEST_STATUS_BADGE_VARIANTS: Record<
+  AdminRunRequestStatus,
+  'warning' | 'success' | 'destructive' | 'secondary'
+> = {
   pending: 'warning',
   approved: 'success',
   denied: 'destructive',
@@ -583,7 +586,13 @@ function RunRequestsTab({ readOnly = false }: { readOnly?: boolean }) {
                     ? 'When someone on one of your projects asks for more runs, the request shows up here. Decided requests are under Approved, Denied and Cancelled.'
                     : 'When a project admin or editor asks for more runs, the request shows up here and we email you. Decided requests are under Approved, Denied and Cancelled.'}
                 </p>
-                <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => setStatusFilter('all')}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setStatusFilter('all')}
+                >
                   See all requests
                 </Button>
               </>
@@ -610,12 +619,7 @@ function RunRequestsTab({ readOnly = false }: { readOnly?: boolean }) {
             </TableHeader>
             <TableBody>
               {items.map((item) => (
-                <RequestRow
-                  key={item.id}
-                  item={item}
-                  readOnly={readOnly}
-                  onReview={() => setReviewing(item)}
-                />
+                <RequestRow key={item.id} item={item} readOnly={readOnly} onReview={() => setReviewing(item)} />
               ))}
             </TableBody>
           </Table>
