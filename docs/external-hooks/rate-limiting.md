@@ -48,6 +48,10 @@ For the layered architecture these components live in, see [`architecture.md`](.
 | `external-hooks/drizzle/0016_add_project_uses_default_limits.sql`       | Additive-only migration: `project_rate_limit.uses_default_limits` (defaults mode; backfills legacy rows as custom)                                                                                                          |
 | `external-hooks/drizzle/0017_add_rate_limit_notification.sql`           | Additive-only migration: `rate_limit_notification` claim table (send-once notification dedup)                                                                                                                               |
 | `external-hooks/drizzle/0018_add_rate_limit_request.sql`                | Additive-only migration: `rate_limit_request` member request table (one pending request per project via partial unique index)                                                                                               |
+<<<<<<< HEAD
+| `external-hooks/drizzle/0019_add_run_request_decision.sql`              | Additive-only migration: decision columns on `rate_limit_request` (`granted_runs`, `decided_weekly_limit`, `decided_annual_limit`, `decision_note`, `decided_by`, `decided_at`) + status/period checks                      |
+=======
+>>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
 | `external-ui/src/components/projects/manage-topups-dialog.tsx`          | Weekly top-up form, paged history and future-week removal                                                                                                                                                                   |
 | `external-ui/src/components/projects/review-run-request-dialog.tsx`     | Admin review dialog: asked-for details, usage snapshot, approve/deny decision (runs to grant, new limits, optional note, required deny reason), read-only decided view; exports the shared `formatSentAt`/`formatSentStamp` |
 | `external-ui/src/lib/limit-input.ts`                                    | Shared limit parsing/validation for both dialogs (empty input → `null`, annual ≥ weekly, shared bounds)                                                                                                                     |
@@ -184,6 +188,15 @@ The **unique constraint on `(project_id, period_key, event_kind)`** is the whole
 | `reason`                  | varchar(500) | `NOT NULL`; CHECK `length ≥ 1`                                                         | Free-text justification shown to the reviewing admin                              |
 | `status`                  | varchar(20)  | `NOT NULL DEFAULT 'pending'`; CHECK `IN ('pending','approved','rejected','cancelled')` | Lifecycle; `cancelled` is member-initiated, `approved`/`rejected` admin decisions |
 | `requested_by`            | varchar(36)  | `NOT NULL`                                                                             | n8n user id of the requesting member                                              |
+<<<<<<< HEAD
+| `granted_runs`            | integer      | nullable; CHECK `≥ 1` (`extra_runs` kind, approved)                                    | Runs actually granted (≤ the ask, enforced by the service)                        |
+| `decided_weekly_limit`    | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind, approved)                                | Weekly limit in force after approval; `NULL` = unchanged/not approved             |
+| `decided_annual_limit`    | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind, approved)                                | Annual limit in force after approval; `NULL` = unchanged/not approved             |
+| `decision_note`           | varchar(500) | nullable                                                                               | Admin note on approval, or the deny reason shown to the requester verbatim        |
+| `decided_by`              | varchar(255) | nullable                                                                               | n8n user id of the deciding admin                                                 |
+| `decided_at`              | timestamptz  | nullable                                                                               | Decision timestamp                                                                |
+=======
+>>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
 | `created_at`/`updated_at` | timestamptz  | `NOT NULL DEFAULT now()`; `(project_id, created_at)` indexed                           | Convention timestamps                                                             |
 
 The **partial unique index on `project_id` where `status = 'pending'`** enforces one in-review request per project at the storage layer: a duplicate submit fails with 23505 and the service surfaces it as **409**, so concurrent submissions can never both queue. Filing requires the same membership the UI button uses (`project:admin` / `project:editor` / `project:personalOwner` — derived from the project relation, never from admin status). The fulfillment flow (an admin approving → top-up grant or limit change, with the review inbox and decision emails) ships with the request & approval system; until then pending requests simply wait and members may cancel their own.
@@ -312,6 +325,8 @@ Reads and writes are split by audience. **Read endpoints** (list, detail, workfl
 
 The run-request review endpoints sit on the same admin router: `GET /ui-api/admin/projects/run-requests` (query: `status` — `pending` default / `approved` / `denied` / `cancelled` / `all`, `search`, `page`, `pageSize`; pending rows come back oldest-first, the rest newest-first, with a `pending` block for the stat tile), `POST /ui-api/admin/projects/run-requests/:id/approve` (body: `grantedRuns` for extra_runs — defaults to the ask, may be lowered, never raised — and `newWeeklyLimit`/`newAnnualLimit` for limit_increase, plus optional `note`) and `POST /ui-api/admin/projects/run-requests/:id/deny` (body: `reason`, 10–500 chars, shown to the requester verbatim). Deciding an already-decided or cancelled request returns **409**.
 
+The **list** is also exposed member-side on the shared router as `GET /ui-api/projects/run-requests` (registered ahead of `/:projectId`, same query parameters and payload): admins get the full review queue, members get only requests belonging to the projects they can access in n8n, and the `pending` block is scoped the same way. Decisions stay admin-only.
+
 ### `GET /ui-api/projects`
 
 Query parameters: `page` (default 1), `pageSize` (default 25, max 100), `search`, `type` (`team`/`personal`). Each item keeps `projectId`, `projectName`, `projectType`, `tenantId` and:
@@ -400,6 +415,10 @@ Example body (mirroring the dialog's output where personal fields were left blan
 ### `GET /ui-api/projects/:projectId`
 
 Same item shape as the list, enrichment included — plus `viewerRole`, the requesting user's n8n project role for the project (`project:admin` / `project:editor` / `project:viewer` / `project:personalOwner`), or `null` when they are not a member (including platform admins without a relation; the field is derived from the project relation only, never from admin status) — and `pendingRunRequest`, the project's pending member request (see below), or `null` when none is open. Both fields are detail-only; the list endpoint never sets them. Backs the project detail page for admins and members — the role-scoped member affordances (the "Request more runs" action, the "You are an editor" meta label, the pending-review panel) key off these fields. Admins may read any project; a non-admin gets **403** unless they can access the project in n8n (project relation or personal-project owner). **404** (`Project not found`) when the project does not exist.
+
+#### `GET /ui-api/projects/run-requests`
+
+Member-visible request list backing the Projects page's "Run requests" tab (the admin route above stays for the review queue; the UI calls this one for both audiences). Same query parameters, item shape and ordering as the admin list; admins get every request, non-admins only those belonging to projects they can access in n8n (`listProjectIdsAccessibleToUser` — personal project plus team relations; members of no project get an empty page without touching the request table). The `pending` block is scoped identically, so the tab count reflects the member's projects only.
 
 #### `POST /ui-api/projects/:projectId/run-requests`
 
