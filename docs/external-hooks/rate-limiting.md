@@ -48,10 +48,7 @@ For the layered architecture these components live in, see [`architecture.md`](.
 | `external-hooks/drizzle/0016_add_project_uses_default_limits.sql`       | Additive-only migration: `project_rate_limit.uses_default_limits` (defaults mode; backfills legacy rows as custom)                                                                                                          |
 | `external-hooks/drizzle/0017_add_rate_limit_notification.sql`           | Additive-only migration: `rate_limit_notification` claim table (send-once notification dedup)                                                                                                                               |
 | `external-hooks/drizzle/0018_add_rate_limit_request.sql`                | Additive-only migration: `rate_limit_request` member request table (one pending request per project via partial unique index)                                                                                               |
-<<<<<<< HEAD
 | `external-hooks/drizzle/0019_add_run_request_decision.sql`              | Additive-only migration: decision columns on `rate_limit_request` (`granted_runs`, `decided_weekly_limit`, `decided_annual_limit`, `decision_note`, `decided_by`, `decided_at`) + status/period checks                      |
-=======
->>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
 | `external-ui/src/components/projects/manage-topups-dialog.tsx`          | Weekly top-up form, paged history and future-week removal                                                                                                                                                                   |
 | `external-ui/src/components/projects/review-run-request-dialog.tsx`     | Admin review dialog: asked-for details, usage snapshot, approve/deny decision (runs to grant, new limits, optional note, required deny reason), read-only decided view; exports the shared `formatSentAt`/`formatSentStamp` |
 | `external-ui/src/lib/limit-input.ts`                                    | Shared limit parsing/validation for both dialogs (empty input → `null`, annual ≥ weekly, shared bounds)                                                                                                                     |
@@ -188,15 +185,12 @@ The **unique constraint on `(project_id, period_key, event_kind)`** is the whole
 | `reason`                  | varchar(500) | `NOT NULL`; CHECK `length ≥ 1`                                                         | Free-text justification shown to the reviewing admin                              |
 | `status`                  | varchar(20)  | `NOT NULL DEFAULT 'pending'`; CHECK `IN ('pending','approved','rejected','cancelled')` | Lifecycle; `cancelled` is member-initiated, `approved`/`rejected` admin decisions |
 | `requested_by`            | varchar(36)  | `NOT NULL`                                                                             | n8n user id of the requesting member                                              |
-<<<<<<< HEAD
 | `granted_runs`            | integer      | nullable; CHECK `≥ 1` (`extra_runs` kind, approved)                                    | Runs actually granted (≤ the ask, enforced by the service)                        |
 | `decided_weekly_limit`    | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind, approved)                                | Weekly limit in force after approval; `NULL` = unchanged/not approved             |
 | `decided_annual_limit`    | integer      | nullable; CHECK `≥ 1` (`limit_increase` kind, approved)                                | Annual limit in force after approval; `NULL` = unchanged/not approved             |
 | `decision_note`           | varchar(500) | nullable                                                                               | Admin note on approval, or the deny reason shown to the requester verbatim        |
 | `decided_by`              | varchar(255) | nullable                                                                               | n8n user id of the deciding admin                                                 |
 | `decided_at`              | timestamptz  | nullable                                                                               | Decision timestamp                                                                |
-=======
->>>>>>> 47fde43c088815ccf932359bfd3fde9b0356b3f6
 | `created_at`/`updated_at` | timestamptz  | `NOT NULL DEFAULT now()`; `(project_id, created_at)` indexed                           | Convention timestamps                                                             |
 
 The **partial unique index on `project_id` where `status = 'pending'`** enforces one in-review request per project at the storage layer: a duplicate submit fails with 23505 and the service surfaces it as **409**, so concurrent submissions can never both queue. Filing requires the same membership the UI button uses (`project:admin` / `project:editor` / `project:personalOwner` — derived from the project relation, never from admin status). The fulfillment flow (an admin approving → top-up grant or limit change, with the review inbox and decision emails) ships with the request & approval system; until then pending requests simply wait and members may cancel their own.
