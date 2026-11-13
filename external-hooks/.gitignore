@@ -1,1 +1,11 @@
 dist
+
+# Compiled TypeScript output: tsc emits next to the sources (no outDir), so
+# committed .js files here are always stale build artifacts — the runtime uses
+# the tsup bundle (dist/), never these. The browser assets are hand-written
+# JavaScript and stay tracked.
+src/**/*.js
+tests/**/*.js
+*.config.js
+!src/api/assets/*.js
+tsconfig.tsbuildinfo
