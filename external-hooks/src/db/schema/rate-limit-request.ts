@@ -38,6 +38,17 @@ export const rateLimitRequest = pgTable(
     status: varchar('status', { length: 20 }).default('pending').notNull(),
     /** n8n user id of the requesting member. */
     requestedBy: varchar('requested_by', { length: 36 }).notNull(),
+    /** Granted one-off runs (approved extra_runs kind; the reviewing admin may lower the ask). */
+    grantedRuns: integer('granted_runs'),
+    /** Decided weekly limit (approved limit_increase kind). */
+    decidedWeeklyLimit: integer('decided_weekly_limit'),
+    /** Decided annual limit (approved limit_increase kind). */
+    decidedAnnualLimit: integer('decided_annual_limit'),
+    /** The admin's note on approval / the required deny reason. */
+    decisionNote: varchar('decision_note', { length: 500 }),
+    /** Platform-admin email of the decider (same convention as topup.created_by). */
+    decidedBy: varchar('decided_by', { length: 255 }),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -50,6 +61,11 @@ export const rateLimitRequest = pgTable(
     check('chk_rlr_extra_runs_non_negative', sql`${table.extraRuns} >= 0`),
     check('chk_rlr_limits_positive', sql`${table.requestedWeeklyLimit} >= 1 AND ${table.requestedAnnualLimit} >= 1`),
     check('chk_rlr_reason_non_empty', sql`length(${table.reason}) >= 1`),
+    check('chk_rlr_granted_runs_positive', sql`${table.grantedRuns} >= 1`),
+    check(
+      'chk_rlr_decided_limits_positive',
+      sql`${table.decidedWeeklyLimit} >= 1 AND ${table.decidedAnnualLimit} >= 1`,
+    ),
   ],
 );
 

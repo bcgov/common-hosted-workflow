@@ -55,6 +55,34 @@ type EmailTemplateDataMap = {
     changedBy: string | null;
     projectUrl: string;
   };
+  rateLimitRequestTopupApproved: {
+    projectName: string;
+    /** e.g. '3,000'. */
+    amount: string;
+    /** Human week description, e.g. 'November 2 to 8, 2026'. */
+    weekDescription: string;
+    /** The reviewing admin's note, when given. */
+    adminNote?: string;
+    decidedByName: string | null;
+    projectUrl: string;
+  };
+  rateLimitRequestLimitsApproved: {
+    projectName: string;
+    /** Formatted limit, or 'unchanged' when that period was not part of the ask. */
+    weeklyLimit: string;
+    yearlyLimit: string;
+    /** The reviewing admin's note, when given. */
+    adminNote?: string;
+    decidedByName: string | null;
+    projectUrl: string;
+  };
+  rateLimitRequestDenied: {
+    projectName: string;
+    /** The admin's required deny reason, word for word. */
+    reason: string;
+    decidedByName: string | null;
+    projectUrl: string;
+  };
 };
 
 const templates = {
@@ -115,6 +143,32 @@ const templates = {
 <p>The execution limits for {{projectName}} were updated{{#if changedBy}} by {{changedBy}}{{/if}}.</p>
 <p><strong>Weekly limit:</strong> {{weeklyLimit}}</p>
 <p><strong>Annual limit:</strong> {{yearlyLimit}}</p>
+<p><a href="{{projectUrl}}">View usage for {{projectName}}</a></p>`,
+  ),
+
+  rateLimitRequestTopupApproved: Handlebars.compile<EmailTemplateDataMap['rateLimitRequestTopupApproved']>(
+    `<h2>Your extra-runs request for {{projectName}} was approved</h2>
+<p>Your request for {{amount}} extra runs for {{projectName}} was approved{{#if decidedByName}} by {{decidedByName}}{{/if}}.</p>
+<p>The runs are added to the weekly limit for {{weekDescription}}, and also raise the annual limit for the year that week falls in.</p>
+{{#if adminNote}}<p><strong>Note from the reviewer:</strong> {{adminNote}}</p>{{/if}}
+<p><a href="{{projectUrl}}">View usage for {{projectName}}</a></p>`,
+  ),
+
+  rateLimitRequestLimitsApproved: Handlebars.compile<EmailTemplateDataMap['rateLimitRequestLimitsApproved']>(
+    `<h2>Your limit-raise request for {{projectName}} was approved</h2>
+<p>Your request to raise the execution limits for {{projectName}} was approved{{#if decidedByName}} by {{decidedByName}}{{/if}}.</p>
+<p><strong>Weekly limit:</strong> {{weeklyLimit}}</p>
+<p><strong>Annual limit:</strong> {{yearlyLimit}}</p>
+<p>The new limits start now and stay in effect until an admin changes them.</p>
+{{#if adminNote}}<p><strong>Note from the reviewer:</strong> {{adminNote}}</p>{{/if}}
+<p><a href="{{projectUrl}}">View usage for {{projectName}}</a></p>`,
+  ),
+
+  rateLimitRequestDenied: Handlebars.compile<EmailTemplateDataMap['rateLimitRequestDenied']>(
+    `<h2>Your run request for {{projectName}} was denied</h2>
+<p>Your request for more runs for {{projectName}} was denied{{#if decidedByName}} by {{decidedByName}}{{/if}}.</p>
+<p><strong>Reason:</strong> {{reason}}</p>
+<p>You can submit a new request from the project page at any time.</p>
 <p><a href="{{projectUrl}}">View usage for {{projectName}}</a></p>`,
   ),
 } satisfies {

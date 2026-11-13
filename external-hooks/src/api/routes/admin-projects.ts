@@ -11,6 +11,9 @@ import {
   deleteProjectTopupSchema,
   getRateLimitDefaultsSchema,
   updateRateLimitDefaultsSchema,
+  listRunRequestsSchema,
+  approveRunRequestSchema,
+  denyRunRequestSchema,
 } from '../schemas/projects';
 import type { UiApiTypedRequest } from '../types/ui-api';
 
@@ -45,6 +48,40 @@ export function buildAdminProjectRouter(routeContext: ApiRouteContext) {
       const updatedBy = req.session.n8nUser?.email ?? null;
       const result = await services.projectRateLimit.updateRateLimitDefaults(req.parsed.body, updatedBy);
       OkResponse(res, { success: true, message: 'Default limits updated', defaults: result });
+    },
+  );
+
+  // Admin run-request review endpoints. Literal paths are registered ahead of
+  // the '/projects/:projectId/...' routes below, following the same
+  // literal-first convention as the defaults routes.
+  router.get(
+    '/projects/run-requests',
+    createRequestParser(listRunRequestsSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof listRunRequestsSchema>>, res) => {
+      const result = await services.projectRateLimit.listRunRequestsForAdmin(req.parsed.query);
+      OkResponse(res, result);
+    },
+  );
+
+  router.post(
+    '/projects/run-requests/:requestId/approve',
+    createRequestParser(approveRunRequestSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof approveRunRequestSchema>>, res) => {
+      const { requestId } = req.parsed.params;
+      const decidedBy = req.session.n8nUser?.email ?? null;
+      const result = await services.projectRateLimit.approveRunRequest(requestId, req.parsed.body, decidedBy);
+      OkResponse(res, { success: true, message: 'Request approved', request: result });
+    },
+  );
+
+  router.post(
+    '/projects/run-requests/:requestId/deny',
+    createRequestParser(denyRunRequestSchema),
+    async (req: UiApiTypedRequest<zInfer<typeof denyRunRequestSchema>>, res) => {
+      const { requestId } = req.parsed.params;
+      const decidedBy = req.session.n8nUser?.email ?? null;
+      const result = await services.projectRateLimit.denyRunRequest(requestId, req.parsed.body, decidedBy);
+      OkResponse(res, { success: true, message: 'Request denied', request: result });
     },
   );
 

@@ -1564,3 +1564,491 @@ describe('ProjectRateLimitService · run requests', () => {
     await expect(runRequestService.getPendingRunRequest(VALID_PROJECT_ID)).resolves.toBeNull();
   });
 });
+
+/* ================================================================== */
+/*  Admin review of run requests (list + approve/deny)                 */
+/* ================================================================== */
+
+describe('ProjectRateLimitService · admin run-request review', () => {
+  const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+  const ADMIN_EMAIL = 'admin@example.com';
+
+  let n8nRepos: ReturnType<typeof createMockN8nRepositories>;
+  let rateLimitRepo: ReturnType<typeof createMockProjectRateLimitRepository>;
+  let defaultsRepo: ReturnType<typeof createMockProjectRateLimitDefaultRepository>;
+  let usageRepo: ReturnType<typeof createMockProjectExecutionUsageRepository>;
+  let workflowUsageRepo: ReturnType<typeof createMockWorkflowExecutionUsageRepository>;
+  let topupRepo: ReturnType<typeof createMockProjectTopupRepository>;
+  let requestRepo: Record<string, ReturnType<typeof vi.fn>>;
+  let service: ProjectRateLimitService;
+  let mailer: { sendMail: ReturnType<typeof vi.fn> } | null;
+
+  function makeRunRequestRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: REQUEST_ID,
+      projectId: VALID_PROJECT_ID,
+      requestKind: 'extra_runs',
+      extraRuns: 5_000,
+      periodKey: '2026-W47',
+      requestedWeeklyLimit: null,
+      requestedAnnualLimit: null,
+      reason: 'Fall intake started early',
+      status: 'pending',
+      requestedBy: 'requester-1',
+      grantedRuns: null,
+      decidedWeeklyLimit: null,
+      decidedAnnualLimit: null,
+      decisionNote: null,
+      decidedBy: null,
+      decidedAt: null,
+      createdAt: new Date('2026-11-10T10:14:00Z'),
+      updatedAt: new Date('2026-11-10T10:14:00Z'),
+      ...overrides,
+    };
+  }
+
+  function makeDecidedRow(overrides: Record<string, unknown> = {}) {
+    return makeRunRequestRow({
+      status: 'approved',
+      grantedRuns: 5_000,
+      decisionNote: 'Enjoy the extra headroom',
+      decidedBy: ADMIN_EMAIL,
+      decidedAt: new Date('2026-11-11T09:00:00Z'),
+      ...overrides,
+    });
+  }
+
+  function buildService(withMailer = false) {
+    mailer = withMailer ? { sendMail: vi.fn().mockResolvedValue(undefined) } : null;
+    service = new ProjectRateLimitService(
+      { ...n8nRepos, user: new UserRepository(n8nRepos.user as any) } as any,
+      {
+        projectRateLimit: rateLimitRepo,
+        projectRateLimitDefault: defaultsRepo,
+        projectExecutionUsage: usageRepo,
+        workflowExecutionUsage: workflowUsageRepo,
+        projectTopup: topupRepo,
+        rateLimitRequest: requestRepo,
+      } as any,
+      mailer as any,
+    );
+  }
+
+  beforeEach(() => {
+    n8nRepos = createMockN8nRepositories();
+    (n8nRepos.projectRelation.findProjectRole as ReturnType<typeof vi.fn>).mockResolvedValue('project:editor');
+    n8nRepos.user.findOne.mockResolvedValue({
+      id: 'requester-1',
+      email: 'jordan.lee@example.com',
+      firstName: 'Jordan',
+      lastName: 'Lee',
+      role: { slug: 'global:member' },
+    });
+    rateLimitRepo = createMockProjectRateLimitRepository();
+    defaultsRepo = createMockProjectRateLimitDefaultRepository();
+    usageRepo = createMockProjectExecutionUsageRepository();
+    workflowUsageRepo = createMockWorkflowExecutionUsageRepository();
+    topupRepo = createMockProjectTopupRepository();
+    requestRepo = {
+      getById: vi.fn().mockResolvedValue(null),
+      listByStatuses: vi.fn().mockResolvedValue([]),
+      approveAsTopup: vi.fn().mockImplementation(async (_id: string, decision: Record<string, unknown>) =>
+        makeDecidedRow(decision),
+      ),
+      approveAsLimitChange: vi.fn().mockImplementation(async (_id: string, decision: Record<string, unknown>) =>
+        makeRunRequestRow({
+          requestKind: 'limit_increase',
+          extraRuns: null,
+          periodKey: null,
+          requestedWeeklyLimit: 10_000,
+          status: 'approved',
+          decidedWeeklyLimit: decision.decidedWeeklyLimit ?? null,
+          decidedAnnualLimit: decision.decidedAnnualLimit ?? null,
+          decisionNote: decision.decisionNote ?? null,
+          decidedBy: decision.decidedBy ?? null,
+          decidedAt: new Date('2026-11-11T09:00:00Z'),
+        }),
+      ),
+      rejectPending: vi.fn().mockImplementation(async (_id: string, decision: Record<string, unknown>) =>
+        makeRunRequestRow({
+          status: 'rejected',
+          decisionNote: decision.decisionNote ?? null,
+          decidedBy: decision.decidedBy ?? null,
+          decidedAt: new Date('2026-11-11T09:00:00Z'),
+        }),
+      ),
+    };
+    buildService();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('listRunRequestsForAdmin', () => {
+    it('lists pending requests oldest-first with enrichment and pending stats', async () => {
+      const older = makeRunRequestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', createdAt: new Date('2026-11-01T09:00:00Z') });
+      const newer = makeRunRequestRow();
+      // The repo returns pending rows oldest-first.
+      requestRepo.listByStatuses.mockResolvedValue([older, newer]);
+
+      const page = await service.listRunRequestsForAdmin({ status: 'pending', page: 1, pageSize: 25 });
+
+      expect(page.pagination).toEqual({ page: 1, pageSize: 25, totalItems: 2, totalPages: 1 });
+      expect(page.pending).toEqual({ count: 2, oldestCreatedAt: '2026-11-01T09:00:00.000Z' });
+      expect(page.data.map((item) => item.id)).toEqual([older.id, newer.id]);
+      expect(page.data[0]).toMatchObject({
+        projectId: VALID_PROJECT_ID,
+        projectName: 'Default project',
+        projectType: 'personal',
+        requestKind: 'extra_runs',
+        status: 'pending',
+        requestedByName: 'Jordan Lee',
+        requestedByEmail: 'jordan.lee@example.com',
+        requestedByRoleLabel: 'Editor',
+        weeklyUsedWhenSent: 0,
+        yearlyUsedWhenSent: 0,
+        weeklyUsedNow: 0,
+        currentWeeklyLimit: null,
+        lastTopup: null,
+        decidedAt: null,
+      });
+    });
+
+    it('maps the denied filter to rejected rows surfaced as denied, newest-first', async () => {
+      const rejected = makeRunRequestRow({
+        status: 'rejected',
+        decisionNote: 'Not enough platform quota',
+        decidedBy: ADMIN_EMAIL,
+        decidedAt: new Date('2026-11-11T09:00:00Z'),
+      });
+      requestRepo.listByStatuses.mockImplementation(async (statuses: string[]) =>
+        statuses.includes('rejected') ? [rejected] : [],
+      );
+
+      const page = await service.listRunRequestsForAdmin({ status: 'denied', page: 1, pageSize: 25 });
+
+      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['rejected']);
+      expect(page.data).toHaveLength(1);
+      expect(page.data[0]).toMatchObject({
+        status: 'denied',
+        decisionNote: 'Not enough platform quota',
+        decidedByName: ADMIN_EMAIL,
+        decidedAt: '2026-11-11T09:00:00.000Z',
+      });
+      expect(page.pending).toEqual({ count: 0, oldestCreatedAt: null });
+    });
+
+    it('sorts the all filter newest-first and enriches decided rows with the decision fields', async () => {
+      const olderDecision = makeDecidedRow({
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        createdAt: new Date('2026-11-01T09:00:00Z'),
+      });
+      const newerDecision = makeDecidedRow({ status: 'rejected', decisionNote: 'Not enough quota', decidedAt: new Date('2026-11-12T08:00:00Z') });
+      requestRepo.listByStatuses.mockImplementation(async (statuses: string[]) =>
+        statuses.length === 1 && statuses[0] === 'pending'
+          ? []
+          : [olderDecision, newerDecision],
+      );
+
+      const page = await service.listRunRequestsForAdmin({ status: 'all', page: 1, pageSize: 25 });
+
+      expect(requestRepo.listByStatuses).toHaveBeenCalledWith(['pending', 'approved', 'rejected', 'cancelled']);
+      expect(page.data.map((item) => item.id)).toEqual([newerDecision.id, olderDecision.id]);
+      expect(page.data[0]).toMatchObject({
+        status: 'denied',
+        decisionNote: 'Not enough quota',
+        decidedBy: ADMIN_EMAIL,
+        decidedByName: ADMIN_EMAIL,
+        decidedAt: '2026-11-12T08:00:00.000Z',
+        grantedRuns: 5_000,
+      });
+    });
+
+    it('searches by project name and by requester name', async () => {
+      const row = makeRunRequestRow();
+      requestRepo.listByStatuses.mockResolvedValue([row]);
+
+      const byProject = await service.listRunRequestsForAdmin({ status: 'pending', search: 'default', page: 1, pageSize: 25 });
+      const byRequester = await service.listRunRequestsForAdmin({ status: 'pending', search: 'jordan', page: 1, pageSize: 25 });
+      const noMatch = await service.listRunRequestsForAdmin({ status: 'pending', search: 'nothing', page: 1, pageSize: 25 });
+
+      expect(byProject.data).toHaveLength(1);
+      expect(byRequester.data).toHaveLength(1);
+      expect(noMatch.data).toHaveLength(0);
+      expect(noMatch.pagination.totalItems).toBe(0);
+    });
+
+    it('paginates the enriched list', async () => {
+      requestRepo.listByStatuses.mockResolvedValue([makeRunRequestRow()]);
+
+      const page2 = await service.listRunRequestsForAdmin({ status: 'pending', page: 2, pageSize: 1 });
+
+      expect(page2.pagination).toEqual({ page: 2, pageSize: 1, totalItems: 1, totalPages: 1 });
+      expect(page2.data).toHaveLength(0);
+    });
+  });
+
+  describe('approveRunRequest · extra_runs', () => {
+    it('approves with the default grant, fulfills the top-up and returns the decided row', async () => {
+      const row = makeRunRequestRow();
+      requestRepo.getById.mockResolvedValue(row);
+      const decided = makeDecidedRow();
+      requestRepo.approveAsTopup.mockResolvedValue(decided);
+
+      const item = await service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL);
+
+      expect(requestRepo.approveAsTopup).toHaveBeenCalledWith(
+        REQUEST_ID,
+        { grantedRuns: 5_000, decisionNote: null, decidedBy: ADMIN_EMAIL },
+        { projectId: VALID_PROJECT_ID, periodKey: '2026-W47', adminComment: "Approved from Jordan's run request" },
+      );
+      expect(item).toMatchObject({
+        id: REQUEST_ID,
+        status: 'approved',
+        grantedRuns: 5_000,
+        decisionNote: 'Enjoy the extra headroom',
+        requestedByName: 'Jordan Lee',
+      });
+      expect(topupRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('allows lowering the grant below the ask', async () => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+
+      await service.approveRunRequest(REQUEST_ID, { grantedRuns: 3_000, note: 'Partial for now' }, ADMIN_EMAIL);
+
+      expect(requestRepo.approveAsTopup).toHaveBeenCalledWith(
+        REQUEST_ID,
+        { grantedRuns: 3_000, decisionNote: 'Partial for now', decidedBy: ADMIN_EMAIL },
+        { projectId: VALID_PROJECT_ID, periodKey: '2026-W47', adminComment: 'Partial for now' },
+      );
+    });
+
+    it.each([
+      ['above the ask', { grantedRuns: 6_000 }],
+      ['below the minimum', { grantedRuns: 50 }],
+    ])('rejects grants %s with 400', async (_label, body) => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+
+      await expect(service.approveRunRequest(REQUEST_ID, body as any, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(requestRepo.approveAsTopup).not.toHaveBeenCalled();
+    });
+
+    it('throws 404 for an unknown request', async () => {
+      requestRepo.getById.mockResolvedValue(null);
+
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('maps decided and cancelled races to distinct 409 messages', async () => {
+      requestRepo.getById.mockResolvedValue(makeDecidedRow());
+
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 409,
+        message: 'This request has already been decided',
+      });
+
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow({ status: 'cancelled' }));
+
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 409,
+        message: 'This request was cancelled by the requester',
+      });
+    });
+
+    it('maps a lost decide race (repo returns null) to 409 after refetching the row', async () => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+      requestRepo.approveAsTopup.mockResolvedValue(null);
+
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({ statusCode: 409 });
+      expect(requestRepo.getById).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('approveRunRequest · limit_increase', () => {
+    const limitRow = () =>
+      makeRunRequestRow({
+        requestKind: 'limit_increase',
+        extraRuns: null,
+        periodKey: null,
+        requestedWeeklyLimit: 10_000,
+        requestedAnnualLimit: 500_000,
+      });
+
+    function mockCurrentLimits(overrides: Record<string, unknown> = {}) {
+      rateLimitRepo.get.mockResolvedValue({
+        projectId: VALID_PROJECT_ID,
+        usesDefaultLimits: false,
+        weeklyRateLimit: 8_000,
+        yearlyRateLimit: 400_000,
+        lastAdminComment: null,
+        stopBehavior: 'hard_stop',
+        updatedBy: ADMIN_EMAIL,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-06-01T00:00:00Z'),
+        ...overrides,
+      });
+    }
+
+    it('approves the asked limits, applies the upsert and returns the decided row', async () => {
+      requestRepo.getById.mockResolvedValue(limitRow());
+      mockCurrentLimits();
+
+      const item = await service.approveRunRequest(
+        REQUEST_ID,
+        { newWeeklyLimit: 10_000, newAnnualLimit: 500_000, note: 'Backfill quota' },
+        ADMIN_EMAIL,
+      );
+
+      expect(requestRepo.approveAsLimitChange).toHaveBeenCalledWith(
+        REQUEST_ID,
+        { decidedWeeklyLimit: 10_000, decidedAnnualLimit: 500_000, decisionNote: 'Backfill quota', decidedBy: ADMIN_EMAIL },
+        { projectId: VALID_PROJECT_ID, lastAdminComment: 'Backfill quota' },
+      );
+      expect(item).toMatchObject({
+        status: 'approved',
+        requestedWeeklyLimit: 10_000,
+        decidedWeeklyLimit: 10_000,
+        decidedAnnualLimit: 500_000,
+      });
+    });
+
+    it.each([
+      ['above the ask', { newWeeklyLimit: 11_000 }],
+      ['below the current limit', { newWeeklyLimit: 7_000 }],
+      ['annual below the new weekly', { newWeeklyLimit: 9_000, newAnnualLimit: 8_000 }],
+      ['without an actual change', { newWeeklyLimit: 8_000, newAnnualLimit: 400_000 }],
+    ])('rejects grants %s with 400', async (_label, body) => {
+      requestRepo.getById.mockResolvedValue(limitRow());
+      mockCurrentLimits();
+
+      await expect(service.approveRunRequest(REQUEST_ID, body as any, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(requestRepo.approveAsLimitChange).not.toHaveBeenCalled();
+    });
+
+    it('rejects changes to a period the requester did not ask about', async () => {
+      const row = limitRow();
+      row.requestedWeeklyLimit = null;
+      requestRepo.getById.mockResolvedValue(row);
+      mockCurrentLimits();
+
+      await expect(
+        service.approveRunRequest(REQUEST_ID, { newAnnualLimit: 500_000, newWeeklyLimit: 9_000 }, ADMIN_EMAIL),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(requestRepo.approveAsLimitChange).not.toHaveBeenCalled();
+    });
+
+    it('resolves current limits from scope defaults when the project is in default mode', async () => {
+      requestRepo.getById.mockResolvedValue(limitRow());
+      rateLimitRepo.get.mockResolvedValue(null);
+      defaultsRepo.get.mockResolvedValue({
+        projectKind: 'personal',
+        weeklyRateLimit: 4,
+        yearlyRateLimit: 200,
+        updatedBy: null,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      // Weekly below the default of 4 → refused.
+      await expect(
+        service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 3 }, ADMIN_EMAIL),
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      // At/above the default and an actual change → allowed.
+      await expect(
+        service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 10_000, newAnnualLimit: 500_000 }, ADMIN_EMAIL),
+      ).resolves.toMatchObject({ status: 'approved' });
+    });
+  });
+
+  describe('denyRunRequest', () => {
+    it('denies with the required reason and returns the rejected row', async () => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+      const rejected = makeRunRequestRow({
+        status: 'rejected',
+        decisionNote: 'Not enough platform quota this quarter. Please ask again in January.',
+        decidedBy: ADMIN_EMAIL,
+        decidedAt: new Date('2026-11-11T09:00:00Z'),
+      });
+      requestRepo.rejectPending.mockResolvedValue(rejected);
+
+      const item = await service.denyRunRequest(
+        REQUEST_ID,
+        { reason: 'Not enough platform quota this quarter. Please ask again in January.' },
+        ADMIN_EMAIL,
+      );
+
+      expect(requestRepo.rejectPending).toHaveBeenCalledWith(REQUEST_ID, {
+        decisionNote: 'Not enough platform quota this quarter. Please ask again in January.',
+        decidedBy: ADMIN_EMAIL,
+      });
+      expect(item).toMatchObject({ status: 'denied', decidedByName: ADMIN_EMAIL });
+      expect(topupRepo.create).not.toHaveBeenCalled();
+      expect(rateLimitRepo.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['too short', 'too short'],
+      ['too long', 'x'.repeat(501)],
+    ])('rejects a %s reason with 400', async (_label, reason) => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+
+      await expect(service.denyRunRequest(REQUEST_ID, { reason }, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(requestRepo.rejectPending).not.toHaveBeenCalled();
+    });
+
+    it('throws 404 for an unknown request', async () => {
+      requestRepo.getById.mockResolvedValue(null);
+
+      await expect(service.denyRunRequest(REQUEST_ID, { reason: 'A sufficiently long reason here' }, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+    });
+  });
+
+  describe('decision emails', () => {
+    it('emails the requester when an extra-runs request is approved', async () => {
+      buildService(true);
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+
+      await service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL);
+
+      expect(mailer!.sendMail).toHaveBeenCalledTimes(1);
+      const { to, subject, html } = mailer!.sendMail.mock.calls[0][0];
+      expect(to).toBe('jordan.lee@example.com');
+      expect(subject).toContain('approved');
+      expect(html).toContain('5,000');
+    });
+
+    it('emails the requester the deny reason word for word', async () => {
+      buildService(true);
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+      const reason = 'Not enough platform quota this quarter. Please ask again in January.';
+      requestRepo.rejectPending.mockResolvedValue(
+        makeRunRequestRow({ status: 'rejected', decisionNote: reason, decidedBy: ADMIN_EMAIL, decidedAt: new Date() }),
+      );
+
+      await service.denyRunRequest(REQUEST_ID, { reason }, ADMIN_EMAIL);
+
+      expect(mailer!.sendMail).toHaveBeenCalledTimes(1);
+      const { html } = mailer!.sendMail.mock.calls[0][0];
+      expect(html).toContain(reason);
+    });
+
+    it('skips the email when no mailer is configured', async () => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow());
+
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).resolves.toMatchObject({ status: 'approved' });
+    });
+  });
+});

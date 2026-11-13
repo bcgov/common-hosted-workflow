@@ -4,9 +4,9 @@ import type { ProjectRateLimit } from '../../db/schema/project-rate-limit';
 import type { ProjectRateLimitDefault } from '../../db/schema/project-rate-limit-default';
 import type { ProjectTopup } from '../../db/schema/project-topup';
 import type { RateLimitNotificationKind } from '../../db/schema/rate-limit-notification';
-import type { RunRequestKind } from '../../db/schema/rate-limit-request';
+import type { RateLimitRequest, RunRequestKind, RunRequestStatus } from '../../db/schema/rate-limit-request';
 import type { NodeMailerService } from './node-mailer';
-import { getViewerProjectRole } from './project-access';
+import { extractRoleSlug, getViewerProjectRole } from './project-access';
 import { renderEmail } from './email-templates';
 import { UI_APP_BASE_URL } from '@config';
 import {
@@ -367,6 +367,123 @@ function serializeRunRequest(row: {
 /** True for a PostgreSQL unique-violation error (used for the pending-per-project race). */
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505';
+}
+
+// -------------------------------------------------------------------------
+// Admin review of run requests (types + enrichment helpers)
+// -------------------------------------------------------------------------
+
+/** Status filter values for the admin run-requests list ('denied' maps to the DB's 'rejected'). */
+export type AdminRunRequestStatusFilter = 'pending' | 'approved' | 'denied' | 'cancelled' | 'all';
+
+/**
+ * Admin list row: a run request enriched with project, requester, usage and
+ * decision context. `status` is the UI-facing value (DB 'rejected' surfaces
+ * as 'denied').
+ */
+export type AdminRunRequestItem = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectType: string;
+  requestKind: RunRequestKind;
+  status: 'pending' | 'approved' | 'denied' | 'cancelled';
+  extraRuns: number | null;
+  periodKey: string | null;
+  requestedWeeklyLimit: number | null;
+  requestedAnnualLimit: number | null;
+  reason: string;
+  requestedBy: string;
+  /** "Jordan Lee" (falls back to the requester's email). */
+  requestedByName: string | null;
+  requestedByEmail: string | null;
+  /** Requester's project-role label, e.g. 'Editor'. */
+  requestedByRoleLabel: string | null;
+  createdAt: string;
+  /** Usage in the week/year the request was sent (the list's "week used" column). */
+  weeklyUsedWhenSent: number | null;
+  yearlyUsedWhenSent: number | null;
+  /** Usage in the current week/year (the review dialog's "now" figure). */
+  weeklyUsedNow: number;
+  yearlyUsedNow: number;
+  /** Limits in force right now (defaults mode resolves the scope defaults). */
+  currentWeeklyLimit: number | null;
+  currentAnnualLimit: number | null;
+  /** Most recent top-up before review, for context in the dialog. */
+  lastTopup: { amount: number; periodKey: string; createdAt: string; createdByName: string | null } | null;
+  /** Most recent limits change before review, for context in the dialog. */
+  lastLimitChange: { at: string; byName: string | null } | null;
+  grantedRuns: number | null;
+  decidedWeeklyLimit: number | null;
+  decidedAnnualLimit: number | null;
+  /** The admin's note on approval, or the deny reason. */
+  decisionNote: string | null;
+  decidedBy: string | null;
+  decidedByName: string | null;
+  decidedAt: string | null;
+};
+
+export type AdminRunRequestsPage = {
+  data: AdminRunRequestItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  /** Drives the "Run requests waiting" stat tile. */
+  pending: { count: number; oldestCreatedAt: string | null };
+};
+
+/** n8n user entity with the identity fields the enrichment reads. */
+type RunRequestUserEntity = {
+  id: string;
+  role: { slug: string };
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+/** Role labels shown next to the requester's name ("From Jordan Lee (Editor)"). */
+const RUN_REQUEST_ROLE_LABELS: Record<string, string> = {
+  'project:admin': 'Admin',
+  'project:editor': 'Editor',
+  'project:personalOwner': 'Owner',
+};
+
+/**
+ * Full-name formatter for the admin surfaces (the member-side view uses the
+ * initials style via formatDisplayName; these mocks show full names).
+ */
+function formatFullName(
+  name: { firstName?: string | null; lastName?: string | null } | undefined,
+  fallbackEmail: string | null,
+): string | null {
+  const first = name?.firstName?.trim() ?? '';
+  const last = name?.lastName?.trim() ?? '';
+  if (first.length > 0 && last.length > 0) {
+    return `${first} ${last}`;
+  }
+  if (first.length > 0) {
+    return first;
+  }
+  return fallbackEmail;
+}
+
+function serializeDecisionFields(
+  row: RateLimitRequest,
+): Pick<
+  AdminRunRequestItem,
+  'grantedRuns' | 'decidedWeeklyLimit' | 'decidedAnnualLimit' | 'decisionNote' | 'decidedBy' | 'decidedAt'
+> {
+  return {
+    grantedRuns: row.grantedRuns,
+    decidedWeeklyLimit: row.decidedWeeklyLimit,
+    decidedAnnualLimit: row.decidedAnnualLimit,
+    decisionNote: row.decisionNote,
+    decidedBy: row.decidedBy,
+    decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
+  };
 }
 
 /** Default limits for one project scope; a null limit means "no default" (uncapped). */
@@ -1191,6 +1308,461 @@ export class ProjectRateLimitService {
     if (!cancelled) {
       throw new AppError(404, 'Pending request not found');
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin review of run requests (list + approve/deny)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Lists run requests for the admin review page, enriched per row. Pending
+   * requests sort oldest-first (review-queue order); every other status — and
+   * the 'all' filter — sorts newest-first. Search matches project name or the
+   * requester's name/email. The pending counts are returned regardless of the
+   * filter so the stat tile stays live.
+   */
+  async listRunRequestsForAdmin(query: {
+    status: AdminRunRequestStatusFilter;
+    search?: string | null;
+    page: number;
+    pageSize: number;
+  }): Promise<AdminRunRequestsPage> {
+    const dbStatuses: RunRequestStatus[] =
+      query.status === 'all'
+        ? ['pending', 'approved', 'rejected', 'cancelled']
+        : query.status === 'denied'
+          ? ['rejected']
+          : [query.status];
+    const [rows, pendingRows] = await Promise.all([
+      this.customRepositories.rateLimitRequest.listByStatuses(dbStatuses),
+      this.customRepositories.rateLimitRequest.listByStatuses(['pending']),
+    ]);
+
+    // Pending keeps the queue's oldest-first order; everything else is newest-first.
+    if (query.status !== 'pending') {
+      rows.sort((a, b) => {
+        const byDate = b.createdAt.getTime() - a.createdAt.getTime();
+        return byDate !== 0 ? byDate : b.id.localeCompare(a.id);
+      });
+    }
+
+    const items = await this.enrichRunRequests(rows);
+    const search = query.search?.trim().toLowerCase() ?? '';
+    const filtered =
+      search.length > 0
+        ? items.filter(
+            (item) =>
+              item.projectName.toLowerCase().includes(search) ||
+              (item.requestedByName ?? '').toLowerCase().includes(search) ||
+              (item.requestedByEmail ?? '').toLowerCase().includes(search),
+          )
+        : items;
+
+    const page = Math.max(1, Math.floor(query.page));
+    const pageSize = Math.max(1, Math.floor(query.pageSize));
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const start = (page - 1) * pageSize;
+
+    const oldestPending = pendingRows.reduce<Date | null>(
+      (oldest, row) => (oldest === null || row.createdAt < oldest ? row.createdAt : oldest),
+      null,
+    );
+
+    return {
+      data: filtered.slice(start, start + pageSize),
+      pagination: { page, pageSize, totalItems, totalPages },
+      pending: {
+        count: pendingRows.length,
+        oldestCreatedAt: oldestPending ? oldestPending.toISOString() : null,
+      },
+    };
+  }
+
+  /**
+   * Approves a pending run request and fulfills it atomically: extra-runs
+   * requests become a top-up for the asked week, limit-raise requests become a
+   * custom limits configuration (full-replace semantics like Edit limits).
+   * The reviewing admin may grant less than asked, never more. Throws AppError
+   * 404 (unknown request), 409 (cancelled or already decided) and 400
+   * (validation).
+   */
+  async approveRunRequest(
+    requestId: string,
+    body: {
+      grantedRuns?: number | null;
+      newWeeklyLimit?: number | null;
+      newAnnualLimit?: number | null;
+      note?: string | null;
+    },
+    decidedBy: string | null,
+  ): Promise<AdminRunRequestItem> {
+    const row = await this.customRepositories.rateLimitRequest.getById(requestId);
+    if (!row) {
+      throw new AppError(404, 'Request not found');
+    }
+    if (row.status !== 'pending') {
+      throw await this.requestGoneError(row);
+    }
+    const note = body.note?.trim() ? body.note!.trim() : null;
+
+    if (row.requestKind === 'extra_runs') {
+      const asked = row.extraRuns ?? 0;
+      const granted = body.grantedRuns ?? asked;
+      if (
+        !Number.isInteger(granted) ||
+        granted < RUN_REQUEST_MIN_EXTRA_RUNS ||
+        granted > asked ||
+        granted > RUN_REQUEST_MAX_EXTRA_RUNS
+      ) {
+        throw new AppError(
+          400,
+          `Runs to grant must be a whole number between ${RUN_REQUEST_MIN_EXTRA_RUNS} and ${formatRuns(asked)} (the number asked for)`,
+        );
+      }
+      const requester = (await this.n8nRepositories.user.findByIdWithRole(row.requestedBy)) as RunRequestUserEntity | null;
+      const firstName = requester?.firstName?.trim() ?? '';
+      const decided = await this.customRepositories.rateLimitRequest.approveAsTopup(
+        requestId,
+        { grantedRuns: granted, decisionNote: note, decidedBy },
+        {
+          projectId: row.projectId,
+          periodKey: row.periodKey as string,
+          // The note shows on the top-up list; without one, label it as a run-request decision.
+          adminComment: note ?? `Approved from ${firstName.length > 0 ? firstName : 'a member'}'s run request`,
+        },
+      );
+      if (!decided) {
+        throw await this.requestGoneError(row);
+      }
+      this.notifyRunRequestDecided(decided, decidedBy);
+      return (await this.enrichRunRequests([decided]))[0];
+    }
+
+    // limit_increase: granted limits must stay within [current, asked] and be an actual change.
+    const project = await this.n8nRepositories.project.findOneBy({ id: row.projectId });
+    const kind = project?.type === 'personal' ? 'personal' : 'team';
+    const [custom, defaults] = await Promise.all([
+      this.customRepositories.projectRateLimit.get(row.projectId),
+      this.customRepositories.projectRateLimitDefault.get(kind),
+    ]);
+    const currentWeekly =
+      custom && !custom.usesDefaultLimits
+        ? (custom.weeklyRateLimit ?? defaults?.weeklyRateLimit ?? null)
+        : (defaults?.weeklyRateLimit ?? null);
+    const currentAnnual =
+      custom && !custom.usesDefaultLimits
+        ? (custom.yearlyRateLimit ?? defaults?.yearlyRateLimit ?? null)
+        : (defaults?.yearlyRateLimit ?? null);
+
+    const newWeekly = body.newWeeklyLimit ?? null;
+    const newAnnual = body.newAnnualLimit ?? null;
+    if (row.requestedWeeklyLimit === null && newWeekly !== null) {
+      throw new AppError(400, 'Only the periods the requester asked about can be changed');
+    }
+    if (row.requestedAnnualLimit === null && newAnnual !== null) {
+      throw new AppError(400, 'Only the periods the requester asked about can be changed');
+    }
+    for (const [label, granted, asked, current] of [
+      ['weekly', newWeekly, row.requestedWeeklyLimit, currentWeekly],
+      ['annual', newAnnual, row.requestedAnnualLimit, currentAnnual],
+    ] as const) {
+      if (granted === null) {
+        continue;
+      }
+      if (!Number.isInteger(granted) || granted < 1) {
+        throw new AppError(400, `The new ${label} limit must be a whole number of at least 1`);
+      }
+      if (asked !== null && granted > asked) {
+        throw new AppError(400, `The new ${label} limit cannot be higher than the ${formatRuns(asked)} asked for`);
+      }
+      if (current !== null && granted < current) {
+        throw new AppError(400, `The new ${label} limit cannot be lower than the current limit of ${formatRuns(current)}`);
+      }
+    }
+    if (newWeekly !== null && newAnnual !== null && newAnnual < newWeekly) {
+      throw new AppError(400, 'The new annual limit must be at least the new weekly limit');
+    }
+    const isChange =
+      (newWeekly !== null && (currentWeekly === null || newWeekly > currentWeekly)) ||
+      (newAnnual !== null && (currentAnnual === null || newAnnual > currentAnnual));
+    if (!isChange) {
+      throw new AppError(400, 'Grant at least one limit above the current values, or deny the request');
+    }
+
+    const decided = await this.customRepositories.rateLimitRequest.approveAsLimitChange(
+      requestId,
+      {
+        decidedWeeklyLimit: newWeekly,
+        decidedAnnualLimit: newAnnual,
+        decisionNote: note,
+        decidedBy,
+      },
+      { projectId: row.projectId, lastAdminComment: note },
+    );
+    if (!decided) {
+      throw await this.requestGoneError(row);
+    }
+    this.notifyRunRequestDecided(decided, decidedBy);
+    return (await this.enrichRunRequests([decided]))[0];
+  }
+
+  /**
+   * Denies a pending run request with a required reason (surfaced to the
+   * requester verbatim in the decision email). Throws AppError 404 (unknown
+   * request), 409 (cancelled or already decided) and 400 (invalid reason).
+   */
+  async denyRunRequest(
+    requestId: string,
+    body: { reason: string },
+    decidedBy: string | null,
+  ): Promise<AdminRunRequestItem> {
+    const row = await this.customRepositories.rateLimitRequest.getById(requestId);
+    if (!row) {
+      throw new AppError(404, 'Request not found');
+    }
+    if (row.status !== 'pending') {
+      throw await this.requestGoneError(row);
+    }
+    const reason = body.reason.trim();
+    if (reason.length < 10 || reason.length > 500) {
+      throw new AppError(400, 'Reason must be between 10 and 500 characters');
+    }
+    const decided = await this.customRepositories.rateLimitRequest.rejectPending(requestId, {
+      decisionNote: reason,
+      decidedBy,
+    });
+    if (!decided) {
+      throw await this.requestGoneError(row);
+    }
+    this.notifyRunRequestDecided(decided, decidedBy);
+    return (await this.enrichRunRequests([decided]))[0];
+  }
+
+  /** Maps a lost decide race (concurrent cancel or second decision) to its 409 message. */
+  private async requestGoneError(row: RateLimitRequest): Promise<AppError> {
+    const fresh = (await this.customRepositories.rateLimitRequest.getById(row.id)) ?? row;
+    if (fresh.status === 'cancelled') {
+      return new AppError(409, 'This request was cancelled by the requester');
+    }
+    return new AppError(409, 'This request has already been decided');
+  }
+
+  /** Resolves an admin display name ("Jordan Lee") from an email, falling back to the email. */
+  private async resolveUserDisplayName(email: string | null): Promise<string | null> {
+    if (!email || email.trim().length === 0) {
+      return null;
+    }
+    try {
+      const names = await this.n8nRepositories.user.findUserNamesByEmails([email.trim()]);
+      return formatFullName(names.get(email.trim().toLowerCase()), email.trim());
+    } catch (error) {
+      log.warn('Failed to resolve a user display name; falling back to the email', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return email.trim();
+    }
+  }
+
+  /**
+   * Enriches request rows for the admin list: project, requester identity and
+   * role, usage when sent and now, current effective limits, and the
+   * last-top-up / last-limit-change context for the review dialogs. Caches
+   * per-project and per-user lookups across rows (the same project or member
+   * can appear in several requests).
+   */
+  private async enrichRunRequests(rows: RateLimitRequest[]): Promise<AdminRunRequestItem[]> {
+    const projectCache = new Map<string, { name: string; type: string } | null>();
+    const requesterCache = new Map<string, RunRequestUserEntity | null>();
+    const roleCache = new Map<string, string | null>();
+    const limitsCache = new Map<
+      string,
+      {
+        custom: ProjectRateLimit | null;
+        weekly: number | null;
+        yearly: number | null;
+        lastTopup: AdminRunRequestItem['lastTopup'];
+      }
+    >();
+
+    const nowKeys = getCurrentPeriodKeys();
+
+    const items = await Promise.all(
+      rows.map(async (row): Promise<AdminRunRequestItem> => {
+        let project = projectCache.get(row.projectId);
+        if (project === undefined) {
+          const loaded = await this.n8nRepositories.project.findOneBy({ id: row.projectId });
+          project = loaded ? { name: loaded.name, type: loaded.type } : null;
+          projectCache.set(row.projectId, project);
+        }
+        let requester = requesterCache.get(row.requestedBy);
+        if (requester === undefined) {
+          requester = (await this.n8nRepositories.user.findByIdWithRole(row.requestedBy)) as RunRequestUserEntity | null;
+          requesterCache.set(row.requestedBy, requester);
+        }
+        const roleKey = `${row.requestedBy}:${row.projectId}`;
+        let roleLabel = roleCache.get(roleKey);
+        if (roleLabel === undefined) {
+          const role = await this.n8nRepositories.projectRelation.findProjectRole({
+            userId: row.requestedBy,
+            projectId: row.projectId,
+          });
+          const slug = extractRoleSlug(role);
+          roleLabel = slug ? (RUN_REQUEST_ROLE_LABELS[slug] ?? slug) : null;
+          roleCache.set(roleKey, roleLabel);
+        }
+        let limits = limitsCache.get(row.projectId);
+        if (limits === undefined) {
+          const kind = project?.type === 'personal' ? 'personal' : 'team';
+          const [custom, defaults, topups] = await Promise.all([
+            this.customRepositories.projectRateLimit.get(row.projectId),
+            this.customRepositories.projectRateLimitDefault.get(kind),
+            this.customRepositories.projectTopup.list(row.projectId, 1, 1),
+          ]);
+          const latestTopup = topups.rows[0] ?? null;
+          limits = {
+            custom,
+            weekly:
+              custom && !custom.usesDefaultLimits
+                ? (custom.weeklyRateLimit ?? defaults?.weeklyRateLimit ?? null)
+                : (defaults?.weeklyRateLimit ?? null),
+            yearly:
+              custom && !custom.usesDefaultLimits
+                ? (custom.yearlyRateLimit ?? defaults?.yearlyRateLimit ?? null)
+                : (defaults?.yearlyRateLimit ?? null),
+            lastTopup: latestTopup
+              ? {
+                  amount: latestTopup.amount,
+                  periodKey: latestTopup.periodKey,
+                  createdAt: latestTopup.createdAt.toISOString(),
+                  createdByName: await this.resolveUserDisplayName(latestTopup.createdBy),
+                }
+              : null,
+          };
+          limitsCache.set(row.projectId, limits);
+        }
+
+        // "When sent" usage: the asked week for extra-runs requests, the week
+        // the request was filed otherwise; the year always from the filed date.
+        const sentKeys = getCurrentPeriodKeys(row.createdAt);
+        const sentWeeklyKey = row.requestKind === 'extra_runs' ? (row.periodKey ?? sentKeys.weekly) : sentKeys.weekly;
+        const [sentCounts, nowCounts] = await Promise.all([
+          this.customRepositories.projectExecutionUsage.getCounts(row.projectId, sentWeeklyKey, sentKeys.yearly),
+          this.customRepositories.projectExecutionUsage.getCounts(row.projectId, nowKeys.weekly, nowKeys.yearly),
+        ]);
+
+        const requesterEmail = requester?.email?.trim() ?? null;
+        let lastLimitChange: AdminRunRequestItem['lastLimitChange'] = null;
+        if (limits.custom?.updatedAt) {
+          lastLimitChange = {
+            at: limits.custom.updatedAt.toISOString(),
+            byName: await this.resolveUserDisplayName(limits.custom.updatedBy),
+          };
+        }
+
+        return {
+          id: row.id,
+          projectId: row.projectId,
+          projectName: project?.name ?? row.projectId,
+          projectType: project?.type ?? 'team',
+          requestKind: row.requestKind as RunRequestKind,
+          status:
+            row.status === 'approved'
+              ? 'approved'
+              : row.status === 'cancelled'
+                ? 'cancelled'
+                : row.status === 'rejected'
+                  ? 'denied'
+                  : 'pending',
+          extraRuns: row.extraRuns,
+          periodKey: row.periodKey,
+          requestedWeeklyLimit: row.requestedWeeklyLimit,
+          requestedAnnualLimit: row.requestedAnnualLimit,
+          reason: row.reason,
+          requestedBy: row.requestedBy,
+          requestedByName: formatFullName(requester ?? undefined, requesterEmail),
+          requestedByEmail: requesterEmail,
+          requestedByRoleLabel: roleLabel,
+          createdAt: row.createdAt.toISOString(),
+          weeklyUsedWhenSent: sentCounts.weeklyCount,
+          yearlyUsedWhenSent: sentCounts.yearlyCount,
+          weeklyUsedNow: nowCounts.weeklyCount,
+          yearlyUsedNow: nowCounts.yearlyCount,
+          currentWeeklyLimit: limits.weekly,
+          currentAnnualLimit: limits.yearly,
+          lastTopup: limits.lastTopup,
+          lastLimitChange,
+          ...serializeDecisionFields(row),
+          decidedByName: await this.resolveUserDisplayName(row.decidedBy),
+        };
+      }),
+    );
+    return items;
+  }
+
+  /**
+   * Spawns the decision email to the requester (fire-and-forget like the other
+   * rate-limit notifications). Supersedes the generic top-up/limits-change
+   * notifications: the decision email already spells out what was granted.
+   */
+  private notifyRunRequestDecided(row: RateLimitRequest, decidedBy: string | null): void {
+    if (!this.nodeMailerService) {
+      return;
+    }
+    void (async () => {
+      try {
+        const context = await this.resolveProjectContext(row.projectId);
+        if (!context) {
+          log.warn('Project not found when sending the run-request decision email', { requestId: row.id });
+          return;
+        }
+        const requester = (await this.n8nRepositories.user.findByIdWithRole(row.requestedBy)) as RunRequestUserEntity | null;
+        const to = requester?.email?.trim() ?? null;
+        if (!to) {
+          log.warn('No requester email resolved for the run-request decision email', { requestId: row.id });
+          return;
+        }
+        const decidedByName = await this.resolveUserDisplayName(decidedBy);
+        let subject: string;
+        let html: string;
+        if (row.status === 'approved' && row.requestKind === 'extra_runs') {
+          subject = `Your extra-runs request for ${context.projectName} was approved`;
+          html = renderEmail('rateLimitRequestTopupApproved', {
+            projectName: context.projectName,
+            amount: formatRuns(row.grantedRuns ?? 0),
+            weekDescription: describeWeeklyPeriodKey(row.periodKey ?? '') ?? (row.periodKey ?? ''),
+            adminNote: row.decisionNote ?? undefined,
+            decidedByName,
+            projectUrl: context.projectUrl,
+          });
+        } else if (row.status === 'approved') {
+          subject = `Your limit-raise request for ${context.projectName} was approved`;
+          html = renderEmail('rateLimitRequestLimitsApproved', {
+            projectName: context.projectName,
+            weeklyLimit: row.decidedWeeklyLimit !== null ? formatRuns(row.decidedWeeklyLimit) : 'unchanged',
+            yearlyLimit: row.decidedAnnualLimit !== null ? formatRuns(row.decidedAnnualLimit) : 'unchanged',
+            adminNote: row.decisionNote ?? undefined,
+            decidedByName,
+            projectUrl: context.projectUrl,
+          });
+        } else {
+          subject = `Your run request for ${context.projectName} was denied`;
+          html = renderEmail('rateLimitRequestDenied', {
+            projectName: context.projectName,
+            reason: row.decisionNote ?? '',
+            decidedByName,
+            projectUrl: context.projectUrl,
+          });
+        }
+        await this.nodeMailerService!.sendMail({ to, subject, html });
+        log.info('Sent the run-request decision email', { requestId: row.id, status: row.status });
+      } catch (error) {
+        log.error('Failed to send the run-request decision email', {
+          requestId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
   }
 
   /** Throws AppError 404 when the project does not exist in n8n. */
