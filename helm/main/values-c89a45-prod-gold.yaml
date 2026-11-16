@@ -21,7 +21,21 @@ n8n:
     CSTAR_BASE_URL: https://connect.digital.gov.bc.ca
     FEATURES_ENABLED: "wil, project, workflow-share, tenant-project-sync"
     AUTHZ_ENVIRONMENT: prod
+    N8N_DEFAULT_BINARY_DATA_MODE: "s3"
+    N8N_EXECUTION_DATA_STORAGE_MODE: "s3"
     N8N_EXTERNAL_STORAGE_S3_BUCKET_NAME: "workflow-prod"
+    EXECUTIONS_DATA_PRUNE: "true"
+    N8N_METRICS: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_NAME_LABEL: "true"
+    N8N_METRICS_INCLUDE_MESSAGE_EVENT_BUS_METRICS: "true"
+    N8N_METRICS_INCLUDE_QUEUE_METRICS: "true"
+    N8N_METRICS_INCLUDE_WORKFLOW_STATISTICS: "true"
+    N8N_METRICS_INCLUDE_CACHE_METRICS: "true"
+    N8N_OTEL_ENABLED: "true"
+    N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://chwf-alloy:4318  # NOSONAR - internal cluster service URL
+    N8N_OTEL_TRACES_PRODUCTION_ONLY: "true"  # prod traces only production executions (dev and test trace everything)
+    N8N_LOG_STREAMING_MANAGED_BY_ENV: "true"
 
   route:
     enabled: true
@@ -80,7 +94,7 @@ pgo:
           incremental: "0 9-17/2 * * 1-5" # Fast sync every 2 hours during working hours (Mon-Fri)
 
 loki:
-  enabled: false
+  enabled: true
   loki:
     storage:
       bucketNames:
@@ -109,7 +123,7 @@ loki:
     enabled: false
 
 tempo:
-  enabled: false
+  enabled: true
   tempo:
     retention: 52560h # 6 years (2190d × 24h)
     extraConfig:
@@ -124,13 +138,13 @@ tempo:
     resources:
       requests:
         cpu: 10m
-        memory: 64Mi
+        memory: 256Mi
       limits:
         cpu: 250m
-        memory: 256Mi
+        memory: 768Mi
 
 mimir:
-  enabled: false
+  enabled: true
   retention:
     blockRetention: 52560h   # 6 years
   storage:
@@ -151,7 +165,7 @@ grafana:
   chwfRoute:
     enabled: true
     host: grafana-workflow.apps.gold.devops.gov.bc.ca
-  enabled: false
+  enabled: true
   # Prerequisites: the `chwf-grafana` secret must contain these keys before deploying.
   # Add them with: oc patch secret chwf-grafana -n <namespace> --type=merge \
   #   -p '{"stringData":{"GRAFANA_ALERT_EMAIL_TO":"ops@example.com","GRAFANA_ALERT_EMAIL_WORKFLOWS":"workflows@example.com","GRAFANA_ALERT_WEBHOOK_URL":"https://callback.example.com/webhook"}}'
@@ -186,7 +200,7 @@ grafana:
       memory: 256Mi
 
 alloy:
-  enabled: false
+  enabled: true
   alloy:
     resources:
       requests:
@@ -195,6 +209,12 @@ alloy:
       limits:
         cpu: 100m
         memory: 256Mi
+
+logStreaming:
+  enabled: true
+
+systemLogs:
+  enabled: true
 
 backup-storage:
   enabled: true
