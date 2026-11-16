@@ -99,7 +99,7 @@ pgo:
           incremental: "0 9-17/2 * * 1-5" # Fast sync every 2 hours during working hours (Mon-Fri)
 
 sdg-mock-app:
-  enabled: true
+  enabled: false
   route:
     enabled: true
     host: dev-workflow-mock.apps.gold.devops.gov.bc.ca
