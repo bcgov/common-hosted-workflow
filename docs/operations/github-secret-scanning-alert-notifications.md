@@ -111,8 +111,8 @@ placeholder, not a test credential.
     "resolution": null,
     "resolved_at": null,
     "resolved_by": null,
-    "secret_type": "github_personal_access_token",
-    "secret_type_display_name": "GitHub Personal Access Token",
+    "secret_type": "github_personal_access_token",  # pragma: allowlist secret
+    "secret_type_display_name": "GitHub Personal Access Token",  # pragma: allowlist secret
     "secret": "[REDACTED]",
     "push_protection_bypassed": false,
     "push_protection_bypassed_by": null,
