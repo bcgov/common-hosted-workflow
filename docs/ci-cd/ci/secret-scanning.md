@@ -15,6 +15,11 @@ This means secret scanning happens in two places:
 
 If a candidate secret is detected, the commit or workflow will fail until the issue is resolved.
 
+GitHub's native secret scanning is a separate alerting system: these `detect-secrets`
+checks do not emit GitHub `secret_scanning_alert` webhooks. See
+[GitHub Secret Scanning Alert Notifications](../../operations/github-secret-scanning-alert-notifications.md)
+for receiving those GitHub events in n8n and sending redacted Teams Adaptive Cards.
+
 ## Operating Model
 
 The repository uses a baseline file, `.secrets.baseline`, to distinguish accepted false positives from real findings. This keeps scanning actionable without forcing developers to re-triage known noise on every run.
