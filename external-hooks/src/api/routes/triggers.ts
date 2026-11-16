@@ -39,7 +39,7 @@ import {
   type WilTriggerSource,
 } from '../constants/enum';
 import { WIL_N8N_NODE_TRIGGERS_ENABLED } from '@config';
-import { buildWilTriggerItem } from './helpers/wil-trigger-item';
+import { buildWilTriggerItem, readSkipChefsSubmission } from './helpers/wil-trigger-item';
 import { WIL_TARGET_UNAVAILABLE_CODE } from '../services/n8n-workflow-runner.service';
 import { createLogger } from '../utils/logger';
 import { shortenIdForLog } from '../utils/string';
@@ -504,7 +504,13 @@ export function buildTriggerRouter(routeContext: ApiRouteContext) {
 
       OkResponse(
         res,
-        { authToken: tokenResult.authToken, formId: tokenResult.formId, formName, baseUrl: tokenResult.baseUrl },
+        {
+          authToken: tokenResult.authToken,
+          formId: tokenResult.formId,
+          formName,
+          baseUrl: tokenResult.baseUrl,
+          ...readSkipChefsSubmission(meta),
+        },
         getTriggerChefsTokenResponseSchema,
       );
     },

@@ -142,6 +142,8 @@ export const getTriggerChefsTokenResponseSchema = z.object({
   formId: z.string(),
   formName: z.string(),
   baseUrl: z.string(),
+  /** When true, the UI sends form data straight to the workflow instead of submitting to CHEFS. */
+  skipChefsSubmission: z.boolean().optional(),
 });
 
 /**

@@ -93,14 +93,14 @@ describe('POST /chefs-credentials', () => {
 });
 
 describe('POST /triggers/:triggerId/chefs-token', () => {
-  it("resolves the credential against the trigger's own project, not every tenant project", async () => {
+  async function callChefsToken(metadata: Record<string, unknown>) {
     const trigger = {
       id: 'trig-1',
       projectId: 'proj-2',
       triggerType: 'chefs-form',
       allowedActorsType: 'all',
       allowedActors: ['*'],
-      metadata: { n8nCredentialId: 'cred-1' },
+      metadata,
     };
     const chefs = {
       resolveFormCredential: vi.fn().mockResolvedValue({ formId: 'form-123', formApiKey: 'key', formName: 'Intake' }), // pragma: allowlist secret
@@ -122,8 +122,30 @@ describe('POST /triggers/:triggerId/chefs-token', () => {
       res,
     );
 
+    return { error, res, chefs };
+  }
+
+  it("resolves the credential against the trigger's own project, not every tenant project", async () => {
+    const { error, chefs } = await callChefsToken({ n8nCredentialId: 'cred-1' });
+
     expect(error).toBeNull();
     expect(chefs.resolveFormCredential).toHaveBeenCalledWith({ credentialId: 'cred-1', allowedProjectIds: ['proj-2'] });
+  });
+
+  it('returns skipChefsSubmission false by default', async () => {
+    const { error, res, chefs } = await callChefsToken({ n8nCredentialId: 'cred-1' });
+
+    expect(error).toBeNull();
+    expect(chefs.resolveFormCredential).toHaveBeenCalledWith({ credentialId: 'cred-1', allowedProjectIds: ['proj-2'] });
+    expect(res.json.mock.calls[0][0]).toEqual(expect.objectContaining({ skipChefsSubmission: false }));
+  });
+
+  it('returns skipChefsSubmission true when set in trigger metadata', async () => {
+    const { error, res, chefs } = await callChefsToken({ n8nCredentialId: 'cred-1', skipChefsSubmission: true });
+
+    expect(error).toBeNull();
+    expect(chefs.resolveFormCredential).toHaveBeenCalledWith({ credentialId: 'cred-1', allowedProjectIds: ['proj-2'] });
+    expect(res.json.mock.calls[0][0]).toEqual(expect.objectContaining({ skipChefsSubmission: true }));
   });
 
   it('returns 400 when a chefs-form trigger has no linked credential', async () => {

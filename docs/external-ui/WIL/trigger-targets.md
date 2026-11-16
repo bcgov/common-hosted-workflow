@@ -76,3 +76,16 @@ The item given to the node: `{ source: 'wil', trigger: { id, type, name }, actor
 - `N8nWorkflowRunnerService` is the only module that touches n8n execution internals (`WorkflowRunner`, `ActiveExecutions`); it resolves them lazily and degrades to a 503 if they cannot be found after an n8n upgrade.
 - Discovery reads n8n's published workflow history (honouring `N8N_USE_WORKFLOW_PUBLICATION_SERVICE`), so only published, non-archived workflows owned by the tenant's projects are listed.
 - Runs are subject to n8n's usual execution handling (queue mode, credential checks); see `.kiro/artifacts/wil-trigger-node/PHASE0-FINDINGS.md` for the items that still need a live-instance check.
+
+## Skip CHEFS submission (CHEFS Form triggers)
+
+A CHEFS Form trigger has an optional setting **Send Form Data to Workflow (Skip CHEFS Submission)**, stored as boolean `metadata.skipChefsSubmission` (default `false`). When on, the form is validated in the browser but not submitted to CHEFS, so no CHEFS submission record is created, and draft saves are ignored. The UI instead posts the form data to `POST /ui-api/wil/triggers/:triggerId/callback`.
+
+`POST /ui-api/wil/triggers/:triggerId/chefs-token` returns `skipChefsSubmission`, because non-editor users only receive a limited trigger listing and cannot read metadata.
+
+| Setting | Node `input`                                                 |
+| ------- | ------------------------------------------------------------ |
+| off     | `{ formId, submission_id }` (the CHEFS submission reference) |
+| on      | the submitted form field values as a flat object             |
+
+Field mappings (selecting a subset of fields) are not supported for triggers; the workflow picks the fields it needs.

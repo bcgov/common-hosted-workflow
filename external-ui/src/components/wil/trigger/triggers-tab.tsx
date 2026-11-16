@@ -43,6 +43,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
     hasPendingNav,
     openCreate,
     openChefsPreview,
+    chefsPreviewRunId,
     selectTrigger,
     cancel,
     changeTriggerType,
@@ -96,6 +97,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
               buttonCallbackStatus={buttonCallbackStatus}
               buttonCallbackError={buttonCallbackError}
               buttonCallbackResponse={buttonCallbackResponse}
+              chefsPreviewRunId={chefsPreviewRunId}
             />
           </div>
         </MobileDetailView>
@@ -204,6 +206,7 @@ export function TriggersTab({ tenantId, isPersonalTenant, userEmail, isMobile = 
             buttonCallbackStatus={buttonCallbackStatus}
             buttonCallbackError={buttonCallbackError}
             buttonCallbackResponse={buttonCallbackResponse}
+            chefsPreviewRunId={chefsPreviewRunId}
           />
         </div>
       </div>

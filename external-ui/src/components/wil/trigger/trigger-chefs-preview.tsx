@@ -6,6 +6,7 @@ import { getStoredAppToken } from '../../../services/backend/axios';
 import { useSessionSnapshot, useTenantGroupsById, useTenantRolesById } from '../../../state/session';
 import { ChefsFormPanel } from '../../chefs/chefs-form-panel';
 import type { ChefsFormPanelInitData } from '../../chefs/chefs-form-panel';
+import type { HostSubmitDetail } from '../../chefs/types';
 import { buildTokenObject, buildUserObject } from '../../chefs/user-claims-utils';
 import { extractSubmissionId } from '../../chefs/submission-utils';
 
@@ -25,7 +26,13 @@ async function initializeForm(params: {
     token: buildTokenObject(params.claims),
     user: buildUserObject(params.claims, { roles: params.tenantRoles, groups: params.tenantGroups }),
     headers: userToken ? { Authorization: `Bearer ${userToken}` } : {},
+    skipChefsSubmission: tokenResponse.skipChefsSubmission === true,
   };
+}
+
+/** Callback body for a skip-CHEFS trigger: all submitted form field values as a flat object. */
+export function buildSkipChefsCallbackBody(detail: HostSubmitDetail): Record<string, unknown> {
+  return { ...detail.data };
 }
 
 interface TriggerChefsPreviewProps {
@@ -83,6 +90,19 @@ export function TriggerChefsPreview({ trigger, tenantId }: Readonly<TriggerChefs
     [submitStatus, callbackMutation.mutate, initMutation.data?.formId],
   );
 
+  const skipChefsSubmission = initMutation.data?.skipChefsSubmission === true;
+
+  // Skip-CHEFS: the form is validated but not submitted to CHEFS; its data goes straight to the workflow.
+  const handleHostSubmit = useCallback(
+    (detail: HostSubmitDetail) => {
+      if (detail.isDraft) return;
+      if (submitStatus === 'pending' || submitStatus === 'success') return;
+      callbackMutation.mutate(buildSkipChefsCallbackBody(detail));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [submitStatus, callbackMutation.mutate],
+  );
+
   return (
     <ChefsFormPanel
       initPending={initMutation.isPending}
@@ -95,7 +115,9 @@ export function TriggerChefsPreview({ trigger, tenantId }: Readonly<TriggerChefs
       successMessage="Your workflow has been triggered successfully."
       errorTitle="Trigger Failed"
       submitErrorFallback="Unable to trigger the workflow. Please try again or contact your administrator."
+      submitMode={skipChefsSubmission ? 'none' : 'chefs'}
       onSubmissionComplete={handleSubmissionComplete}
+      onHostSubmit={skipChefsSubmission ? handleHostSubmit : undefined}
     />
   );
 }
