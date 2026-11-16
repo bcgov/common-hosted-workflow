@@ -35,6 +35,8 @@ interface TriggerFormPaneProps {
   buttonCallbackStatus: ButtonCallbackStatus;
   buttonCallbackError: Error | null;
   buttonCallbackResponse?: TriggerCallbackResponse | null;
+  /** Bumped on every Run click so the CHEFS preview remounts with a fresh form. */
+  chefsPreviewRunId?: number;
 }
 
 export function TriggerFormPane({
@@ -54,6 +56,7 @@ export function TriggerFormPane({
   buttonCallbackStatus,
   buttonCallbackError,
   buttonCallbackResponse = null,
+  chefsPreviewRunId = 0,
 }: Readonly<TriggerFormPaneProps>) {
   const isGoldDr = useIsGoldDr();
 
@@ -77,7 +80,13 @@ export function TriggerFormPane({
       );
     }
 
-    return <TriggerChefsPreview trigger={selectedTrigger} tenantId={tenantId} />;
+    return (
+      <TriggerChefsPreview
+        key={`${selectedTrigger.id}-${chefsPreviewRunId}`}
+        trigger={selectedTrigger}
+        tenantId={tenantId}
+      />
+    );
   }
 
   if (mode === 'view' && selectedTrigger?.config.type === TRIGGER_TYPES.BUTTON) {

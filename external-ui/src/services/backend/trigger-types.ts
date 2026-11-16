@@ -57,6 +57,8 @@ export interface ChefsFormTriggerPayload extends TriggerTargetFields {
   apiKey: string;
   allowedActors: string;
   allowedActorsType: TriggerActorType;
+  /** When true, form data is sent straight to the workflow and no CHEFS submission is created. */
+  skipChefsSubmission?: boolean;
 }
 
 export interface ButtonTriggerPayload extends TriggerTargetFields {
@@ -118,4 +120,6 @@ export type TriggerChefsTokenResponse = {
   formId: string;
   formName: string;
   baseUrl: string;
+  /** When true, form data is sent straight to the workflow and no CHEFS submission is created. */
+  skipChefsSubmission?: boolean;
 };

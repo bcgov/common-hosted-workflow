@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { apiItemToTrigger, payloadToCreateBody, payloadToUpdateBody } from '../../src/services/backend/trigger-mappers';
-import type { ChefsFormTriggerPayload } from '../../src/services/backend/trigger-types';
+import type { ApiTriggerItem, ChefsFormTriggerPayload } from '../../src/services/backend/trigger-types';
 
 const base: ChefsFormTriggerPayload = {
   type: 'chefs-form',
@@ -31,6 +31,47 @@ describe('CHEFS trigger mappers', () => {
     const created = payloadToCreateBody({ ...base, n8nCredentialId: '', apiKey: 'legacy-key' }, 'user@example.com'); // pragma: allowlist secret
 
     expect(created.metadata).toMatchObject({ n8nCredentialId: '', apiKey: 'legacy-key' }); // pragma: allowlist secret
+  });
+});
+
+describe('CHEFS skipChefsSubmission mapping', () => {
+  const apiItem = (metadata: Record<string, unknown>): ApiTriggerItem => ({
+    id: 't1',
+    projectId: 'p1',
+    triggerType: 'chefs-form',
+    targetKind: 'n8n-node',
+    targetWorkflowId: 'wf1',
+    targetNodeId: 'node1',
+    targetStatus: 'live',
+    metadata,
+    allowedActorsType: 'all',
+    allowedActors: ['*'],
+    authEnabled: false,
+    createdAt: '',
+    updatedAt: '',
+    createdBy: null,
+    updatedBy: null,
+  });
+
+  it('writes skipChefsSubmission true and defaults to false', () => {
+    const on = payloadToCreateBody({ ...base, skipChefsSubmission: true }, 'user@example.com');
+    const off = payloadToCreateBody(base, 'user@example.com');
+    const updated = payloadToUpdateBody({ ...base, skipChefsSubmission: true }, 'user@example.com');
+
+    expect(on.metadata).toMatchObject({ skipChefsSubmission: true });
+    expect(off.metadata).toMatchObject({ skipChefsSubmission: false });
+    expect(updated.metadata).toMatchObject({ skipChefsSubmission: true });
+  });
+
+  it('reads skipChefsSubmission from metadata, defaulting to false', () => {
+    const on = apiItemToTrigger(apiItem({ formId: 'f', skipChefsSubmission: true }), 'tenant-1');
+    const off = apiItemToTrigger(apiItem({ formId: 'f' }), 'tenant-1');
+    const junk = apiItemToTrigger(apiItem({ formId: 'f', skipChefsSubmission: 'yes' }), 'tenant-1');
+
+    expect(on.config.type).toBe('chefs-form');
+    expect(on.config).toMatchObject({ skipChefsSubmission: true });
+    expect(off.config).toMatchObject({ skipChefsSubmission: false });
+    expect(junk.config).toMatchObject({ skipChefsSubmission: false });
   });
 });
 

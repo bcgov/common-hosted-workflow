@@ -44,6 +44,7 @@ export function apiItemToTrigger(item: ApiTriggerItem, tenantId: string): Trigge
       apiKey: (meta.apiKey as string) ?? '',
       allowedActors,
       allowedActorsType,
+      skipChefsSubmission: meta.skipChefsSubmission === true,
       ...target,
     };
   } else {
@@ -106,6 +107,7 @@ function chefsFormMetadata(config: ChefsFormTriggerPayload): Record<string, unkn
     formId: config.formId,
     formName: config.formName,
     baseUrl: config.baseUrl,
+    skipChefsSubmission: config.skipChefsSubmission === true,
   };
   if (!config.n8nCredentialId) {
     metadata.apiKey = config.apiKey;

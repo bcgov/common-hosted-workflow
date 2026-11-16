@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildWilTriggerItem, resolveTriggerInput } from '../../../../src/api/routes/helpers/wil-trigger-item';
+import {
+  buildWilTriggerItem,
+  readSkipChefsSubmission,
+  resolveTriggerInput,
+} from '../../../../src/api/routes/helpers/wil-trigger-item';
 
 const session = {
   email: 'actor@example.com',
@@ -45,5 +49,26 @@ describe('buildWilTriggerItem', () => {
   it('returns empty roles/groups for another tenant', () => {
     const item = buildWilTriggerItem({ trigger: button({}), session, tenantId: 'other', requestBody: {} });
     expect(item.json.actor).toMatchObject({ roles: [], groups: [] });
+  });
+});
+
+describe('readSkipChefsSubmission', () => {
+  it('defaults to false for an empty object', () => {
+    expect(readSkipChefsSubmission({})).toEqual({ skipChefsSubmission: false });
+  });
+
+  it('defaults to false for non-object metadata', () => {
+    for (const v of [null, undefined, [], 'x']) {
+      expect(readSkipChefsSubmission(v)).toEqual({ skipChefsSubmission: false });
+    }
+  });
+
+  it('returns true only for literal true', () => {
+    expect(readSkipChefsSubmission({ skipChefsSubmission: true })).toEqual({ skipChefsSubmission: true });
+  });
+
+  it('treats non-boolean truthy values as false', () => {
+    expect(readSkipChefsSubmission({ skipChefsSubmission: 'true' })).toEqual({ skipChefsSubmission: false });
+    expect(readSkipChefsSubmission({ skipChefsSubmission: 1 })).toEqual({ skipChefsSubmission: false });
   });
 });

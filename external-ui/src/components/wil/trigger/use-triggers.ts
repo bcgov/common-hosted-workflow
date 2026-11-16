@@ -29,6 +29,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
 
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('idle');
+  const [chefsPreviewRunId, setChefsPreviewRunId] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -126,6 +127,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
       if (!isSameTrigger) callbackStatus.reset();
       setSelectedTriggerId(trigger.id);
       setFormMode('view');
+      setChefsPreviewRunId((n) => n + 1);
     });
   }
 
@@ -223,6 +225,7 @@ export function useTriggers({ tenantId, isPersonalTenant, userEmail }: UseTrigge
     openCreate,
     openEdit,
     openChefsPreview,
+    chefsPreviewRunId,
     selectTrigger,
     cancel,
     changeTriggerType: formState.changeTriggerType,

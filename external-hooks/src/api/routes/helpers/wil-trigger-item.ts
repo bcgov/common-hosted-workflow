@@ -24,6 +24,17 @@ export function triggerDisplayName(trigger: TriggerLike): string {
 }
 
 /**
+ * Reads the skip-CHEFS flag stored in a CHEFS form trigger's metadata.
+ * Anything other than literal `true` means CHEFS submission is NOT skipped.
+ */
+export function readSkipChefsSubmission(metadata: unknown): { skipChefsSubmission: boolean } {
+  const meta = asRecord(metadata);
+  return {
+    skipChefsSubmission: meta.skipChefsSubmission === true,
+  };
+}
+
+/**
  * Input handed to the node: button → configured `inputValues` (legacy `postBody` JSON as fallback),
  * CHEFS form → the submitted body.
  */

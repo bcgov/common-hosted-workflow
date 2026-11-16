@@ -32,6 +32,7 @@ export const DEFAULT_CHEFS_FORM: ChefsFormTriggerPayload = {
   apiKey: '',
   allowedActors: '*',
   allowedActorsType: '',
+  skipChefsSubmission: false,
 };
 
 interface ChefsFormFieldsProps {
@@ -197,6 +198,23 @@ export function ChefsFormFields({
           required
           disabled={actorsLocked || value.allowedActorsType === 'all'}
         />
+      </div>
+      <div className="rounded-lg border border-border-strong px-3.5 py-3">
+        <div className="flex items-start gap-2">
+          <input
+            id="chefs-skip-submission"
+            type="checkbox"
+            className="mt-1 h-4 w-4"
+            checked={value.skipChefsSubmission === true}
+            onChange={(e) => set('skipChefsSubmission', e.target.checked)}
+          />
+          <div className="space-y-0.5">
+            <Label htmlFor="chefs-skip-submission">Send Form Data to Workflow (Skip CHEFS Submission)</Label>
+            <p className="text-sm text-muted-foreground">
+              The form is validated but not submitted to CHEFS, so no CHEFS submission record is created.
+            </p>
+          </div>
+        </div>
       </div>
       <TriggerTargetSection
         idPrefix="chefs"
