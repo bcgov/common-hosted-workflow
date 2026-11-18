@@ -169,6 +169,10 @@ It does not currently provision, in this repository at least:
 - large policy libraries
 - broad multi-environment Sysdig stacks beyond the current Terraform entry point
 
+Team and membership management is also outside the Terraform scope. Sysdig teams, their namespace
+scoping, and user access are managed separately through the `SysdigTeam` custom resource — see
+[Sysdig Team Management](../operations/sysdig-team-management.md).
+
 ## Key Source Files
 
 - `terraform/sysdig/b0c13b/main.tf`
