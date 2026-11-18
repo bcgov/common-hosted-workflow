@@ -5,6 +5,7 @@ provider "registry.terraform.io/sysdiglabs/sysdig" {
   version     = "1.60.0"
   constraints = "~> 1.0"
   hashes = [
+    "h1:EnsSU0lHz4e+DEp0puV+/MHYbSVfb7nmJiej+az8ot4=",
     "h1:dkK9ijYZO+nSRyIwUurrfU3ebWZrP5n1Oz4C+ZKeRaw=",
     "zh:135c98a77f75884a5045cb2d81134c25dcc6be4210584b1b23cae6494e7178ce",
     "zh:15968c183a807eed1bdefbeeb4980d5ad5adfceca46962f10f0775eeccc66432",

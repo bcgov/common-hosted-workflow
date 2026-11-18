@@ -8,8 +8,8 @@ terraform {
 }
 
 resource "sysdig_monitor_dashboard" "cluster_health" {
-  name        = "b0c13b Cluster Health"
-  description = "Real-time CPU, memory, and network metrics for b0c13b namespaces"
+  name        = "${var.workspace} Cluster Health"
+  description = "Real-time CPU, memory, and network metrics for ${var.workspace} namespaces"
 
   panel {
     pos_x  = 0
@@ -55,14 +55,25 @@ resource "sysdig_monitor_dashboard" "cluster_health" {
 }
 
 resource "sysdig_monitor_notification_channel_email" "alerts" {
-  name                    = "b0c13b Alert Email"
+  name                    = "${var.workspace} Alert Email"
   recipients              = var.alert_email_recipients
   share_with_current_team = true
 }
 
+resource "sysdig_monitor_notification_channel_webhook" "alerts" {
+  count = (var.alert_webhook_url != null && var.alert_webhook_url != "") ? 1 : 0
+
+  name                    = "${var.workspace} Alert Webhook"
+  url                     = var.alert_webhook_url
+  enabled                 = true
+  share_with_current_team = true
+
+  additional_headers = merge(var.alert_webhook_headers, { Authorization = var.alert_webhook_authorization })
+}
+
 resource "sysdig_monitor_alert_v2_prometheus" "high_cpu" {
-  name        = "High CPU Utilization - b0c13b"
-  description = "CPU utilization has exceeded 85% for more than 5 minutes in a b0c13b namespace"
+  name        = "High CPU Utilization - ${var.workspace}"
+  description = "CPU utilization has exceeded 85% for more than 5 minutes in a ${var.workspace} namespace"
   severity    = "high"
 
   query = "avg(sysdig_container_cpu_used_percent) by (kube_namespace_label_environment, kubernetes_cluster_name) > ${var.cpu_alert_threshold}"
@@ -72,11 +83,18 @@ resource "sysdig_monitor_alert_v2_prometheus" "high_cpu" {
   notification_channels {
     id = sysdig_monitor_notification_channel_email.alerts.id
   }
+
+  dynamic "notification_channels" {
+    for_each = sysdig_monitor_notification_channel_webhook.alerts[*].id
+    content {
+      id = notification_channels.value
+    }
+  }
 }
 
 resource "sysdig_monitor_alert_v2_prometheus" "high_memory" {
-  name        = "High Memory Utilization - b0c13b"
-  description = "Memory utilization has exceeded 80% for more than 5 minutes in a b0c13b namespace"
+  name        = "High Memory Utilization - ${var.workspace}"
+  description = "Memory utilization has exceeded 80% for more than 5 minutes in a ${var.workspace} namespace"
   severity    = "high"
 
   query = "avg(sysdig_container_memory_used_percent) by (kube_namespace_label_environment, kubernetes_cluster_name) > ${var.memory_alert_threshold}"
@@ -85,5 +103,12 @@ resource "sysdig_monitor_alert_v2_prometheus" "high_memory" {
 
   notification_channels {
     id = sysdig_monitor_notification_channel_email.alerts.id
+  }
+
+  dynamic "notification_channels" {
+    for_each = sysdig_monitor_notification_channel_webhook.alerts[*].id
+    content {
+      id = notification_channels.value
+    }
   }
 }
