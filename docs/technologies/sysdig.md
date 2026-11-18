@@ -19,11 +19,13 @@ flowchart LR
     Dash[Cluster Health Dashboard]
     Alerts[CPU and Memory Alerts]
     Email[Email Notifications]
+    Webhook[Webhook Callbacks]
 
     OCP --> Sysdig
     Sysdig --> Dash
     Sysdig --> Alerts
     Alerts --> Email
+    Alerts --> Webhook
 ```
 
 ## Why This Project Uses Sysdig
@@ -36,6 +38,7 @@ The repository uses Sysdig to provide:
 - alerting on sustained high CPU utilization
 - alerting on sustained high memory utilization
 - email notifications to the configured operational recipients
+- webhook callbacks to a configured endpoint, when provided
 
 At an architectural level, Sysdig fills the gap between deployment automation and runtime operations:
 
@@ -44,12 +47,15 @@ At an architectural level, Sysdig fills the gap between deployment automation an
 
 ## What This Repository Provisions In Sysdig
 
-The Terraform configuration under `terraform/sysdig` currently provisions Sysdig Monitor resources for the `b0c13b` footprint.
+The Terraform configuration under `terraform/sysdig` currently provisions Sysdig Monitor resources for the `b0c13b` and `c89a45` footprints.
 
-The module creates:
+Each workspace instantiates the shared module and passes its own slug, which is used to name and scope the provisioned resources.
 
-- a dashboard named `b0c13b Cluster Health`
+The module creates, per workspace:
+
+- a dashboard named `<workspace> Cluster Health`
 - an email notification channel
+- a webhook notification channel, created only when a webhook URL is configured
 - a high CPU Prometheus-style alert
 - a high memory Prometheus-style alert
 
@@ -59,17 +65,18 @@ The dashboard includes panels for:
 - memory usage
 - network throughput
 
-The alerts are configured with a 5-minute evaluation window and notify the configured email recipients.
+The alerts are configured with a 5-minute evaluation window and notify the configured email recipients. When a webhook URL is configured, alerts additionally send a callback to that endpoint.
 
 ## How It Is Provisioned
 
 Provisioning is managed with Terraform, not manually through the Sysdig UI.
 
-The entry point is:
+The entry points are:
 
 - `terraform/sysdig/b0c13b/main.tf`
+- `terraform/sysdig/c89a45/main.tf`
 
-That environment uses the shared Terraform module in:
+Each environment uses the shared Terraform module in:
 
 - `terraform/sysdig/_module`
 
@@ -83,14 +90,16 @@ The current Terraform design has two layers:
 | -------------------------- | ---------------------------------------------------------------------------------------- |
 | `terraform/sysdig/_module` | reusable Sysdig dashboard, notification channel, and alert definitions                   |
 | `terraform/sysdig/b0c13b`  | environment-specific instantiation, provider config, backend config, and variable wiring |
+| `terraform/sysdig/c89a45`  | environment-specific instantiation, provider config, backend config, and variable wiring |
 
 This separation keeps the Sysdig resource model reusable while still allowing per-environment customization.
 
 ## State And Credentials
 
-The Sysdig Terraform state is stored using the Kubernetes backend:
+The Sysdig Terraform state is stored using the Kubernetes backend, one state per workspace:
 
-- namespace: `b0c13b-tools`
+- `b0c13b`: namespace `b0c13b-tools`
+- `c89a45`: namespace `c89a45-tools`
 - secret suffix: `sysdig-state`
 
 The Sysdig provider authenticates with:
@@ -101,21 +110,47 @@ Alert recipients are passed through:
 
 - `TF_VAR_alert_email_recipients`
 
+An optional webhook callback URL is passed through:
+
+- `TF_VAR_alert_webhook_url`
+
+When unset (or empty), the webhook notification channel is not created and alerts notify through email only.
+
+The webhook Authorization header is passed through:
+
+- `TF_VAR_alert_webhook_authorization`
+
+It is mandatory whenever a webhook URL is configured; provisioning fails with a validation error otherwise.
+
+The GitHub Actions workflows map these Terraform variables from secrets in each workspace's GitHub environment (`sysdig` for `b0c13b`, `standard-sysdig` for `c89a45`):
+
+| Terraform variable            | GitHub secret                 |
+| ----------------------------- | ----------------------------- |
+| `sysdig_monitor_api_token`    | `SYSDIG_MONITOR_API_TOKEN`    |
+| `alert_email_recipients`      | `ALERT_EMAIL_RECIPIENTS`      |
+| `alert_webhook_url`           | `ALERT_WEBHOOK_URL`           |
+| `alert_webhook_authorization` | `ALERT_WEBHOOK_AUTHORIZATION` |
+
+The OpenShift login used to reach the Kubernetes state backend reads `OPENSHIFT_SERVER` and `OPENSHIFT_TOKEN` from the same environment.
+
 This keeps secrets out of the repository and aligns provisioning with the GitHub Actions environment model.
 
 ## Delivery Automation
 
-Sysdig provisioning is automated through the GitHub Actions workflow:
+Sysdig provisioning is automated through GitHub Actions workflows, one per workspace:
 
-- `.github/workflows/sysdig-terraform.yml`
+| Workspace | Workflow                                          | GitHub environment |
+| --------- | ------------------------------------------------- | ------------------ |
+| `b0c13b`  | `.github/workflows/sysdig-terraform.yml`          | `sysdig`           |
+| `c89a45`  | `.github/workflows/sysdig-terraform-standard.yml` | `standard-sysdig`  |
 
-The workflow behavior is:
+Each workflow's behavior is:
 
-- on pull requests touching `terraform/sysdig/**`: run `terraform plan`
-- on pushes to `main` touching `terraform/sysdig/**`: run `terraform apply`
+- on pull requests touching that workspace or the shared module (`terraform/sysdig/_module/**`): run `terraform plan`
+- on pushes to `main` touching the same paths: run `terraform apply`
 - on manual dispatch: allow either `plan` or `apply`
 
-The workflow also posts the Terraform plan back to the pull request, which makes Sysdig monitoring changes reviewable before they are applied.
+The plan workflows also post the Terraform plan back to the pull request, which makes Sysdig monitoring changes reviewable before they are applied.
 
 ## Current Scope
 
@@ -125,11 +160,12 @@ It provisions:
 
 - baseline resource health monitoring
 - baseline email-based alerting
+- optional webhook callback notifications
 
 It does not currently provision, in this repository at least:
 
 - complex service maps
-- incident routing integrations beyond email
+- incident routing integrations beyond email and webhook callbacks
 - large policy libraries
 - broad multi-environment Sysdig stacks beyond the current Terraform entry point
 
@@ -137,7 +173,10 @@ It does not currently provision, in this repository at least:
 
 - `terraform/sysdig/b0c13b/main.tf`
 - `terraform/sysdig/b0c13b/config.tf`
+- `terraform/sysdig/c89a45/main.tf`
+- `terraform/sysdig/c89a45/config.tf`
 - `terraform/sysdig/_module/main.tf`
 - `terraform/sysdig/_module/variables.tf`
 - `terraform/sysdig/_module/outputs.tf`
 - `.github/workflows/sysdig-terraform.yml`
+- `.github/workflows/sysdig-terraform-standard.yml`

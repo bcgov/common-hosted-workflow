@@ -14,12 +14,14 @@ on:
     branches:
     - main
     paths:
-    - terraform/sysdig/**
+    - terraform/sysdig/b0c13b/**
+    - terraform/sysdig/_module/**
   push:
     branches:
     - main
     paths:
-    - terraform/sysdig/**
+    - terraform/sysdig/b0c13b/**
+    - terraform/sysdig/_module/**
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -55,6 +57,8 @@ jobs:
       env:
         TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+        TF_VAR_alert_webhook_url: ${{ secrets.ALERT_WEBHOOK_URL }}
+        TF_VAR_alert_webhook_authorization: ${{ secrets.ALERT_WEBHOOK_AUTHORIZATION }}
       run: terraform init
 
     - name: Terraform Plan
@@ -63,6 +67,8 @@ jobs:
       env:
         TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+        TF_VAR_alert_webhook_url: ${{ secrets.ALERT_WEBHOOK_URL }}
+        TF_VAR_alert_webhook_authorization: ${{ secrets.ALERT_WEBHOOK_AUTHORIZATION }}
       run: terraform plan -no-color 2>&1 | tee /tmp/plan.txt
 
     - name: Post Plan as PR Comment
@@ -73,7 +79,7 @@ jobs:
           const fs = require('fs');
           const plan = fs.readFileSync('/tmp/plan.txt', 'utf8');
           const body = [
-            '## Sysdig Terraform Plan',
+            '## Sysdig Terraform Plan (b0c13b)',
             '```',
             plan.substring(0, 65000),
             '```'
@@ -113,6 +119,8 @@ jobs:
       env:
         TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+        TF_VAR_alert_webhook_url: ${{ secrets.ALERT_WEBHOOK_URL }}
+        TF_VAR_alert_webhook_authorization: ${{ secrets.ALERT_WEBHOOK_AUTHORIZATION }}
       run: terraform init
 
     - name: Terraform Apply
@@ -120,4 +128,6 @@ jobs:
       env:
         TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
+        TF_VAR_alert_webhook_url: ${{ secrets.ALERT_WEBHOOK_URL }}
+        TF_VAR_alert_webhook_authorization: ${{ secrets.ALERT_WEBHOOK_AUTHORIZATION }}
       run: terraform apply -auto-approve

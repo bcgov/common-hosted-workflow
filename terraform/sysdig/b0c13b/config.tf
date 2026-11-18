@@ -29,3 +29,16 @@ variable "alert_email_recipients" {
   description = "Email addresses to notify on alerts — inject via TF_VAR_alert_email_recipients environment variable"
   type        = list(string)
 }
+
+variable "alert_webhook_url" {
+  description = "Webhook URL to receive alert callbacks — inject via TF_VAR_alert_webhook_url environment variable (optional)"
+  type        = string
+  default     = null
+}
+
+variable "alert_webhook_authorization" {
+  description = "Value of the Authorization header for webhook notifications — inject via TF_VAR_alert_webhook_authorization environment variable (mandatory when alert_webhook_url is set)"
+  type        = string
+  sensitive   = true
+  default     = null
+}
