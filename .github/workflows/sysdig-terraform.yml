@@ -59,7 +59,9 @@ jobs:
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
         TF_VAR_alert_webhook_url: ${{ secrets.ALERT_WEBHOOK_URL }}
         TF_VAR_alert_webhook_authorization: ${{ secrets.ALERT_WEBHOOK_AUTHORIZATION }}
-      run: terraform init
+      # The backend is pinned to ~/.kube/config, but oc-login writes the kubeconfig
+      # to $KUBECONFIG; point init at the login kubeconfig explicitly.
+      run: terraform init -backend-config="config_path=${KUBECONFIG:?KUBECONFIG must be set by the OpenShift login step}"
 
     - name: Terraform Plan
       id: plan
@@ -121,7 +123,9 @@ jobs:
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
         TF_VAR_alert_webhook_url: ${{ secrets.ALERT_WEBHOOK_URL }}
         TF_VAR_alert_webhook_authorization: ${{ secrets.ALERT_WEBHOOK_AUTHORIZATION }}
-      run: terraform init
+      # The backend is pinned to ~/.kube/config, but oc-login writes the kubeconfig
+      # to $KUBECONFIG; point init at the login kubeconfig explicitly.
+      run: terraform init -backend-config="config_path=${KUBECONFIG:?KUBECONFIG must be set by the OpenShift login step}"
 
     - name: Terraform Apply
       working-directory: terraform/sysdig/b0c13b
