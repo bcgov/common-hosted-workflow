@@ -4,13 +4,14 @@ Use `Webhook` together with `DevX Message Connector` to receive an incoming payl
 
 ## What This Node Supports
 
-The `DevX Message Connector` node has three message types:
+The `DevX Message Connector` node supports these message types:
 
-| Type       | When to use it                                                   | Extra options               |
-| ---------- | ---------------------------------------------------------------- | --------------------------- |
-| `Template` | Transform a known webhook payload into a supported DevX template | `Source`, `Payload`, `Mode` |
-| `Text`     | Send plain text directly to Teams                                | `Text`, `Mode`              |
-| `HTML`     | Send sanitized HTML directly to Teams                            | `Html`, `Mode`              |
+| Type            | When to use it                                                   | Extra options               |
+| --------------- | ---------------------------------------------------------------- | --------------------------- |
+| `Template`      | Transform a known webhook payload into a supported DevX template | `Source`, `Payload`, `Mode` |
+| `Text`          | Send plain text directly to Teams                                | `Text`, `Mode`              |
+| `HTML`          | Send sanitized HTML directly to Teams                            | `Html`, `Mode`              |
+| `Adaptive Card` | Send a card built by an upstream node                            | `Payload`, `Mode`           |
 
 When `Type` is set to `Template`, these `Source` values are available:
 
@@ -272,6 +273,8 @@ This source is intended for Backup Container webhook payloads. If you connect it
 ### Sysdig
 
 This source is intended for Sysdig alert webhook payloads. If you connect it through n8n, use the incoming request body directly, usually with `{{ $json.body }}`.
+
+For a custom Adaptive Card with Kubernetes scope and metric values, see [Sysdig Alert Notifications](../../operations/sysdig-alert-notifications.md).
 
 ### Uptime.com
 

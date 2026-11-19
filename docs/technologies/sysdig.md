@@ -56,16 +56,44 @@ The module creates, per workspace:
 - a dashboard named `<workspace> Cluster Health`
 - an email notification channel
 - a webhook notification channel, created only when a webhook URL is configured
-- a high CPU Prometheus-style alert
-- a high memory Prometheus-style alert
+- one high CPU and one high memory alert for each environment namespace (`<workspace>-dev`, `<workspace>-test`, `<workspace>-prod`)
+- an additional CPU and memory alert pair for **each** of `n8n` and `pgo` in **each** environment namespace
 
 The dashboard includes panels for:
 
-- CPU utilization
-- memory usage
-- network throughput
+- total CPU usage in cores
+- total memory usage, measured in bytes and scaled for display
+- outbound network throughput in bytes per second, calculated over five minutes
 
-The alerts are configured with a 5-minute evaluation window and notify the configured email recipients. When a webhook URL is configured, alerts additionally send a callback to that endpoint.
+The panels are filtered to the workspace's environment namespaces and grouped by namespace and cluster.
+
+An alert fires when its condition is true for **five consecutive minutes**. Alerts notify the configured email recipients and, when a webhook URL is configured, send a callback to that endpoint.
+
+To turn those callbacks into Teams Adaptive Cards, see [Sysdig Alert Notifications](../operations/sysdig-alert-notifications.md) for the n8n workflow and Code node script.
+
+### Alert scopes
+
+Alerts are generated from two kinds of scope, driven by module variables:
+
+| Scope       | Example alert suffix | Namespace filter            | Workload filter                    |
+| ----------- | -------------------- | --------------------------- | ---------------------------------- |
+| Environment | `c89a45-dev`         | `<workspace>-<environment>` | All workloads                      |
+| Component   | `c89a45-dev (n8n)`   | `<workspace>-<environment>` | `chwf-n8n(-.*)?`, `chwf-pgo(-.*)?` |
+
+By default, each workspace has nine scopes (three namespace-wide and six component-specific), for **18 alerts**. The `alert_ids` and `memory_alert_ids` outputs are maps keyed by `dev`, `test`, `prod`, or `<environment>/<component>` (for example, `prod/n8n`).
+
+Environment alerts group by cluster and namespace. Component alerts also group by workload, so, for example, `chwf-n8n-main` and `chwf-n8n-worker` can produce separate alert occurrences within `c89a45-dev (n8n)`. Each group uses the **maximum** container value, so idle replicas and sidecars do not dilute a hot container's usage. The five-minute duration applies to the group even if the container with the highest usage changes. Gold and GoldDR are evaluated separately.
+
+The default CPU and memory thresholds are both 85%. CPU uses the percentage of container CPU quota; memory uses the percentage of the container's positive memory limit. If Sysdig does not report usable limit metrics for a container, as expected for request-only PGO containers, usage is compared to a fallback budget instead:
+
+| Fallback budget             | Default    | Usage that must be exceeded at 85% |
+| --------------------------- | ---------- | ---------------------------------- |
+| `cpu_alert_fallback_cores`  | 1 CPU core | 850 millicores                     |
+| `memory_alert_fallback_mib` | 1024 MiB   | 870.4 MiB                          |
+
+These are monitoring budgets, not Kubernetes limits or requests. Adjust them in the root module if observed usage calls for a different threshold.
+
+The scopes overlap: a sustained spike can trigger both a component alert and its namespace-wide alert. The `alert_workloads` regexes follow the Helm names in `helm/main`; override them if those names change, or set `alert_workloads = {}` to disable component alerts. The `alert_environments` list controls **both** alert scope types and the dashboard's namespace filter.
 
 ## How It Is Provisioned
 
@@ -106,9 +134,11 @@ The Sysdig provider authenticates with:
 
 - `TF_VAR_sysdig_monitor_api_token`
 
-Alert recipients are passed through:
+`ALERT_EMAIL_RECIPIENTS` is passed to `TF_VAR_alert_email_recipients`. Set the secret in each GitHub environment to an HCL list literal, not a comma-separated string:
 
-- `TF_VAR_alert_email_recipients`
+```text
+["alice@example.com", "bob@example.com"]
+```
 
 An optional webhook callback URL is passed through:
 
@@ -152,13 +182,31 @@ Each workflow's behavior is:
 
 The plan workflows also post the Terraform plan back to the pull request, which makes Sysdig monitoring changes reviewable before they are applied.
 
+### Verify before applying
+
+1. In Sysdig's PromQL Query Explorer, check that container metrics have the expected cluster, namespace, workload, and container labels. For example, run the following for `c89a45`, then repeat for `b0c13b`:
+
+   ```promql
+   count by (kube_cluster_name, kube_namespace_name, kube_workload_name) (
+     sysdig_container_cpu_cores_used{
+       kube_namespace_name=~"c89a45-(dev|test|prod)",
+       kube_workload_name=~"chwf-(n8n|pgo)(-.*)?",
+       container_id!=""
+     }
+   )
+   ```
+
+   Look for distinct cluster names wherever the workloads are running. In each workspace, run representative CPU and memory alert queries without the final `> 85` comparison to check the n8n limit metrics and the PGO fallback. An alert query with the comparison in place returns no series when usage is below threshold **or** when metrics are missing.
+
+2. Review the real Terraform plans from both GitHub workflows before merging. With the default scopes, if the two previous workspace-wide alerts already exist in state, the plan should move them to the `prod` keys and update them in place, keeping their IDs, then add the other 16 alerts. The former CPU `alert_id` is now `alert_ids["prod"]`. A workspace with no existing alerts should plan 18 new ones.
+
 ## Current Scope
 
 The current repository implementation is intentionally small and focused.
 
 It provisions:
 
-- baseline resource health monitoring
+- baseline resource health monitoring per environment namespace and per component workload family
 - baseline email-based alerting
 - optional webhook callback notifications
 
