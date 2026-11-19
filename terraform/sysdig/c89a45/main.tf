@@ -12,6 +12,10 @@ output "dashboard_id" {
   value = module.sysdig.dashboard_id
 }
 
-output "alert_id" {
-  value = module.sysdig.alert_id
+output "alert_ids" {
+  value = module.sysdig.alert_ids
+}
+
+output "memory_alert_ids" {
+  value = module.sysdig.memory_alert_ids
 }
