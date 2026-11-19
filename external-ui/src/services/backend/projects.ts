@@ -23,6 +23,8 @@ export type ProjectItem = {
   weeklyTopupRuns: number;
   /** Runs added by weekly top-ups whose weeks overlap the current year (0 when none). */
   yearlyTopupRuns: number;
+  /** Top-up sums for selectable request weeks (detail endpoint only). */
+  upcomingWeeklyTopupRuns?: Record<string, number>;
   workflowCount: number;
   membersCount: number;
   /**
@@ -195,7 +197,7 @@ export type AdminRunRequestItem = {
   /** Requester's project-role label, e.g. 'Editor'. */
   requestedByRoleLabel: string | null;
   createdAt: string;
-  /** Usage in the week/year the request was sent (the list's "week used" column). */
+  /** Live totals for the request's periods, NOT submission-time snapshots. */
   weeklyUsedWhenSent: number | null;
   yearlyUsedWhenSent: number | null;
   /** Usage in the current week/year (the review dialog's "now" figure). */
@@ -204,6 +206,11 @@ export type AdminRunRequestItem = {
   /** Limits in force right now (defaults mode resolves the scope defaults). */
   currentWeeklyLimit: number | null;
   currentAnnualLimit: number | null;
+  /** Effective current limits including matching top-ups. */
+  currentEffectiveWeeklyLimit?: number | null;
+  currentEffectiveAnnualLimit?: number | null;
+  /** Effective allowance for the requested week, before this grant. */
+  targetWeeklyLimit?: number | null;
   /** Most recent top-up before review, for context in the dialog. */
   lastTopup: { amount: number; periodKey: string; createdAt: string; createdByName: string | null } | null;
   /** Most recent limits change before review, for context in the dialog. */

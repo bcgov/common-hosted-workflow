@@ -469,6 +469,18 @@ describe('AdminProjectsView run requests tab', () => {
     expect(pendingBadges.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('labels request usage as current-week usage and includes top-ups in its percentage', async () => {
+    mockRequestsList([
+      { ...EXTRA_RUNS_REQUEST, weeklyUsedWhenSent: 9_999, weeklyUsedNow: 5_200, currentEffectiveWeeklyLimit: 20_000 },
+    ]);
+    renderView(['/projects?tab=requests']);
+    expect(await screen.findByText('Used this week')).toBeInTheDocument();
+    expect(await screen.findByText('5,200 / 20,000')).toBeInTheDocument();
+    const bar = screen.getByRole('img', { name: '5,200 of 20,000 runs used' });
+    expect(bar.firstElementChild).toHaveStyle({ width: '26%' });
+    expect(screen.queryByText('9,999')).not.toBeInTheDocument();
+  });
+
   it('opens the review dialog when a row is clicked', async () => {
     const user = userEvent.setup();
     mockRequestsList([EXTRA_RUNS_REQUEST]);

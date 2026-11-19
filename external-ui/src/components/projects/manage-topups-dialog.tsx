@@ -164,9 +164,16 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
       : `${formatCount(project.weeklyRateLimit)}${
           project.weeklyTopupRuns > 0 ? ` (+${formatCount(project.weeklyTopupRuns)} top-up)` : ''
         }`;
-  const annualLimitText = project.yearlyRateLimit === null ? 'not set' : formatCount(project.yearlyRateLimit);
-  const limitsText =
-    weeklyLimitText === null
+  const annualLimitText =
+    project.yearlyRateLimit === null
+      ? 'not set'
+      : `${formatCount(project.yearlyRateLimit)}${
+          project.yearlyTopupRuns > 0 ? ` (+${formatCount(project.yearlyTopupRuns)} top-up)` : ''
+        }`;
+  const isUncapped = project.weeklyRateLimit === null && project.yearlyRateLimit === null;
+  const limitsText = isUncapped
+    ? 'No weekly or annual limit is configured. Set a limit before adding a top-up; this project is already uncapped.'
+    : weeklyLimitText === null
       ? `No weekly limit is configured, so a top-up would only affect the annual limit (currently ${annualLimitText}).`
       : `Weekly limit is ${weeklyLimitText} and annual limit is ${annualLimitText}.`;
 
@@ -247,7 +254,7 @@ export function ManageTopupsDialog({ project, open, onOpenChange }: Readonly<Man
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleAdd} disabled={addMutation.isPending}>
+            <Button type="button" onClick={handleAdd} disabled={addMutation.isPending || isUncapped}>
               Add top-up
             </Button>
           </DialogFooter>

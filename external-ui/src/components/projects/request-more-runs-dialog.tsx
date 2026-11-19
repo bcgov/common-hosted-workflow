@@ -30,6 +30,7 @@ import {
   getUsageBarTone,
   getUsagePercent,
   getUsageRatio,
+  getWeeklyPeriodKey,
   listUpcomingWeeklyPeriodOptions,
   type UsageBarTone,
 } from '@/lib/rate-limit';
@@ -82,7 +83,10 @@ function getSendErrorMessage(error: unknown): string {
     const status = error.response.status;
     if (status === 409) return 'This project already has a request waiting for review.';
     if (status === 403) return 'Only project admins, editors and personal owners can request more runs.';
-    if (status === 400) return 'Check the highlighted fields — the request was not valid.';
+    if (status === 400) {
+      const data = error.response.data as { message?: string } | undefined;
+      return data?.message || 'The request was not valid. Check the values and try again.';
+    }
   }
   return 'Could not send the request. Try again.';
 }
@@ -232,6 +236,11 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
   const parsedAnnualLimit = parseAmountInput(annualLimitInput);
   const effectiveWeeklyLimit = getEffectiveWeeklyLimit(project);
   const effectiveYearlyLimit = getEffectiveYearlyLimit(project);
+  const targetTopups =
+    project.upcomingWeeklyTopupRuns?.[periodKey] ??
+    (periodKey === getWeeklyPeriodKey() ? project.weeklyTopupRuns : undefined);
+  const targetWeeklyLimit =
+    project.weeklyRateLimit === null || targetTopups === undefined ? null : project.weeklyRateLimit + targetTopups;
   const hasPendingRequest = project.pendingRunRequest != null;
   const isSending = sendMutation.isPending;
 
@@ -245,11 +254,17 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
       if (parsedWeeklyLimit === undefined && parsedAnnualLimit === undefined) {
         nextErrors.weekly = 'Change one or both limits';
       }
-      if (parsedWeeklyLimit !== undefined && parsedWeeklyLimit < 1) {
-        nextErrors.weekly = 'Enter a whole number of runs of at least 1';
+      if (
+        weeklyLimitInput.trim() !== '' &&
+        (parsedWeeklyLimit === undefined || parsedWeeklyLimit < 1 || parsedWeeklyLimit > 1_000_000)
+      ) {
+        nextErrors.weekly = 'Enter a whole number of runs between 1 and 1,000,000';
       }
-      if (parsedAnnualLimit !== undefined && parsedAnnualLimit < 1) {
-        nextErrors.annual = 'Enter a whole number of runs of at least 1';
+      if (
+        annualLimitInput.trim() !== '' &&
+        (parsedAnnualLimit === undefined || parsedAnnualLimit < 1 || parsedAnnualLimit > 100_000_000)
+      ) {
+        nextErrors.annual = 'Enter a whole number of runs between 1 and 100,000,000';
       }
       if (parsedWeeklyLimit !== undefined && parsedAnnualLimit !== undefined && parsedAnnualLimit < parsedWeeklyLimit) {
         nextErrors.annual = 'The annual limit must be at least the weekly limit';
@@ -291,14 +306,18 @@ export function RequestMoreRunsDialog({ project, open, onOpenChange }: Readonly<
       sendBlocked = 'Extra runs need a weekly limit to add to.';
     } else if (
       parsedExtraRuns !== undefined &&
+      targetWeeklyLimit !== null &&
       parsedExtraRuns >= MIN_EXTRA_RUNS &&
       parsedExtraRuns <= MAX_EXTRA_RUNS
     ) {
-      approvedTitle = `If approved: up to ${formatCount(effectiveWeeklyLimit + parsedExtraRuns)} runs for ${formatWeeklyKeyRange(periodKey)}`;
-      approvedDescription = `That is your ${formatCount(effectiveWeeklyLimit)} weekly limit plus the ${formatCount(parsedExtraRuns)} you asked for. Extra runs also count toward your annual limit.`;
+      approvedTitle = `If approved: up to ${formatCount(targetWeeklyLimit + parsedExtraRuns)} runs for ${formatWeeklyKeyRange(periodKey)}`;
+      approvedDescription = `That is your ${formatCount(targetWeeklyLimit)} allowance for that week plus the ${formatCount(parsedExtraRuns)} you asked for.${project.yearlyRateLimit === null ? '' : ' Extra runs also raise your annual limit.'}`;
     } else {
       approvedTitle = 'If approved: your weekly limit plus the extra runs';
-      approvedDescription = 'Enter the number of extra runs to see the approved total here.';
+      approvedDescription =
+        targetWeeklyLimit === null
+          ? 'Existing top-ups for that week are unavailable. The total will be confirmed during review.'
+          : 'Enter the number of extra runs to see the approved total here.';
     }
   } else if (parsedWeeklyLimit !== undefined && parsedAnnualLimit !== undefined) {
     approvedTitle = `If approved: ${formatCount(parsedWeeklyLimit)} runs a week and ${formatCount(parsedAnnualLimit)} a year`;

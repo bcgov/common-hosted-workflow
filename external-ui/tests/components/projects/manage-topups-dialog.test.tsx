@@ -152,16 +152,16 @@ describe('ManageTopupsDialog', () => {
     expect(screen.getByText('Weekly limit is 12,000 (+2,000 top-up) and annual limit is 500,000.')).toBeInTheDocument();
   });
 
-  it('warns that a top-up would only affect the annual limit without a weekly limit', async () => {
+  it('blocks ineffective top-ups when neither limit exists', async () => {
     renderDialog({ ...PROJECT, weeklyRateLimit: null, yearlyRateLimit: null, weeklyTopupRuns: 2_000 });
     await screen.findByText('No top-ups yet.');
 
     expect(
       screen.getByText(
-        'No weekly limit is configured, so a top-up would only affect the annual limit (currently not set).',
+        'No weekly or annual limit is configured. Set a limit before adding a top-up; this project is already uncapped.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add top-up' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add top-up' })).toBeDisabled();
   });
 
   it('mentions the annual limit in the no-weekly-limit warning when one is set', async () => {
@@ -419,5 +419,10 @@ describe('ManageTopupsDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(createMock).not.toHaveBeenCalled();
     expect(deleteMock).not.toHaveBeenCalled();
+  });
+  it('includes annual top-ups in the limit summary', async () => {
+    renderDialog({ ...PROJECT, yearlyTopupRuns: 3_000 });
+    await screen.findByText('No top-ups yet.');
+    expect(screen.getByText('Weekly limit is 12,000 and annual limit is 500,000 (+3,000 top-up).')).toBeInTheDocument();
   });
 });

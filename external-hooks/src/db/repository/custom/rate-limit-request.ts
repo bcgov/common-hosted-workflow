@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { projectTopup } from '../../schema/project-topup';
 import { projectRateLimit } from '../../schema/project-rate-limit';
 import { rateLimitRequest } from '../../schema/rate-limit-request';
@@ -150,10 +150,10 @@ export class RateLimitRequestRepository {
 
   /**
    * Approves a limit-raise request and applies the new limits atomically
-   * (same transaction, full-replace semantics like Edit limits: the project
-   * leaves defaults mode with the granted values; unasked periods stay null
-   * and fall back to scope defaults at enforcement time). Returns the approved
-   * row, or null when the request was no longer pending.
+   * (same transaction). Only granted periods change; untouched periods retain
+   * their custom values or scope-default inheritance. Custom stop behavior is
+   * preserved; defaults mode retains its effective hard stop.
+   * Returns the approved row, or null when the request was no longer pending.
    */
   async approveAsLimitChange(
     requestId: string,
@@ -181,10 +181,14 @@ export class RateLimitRequestRepository {
           target: projectRateLimit.projectId,
           set: {
             usesDefaultLimits: false,
-            weeklyRateLimit: decision.decidedWeeklyLimit,
-            yearlyRateLimit: decision.decidedAnnualLimit,
+            weeklyRateLimit:
+              decision.decidedWeeklyLimit ??
+              sql`CASE WHEN ${projectRateLimit.usesDefaultLimits} THEN NULL ELSE ${projectRateLimit.weeklyRateLimit} END`,
+            yearlyRateLimit:
+              decision.decidedAnnualLimit ??
+              sql`CASE WHEN ${projectRateLimit.usesDefaultLimits} THEN NULL ELSE ${projectRateLimit.yearlyRateLimit} END`,
             lastAdminComment: limits.lastAdminComment,
-            stopBehavior: 'hard_stop',
+            stopBehavior: sql`CASE WHEN ${projectRateLimit.usesDefaultLimits} THEN 'hard_stop' ELSE ${projectRateLimit.stopBehavior} END`,
             updatedBy: decision.decidedBy,
             updatedAt: new Date(),
           },

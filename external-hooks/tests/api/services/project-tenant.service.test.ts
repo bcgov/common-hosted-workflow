@@ -237,6 +237,7 @@ describe('ProjectTenantService', () => {
         tenantId: 'tenant-1',
         viewerRole: null,
         pendingRunRequest: null,
+        upcomingWeeklyTopupRuns: expect.any(Object),
         usesDefaultLimits: false,
         weeklyRateLimit: 10,
         yearlyRateLimit: 1000,
