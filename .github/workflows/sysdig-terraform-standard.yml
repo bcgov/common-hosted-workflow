@@ -66,6 +66,7 @@ jobs:
     - name: Terraform Plan
       id: plan
       working-directory: terraform/sysdig/c89a45
+      shell: bash
       env:
         TF_VAR_sysdig_monitor_api_token: ${{ secrets.SYSDIG_MONITOR_API_TOKEN }}
         TF_VAR_alert_email_recipients: ${{ secrets.ALERT_EMAIL_RECIPIENTS }}
