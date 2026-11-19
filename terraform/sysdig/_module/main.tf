@@ -7,6 +7,34 @@ terraform {
   }
 }
 
+locals {
+  environment_namespaces = {
+    for environment in var.alert_environments : environment => "${var.workspace}-${environment}"
+  }
+
+  dashboard_selector = "kube_namespace_name=~${jsonencode(join("|", values(local.environment_namespaces)))}"
+  namespace_labels   = "kube_cluster_name, kube_namespace_name"
+  container_labels   = "${local.namespace_labels}, container_id"
+
+  environment_scopes = {
+    for environment, namespace in local.environment_namespaces : environment => {
+      label    = namespace
+      selector = "kube_namespace_name=${jsonencode(namespace)},container_id!=\"\""
+      group_by = local.namespace_labels
+    }
+  }
+
+  component_scopes = {
+    for pair in setproduct(keys(local.environment_namespaces), keys(var.alert_workloads)) : "${pair[0]}/${pair[1]}" => {
+      label    = "${local.environment_namespaces[pair[0]]} (${pair[1]})"
+      selector = "${local.environment_scopes[pair[0]].selector},kube_workload_name=~${jsonencode(var.alert_workloads[pair[1]])}"
+      group_by = "${local.namespace_labels}, kube_workload_name"
+    }
+  }
+
+  alert_scopes = merge(local.environment_scopes, local.component_scopes)
+}
+
 resource "sysdig_monitor_dashboard" "cluster_health" {
   name        = "${var.workspace} Cluster Health"
   description = "Real-time CPU, memory, and network metrics for ${var.workspace} namespaces"
@@ -17,11 +45,18 @@ resource "sysdig_monitor_dashboard" "cluster_health" {
     width  = 12
     height = 6
     type   = "timechart"
-    name   = "CPU Utilization (%)"
+    name   = "CPU Usage (cores)"
 
     query {
-      unit   = "percent"
-      promql = "avg(sysdig_container_cpu_used_percent) by (kube_namespace_label_environment, kubernetes_cluster_name)"
+      unit   = "number"
+      promql = "sum by (${local.namespace_labels}) (sysdig_container_cpu_cores_used{${local.dashboard_selector}})"
+
+      format {
+        input_format   = "1"
+        display_format = "auto"
+        y_axis         = "auto"
+        decimals       = 3
+      }
     }
   }
 
@@ -31,11 +66,11 @@ resource "sysdig_monitor_dashboard" "cluster_health" {
     width  = 6
     height = 6
     type   = "timechart"
-    name   = "Memory Usage (MiB)"
+    name   = "Memory Usage"
 
     query {
       unit   = "data"
-      promql = "sum(sysdig_container_memory_used_bytes) by (kube_namespace_label_environment, kubernetes_cluster_name)"
+      promql = "sum by (${local.namespace_labels}) (sysdig_container_memory_used_bytes{${local.dashboard_selector}})"
     }
   }
 
@@ -45,11 +80,11 @@ resource "sysdig_monitor_dashboard" "cluster_health" {
     width  = 6
     height = 6
     type   = "timechart"
-    name   = "Network Throughput (bytes/s)"
+    name   = "Outbound Network Throughput (bytes/s)"
 
     query {
       unit   = "data rate"
-      promql = "sum(sysdig_container_net_out_bytes) by (kube_namespace_label_environment, kubernetes_cluster_name)"
+      promql = "sum by (${local.namespace_labels}) (rate(sysdig_container_net_out_bytes{${local.dashboard_selector}}[5m]))"
     }
   }
 }
@@ -71,12 +106,34 @@ resource "sysdig_monitor_notification_channel_webhook" "alerts" {
   additional_headers = merge(var.alert_webhook_headers, { Authorization = var.alert_webhook_authorization })
 }
 
+# Reuse the previous workspace-wide alerts for the production namespace.
+moved {
+  from = sysdig_monitor_alert_v2_prometheus.high_cpu
+  to   = sysdig_monitor_alert_v2_prometheus.high_cpu["prod"]
+}
+
+moved {
+  from = sysdig_monitor_alert_v2_prometheus.high_memory
+  to   = sysdig_monitor_alert_v2_prometheus.high_memory["prod"]
+}
+
 resource "sysdig_monitor_alert_v2_prometheus" "high_cpu" {
-  name        = "High CPU Utilization - ${var.workspace}"
-  description = "CPU utilization has exceeded 85% for more than 5 minutes in a ${var.workspace} namespace"
+  for_each = local.alert_scopes
+
+  name        = "High CPU Utilization - ${each.value.label}"
+  description = "Peak container CPU usage in ${each.value.label} is above ${var.cpu_alert_threshold}% of its quota or fallback budget (${var.cpu_alert_fallback_cores} cores) for 5 minutes"
   severity    = "high"
 
-  query = "avg(sysdig_container_cpu_used_percent) by (kube_namespace_label_environment, kubernetes_cluster_name) > ${var.cpu_alert_threshold}"
+  # Resolve the fallback per container before grouping so a limited sidecar
+  # cannot mask usage by a request-only container in the same workload.
+  query = trimspace(<<-PROMQL
+    max by (${each.value.group_by}) (
+      (sysdig_container_cpu_quota_used_percent{${each.value.selector}} >= 0)
+      or on (${local.container_labels})
+      (100 * sysdig_container_cpu_cores_used{${each.value.selector}} / ${var.cpu_alert_fallback_cores})
+    ) > ${var.cpu_alert_threshold}
+  PROMQL
+  )
 
   duration_seconds = 300
 
@@ -93,11 +150,23 @@ resource "sysdig_monitor_alert_v2_prometheus" "high_cpu" {
 }
 
 resource "sysdig_monitor_alert_v2_prometheus" "high_memory" {
-  name        = "High Memory Utilization - ${var.workspace}"
-  description = "Memory utilization has exceeded 80% for more than 5 minutes in a ${var.workspace} namespace"
+  for_each = local.alert_scopes
+
+  name        = "High Memory Utilization - ${each.value.label}"
+  description = "Peak container memory usage in ${each.value.label} is above ${var.memory_alert_threshold}% of its limit or fallback budget (${var.memory_alert_fallback_mib} MiB) for 5 minutes"
   severity    = "high"
 
-  query = "avg(sysdig_container_memory_used_percent) by (kube_namespace_label_environment, kubernetes_cluster_name) > ${var.memory_alert_threshold}"
+  # Sysdig's memory limit defaults to zero for a container without a limit.
+  query = trimspace(<<-PROMQL
+    max by (${each.value.group_by}) (
+      ((sysdig_container_memory_limit_used_percent{${each.value.selector}} >= 0)
+       and on (${local.container_labels})
+       (sysdig_container_memory_limit_bytes{${each.value.selector}} > 0))
+      or on (${local.container_labels})
+      (100 * sysdig_container_memory_used_bytes{${each.value.selector}} / ${var.memory_alert_fallback_mib * 1048576})
+    ) > ${var.memory_alert_threshold}
+  PROMQL
+  )
 
   duration_seconds = 300
 
