@@ -52,10 +52,11 @@ resource "sysdig_monitor_dashboard" "cluster_health" {
       promql = "sum by (${local.namespace_labels}) (sysdig_container_cpu_cores_used{${local.dashboard_selector}})"
 
       format {
-        input_format   = "1"
-        display_format = "auto"
-        y_axis         = "auto"
-        decimals       = 3
+        input_format            = "1"
+        display_format          = "auto"
+        y_axis                  = "auto"
+        decimals                = 3
+        null_value_display_mode = "nullGap"
       }
     }
   }
