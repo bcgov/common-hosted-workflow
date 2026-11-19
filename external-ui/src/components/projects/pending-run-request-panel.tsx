@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toasts';
 import {
   formatCount,
   formatShortDate,
+  getRateLimitTimezone,
   formatWeeklyKeyRange,
   getEffectiveYearlyLimit,
   getEffectiveWeeklyLimit,
@@ -17,23 +18,21 @@ const KIND_LABELS: Record<PendingRunRequest['requestKind'], string> = {
   limit_increase: 'A higher limit',
 };
 
-const VANCOUVER_TIME_ZONE = 'America/Vancouver';
-
 function formatRequestTime(createdAt: string): string {
   const date = new Date(createdAt);
   const timeText = new Intl.DateTimeFormat('en-US', {
-    timeZone: VANCOUVER_TIME_ZONE,
+    timeZone: getRateLimitTimezone(),
     hour: 'numeric',
     minute: '2-digit',
   }).format(date);
   const dayText = new Intl.DateTimeFormat('en-CA', {
-    timeZone: VANCOUVER_TIME_ZONE,
+    timeZone: getRateLimitTimezone(),
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(date);
   const todayText = new Intl.DateTimeFormat('en-CA', {
-    timeZone: VANCOUVER_TIME_ZONE,
+    timeZone: getRateLimitTimezone(),
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

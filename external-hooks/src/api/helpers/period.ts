@@ -32,10 +32,12 @@ function resolvePeriodTimezone(timeZone: string): string {
   }
 }
 
+export const PERIOD_TIMEZONE = resolvePeriodTimezone(RATE_LIMIT_TIMEZONE);
+
 // 'en-CA' yields plain numeric Y/M/D parts; formatToParts is walked by part
 // type, so the exact literal/segment ordering never matters.
 const localDateFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: resolvePeriodTimezone(RATE_LIMIT_TIMEZONE),
+  timeZone: PERIOD_TIMEZONE,
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',

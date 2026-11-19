@@ -44,6 +44,7 @@ import { buildWilRouter } from './wil';
 import { buildAdminProjectRouter } from './admin-projects';
 import { buildProjectsRouter } from './projects';
 import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
+import { PERIOD_TIMEZONE } from '../helpers/period';
 
 type UiApiMutableRequest = Request & {
   session?: UiApiRequest['session'];
@@ -264,6 +265,11 @@ function checkRole(...allowedRoles: string[]) {
 export function buildUiApiRouter(routeContext: ApiRouteContext) {
   const { services } = routeContext;
   const router = Router();
+  router.use((_req, res, next) => {
+    res.setHeader('X-Rate-Limit-Timezone', PERIOD_TIMEZONE);
+    res.append('Access-Control-Expose-Headers', 'X-Rate-Limit-Timezone');
+    next();
+  });
   const requireUiRequestContext = requireUiRequestContextMiddleware(services);
   const returnTargetPolicy = createReturnTargetPolicy();
 

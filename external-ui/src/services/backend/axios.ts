@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { setRateLimitTimezone } from '@/lib/rate-limit';
 
 export const APP_AUTH_TOKEN_STORAGE_KEY = 'external-ui.auth-token';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/';
@@ -52,6 +53,10 @@ instance.interceptors.request.use((config) => {
 });
 
 instance.interceptors.response.use((response) => {
+  const timezone = response.headers['x-rate-limit-timezone'];
+  if (typeof timezone === 'string') {
+    setRateLimitTimezone(timezone);
+  }
   const refreshedToken =
     (response.headers as Record<string, unknown>)['x-ui-auth-token'] ??
     (response.headers as Record<string, unknown>)['X-UI-Auth-Token'];
