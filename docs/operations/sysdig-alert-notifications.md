@@ -1,6 +1,6 @@
 # Sysdig Alert Notifications
 
-The [Sysdig CPU and memory alerts](../technologies/sysdig.md#alert-scopes) send email and can also
+The [Sysdig CPU, memory, and PVC alerts](../technologies/sysdig.md#alert-scopes) send email and can also
 POST to an n8n webhook. This guide follows the [Grafana](grafana-alert-notifications.md) and
 [DNS Probe](../platform/dns-probe.md#n8n-workflow-setup) pattern: a Code node builds a Microsoft
 Teams Adaptive Card and the DevX Message Connector delivers it.
@@ -65,11 +65,12 @@ This shortened body is based on a Sysdig test notification. The formatter ignore
 ```
 
 - **Status:** `ACTIVE` renders as **Triggered** (amber for the `Warning` threshold); `OK` renders
-  as **Resolved**. Other states are neutral. The module does not enable recovery notifications
-  by default; a resolved card is only generated if Sysdig sends an `OK` delivery.
-- **Scope:** read cluster, namespace, workload, and pod from `labels` when present; otherwise
-  look for quoted label assignments in `entities[].entity`, as in the sample. A namespace-wide
-  alert may not identify a workload or pod; those facts are omitted when unavailable.
+  as **Resolved**. Other states are neutral. A resolved card is only generated if Sysdig sends
+  an `OK` delivery.
+- **Scope:** read cluster, namespace, workload, pod, and persistent volume claim from `labels`
+  when present; otherwise look for quoted label assignments in `entities[].entity`, as in the
+  sample. The PVC rules use `namespace` and `persistentvolumeclaim` for the claim's identity.
+  Facts are omitted when unavailable.
 - **Metric and time:** show values from `entities[].metricValues`. For `OK`, use `endEntities`
   values if supplied rather than showing the original triggering values as recovery values.
   Convert the top-level `timestamp` from epoch microseconds to UTC.
@@ -90,9 +91,10 @@ const SYSDIG_ORIGIN = 'https://app.sysdigcloud.com'; // Exact HTTPS origin, with
 const MAX_ROWS = 4; // Maximum segments per card and metric rows per segment.
 const KUBE_LABELS = [
   ['Cluster', 'kube_cluster_name'],
-  ['Namespace', 'kube_namespace_name'],
+  ['Namespace', 'kube_namespace_name', 'namespace'],
   ['Workload', 'kube_workload_name'],
   ['Pod', 'kube_pod_name'],
+  ['PVC', 'persistentvolumeclaim'],
 ];
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -139,7 +141,7 @@ const statusOf = (state, warning) => {
 const segmentLabels = (entity) => {
   if (typeof entity !== 'string') return {};
   const pairs = entity.matchAll(
-    /(?:^|[{,]|\s+and\s+)\s*(kube_(?:cluster|namespace|workload|pod)_name)\s*=\s*(?:'([^']*)'|"([^"]*)")/g,
+    /(?:^|[{,]|\s+and\s+)\s*(kube_(?:cluster|namespace|workload|pod)_name|namespace|persistentvolumeclaim)\s*=\s*(?:'([^']*)'|"([^"]*)")/g,
   );
   return Object.fromEntries(Array.from(pairs, ([, key, single, double]) => [key, single ?? double]));
 };
@@ -166,9 +168,10 @@ return $input.all().map((item, index) => {
 
   const sections = (entities.length ? entities.slice(0, MAX_ROWS) : [{}]).flatMap((entity) => {
     const labels = segmentLabels(entity?.entity);
-    const rows = KUBE_LABELS.map(([title, key]) => ({
+    const rows = KUBE_LABELS.map(([title, ...keys]) => ({
       title,
-      value: text(p.labels?.[key]) || text(labels[key]),
+      value:
+        keys.map((key) => text(p.labels?.[key])).find(Boolean) || keys.map((key) => text(labels[key])).find(Boolean),
     })).filter(({ value }) => value);
 
     // On recovery without endEntities, keep the original segment labels but not the old values.
@@ -240,4 +243,4 @@ return $input.all().map((item, index) => {
    Do not include `Authorization:` in the value. Changing secrets does not run Terraform; use
    workflow dispatch to review the plan and then apply the channel change. Verify a real
    non-production PromQL alert as well as the sample, since the scope and metric fields depend
-   on the rule that fired.
+   on the rule that fired. For a volume alert, check that the card identifies the PVC and cluster.

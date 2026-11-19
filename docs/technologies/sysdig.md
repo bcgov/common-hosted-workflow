@@ -17,7 +17,7 @@ flowchart LR
     OCP[OpenShift Runtime Metrics]
     Sysdig[Sysdig Monitor]
     Dash[Cluster Health Dashboard]
-    Alerts[CPU and Memory Alerts]
+    Alerts["CPU, Memory, and PVC Alerts"]
     Email[Email Notifications]
     Webhook[Webhook Callbacks]
 
@@ -37,6 +37,7 @@ The repository uses Sysdig to provide:
 - a shared dashboard for environment-level cluster health
 - alerting on sustained high CPU utilization
 - alerting on sustained high memory utilization
+- alerting on sustained high persistent volume usage
 - email notifications to the configured operational recipients
 - webhook callbacks to a configured endpoint, when provided
 
@@ -56,8 +57,8 @@ The module creates, per workspace:
 - a dashboard named `<workspace> Cluster Health`
 - an email notification channel
 - a webhook notification channel, created only when a webhook URL is configured
-- one high CPU and one high memory alert for each environment namespace (`<workspace>-dev`, `<workspace>-test`, `<workspace>-prod`)
-- an additional CPU and memory alert pair for **each** of `n8n` and `pgo` in **each** environment namespace
+- one CPU, one memory, and one persistent volume claim (PVC) alert for each environment namespace (`<workspace>-dev`, `<workspace>-test`, `<workspace>-prod`)
+- a separate CPU, memory, and PVC alert for **each** of `n8n` and `pgo` in **each** environment namespace
 
 The dashboard includes panels for:
 
@@ -75,12 +76,16 @@ To turn those callbacks into Teams Adaptive Cards, see [Sysdig Alert Notificatio
 
 Alerts are generated from two kinds of scope, driven by module variables:
 
-| Scope       | Example alert suffix | Namespace filter            | Workload filter                    |
+| Scope       | Example alert suffix | Namespace filter            | Workload or PVC name filter        |
 | ----------- | -------------------- | --------------------------- | ---------------------------------- |
-| Environment | `c89a45-dev`         | `<workspace>-<environment>` | All workloads                      |
+| Environment | `c89a45-dev`         | `<workspace>-<environment>` | All workloads or claims            |
 | Component   | `c89a45-dev (n8n)`   | `<workspace>-<environment>` | `chwf-n8n(-.*)?`, `chwf-pgo(-.*)?` |
 
-By default, each workspace has nine scopes (three namespace-wide and six component-specific), for **18 alerts**. The `alert_ids` and `memory_alert_ids` outputs are maps keyed by `dev`, `test`, `prod`, or `<environment>/<component>` (for example, `prod/n8n`).
+By default, each workspace has nine scopes (three namespace-wide and six component-specific), for **27 alerts**: nine CPU, nine memory, and nine PVC. The `alert_ids`, `memory_alert_ids`, and `volume_alert_ids` outputs are maps keyed by `dev`, `test`, `prod`, or `<environment>/<component>` (for example, `prod/n8n`).
+
+The scopes overlap, so a breach can trigger both a component alert and its namespace-wide alert. `alert_environments` controls all three alert types and the dashboard's namespace filter.
+
+#### CPU and memory
 
 Environment alerts group by cluster and namespace. Component alerts also group by workload, so, for example, `chwf-n8n-main` and `chwf-n8n-worker` can produce separate alert occurrences within `c89a45-dev (n8n)`. Each group uses the **maximum** container value, so idle replicas and sidecars do not dilute a hot container's usage. The five-minute duration applies to the group even if the container with the highest usage changes. Gold and GoldDR are evaluated separately.
 
@@ -93,7 +98,29 @@ The default CPU and memory thresholds are both 85%. CPU uses the percentage of c
 
 These are monitoring budgets, not Kubernetes limits or requests. Adjust them in the root module if observed usage calls for a different threshold.
 
-The scopes overlap: a sustained spike can trigger both a component alert and its namespace-wide alert. The `alert_workloads` regexes follow the Helm names in `helm/main`; override them if those names change, or set `alert_workloads = {}` to disable component alerts. The `alert_environments` list controls **both** alert scope types and the dashboard's namespace filter.
+The `alert_workloads` regexes follow the Helm names in `helm/main`; override them if those names change, or set `alert_workloads = {}` to disable component CPU and memory alerts.
+
+#### Persistent volume usage
+
+**High PVC Utilization** fires when one claim stays above **85%** of its filesystem capacity for **five consecutive minutes**. It calculates `100 * used / capacity` from `kubelet_volume_stats_used_bytes` and `kubelet_volume_stats_capacity_bytes`. The query pairs readings from the same reporter, then takes the highest percentage per **cluster, namespace, and claim** to avoid double-counting a shared volume. A claim without a matching positive capacity or cluster label is not evaluated.
+
+The n8n and PGO rules match `persistentvolumeclaim`, not workload labels. The n8n filter covers the shared `chwf-n8n` claim; the PGO filter covers the operator's `chwf-pgo-*` claims, including data and local pgBackRest repository volumes where present. Other claims, such as `chwf-pgdump-backup`, are covered by the namespace-wide rule only. Override `alert_volume_claims` if these names change, set it to `{}` to disable component PVC rules, or adjust `volume_alert_threshold` in the module call.
+
+To graph usage in Sysdig Query Explorer, use the alert expression without its final threshold comparison. For example, this returns utilization percentages for all reporting claims in `c89a45-dev`; replace that namespace in all four selectors to check another environment:
+
+```promql
+max by (kube_cluster_name, namespace, persistentvolumeclaim) (
+  100 * kubelet_volume_stats_used_bytes{namespace="c89a45-dev",persistentvolumeclaim!="",kube_cluster_name!=""}
+  / (kubelet_volume_stats_capacity_bytes{namespace="c89a45-dev",persistentvolumeclaim!="",kube_cluster_name!=""} > 0)
+  or label_replace(
+    100 * kubelet_volume_stats_used_bytes{namespace="c89a45-dev",persistentvolumeclaim!="",kube_cluster_name="",cluster!=""}
+    / (kubelet_volume_stats_capacity_bytes{namespace="c89a45-dev",persistentvolumeclaim!="",kube_cluster_name="",cluster!=""} > 0),
+    "kube_cluster_name", "$1", "cluster", "(.+)"
+  )
+)
+```
+
+Use `kubelet_volume_stats_available_bytes` to inspect remaining space in bytes; it does not have a separate alert.
 
 ## How It Is Provisioned
 
@@ -198,7 +225,20 @@ The plan workflows also post the Terraform plan back to the pull request, which 
 
    Look for distinct cluster names wherever the workloads are running. In each workspace, run representative CPU and memory alert queries without the final `> 85` comparison to check the n8n limit metrics and the PGO fallback. An alert query with the comparison in place returns no series when usage is below threshold **or** when metrics are missing.
 
-2. Review the real Terraform plans from both GitHub workflows before merging. With the default scopes, if the two previous workspace-wide alerts already exist in state, the plan should move them to the `prod` keys and update them in place, keeping their IDs, then add the other 16 alerts. The former CPU `alert_id` is now `alert_ids["prod"]`. A workspace with no existing alerts should plan 18 new ones.
+2. Check PVC metric labels and claim names in both workspaces. For example:
+
+   ```promql
+   count by (kube_cluster_name, cluster, namespace, persistentvolumeclaim) (
+     kubelet_volume_stats_used_bytes{
+       namespace=~"c89a45-(dev|test|prod)",
+       persistentvolumeclaim!=""
+     }
+   )
+   ```
+
+   Repeat for `kubelet_volume_stats_capacity_bytes`, and run the generated PVC alert query without its final comparison. Confirm it returns distinct Gold and GoldDR series wherever claims report stats, including `chwf-n8n` and `chwf-pgo-*`. The rule uses `cluster` when `kube_cluster_name` is absent and requires the kubelet's `namespace` and `persistentvolumeclaim` labels.
+
+3. Review the Terraform plans from both workflows before merging. With the scoped CPU and memory alerts already deployed, expect **nine additions per workspace** and no changes to existing rules or the dashboard. If upgrading directly from the two old workspace-wide alerts, those should move to the `prod` keys and update in place, preserving their IDs, alongside 16 new CPU and memory alerts and nine new PVC alerts. The former CPU `alert_id` is now `alert_ids["prod"]`. A fresh workspace should plan 27 new alerts.
 
 ## Current Scope
 
@@ -228,6 +268,7 @@ scoping, and user access are managed separately through the `SysdigTeam` custom 
 - `terraform/sysdig/c89a45/main.tf`
 - `terraform/sysdig/c89a45/config.tf`
 - `terraform/sysdig/_module/main.tf`
+- `terraform/sysdig/_module/volume-alerts.tf`
 - `terraform/sysdig/_module/variables.tf`
 - `terraform/sysdig/_module/outputs.tf`
 - `.github/workflows/sysdig-terraform.yml`

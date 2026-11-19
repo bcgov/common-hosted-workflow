@@ -10,7 +10,7 @@ variable "workspace" {
 }
 
 variable "alert_environments" {
-  description = "Environment suffixes for the dashboard and both kinds of alert; namespaces are named <workspace>-<suffix>"
+  description = "Environment suffixes for the dashboard and alerts; namespaces are named <workspace>-<suffix>"
   type        = list(string)
   default     = ["dev", "test", "prod"]
   nullable    = false
@@ -24,7 +24,7 @@ variable "alert_environments" {
 }
 
 variable "alert_workloads" {
-  description = "Map of component name to a kube_workload_name regex; each component gets its own alert pair in each monitored namespace. Set to {} to disable component alerts."
+  description = "Map of component name to a kube_workload_name regex; each component gets a CPU and memory alert in each monitored namespace. Set to {} to disable component CPU and memory alerts."
   type        = map(string)
   nullable    = false
   default = {
@@ -38,6 +38,24 @@ variable "alert_workloads" {
       can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", component)) && can(regexall(pattern, "")) && !can(regex("^(${pattern})$", ""))
     ])
     error_message = "alert_workloads keys must use only lowercase letters, digits, and internal hyphens. Patterns must be valid regexes that do not match an empty workload name."
+  }
+}
+
+variable "alert_volume_claims" {
+  description = "Map of component name to a persistentvolumeclaim regex; each component gets a PVC alert in each monitored namespace. Set to {} to disable component PVC alerts."
+  type        = map(string)
+  nullable    = false
+  default = {
+    n8n = "chwf-n8n(-.*)?"
+    pgo = "chwf-pgo(-.*)?"
+  }
+
+  validation {
+    condition = alltrue([
+      for component, pattern in var.alert_volume_claims :
+      can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", component)) && can(regexall(pattern, "")) && !can(regex("^(${pattern})$", ""))
+    ])
+    error_message = "alert_volume_claims keys must use only lowercase letters, digits, and internal hyphens. Patterns must be valid regexes that do not match an empty PVC name."
   }
 }
 
@@ -91,6 +109,18 @@ variable "memory_alert_threshold" {
   validation {
     condition     = var.memory_alert_threshold > 0 && var.memory_alert_threshold < 100
     error_message = "memory_alert_threshold must be greater than 0 and less than 100."
+  }
+}
+
+variable "volume_alert_threshold" {
+  description = "Volume alert threshold as a percentage of a persistent volume claim's reported capacity"
+  type        = number
+  default     = 85
+  nullable    = false
+
+  validation {
+    condition     = var.volume_alert_threshold > 0 && var.volume_alert_threshold < 100
+    error_message = "volume_alert_threshold must be greater than 0 and less than 100."
   }
 }
 

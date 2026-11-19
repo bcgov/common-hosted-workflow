@@ -19,3 +19,7 @@ output "alert_ids" {
 output "memory_alert_ids" {
   value = module.sysdig.memory_alert_ids
 }
+
+output "volume_alert_ids" {
+  value = module.sysdig.volume_alert_ids
+}

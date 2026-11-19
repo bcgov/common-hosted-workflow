@@ -13,6 +13,11 @@ output "memory_alert_ids" {
   value       = { for scope, alert in sysdig_monitor_alert_v2_prometheus.high_memory : scope => alert.id }
 }
 
+output "volume_alert_ids" {
+  description = "Sysdig Monitor PVC alert IDs keyed by environment or environment/component"
+  value       = { for scope, alert in sysdig_monitor_alert_v2_prometheus.high_volume : scope => alert.id }
+}
+
 output "webhook_channel_id" {
   description = "Sysdig Monitor webhook notification channel ID (empty list when no webhook URL is configured)"
   value       = sysdig_monitor_notification_channel_webhook.alerts[*].id
