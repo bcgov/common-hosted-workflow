@@ -149,8 +149,8 @@ export function canRequestMoreRuns(viewerRole: string | null | undefined): boole
 
 /**
  * Projects when the weekly limit will be reached at the current pace: the
- * elapsed share of the Mon–Sun week sets the run rate, and the returned
- * instant is when that rate reaches the limit. Null when there is no
+ * elapsed calendar days of the Mon–Sun week set the run rate, and the returned
+ * date represents local noon on the projected day. Null when there is no
  * meaningful projection: the limit is already met, there is no usage yet, the
  * week just started, or the pace won't reach the limit within this week.
  */
@@ -160,12 +160,13 @@ export function getProjectedWeeklyPauseDate(params: { used: number; limit: numbe
     return null;
   }
   const weekStart = getCurrentWeekMonday(now);
-  const elapsed = getVancouverAnchor(now).getTime() - weekStart.getTime();
+  const elapsed = getPeriodAnchor(now).getTime() - weekStart.getTime();
   if (elapsed <= 0) {
     return null;
   }
   const projected = weekStart.getTime() + (limit * elapsed) / used;
-  return projected < weekStart.getTime() + 7 * DAY_MS ? new Date(projected) : null;
+  const projectedDay = Math.floor((projected - weekStart.getTime()) / DAY_MS);
+  return projectedDay < 7 ? toPeriodNoon(new Date(weekStart.getTime() + projectedDay * DAY_MS)) : null;
 }
 
 const countFormat = new Intl.NumberFormat('en-CA');
@@ -193,85 +194,90 @@ export function formatCompactCount(count: number): string {
   return formatCount(count);
 }
 
-const VANCOUVER_TIME_ZONE = 'America/Vancouver';
-const DAY_MS = 24 * 60 * 60 * 1000;
+let rateLimitTimezone = 'America/Vancouver';
 
-const shortDateFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: VANCOUVER_TIME_ZONE,
-  month: 'short',
-  day: 'numeric',
-});
-
-const datedFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: VANCOUVER_TIME_ZONE,
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-});
-
-/** "Sep 2" style date, rendered in the Vancouver time zone. */
-export function formatShortDate(date: Date): string {
-  return shortDateFormat.format(date);
+/** Set from the API response before its project data reaches the UI. */
+export function setRateLimitTimezone(timeZone: string): void {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    rateLimitTimezone = timeZone;
+  } catch {
+    rateLimitTimezone = 'America/Vancouver';
+  }
 }
 
-const weekdayShortDateFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: VANCOUVER_TIME_ZONE,
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-});
+export function getRateLimitTimezone(): string {
+  return rateLimitTimezone;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function formatPeriodDate(date: Date, options: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat('en-US', { timeZone: rateLimitTimezone, ...options }).format(date);
+}
+
+/** "Sep 2" style date in the enforcement timezone. */
+export function formatShortDate(date: Date): string {
+  return formatPeriodDate(date, { month: 'short', day: 'numeric' });
+}
 
 /** "Mon, Nov 9" style weekday + short date, for compact reset mentions. */
 export function formatWeekdayShortDate(date: Date): string {
-  return weekdayShortDateFormat.format(date);
+  return formatPeriodDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
 }
-
-const resetWithWeekdayFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: VANCOUVER_TIME_ZONE,
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-});
 
 /** "Mon, Nov 9, 2026" style reset date with its weekday (limit cards). */
 export function formatResetDateWithWeekday(date: Date): string {
-  return resetWithWeekdayFormat.format(date);
+  return formatPeriodDate(date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** "Sep 2, 2026" style date, rendered in the Vancouver time zone. */
+/** "Sep 2, 2026" style date in the enforcement timezone. */
 export function formatResetDate(date: Date): string {
-  return datedFormat.format(date);
+  return formatPeriodDate(date, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const weekdayDateFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: VANCOUVER_TIME_ZONE,
-  weekday: 'long',
-  month: 'short',
-  day: 'numeric',
-});
-
-/** "Friday, Nov 6" style weekday date, rendered in the Vancouver time zone. */
+/** "Friday, Nov 6" style weekday date in the enforcement timezone. */
 export function formatWeekdayDate(date: Date): string {
-  return weekdayDateFormat.format(date);
+  return formatPeriodDate(date, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 /**
- * Midday-UTC Date whose UTC calendar date equals the given instant's Vancouver
- * calendar date. Noon UTC is 4–5am in Vancouver, so the day never shifts, and
- * UTC arithmetic below is unaffected by DST transitions.
+ * Synthetic noon-UTC anchor for calendar arithmetic, not a zoned instant.
+ * Always format anchors as UTC, so zones beyond UTC+12 cannot shift the day.
  */
-function getVancouverAnchor(date: Date): Date {
-  const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
-    timeZone: VANCOUVER_TIME_ZONE,
+function getPeriodAnchor(date: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: rateLimitTimezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  })
-    .format(date)
-    .split('-')
-    .map(Number);
-  return new Date(Date.UTC(year, month - 1, day, 12));
+  }).formatToParts(date);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return new Date(Date.UTC(value('year'), value('month') - 1, value('day'), 12));
+}
+
+/** Convert a calendar anchor to local noon for reset-date presentation. */
+function toPeriodNoon(anchor: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: rateLimitTimezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(anchor);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const local = Date.UTC(
+    value('year'),
+    value('month') - 1,
+    value('day'),
+    value('hour'),
+    value('minute'),
+    value('second'),
+  );
+  return new Date(anchor.getTime() - (local - anchor.getTime()));
 }
 
 function getDaysSinceMonday(anchor: Date): number {
@@ -279,26 +285,26 @@ function getDaysSinceMonday(anchor: Date): number {
 }
 
 /**
- * The Monday after the current Mon–Sun week in Vancouver — when weekly run
+ * The Monday after the current Mon–Sun week in the enforcement timezone — when weekly run
  * counters reset. On a Sunday this is the following day.
  */
 export function getNextWeeklyReset(now: Date = new Date()): Date {
-  const anchor = getVancouverAnchor(now);
-  return new Date(anchor.getTime() + (7 - getDaysSinceMonday(anchor)) * DAY_MS);
+  const anchor = getPeriodAnchor(now);
+  return toPeriodNoon(new Date(anchor.getTime() + (7 - getDaysSinceMonday(anchor)) * DAY_MS));
 }
 
-/** January 1 of the year after the current Vancouver calendar year. */
+/** January 1 of the year after the current enforcement calendar year. */
 export function getNextYearlyReset(now: Date = new Date()): Date {
-  const anchor = getVancouverAnchor(now);
-  return new Date(Date.UTC(anchor.getUTCFullYear() + 1, 0, 1, 12));
+  const anchor = getPeriodAnchor(now);
+  return toPeriodNoon(new Date(Date.UTC(anchor.getUTCFullYear() + 1, 0, 1, 12)));
 }
 
 /** Label for the current Mon–Sun counting week, e.g. "Oct 26 to Nov 1". */
 export function formatWeeklyPeriodLabel(now: Date = new Date()): string {
-  const anchor = getVancouverAnchor(now);
+  const anchor = getPeriodAnchor(now);
   const weekStart = new Date(anchor.getTime() - getDaysSinceMonday(anchor) * DAY_MS);
   const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
-  return `${formatShortDate(weekStart)} to ${formatShortDate(weekEnd)}`;
+  return `${formatPeriodDate(weekStart, { timeZone: 'UTC', month: 'short', day: 'numeric' })} to ${formatPeriodDate(weekEnd, { timeZone: 'UTC', month: 'short', day: 'numeric' })}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -310,20 +316,24 @@ export const TOPUP_PERIOD_HORIZON_WEEKS = 26;
 
 const WEEKLY_KEY_PATTERN = /^(\d{4})-W(\d{2})$/;
 
-/** The Monday (noon-UTC anchored) starting the current Mon–Sun counting week in Vancouver. */
+/** Synthetic Monday anchor of the current counting week. */
 function getCurrentWeekMonday(now: Date): Date {
-  const anchor = getVancouverAnchor(now);
+  const anchor = getPeriodAnchor(now);
   return new Date(anchor.getTime() - getDaysSinceMonday(anchor) * DAY_MS);
 }
 
 /**
  * ISO-8601 weekly period key ('2026-W44') of the Mon–Sun counting week that
- * contains `now` in Vancouver — the same keys the server derives for
+ * contains `now` in the enforcement timezone — the same keys the server derives for
  * enforcement. The ISO week number is anchored to the week's Thursday: the
  * ISO year is the Thursday's year, and week 1 is the week containing Jan 4.
  */
 export function getWeeklyPeriodKey(now: Date = new Date()): string {
   const weekStart = getCurrentWeekMonday(now);
+  return getAnchorWeeklyKey(weekStart);
+}
+
+function getAnchorWeeklyKey(weekStart: Date): string {
   const thursday = new Date(weekStart.getTime() + 3 * DAY_MS);
 
   const isoYear = thursday.getUTCFullYear();
@@ -345,13 +355,13 @@ function getWeekMonday(periodKey: string): Date | null {
   const jan4 = new Date(Date.UTC(isoYear, 0, 4, 12));
   const firstMonday = jan4.getTime() - getDaysSinceMonday(jan4) * DAY_MS;
   const monday = new Date(firstMonday + (week - 1) * 7 * DAY_MS);
-  return getWeeklyPeriodKey(monday) === periodKey ? monday : null;
+  return getAnchorWeeklyKey(monday) === periodKey ? monday : null;
 }
 
 /** "Nov 2 to 8" / "Oct 26 to Nov 1" range text for a Mon–Sun week (month dropped when shared). */
 function formatWeekRange(weekStart: Date, weekEnd: Date): string {
-  const startText = formatShortDate(weekStart);
-  const endText = formatShortDate(weekEnd);
+  const startText = formatPeriodDate(weekStart, { timeZone: 'UTC', month: 'short', day: 'numeric' });
+  const endText = formatPeriodDate(weekEnd, { timeZone: 'UTC', month: 'short', day: 'numeric' });
   const [startMonth, startDay] = startText.split(' ');
   const [endMonth, endDay] = endText.split(' ');
   return startMonth === endMonth ? `${startMonth} ${startDay} to ${endDay}` : `${startText} to ${endText}`;
@@ -379,7 +389,7 @@ export function listUpcomingWeeklyPeriodOptions(
   for (let offset = 0; offset < count; offset += 1) {
     const monday = new Date(currentMonday.getTime() + offset * 7 * DAY_MS);
     const range = formatWeekRange(monday, new Date(monday.getTime() + 6 * DAY_MS));
-    options.push({ value: getWeeklyPeriodKey(monday), label: offset === 0 ? `This week (${range})` : range });
+    options.push({ value: getAnchorWeeklyKey(monday), label: offset === 0 ? `This week (${range})` : range });
   }
   return options;
 }

@@ -113,7 +113,9 @@ describe('RequestMoreRunsDialog', () => {
     await user.type(screen.getByLabelText(/How many extra runs\?/), '5,000');
 
     expect(screen.getByText('If approved: up to 15,000 runs for Nov 9 to 15')).toBeInTheDocument();
-    expect(screen.getByText(/That is your 10,000 weekly limit plus the 5,000 you asked for/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/That is your 10,000 allowance for that week plus the 5,000 you asked for/),
+    ).toBeInTheDocument();
   });
 
   it('requires a reason and shows the field error', async () => {
@@ -189,5 +191,68 @@ describe('RequestMoreRunsDialog', () => {
 
     expect(screen.getByText(/You already have a request waiting for review/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
+  });
+  it('uses the selected week top-ups instead of the current week top-ups', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderDialog({
+      ...PROJECT,
+      weeklyTopupRuns: 2_000,
+      upcomingWeeklyTopupRuns: { '2026-W46': 2_000, '2026-W47': 1_000, '2026-W48': 0 },
+    });
+    await user.type(screen.getByLabelText(/How many extra runs/), '3000');
+    expect(screen.getByText('If approved: up to 15,000 runs for Nov 9 to 15')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/Which week/), '2026-W47');
+    expect(screen.getByText('If approved: up to 14,000 runs for Nov 16 to 22')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/Which week/), '2026-W48');
+    expect(screen.getByText('If approved: up to 13,000 runs for Nov 23 to 29')).toBeInTheDocument();
+  });
+
+  it('rejects limit values above API bounds without submitting', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderDialog();
+    await user.click(screen.getByRole('radio', { name: /A higher limit/ }));
+    await user.type(screen.getByLabelText(/New weekly limit/), '1000001');
+    await user.type(screen.getByLabelText(/New annual limit/), '100000001');
+    await user.type(screen.getByLabelText(/Why do you need/), 'Capacity planning');
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(screen.getByText('Enter a whole number of runs between 1 and 1,000,000')).toBeInTheDocument();
+    expect(screen.getByText('Enter a whole number of runs between 1 and 100,000,000')).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('shows API validation feedback without claiming fields are highlighted', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    createMock.mockRejectedValue(
+      Object.assign(new Error('Invalid'), {
+        isAxiosError: true,
+        response: { status: 400, data: { message: 'The selected week is no longer available.' } },
+      }),
+    );
+    renderDialog();
+    await user.type(screen.getByLabelText(/How many extra runs/), '3000');
+    await user.type(screen.getByLabelText(/Why do you need/), 'Capacity planning');
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(await screen.findByText('The selected week is no longer available.')).toBeInTheDocument();
+  });
+
+  it('rejects malformed nonempty limits instead of silently omitting them', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderDialog();
+    await user.click(screen.getByRole('radio', { name: /A higher limit/ }));
+    await user.type(screen.getByLabelText(/New weekly limit/), '123abc');
+    await user.type(screen.getByLabelText(/New annual limit/), '20000');
+    await user.type(screen.getByLabelText(/Why do you need/), 'Capacity planning');
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(screen.getByText('Enter a whole number of runs between 1 and 1,000,000')).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('does not present a definitive future-week total without target-week data', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderDialog();
+    await user.type(screen.getByLabelText(/How many extra runs/), '3000');
+    await user.selectOptions(screen.getByLabelText(/Which week/), '2026-W47');
+    expect(screen.getByText(/Existing top-ups for that week are unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/If approved: up to/)).not.toBeInTheDocument();
   });
 });

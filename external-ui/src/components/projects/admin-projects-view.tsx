@@ -610,7 +610,7 @@ function RunRequestsTab({ readOnly = false }: { readOnly?: boolean }) {
                 <TableHead className="uppercase">Requested by</TableHead>
                 <TableHead className="uppercase">Request</TableHead>
                 <TableHead className="uppercase">Reason</TableHead>
-                <TableHead className="uppercase">Week used when sent</TableHead>
+                <TableHead className="uppercase">Used this week</TableHead>
                 <TableHead className="uppercase">Status</TableHead>
                 <TableHead className="uppercase">
                   <span className="sr-only">Actions</span>
@@ -708,7 +708,12 @@ function RequestRow({
         </p>
       </TableCell>
       <TableCell>
-        <UsageBarCell used={item.weeklyUsedWhenSent ?? 0} limit={item.currentWeeklyLimit} />
+        <UsageBarCell
+          used={item.weeklyUsedNow}
+          limit={
+            item.currentEffectiveWeeklyLimit === undefined ? item.currentWeeklyLimit : item.currentEffectiveWeeklyLimit
+          }
+        />
       </TableCell>
       <TableCell>
         <Badge variant={REQUEST_STATUS_BADGE_VARIANTS[item.status]}>{REQUEST_STATUS_BADGE_LABELS[item.status]}</Badge>

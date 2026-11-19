@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   canRequestMoreRuns,
@@ -21,7 +21,54 @@ import {
   getUsageRatio,
   getWeeklyPeriodKey,
   listUpcomingWeeklyPeriodOptions,
+  setRateLimitTimezone,
+  getRateLimitTimezone,
 } from '@/lib/rate-limit';
+
+describe('configured rate-limit timezone', () => {
+  afterEach(() => setRateLimitTimezone('America/Vancouver'));
+
+  it('uses backend timezone at a week boundary instead of Vancouver', () => {
+    const now = new Date('2026-11-16T01:00:00Z');
+    expect(getWeeklyPeriodKey(now)).toBe('2026-W46');
+    setRateLimitTimezone('UTC');
+    expect(getWeeklyPeriodKey(now)).toBe('2026-W47');
+    expect(listUpcomingWeeklyPeriodOptions(2, now)).toEqual([
+      { value: '2026-W47', label: 'This week (Nov 16 to 22)' },
+      { value: '2026-W48', label: 'Nov 23 to 29' },
+    ]);
+  });
+
+  it('keeps ISO-week ranges and reset dates on the correct calendar day beyond UTC+12', () => {
+    setRateLimitTimezone('Pacific/Kiritimati');
+    const now = new Date('2026-12-31T12:00:00Z');
+    expect(formatWeeklyKeyRange('2026-W47')).toBe('Nov 16 to 22');
+    expect(getWeeklyPeriodKey(now)).toBe('2026-W53');
+    expect(formatResetDate(getNextYearlyReset(now))).toBe('Jan 1, 2028');
+    expect(formatShortDate(getNextWeeklyReset(now))).toBe('Jan 4');
+    expect(listUpcomingWeeklyPeriodOptions(2, now)[1].value).toBe('2027-W01');
+  });
+
+  it('falls back safely for an invalid configured timezone', () => {
+    setRateLimitTimezone('not-a-timezone');
+    expect(getRateLimitTimezone()).toBe('America/Vancouver');
+  });
+
+  it.each(['2026-03-08T09:59:00Z', '2026-03-08T10:01:00Z'])('keeps the same week across the DST jump at %s', (iso) => {
+    setRateLimitTimezone('America/Los_Angeles');
+    const now = new Date(iso);
+    expect(getWeeklyPeriodKey(now)).toBe('2026-W10');
+    expect(formatShortDate(getNextWeeklyReset(now))).toBe('Mar 9');
+  });
+
+  it('uses the previous calendar year and week in a UTC-12 zone', () => {
+    setRateLimitTimezone('Etc/GMT+12');
+    const now = new Date('2027-01-01T06:00:00Z');
+    expect(getWeeklyPeriodKey(now)).toBe('2026-W53');
+    expect(formatResetDate(getNextYearlyReset(now))).toBe('Jan 1, 2027');
+    expect(formatShortDate(getNextWeeklyReset(now))).toBe('Jan 4');
+  });
+});
 
 type UsageFixture = {
   weeklyRateLimit: number | null;

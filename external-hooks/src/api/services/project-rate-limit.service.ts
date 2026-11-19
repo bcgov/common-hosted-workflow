@@ -35,7 +35,7 @@ export const MAX_TOPUP_AMOUNT = 1_000_000;
  */
 export const RUN_REQUEST_MIN_EXTRA_RUNS = 100;
 export const RUN_REQUEST_MAX_EXTRA_RUNS = 50_000;
-export const MAX_RUN_REQUEST_HORIZON_WEEKS = 8;
+export const MAX_RUN_REQUEST_HORIZON_WEEKS = 9;
 
 const WEEKLY_KEY_PATTERN = /^\d{4}-W\d{2}$/;
 
@@ -73,6 +73,8 @@ export type ProjectRateLimitEnrichment = {
   weeklyTopupRuns: number;
   /** Runs added by weekly top-ups whose weeks overlap the current year (0 when none). */
   yearlyTopupRuns: number;
+  /** Target-week top-ups, included on the project detail endpoint only. */
+  upcomingWeeklyTopupRuns?: Record<string, number>;
   workflowCount: number;
   membersCount: number;
   updatedAt: string | null;
@@ -400,7 +402,7 @@ export type AdminRunRequestItem = {
   /** Requester's project-role label, e.g. 'Editor'. */
   requestedByRoleLabel: string | null;
   createdAt: string;
-  /** Usage in the week/year the request was sent (the list's "week used" column). */
+  /** Live totals for the request's periods, NOT submission-time snapshots. */
   weeklyUsedWhenSent: number | null;
   yearlyUsedWhenSent: number | null;
   /** Usage in the current week/year (the review dialog's "now" figure). */
@@ -409,6 +411,10 @@ export type AdminRunRequestItem = {
   /** Limits in force right now (defaults mode resolves the scope defaults). */
   currentWeeklyLimit: number | null;
   currentAnnualLimit: number | null;
+  currentEffectiveWeeklyLimit: number | null;
+  currentEffectiveAnnualLimit: number | null;
+  /** Effective allowance before the grant for the requested week. */
+  targetWeeklyLimit: number | null;
   /** Most recent top-up before review, for context in the dialog. */
   lastTopup: { amount: number; periodKey: string; createdAt: string; createdByName: string | null } | null;
   /** Most recent limits change before review, for context in the dialog. */
@@ -970,6 +976,7 @@ export class ProjectRateLimitService {
    */
   async enrichProjectsWithRateLimits(
     items: Array<{ projectId: string; projectType: string }>,
+    includeUpcomingTopups = false,
   ): Promise<Record<string, ProjectRateLimitEnrichment>> {
     const projectIds = items.map((item) => item.projectId);
     const enrichment: Record<string, ProjectRateLimitEnrichment> = {};
@@ -998,6 +1005,14 @@ export class ProjectRateLimitService {
           this.customRepositories.projectRateLimitDefault.getAll(),
         ]);
       const defaultsByKind = new Map(defaultsRows.map((row) => [row.projectKind, row]));
+      const upcomingTopups = includeUpcomingTopups
+        ? await Promise.all(
+            listUpcomingWeeklyPeriodKeys(MAX_RUN_REQUEST_HORIZON_WEEKS).map(
+              async (key) =>
+                [key, await this.customRepositories.projectTopup.sumByProjectIds(projectIds, key)] as const,
+            ),
+          )
+        : [];
 
       // A failed name lookup must not discard the enrichment it accompanies,
       // so resolution degrades to its own catch (updatedByName → null) instead
@@ -1047,6 +1062,13 @@ export class ProjectRateLimitService {
           yearlyExecutionCount: usage?.yearlyCount ?? 0,
           weeklyTopupRuns: topupMap.get(projectId) ?? 0,
           yearlyTopupRuns: yearlyTopupMap.get(projectId) ?? 0,
+          ...(includeUpcomingTopups
+            ? {
+                upcomingWeeklyTopupRuns: Object.fromEntries(
+                  upcomingTopups.map(([key, sums]) => [key, sums.get(projectId) ?? 0]),
+                ),
+              }
+            : {}),
           workflowCount: workflowCount ?? 0,
           membersCount: memberCount ?? 0,
           updatedAt: config?.updatedAt ? config.updatedAt.toISOString() : null,
@@ -1451,6 +1473,12 @@ export class ProjectRateLimitService {
     const note = body.note?.trim() ? body.note!.trim() : null;
 
     if (row.requestKind === 'extra_runs') {
+      if (row.periodKey === null || row.periodKey < getCurrentPeriodKeys().weekly) {
+        throw new AppError(
+          400,
+          'The requested week has passed. Deny this request and ask the requester to submit one for a current or future week.',
+        );
+      }
       const asked = row.extraRuns ?? 0;
       const granted = body.grantedRuns ?? asked;
       if (
@@ -1529,7 +1557,9 @@ export class ProjectRateLimitService {
         );
       }
     }
-    if (newWeekly !== null && newAnnual !== null && newAnnual < newWeekly) {
+    const resultingWeekly = newWeekly ?? currentWeekly;
+    const resultingAnnual = newAnnual ?? currentAnnual;
+    if (resultingWeekly !== null && resultingAnnual !== null && resultingAnnual < resultingWeekly) {
       throw new AppError(400, 'The new annual limit must be at least the new weekly limit');
     }
     const isChange =
@@ -1693,13 +1723,21 @@ export class ProjectRateLimitService {
           limitsCache.set(row.projectId, limits);
         }
 
-        // "When sent" usage: the asked week for extra-runs requests, the week
-        // the request was filed otherwise; the year always from the filed date.
+        // Legacy API fields: live period totals, not submission-time snapshots.
+        // New UI consumers use the current counts with current effective limits.
         const sentKeys = getCurrentPeriodKeys(row.createdAt);
         const sentWeeklyKey = row.requestKind === 'extra_runs' ? (row.periodKey ?? sentKeys.weekly) : sentKeys.weekly;
-        const [sentCounts, nowCounts] = await Promise.all([
+        const [sentCounts, nowCounts, weeklyTopups, annualTopups, targetTopups] = await Promise.all([
           this.customRepositories.projectExecutionUsage.getCounts(row.projectId, sentWeeklyKey, sentKeys.yearly),
           this.customRepositories.projectExecutionUsage.getCounts(row.projectId, nowKeys.weekly, nowKeys.yearly),
+          this.customRepositories.projectTopup.sumByProjectIds([row.projectId], nowKeys.weekly),
+          this.customRepositories.projectTopup.sumByProjectIdsInWeeklyKeys(
+            [row.projectId],
+            listWeeklyPeriodKeysOverlappingYearlyPeriod(nowKeys.yearly),
+          ),
+          row.periodKey
+            ? this.customRepositories.projectTopup.sumByProjectIds([row.projectId], row.periodKey)
+            : Promise.resolve(new Map<string, number>()),
         ]);
 
         const requesterEmail = requester?.email?.trim() ?? null;
@@ -1741,6 +1779,11 @@ export class ProjectRateLimitService {
           yearlyUsedNow: nowCounts.yearlyCount,
           currentWeeklyLimit: limits.weekly,
           currentAnnualLimit: limits.yearly,
+          currentEffectiveWeeklyLimit:
+            limits.weekly === null ? null : limits.weekly + (weeklyTopups.get(row.projectId) ?? 0),
+          currentEffectiveAnnualLimit:
+            limits.yearly === null ? null : limits.yearly + (annualTopups.get(row.projectId) ?? 0),
+          targetWeeklyLimit: limits.weekly === null ? null : limits.weekly + (targetTopups.get(row.projectId) ?? 0),
           lastTopup: limits.lastTopup,
           lastLimitChange,
           ...serializeDecisionFields(row),

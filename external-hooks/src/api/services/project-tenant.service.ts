@@ -98,9 +98,10 @@ export class ProjectTenantService {
     }
 
     const tenantMap = await this.customRepositories.tenantProjectRelation.listAll();
-    const rateLimitEnrichment = await this.projectRateLimitService.enrichProjectsWithRateLimits([
-      { projectId, projectType: project.type },
-    ]);
+    const rateLimitEnrichment = await this.projectRateLimitService.enrichProjectsWithRateLimits(
+      [{ projectId, projectType: project.type }],
+      true,
+    );
     const viewerRole = viewerUserId
       ? await getViewerProjectRole(
           this.n8nRepositories.project,

@@ -22,10 +22,12 @@ import { toast } from '@/hooks/use-toasts';
 import {
   formatCount,
   formatResetDate,
+  formatShortDate,
   formatWeekdayShortDate,
   formatWeeklyKeyRange,
   getNextWeeklyReset,
   getNextYearlyReset,
+  getRateLimitTimezone,
   getUsageBarTone,
   getUsagePercent,
   getUsageRatio,
@@ -47,29 +49,24 @@ const MIN_REASON_LENGTH = 10;
 /** One-off top-up grant floor (mirrored by the service). */
 const MIN_EXTRA_RUNS = 100;
 
-const REVIEW_TZ = 'America/Vancouver';
-
-const reviewDateFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: REVIEW_TZ,
-  month: 'short',
-  day: 'numeric',
-});
-const reviewTimeFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: REVIEW_TZ,
-  hour: 'numeric',
-  minute: '2-digit',
-});
+function formatReviewTime(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: getRateLimitTimezone(),
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
 
 /** "Nov 4 at 3:52 PM" — the from-line and the decision stamps. */
 export function formatSentAt(iso: string): string {
   const date = new Date(iso);
-  return `${reviewDateFormat.format(date)} at ${reviewTimeFormat.format(date)}`;
+  return `${formatShortDate(date)} at ${formatReviewTime(date)}`;
 }
 
-/** "Nov 5, 10:14 AM" — the usage snapshot caption and list "sent" stamps. */
+/** "Nov 5, 10:14 AM" — list "sent" stamps. */
 export function formatSentStamp(iso: string): string {
   const date = new Date(iso);
-  return `${reviewDateFormat.format(date)}, ${reviewTimeFormat.format(date)}`;
+  return `${formatShortDate(date)}, ${formatReviewTime(date)}`;
 }
 
 type DialogDecisionMode = 'approve' | 'deny';
@@ -109,8 +106,8 @@ function getDecisionErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-/** One usage cell of the "when they asked" snapshot card. */
-function SnapshotUsageCell({
+/** Current usage paired with the effective limit for the same period. */
+function CurrentUsageCell({
   label,
   used,
   limit,
@@ -198,7 +195,7 @@ export interface ReviewRunRequestDialogProps {
 
 /**
  * The admin "Review {project}'s request" dialog: what the member asked for,
- * the usage snapshot from when they asked, and the approve/deny decision
+ * current usage and limits, and the approve/deny decision
  * (runs to grant, new limits, optional note, required deny reason). Decided
  * requests open the same dialog read-only with the decision recorded, and
  * members always get it read-only.
@@ -281,6 +278,9 @@ export function ReviewRunRequestDialog({
   function validateApprove(): DialogFieldErrors {
     const nextErrors: DialogFieldErrors = {};
     if (request.requestKind === 'extra_runs') {
+      if (request.periodKey === null || request.periodKey < getWeeklyPeriodKey()) {
+        nextErrors.form = 'The requested week has passed. Deny this request and ask for a new one.';
+      }
       if (parsedGrantedRuns === undefined || parsedGrantedRuns < MIN_EXTRA_RUNS) {
         nextErrors.granted = `Enter a whole number of at least ${formatCount(MIN_EXTRA_RUNS)} runs, or choose Deny`;
       } else if (parsedGrantedRuns > (request.extraRuns ?? 0)) {
@@ -312,8 +312,14 @@ export function ReviewRunRequestDialog({
           hasActualChange = true;
         }
       }
-      if (parsedWeeklyLimit !== undefined && parsedAnnualLimit !== undefined && parsedAnnualLimit < parsedWeeklyLimit) {
-        nextErrors.annual = 'The annual limit must be at least the weekly limit';
+      const resultingWeekly = weeklyAsked === null ? request.currentWeeklyLimit : parsedWeeklyLimit;
+      const resultingAnnual = annualAsked === null ? request.currentAnnualLimit : parsedAnnualLimit;
+      if (resultingWeekly != null && resultingAnnual != null && resultingAnnual < resultingWeekly) {
+        if (annualAsked !== null) {
+          nextErrors.annual = 'The annual limit must be at least the weekly limit';
+        } else {
+          nextErrors.weekly = 'The weekly limit cannot exceed the unchanged annual limit';
+        }
       }
       if (!nextErrors.weekly && !nextErrors.annual && !hasActualChange) {
         nextErrors.form = 'Grant at least one limit above the current values, or deny the request';
@@ -352,10 +358,20 @@ export function ReviewRunRequestDialog({
     denyMutation.mutate({ reason: trimmedReason });
   }
 
+  const targetWeeklyLimit =
+    request.targetWeeklyLimit === undefined ? request.currentWeeklyLimit : request.targetWeeklyLimit;
   const weeklyLimitForGrant =
-    request.requestKind === 'extra_runs' && parsedGrantedRuns !== undefined
-      ? (request.currentWeeklyLimit ?? 0) + parsedGrantedRuns
+    request.requestKind === 'extra_runs' && parsedGrantedRuns !== undefined && targetWeeklyLimit !== null
+      ? targetWeeklyLimit + parsedGrantedRuns
       : null;
+  const effectiveWeeklyLimit =
+    request.currentEffectiveWeeklyLimit === undefined
+      ? request.currentWeeklyLimit
+      : request.currentEffectiveWeeklyLimit;
+  const effectiveAnnualLimit =
+    request.currentEffectiveAnnualLimit === undefined
+      ? request.currentAnnualLimit
+      : request.currentEffectiveAnnualLimit;
 
   const isThisWeek = request.periodKey !== null && request.periodKey === getWeeklyPeriodKey();
 
@@ -435,31 +451,23 @@ export function ReviewRunRequestDialog({
           )}
         </dl>
 
-        {/* Usage snapshot: what the admin saw when the request landed, plus today's number. */}
+        {/* Live current-period data, never a submission-time snapshot. */}
         <div className="rounded-card border border-border bg-surface-muted p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-bold text-foreground">
-              {request.projectName} when {firstName} asked
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {formatSentStamp(request.createdAt)}. Now {formatCount(request.weeklyUsedNow)} this week (
-              {request.currentWeeklyLimit === null
-                ? 'no limit'
-                : `${getUsagePercent(request.weeklyUsedNow, request.currentWeeklyLimit)}%`}
-              )
-            </p>
+            <p className="text-sm font-bold text-foreground">{request.projectName} right now</p>
+            <p className="text-xs text-muted-foreground">Current period totals; not usage at submission time.</p>
           </div>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <SnapshotUsageCell
+            <CurrentUsageCell
               label="This week"
-              used={request.weeklyUsedWhenSent}
-              limit={request.currentWeeklyLimit}
+              used={request.weeklyUsedNow}
+              limit={effectiveWeeklyLimit}
               resetText={formatWeekdayShortDate(getNextWeeklyReset())}
             />
-            <SnapshotUsageCell
+            <CurrentUsageCell
               label="This year"
-              used={request.yearlyUsedWhenSent}
-              limit={request.currentAnnualLimit}
+              used={request.yearlyUsedNow}
+              limit={effectiveAnnualLimit}
               resetText={formatResetDate(getNextYearlyReset())}
             />
           </div>
@@ -539,7 +547,9 @@ export function ReviewRunRequestDialog({
                       <p className="text-xs text-muted-foreground">
                         {parsedGrantedRuns === undefined || parsedGrantedRuns === 0
                           ? `Enter at least ${formatCount(MIN_EXTRA_RUNS)} runs, or choose Deny.`
-                          : `${request.currentWeeklyLimit === null ? 'No weekly limit today' : formatCount(request.currentWeeklyLimit) + ' limit'} + ${formatCount(parsedGrantedRuns)} extra`}
+                          : targetWeeklyLimit === null
+                            ? 'No weekly limit; extra runs do not create a cap.'
+                            : `${formatCount(targetWeeklyLimit)} allowance for that week + ${formatCount(parsedGrantedRuns)} extra`}
                       </p>
                     </div>
                   </div>

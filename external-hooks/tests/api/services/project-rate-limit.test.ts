@@ -783,6 +783,20 @@ describe('ProjectRateLimitService', () => {
   });
 
   describe('enrichProjectsWithRateLimits', () => {
+    it('includes target-week top-up sums only for project details across all nine request weeks', async () => {
+      const weeks = listUpcomingWeeklyPeriodKeys(9);
+      topupRepo.sumByProjectIds.mockImplementation(
+        async (_ids: string[], key: string) => new Map([[VALID_PROJECT_ID, key === weeks[1] ? 3_000 : 0]]),
+      );
+      const projects = [{ projectId: VALID_PROJECT_ID, projectType: 'team' }];
+      const detail = await service.enrichProjectsWithRateLimits(projects, true);
+      expect(detail[VALID_PROJECT_ID].upcomingWeeklyTopupRuns).toEqual(
+        Object.fromEntries(weeks.map((key) => [key, key === weeks[1] ? 3_000 : 0])),
+      );
+      const list = await service.enrichProjectsWithRateLimits(projects);
+      expect(list[VALID_PROJECT_ID]).not.toHaveProperty('upcomingWeeklyTopupRuns');
+    });
+
     it('returns merged enrichment from one batched query per source', async () => {
       const configRow = makeConfigRow({
         weeklyRateLimit: 10,
@@ -1483,6 +1497,12 @@ describe('ProjectRateLimitService · run requests', () => {
     expect(requestRepo.create).not.toHaveBeenCalled();
   });
 
+  it('accepts the eighth future week offered by the UI', async () => {
+    const lastWeek = listUpcomingWeeklyPeriodKeys(9)[8];
+    await runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', { ...extraRunsBody, periodKey: lastWeek });
+    expect(requestRepo.create).toHaveBeenCalledWith(expect.objectContaining({ periodKey: lastWeek }));
+  });
+
   it('requires kind/field coherence and at least one proposed limit for limit_increase', async () => {
     await expect(
       runRequestService.createRunRequest(VALID_PROJECT_ID, 'user-1', {
@@ -1845,6 +1865,32 @@ describe('ProjectRateLimitService · admin run-request review', () => {
   });
 
   describe('approveRunRequest · extra_runs', () => {
+    it('rejects requests whose target week has passed without fulfillment or notification', async () => {
+      buildService(true);
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow({ periodKey: '2026-W46' }));
+      await expect(service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL)).rejects.toMatchObject({
+        statusCode: 400,
+        message: expect.stringContaining('requested week has passed'),
+      });
+      expect(requestRepo.approveAsTopup).not.toHaveBeenCalled();
+      expect(mailer!.sendMail).not.toHaveBeenCalled();
+    });
+
+    it('enriches grant previews with target-week top-ups and current usage with current top-ups', async () => {
+      requestRepo.getById.mockResolvedValue(makeRunRequestRow({ periodKey: '2026-W48' }));
+      rateLimitRepo.get.mockResolvedValue(makeConfigRow({ weeklyRateLimit: 10_000, yearlyRateLimit: 500_000 }));
+      requestRepo.approveAsTopup.mockResolvedValue(makeDecidedRow({ periodKey: '2026-W48' }));
+      topupRepo.sumByProjectIds.mockImplementation(
+        async (_ids: string[], key: string) => new Map([[VALID_PROJECT_ID, key === '2026-W48' ? 1_000 : 2_000]]),
+      );
+      topupRepo.sumByProjectIdsInWeeklyKeys.mockResolvedValue(new Map([[VALID_PROJECT_ID, 3_000]]));
+      const item = await service.approveRunRequest(REQUEST_ID, {}, ADMIN_EMAIL);
+      expect(item).toMatchObject({
+        targetWeeklyLimit: 11_000,
+        currentEffectiveWeeklyLimit: 12_000,
+        currentEffectiveAnnualLimit: 503_000,
+      });
+    });
     it('approves with the default grant, fulfills the top-up and returns the decided row', async () => {
       const row = makeRunRequestRow();
       requestRepo.getById.mockResolvedValue(row);
@@ -2001,6 +2047,26 @@ describe('ProjectRateLimitService · admin run-request review', () => {
         service.approveRunRequest(REQUEST_ID, { newAnnualLimit: 500_000, newWeeklyLimit: 9_000 }, ADMIN_EMAIL),
       ).rejects.toMatchObject({ statusCode: 400 });
       expect(requestRepo.approveAsLimitChange).not.toHaveBeenCalled();
+    });
+
+    it('validates the granted weekly limit against the preserved annual limit', async () => {
+      requestRepo.getById.mockResolvedValue(limitRow());
+      mockCurrentLimits({ yearlyRateLimit: 9_000 });
+      await expect(
+        service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 10_000 }, ADMIN_EMAIL),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(requestRepo.approveAsLimitChange).not.toHaveBeenCalled();
+    });
+
+    it('allows a weekly-only grant while leaving the annual decision untouched', async () => {
+      requestRepo.getById.mockResolvedValue(limitRow());
+      mockCurrentLimits({ stopBehavior: 'soft_stop' });
+      await service.approveRunRequest(REQUEST_ID, { newWeeklyLimit: 10_000 }, ADMIN_EMAIL);
+      expect(requestRepo.approveAsLimitChange).toHaveBeenCalledWith(
+        REQUEST_ID,
+        expect.objectContaining({ decidedWeeklyLimit: 10_000, decidedAnnualLimit: null }),
+        expect.anything(),
+      );
     });
 
     it('resolves current limits from scope defaults when the project is in default mode', async () => {

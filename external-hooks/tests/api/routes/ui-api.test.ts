@@ -66,6 +66,7 @@ vi.mock('../../../src/api/helpers/oidc-provider', async () => {
 });
 
 import { buildUiApiRouter } from '../../../src/api/routes/ui-api';
+import { PERIOD_TIMEZONE } from '../../../src/api/helpers/period';
 import { createMockRequest, createMockResponse } from '../../helpers/mocks';
 import { getRouteHandlers } from '../../helpers/test-utils';
 
@@ -133,6 +134,12 @@ async function dispatchUiRequest(services: Record<string, unknown>, method: 'get
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
+
+it('exposes the resolved enforcement timezone on UI API responses', async () => {
+  const response = await dispatchUiRequest({}, 'get', '/not-a-route');
+  expect(response.headers.get('x-rate-limit-timezone')).toBe(PERIOD_TIMEZONE);
+  expect(response.headers.get('access-control-expose-headers')).toContain('X-Rate-Limit-Timezone');
+});
 
 beforeEach(() => {
   mockTenantService.getTenantRolesForSession.mockReset();

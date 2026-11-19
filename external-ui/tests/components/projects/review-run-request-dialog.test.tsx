@@ -128,7 +128,7 @@ describe('ReviewRunRequestDialog', () => {
     vi.useRealTimers();
   });
 
-  it('renders the pending extra-runs review with the asked-for details and usage snapshot', () => {
+  it('renders the pending extra-runs review with current usage, not a snapshot', () => {
     renderDialog();
 
     expect(screen.getByText("Review CITZ Tenant's request")).toBeInTheDocument();
@@ -141,8 +141,10 @@ describe('ReviewRunRequestDialog', () => {
     expect(screen.getByText(/approved by N\. McInnis on /)).toHaveTextContent(
       `approved by N. McInnis on ${sentStamp(BASE_REQUEST.lastTopup.createdAt)}`,
     );
-    expect(screen.getByText('CITZ Tenant when Jordan asked')).toBeInTheDocument();
-    expect(screen.getByText(`${sentStamp(BASE_REQUEST.createdAt)}. Now 5,200 this week (43%)`)).toBeInTheDocument();
+    expect(screen.getByText('CITZ Tenant right now')).toBeInTheDocument();
+    expect(screen.getByText('Current period totals; not usage at submission time.')).toBeInTheDocument();
+    expect(screen.getByText('5,200')).toBeInTheDocument();
+    expect(screen.queryByText('5,000')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve 3,000 runs' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open CITZ Tenant project page' })).toHaveAttribute(
       'href',
@@ -286,6 +288,14 @@ describe('ReviewRunRequestDialog', () => {
     expect(approveMock).not.toHaveBeenCalled();
   });
 
+  it('checks a weekly-only approval against the unchanged annual limit', async () => {
+    const user = userEvent.setup();
+    renderDialog({ ...LIMIT_REQUEST, requestedAnnualLimit: null, currentAnnualLimit: 15_000 });
+    await user.click(screen.getByRole('button', { name: /Approve/ }));
+    expect(screen.getByText('The weekly limit cannot exceed the unchanged annual limit')).toBeInTheDocument();
+    expect(approveMock).not.toHaveBeenCalled();
+  });
+
   it('shows the recorded decision read-only for a decided request', () => {
     renderDialog(DECIDED_REQUEST);
 
@@ -321,5 +331,33 @@ describe('ReviewRunRequestDialog', () => {
     expect(screen.queryByRole('button', { name: /Approve/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deny request' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(2);
+  });
+  it('uses the requested week allowance including existing top-ups for grant previews', () => {
+    renderDialog({ ...BASE_REQUEST, periodKey: '2026-W46', targetWeeklyLimit: 14_000 });
+    expect(screen.getByText('17,000')).toBeInTheDocument();
+  });
+
+  it('blocks an expired approval but leaves denial available', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderDialog({ ...BASE_REQUEST, periodKey: '2026-W44' });
+    await user.click(screen.getByRole('button', { name: 'Approve 3,000 runs' }));
+    expect(screen.getByText(/The requested week has passed/)).toBeInTheDocument();
+    expect(approveMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('radio', { name: 'Deny' }));
+    expect(screen.getByRole('button', { name: 'Deny request' })).toBeInTheDocument();
+  });
+
+  it('pairs current counts with current effective limits even for an old request', () => {
+    renderDialog({
+      ...DECIDED_REQUEST,
+      weeklyUsedWhenSent: 9_999,
+      yearlyUsedWhenSent: 99_999,
+      currentEffectiveWeeklyLimit: 20_000,
+      currentEffectiveAnnualLimit: 600_000,
+    });
+    expect(screen.getByText('5,200')).toBeInTheDocument();
+    expect(screen.getByText('of 20,000 runs')).toBeInTheDocument();
+    expect(screen.getByText('of 600,000 runs')).toBeInTheDocument();
+    expect(screen.queryByText('9,999')).not.toBeInTheDocument();
   });
 });

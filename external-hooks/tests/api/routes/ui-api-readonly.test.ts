@@ -46,6 +46,7 @@ function dispatch(method: string, url: string) {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(() => resolve({ error: null, responded: true })),
       setHeader: vi.fn(),
+      append: vi.fn(),
       end: vi.fn(() => resolve({ error: null, responded: true })),
     };
     (router as any).handle(
