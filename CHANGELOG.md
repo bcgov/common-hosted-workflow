@@ -1,3 +1,35 @@
+## [0.13.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.12.0...v0.13.0) (2026-11-20)
+
+### Features
+
+* **CCP-6063:** add trigger option to skip CHEF submission ([#615](https://github.com/bcgov/common-hosted-workflow/issues/615)) ([2f96f36](https://github.com/bcgov/common-hosted-workflow/commit/2f96f36d92154fd2e7a915698f2e96e8988d5371))
+* **CCP-6287:** add optional webhook alerts and c89a45 workspace ([5680c4f](https://github.com/bcgov/common-hosted-workflow/commit/5680c4f746474a825c0ed506b9d40a6d33ea7c15))
+* **CCP-6287:** add PGO backup artifact and health runtime helpers ([92f6634](https://github.com/bcgov/common-hosted-workflow/commit/92f6634cfda522228597f534e5738323bf6f2dfd))
+* **CCP-6287:** add scoped PVC utilization alerts ([cbfc29e](https://github.com/bcgov/common-hosted-workflow/commit/cbfc29ee8925ec10f96a2b26c9259db51481bdf0))
+* **CCP-6287:** scope Sysdig alerts by environment and workload ([2737d40](https://github.com/bcgov/common-hosted-workflow/commit/2737d40cd90cbb318f19707ae57dbfb823849d5d))
+* **CCP-6289:** add admin run request review flow ([6b08bbe](https://github.com/bcgov/common-hosted-workflow/commit/6b08bbea82099563bf5273231895c1663b8dc547))
+* **CCP-6289:** add member run requests and viewer roles ([a1b84b3](https://github.com/bcgov/common-hosted-workflow/commit/a1b84b39eac42bd70c0267f215344fb408f8d8dc))
+* **CCP-6289:** enable n8n templates across gold environments ([7dbb519](https://github.com/bcgov/common-hosted-workflow/commit/7dbb519101f80d6f5854b1cd1c1b1c97e0b04380))
+* **CCP-6289:** expose member-scoped run request review flows ([03d56e6](https://github.com/bcgov/common-hosted-workflow/commit/03d56e63e6fed7a67408c6315c4abbf6aac9cde7))
+* **CCP-6289:** extend admin projects view with run request queue and review dialog ([22a2cf1](https://github.com/bcgov/common-hosted-workflow/commit/22a2cf1a3a5bbeeaa6f400c64d58de37d72568c3))
+* **CCP-6289:** update project detail views for run request actions ([9e638b6](https://github.com/bcgov/common-hosted-workflow/commit/9e638b6a30b3287bbde40f9f03ac0e5c5f85a484))
+* **CCP-6363:** align prod and test with dev readiness settings ([#612](https://github.com/bcgov/common-hosted-workflow/issues/612)) ([5247ed7](https://github.com/bcgov/common-hosted-workflow/commit/5247ed7b5a50ca4c7cb129f4f79e9c6693ea9db7))
+
+### Bug Fixes
+
+* **CCP-6287:** display gaps for null CPU usage values ([b4e9c4d](https://github.com/bcgov/common-hosted-workflow/commit/b4e9c4d945de2ff38c74045015e2439f836e099c))
+* **CCP-6287:** use the OpenShift login kubeconfig for Terraform initialization ([bc3aca7](https://github.com/bcgov/common-hosted-workflow/commit/bc3aca784a5440076ae33efbd1c1056ea01b8ebe))
+* **CCP-6289:** correct run request approvals and allowance previews ([5d00bf8](https://github.com/bcgov/common-hosted-workflow/commit/5d00bf86f9184cce7756f004d7730845e796007b))
+* **CCP-6289:** synchronize the enforcement timezone between API and UI ([0401303](https://github.com/bcgov/common-hosted-workflow/commit/040130391a5dfaf19c7038cc9dd73b57cceaaa20))
+
+### Documentation
+
+* **CCP-6287:** document scoped alerts and Teams notifications ([e74da40](https://github.com/bcgov/common-hosted-workflow/commit/e74da40e60e506bc828b6ef4961e2bcb5c8f275f))
+* **CCP-6287:** document Sysdig team management ([ec1c873](https://github.com/bcgov/common-hosted-workflow/commit/ec1c87311ab53b08803faefbd6f727b4cf6ed032))
+* **CCP-6289:** allowlist secret type examples in notification guide ([56dd2cc](https://github.com/bcgov/common-hosted-workflow/commit/56dd2cc9d6fa463e3db6007b59ff6df244dec410))
+* **CCP-6289:** document GitHub secret scanning alert notifications ([0855f00](https://github.com/bcgov/common-hosted-workflow/commit/0855f0001732934c5b4aa96a35a67f9878038a4d))
+* **CCP-6289:** document run-request decision schema and member listing route ([02dfc82](https://github.com/bcgov/common-hosted-workflow/commit/02dfc8254414eebe1409a5adc557e29b84b6858b))
+
 ## [0.12.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.11.0...v0.12.0) (2026-11-10)
 
 ### Features
