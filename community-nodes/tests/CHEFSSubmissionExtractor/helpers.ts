@@ -128,6 +128,8 @@ interface CreateContextOptions {
   fieldMappingMode?: 'keyValue' | 'json' | 'fullSubmission';
   missingPathBehavior?: 'returnNull' | 'throwError';
   includeSubmissionMeta?: boolean;
+  /** Omit to simulate a workflow saved without the option (n8n drops default values). */
+  draftDeletedHandling?: 'route' | 'stop' | 'process';
   fieldMappings?: { mapping: Array<{ outputKey: string; sourcePath: string }> };
   fieldMappingJson?: string;
   httpResponse?: unknown;
@@ -147,6 +149,7 @@ export function createExecutionContext(opts: CreateContextOptions) {
     fieldMappingJson = '{}',
     httpResponse = makeChefsSubmissionResponse(),
     continueOnFail = false,
+    draftDeletedHandling,
   } = opts;
 
   const httpRequest = vi.fn().mockResolvedValue(httpResponse);
@@ -167,6 +170,7 @@ export function createExecutionContext(opts: CreateContextOptions) {
     includeSubmissionMeta,
     fieldMappings,
     fieldMappingJson,
+    ...(draftDeletedHandling === undefined ? {} : { draftDeletedHandling }),
   };
 
   return {

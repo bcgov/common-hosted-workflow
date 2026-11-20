@@ -7,6 +7,7 @@ A custom n8n community node that fetches a [CHEFS](https://submit.digital.gov.bc
 - [Overview](#overview)
 - [Authentication](#authentication)
 - [Node Parameters](#node-parameters)
+  - [Draft and Deleted Submissions](#draft-and-deleted-submissions)
 - [Field Mapping](#field-mapping)
   - [UI Field Pairs Mode](#ui-field-pairs-mode)
   - [JSON Mode](#json-mode)
@@ -44,14 +45,33 @@ The node constructs a `Basic` authorization header from these values for every A
 
 ## Node Parameters
 
-| Parameter                   | Type              | Required    | Default          | Description                                                                                                  |
-| --------------------------- | ----------------- | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------ |
-| Submission ID               | `string`          | Yes         | —                | The ID of the CHEFS submission to retrieve                                                                   |
-| Field Mapping Mode          | `options`         | No          | `UI Field Pairs` | Choose UI key-value pairs, a JSON object, or the full submission object                                      |
-| Missing Path Behavior       | `options`         | No          | `Return Null`    | What to do when a source path does not exist (hidden in Full Submission mode)                                |
-| Include Submission Metadata | `boolean`         | No          | `false`          | Append `_createdBy`, `_createdAt`, `_updatedBy`, `_updatedAt` to the output (hidden in Full Submission mode) |
-| Field Mappings              | `fixedCollection` | Conditional | —                | UI key-value pairs (shown when mode is `UI Field Pairs`)                                                     |
-| Field Mapping JSON          | `json`            | Conditional | `{}`             | JSON object mapping output keys to source paths (shown when mode is `JSON`)                                  |
+| Parameter                     | Type              | Required    | Default            | Description                                                                                                                               |
+| ----------------------------- | ----------------- | ----------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Submission ID                 | `string`          | Yes         | —                  | The ID of the CHEFS submission to retrieve                                                                                                |
+| Field Mapping Mode            | `options`         | No          | `UI Field Pairs`   | Choose UI key-value pairs, a JSON object, or the full submission object                                                                   |
+| On Draft / Deleted Submission | `options`         | No          | `Process Normally` | What to do with draft or deleted submissions, in every mapping mode (see [Draft and Deleted Submissions](#draft-and-deleted-submissions)) |
+| Missing Path Behavior         | `options`         | No          | `Return Null`      | What to do when a source path does not exist (hidden in Full Submission mode)                                                             |
+| Include Submission Metadata   | `boolean`         | No          | `false`            | Append `_createdBy`, `_createdAt`, `_updatedBy`, `_updatedAt` to the output (hidden in Full Submission mode)                              |
+| Field Mappings                | `fixedCollection` | Conditional | —                  | UI key-value pairs (shown when mode is `UI Field Pairs`)                                                                                  |
+| Field Mapping JSON            | `json`            | Conditional | `{}`               | JSON object mapping output keys to source paths (shown when mode is `JSON`)                                                               |
+
+### Draft and Deleted Submissions
+
+The node fetches the submission and checks its `draft` and `deleted` flags before any field mapping, so **On Draft / Deleted Submission** works in every Field Mapping Mode. A submission that is both a draft and deleted counts as **deleted**.
+
+| Choice                             | Node outputs                           | A draft or deleted submission…                                                                                         |
+| ---------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Process Normally** (default)     | one                                    | is treated like any other submission, as before this option existed                                                    |
+| **Stop (Output Nothing)**          | one                                    | produces no items; nodes after it do not run for it and the execution still finishes as **Succeeded**                  |
+| **Send to Draft / Deleted Output** | **Submission**, **Draft**, **Deleted** | goes to the **Draft** or **Deleted** output, extracted exactly like a normal submission, so the workflow can handle it |
+
+Other submissions always go to the first output. With several input items, each item goes to its own output. If **On Error** is set to _Continue (using error output)_, n8n adds the **Error** output after these.
+
+When does the node see a draft? CHEFS Event Subscription only fires on **Submit**, so a fetch straight after the event returns submitted data. But if the submitter later clicks **Recall Submission**, CHEFS marks the submission as a draft again and the API returns their in-progress edits; there is no API call for the previously submitted version. A later fetch in the same run can therefore hit a draft. Fetch once, right after the event, and reuse that output. A submission deleted in CHEFS is still returned by the API, with `deleted: true`.
+
+- **Existing workflows**: n8n does not save parameters left at their default, so nodes saved before this option existed have no stored value. The node treats a missing value as **Process Normally**, so they behave exactly as before.
+- **Always Output Data** (node Settings) makes n8n pass on an empty item when an output has no items, so the workflow continues on that output. Leave it off if you rely on **Stop** to end the run.
+- **AI tool use** (not tested): an AI agent tool returns a single result, so with **Send to Draft / Deleted Output** a draft or deleted submission may come back empty. Keep **Process Normally** if an agent should see them.
 
 ## Field Mapping
 
