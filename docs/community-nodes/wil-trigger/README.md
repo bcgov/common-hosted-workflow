@@ -12,6 +12,8 @@ Once a workflow containing this node is **published**, it appears in the workflo
 
 The node does not listen for anything itself. WIL stores only the workflow id and the node id, so renaming the node or the workflow does not break a trigger. Unpublishing the workflow or deleting the node shows the trigger as _Unpublished_ / _Node removed_ in WIL, and firing it returns `409 WIL_TARGET_UNAVAILABLE`.
 
+For a step-by-step guide to CHEFS Form triggers, see [CHEFS + n8n: Portal CHEFS Form trigger](../../integrations/chefs/portal-chefs-form-trigger.md).
+
 ## Parameters
 
 | Parameter            | Default            | Description                                                                                                                                    |
