@@ -65,6 +65,8 @@ Add a **Workflow Interaction Layer** node:
 | Action Type  | **Show Form**                                                                                     |
 | Action Title | What the actor sees in the action list, for example `Assess trip plan {{ $json.confirmationId }}` |
 
+In a **personal project** tenant, assign actions to yourself only; other people can't take part. See [Do I need a CSTAR tenant?](./README.md#do-i-need-a-cstar-tenant).
+
 Then choose one of the ways of using the form below.
 
 ![Workflow Interaction Layer node: Create, Wait and Get Data, Show Form, with a CHEFS Form Authentication credential](./img/b1.png)

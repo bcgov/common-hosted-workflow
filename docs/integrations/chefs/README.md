@@ -9,11 +9,11 @@ This guide is for **workflow designers** and **client teams** who want to use [C
 
 CHW gives you three ways to connect a CHEFS form to a workflow. They solve different problems and can be combined in one workflow.
 
-| #   | Pattern                                                     | Who fills in the form                                        | Where the form is shown                                 | What starts or resumes the workflow                                                                                              |
-| --- | ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| A   | [CHEFS Event Subscription](./event-subscription.md)         | Anyone with access to the CHEFS form (often the public)      | CHEFS itself (`submit.digital.gov.bc.ca`)               | CHEFS calls `…/rest/custom/v1/chefs/<path>` on submission, which fires an n8n **Webhook** (or resumes a **CHEFS Resubmit Wait**) |
-| B   | [WIL Show Form action](./wil-show-form.md)                  | A specific user, group or role chosen by the workflow        | The **Workflow User Portal**, under the actor's actions | The workflow is already running; a **Workflow Interaction Layer** node creates the action and waits                              |
-| C   | [Portal CHEFS Form trigger](./portal-chefs-form-trigger.md) | Signed-in portal users you allow (all, roles, groups, users) | The **Workflow User Portal**, under Triggers            | The user submits the form in the portal, which starts the workflow at a **WIL Trigger** node                                     |
+| #   | Pattern                                                     | Who fills in the form                                        | Where the form is shown                                 | What starts or resumes the workflow                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | [CHEFS Event Subscription](./event-subscription.md)         | Anyone with access to the CHEFS form (often the public)      | CHEFS itself (`submit.digital.gov.bc.ca`)               | CHEFS calls `…/rest/custom/v1/chefs/<path>` on submission, which fires an n8n **Webhook** (or resumes a **CHEFS Resubmit Wait**). CHEFS can also call the n8n **Webhook** URL directly, but then every submission and resubmission starts a new execution |
+| B   | [WIL Show Form action](./wil-show-form.md)                  | A specific user, group or role chosen by the workflow        | The **Workflow User Portal**, under the actor's actions | The workflow is already running; a **Workflow Interaction Layer** node creates the action and waits                                                                                                                                                       |
+| C   | [Portal CHEFS Form trigger](./portal-chefs-form-trigger.md) | Signed-in portal users you allow (all, roles, groups, users) | The **Workflow User Portal**, under Triggers            | The user submits the form in the portal, which starts the workflow at a **WIL Trigger** node                                                                                                                                                              |
 
 ## Which pattern should I use?
 
@@ -57,10 +57,24 @@ You need:
 
 1. A **published** CHEFS form, with you as an owner or form designer.
 2. A CHEFS **API key** for that form (CHEFS → Manage Form → API Key). Each CHEFS form has its own key.
-3. Access to an n8n **project** that is linked to your WIL tenant, so the portal can see your workflows and credentials.
-4. For patterns B and C: the people who will use the form must be able to sign in to the Workflow User Portal for your tenant.
+3. An n8n **project** the portal can see: either a team project linked to a CSTAR tenant, or your own **personal project** (see below). The portal only sees workflows and credentials in that project.
+4. For patterns B and C: the people who will use the form must be able to sign in to the Workflow User Portal and see that tenant.
 
 Then read the page for your pattern, and keep [Credentials, nodes and troubleshooting](./credentials-and-nodes.md) open as a reference.
+
+### Do I need a CSTAR tenant?
+
+No. A CSTAR tenant is only needed when **other people** take part in your workflow.
+
+Every user who can sign in gets a **personal project** in n8n. The platform gives it its own tenant ID, so it appears in the Workflow User Portal's **Tenant** list like a team tenant. With only a personal project you can use all three patterns, but only for yourself:
+
+| Pattern                                                         | With a personal project                                                                                           |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| A — [Event Subscription](./event-subscription.md)               | Works as usual: anyone who can fill in the CHEFS form can start your workflow.                                    |
+| B — [WIL Show Form](./wil-show-form.md)                         | Actions can only be assigned to you. You receive and complete the form under your personal project's **Actions**. |
+| C — [Portal CHEFS Form trigger](./portal-chefs-form-trigger.md) | **Allowed Actors** is fixed to your own email, so only you can run the trigger.                                   |
+
+To involve other people (reviewer groups, roles, other users), use a team project linked to a CSTAR tenant. The personal project's tenant ID is generated by the platform; it is not a CSTAR tenant and gives no access to other people. See [Personal project tenant mapping](../../platform/personal-project-tenant-mapping.md).
 
 ## Further reading
 
