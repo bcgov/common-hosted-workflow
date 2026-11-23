@@ -24,7 +24,11 @@ x-n8n-env: &n8n-env
   CUSTOM_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/n8n_custom # pragma: allowlist secret
   N8N_DIAGNOSTICS_ENABLED: 'false'
   N8N_PERSONALIZATION_ENABLED: 'false'
-  N8N_TEMPLATES_ENABLED: 'false'
+  N8N_TEMPLATES_ENABLED: 'true'
+  # In-app template browser backed by the custom template library in
+  # external-hooks (mounted at /rest/custom/v1). A relative host keeps the
+  # browser on the same origin, so no CORS and no hard-coded port.
+  N8N_TEMPLATES_HOST: ${N8N_TEMPLATES_HOST:-/rest/custom/v1}
   N8N_AI_ENABLED: 'false'
   N8N_HIRING_BANNER_ENABLED: 'false'
   N8N_HIDE_USAGE_PAGE: 'true'
@@ -250,6 +254,9 @@ services:
     - 5678:5678
     volumes:
     - n8n_storage:/home/node/.n8n
+    # Live template library: edit external-hooks/src/api/assets/templates and
+    # `docker compose restart n8n` to pick up changes (no image rebuild).
+    - ../external-hooks/src/api/assets/templates:/external-hooks/api/assets/templates:ro
     depends_on:
       postgres:
         condition: service_healthy

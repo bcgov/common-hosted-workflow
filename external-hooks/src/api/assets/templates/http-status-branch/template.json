@@ -1,0 +1,150 @@
+{
+  "id": 1004,
+  "name": "Branch on an HTTP status code",
+  "description": "## What it does\n\nCalls an endpoint, then uses an **If** node to branch on `statusCode`. The healthy branch does nothing; the unhealthy branch is where you would add a Slack message, an email, or a ticket.\n\n## Try it\n\nRun the workflow manually. The URL points at `https://httpbin.org/status/200`, so the healthy branch runs by default — change it to `/status/500` to see the other branch.\n\n## Notes\n\nThe HTTP Request node returns the full response and ignores HTTP error statuses, so the status code stays available to the If node instead of throwing first.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 4,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    { "id": 4, "name": "Development" },
+    { "id": 5, "name": "Monitoring" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 10041,
+      "name": "n8n-nodes-base.manualTrigger",
+      "displayName": "Manual Trigger",
+      "icon": "fa:play",
+      "iconData": { "type": "icon", "icon": "play" },
+      "defaults": { "name": "Manual Trigger", "color": "#909399" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10042,
+      "name": "n8n-nodes-base.httpRequest",
+      "displayName": "HTTP Request",
+      "icon": "fa:server",
+      "iconData": { "type": "icon", "icon": "server" },
+      "defaults": { "name": "HTTP Request", "color": "#0004F5" },
+      "typeVersion": 4.2,
+      "nodeCategories": [{ "id": 4, "name": "Development" }]
+    },
+    {
+      "id": 10043,
+      "name": "n8n-nodes-base.if",
+      "displayName": "If",
+      "icon": "fa:filter",
+      "iconData": { "type": "icon", "icon": "filter" },
+      "defaults": { "name": "If", "color": "#408000" },
+      "typeVersion": 2.2,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10044,
+      "name": "n8n-nodes-base.noOp",
+      "displayName": "No Operation, do nothing",
+      "icon": "fa:check",
+      "iconData": { "type": "icon", "icon": "check" },
+      "defaults": { "name": "No Operation, do nothing", "color": "#909399" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "5d3ae5f4-c2cd-54c0-abd7-9d22fcbac6f1",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "position": [0, 0],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "4725b710-c76d-5216-b89a-04d13487dc18",
+        "name": "Call endpoint",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [220, 0],
+        "typeVersion": 4.2,
+        "parameters": {
+          "url": "https://httpbin.org/status/200",
+          "options": {
+            "response": {
+              "response": {
+                "fullResponse": true,
+                "neverError": true
+              }
+            }
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "4e09a813-2490-52f8-a620-9979034c0ec1",
+        "name": "Status is 200?",
+        "type": "n8n-nodes-base.if",
+        "position": [440, 0],
+        "typeVersion": 2.2,
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "d1",
+                "leftValue": "={{ $json.statusCode }}",
+                "rightValue": 200,
+                "operator": { "type": "number", "operation": "equals" }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "5eb77b3c-78e1-5746-a608-f43633651cc8",
+        "name": "Healthy",
+        "type": "n8n-nodes-base.noOp",
+        "position": [660, -100],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "368dbc37-05b0-5856-afe8-ca7b30fe6034",
+        "name": "Unhealthy",
+        "type": "n8n-nodes-base.noOp",
+        "position": [660, 100],
+        "typeVersion": 1,
+        "parameters": {}
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [[{ "node": "Call endpoint", "type": "main", "index": 0 }]]
+      },
+      "Call endpoint": {
+        "main": [[{ "node": "Status is 200?", "type": "main", "index": 0 }]]
+      },
+      "Status is 200?": {
+        "main": [
+          [{ "node": "Healthy", "type": "main", "index": 0 }],
+          [{ "node": "Unhealthy", "type": "main", "index": 0 }]
+        ]
+      }
+    }
+  }
+}

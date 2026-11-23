@@ -6,6 +6,7 @@ import { buildChefsSubmissionRouter } from '../routes/chefs-submission';
 import { buildGrafanaProjectsRouter } from '../routes/grafana-projects';
 import { buildMessageRouter } from '../routes/messages';
 import { buildMultiWebhookWaitRouter } from '../routes/multi-webhook-wait';
+import { buildTemplatesRouter } from '../routes/templates';
 import { createReadOnlyMiddleware } from '../middlewares';
 import { mountSwaggerUi } from '../swagger-ui';
 import type { ApiRouteContext } from '../types/routes';
@@ -23,6 +24,10 @@ export function mountCustomApi(app: Express, routeContext: ApiRouteContext) {
   v1Router.use('/multi-webhook-wait', buildMultiWebhookWaitRouter(routeContext));
 
   v1Router.use('/obs/projects', buildGrafanaProjectsRouter(routeContext));
+
+  // Custom workflow template library (N8N_TEMPLATES_HOST points here). Serves
+  // /templates/*, /workflows/templates/:id and /health from static JSON.
+  v1Router.use(buildTemplatesRouter());
 
   mountSwaggerUi(app);
   app.use('/rest/custom/v1', v1Router);

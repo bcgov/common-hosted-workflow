@@ -1,0 +1,117 @@
+{
+  "id": 1002,
+  "name": "JSON endpoint with a Webhook and Respond to Webhook",
+  "description": "## What it does\n\nExposes `POST /webhook/hello` and answers with JSON built in the workflow. No external service, no credentials — a good first template to prove that webhooks and responses work.\n\n## Try it\n\n```bash\ncurl -X POST http://localhost:5678/webhook/hello \\\n  -H 'content-type: application/json' \\\n  -d '{\"name\":\"Ada\"}'\n```\n\n## Notes\n\n`responseMode` is set to **Respond to Webhook node**, so the HTTP response is only sent when the workflow reaches the last node. Switch it to *Immediately* if you want the webhook to answer before the rest of the workflow runs. Activate the imported workflow before calling the production `/webhook/hello` URL; the test URL is available while editing.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 2,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    { "id": 1, "name": "Starter" },
+    { "id": 4, "name": "Development" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 10021,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": { "type": "icon", "icon": "globe" },
+      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "typeVersion": 2,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10022,
+      "name": "n8n-nodes-base.set",
+      "displayName": "Edit Fields",
+      "icon": "fa:pen",
+      "iconData": { "type": "icon", "icon": "pen" },
+      "defaults": { "name": "Edit Fields", "color": "#0000FF" },
+      "typeVersion": 3.4,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10023,
+      "name": "n8n-nodes-base.respondToWebhook",
+      "displayName": "Respond to Webhook",
+      "icon": "fa:reply",
+      "iconData": { "type": "icon", "icon": "reply" },
+      "defaults": { "name": "Respond to Webhook", "color": "#1f8ceb" },
+      "typeVersion": 1.1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "d45f36d2-2f90-5884-a0cf-7b7dfac8f510",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [0, 0],
+        "typeVersion": 2,
+        "webhookId": "11111111-1111-4111-8111-111111111111",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "hello",
+          "responseMode": "responseNode",
+          "options": {}
+        }
+      },
+      {
+        "id": "87387f59-c0bf-5c2a-b5db-15c96c94c090",
+        "name": "Build response",
+        "type": "n8n-nodes-base.set",
+        "position": [220, 0],
+        "typeVersion": 3.4,
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "b1",
+                "name": "message",
+                "value": "Hello from the template library",
+                "type": "string"
+              },
+              { "id": "b2", "name": "receivedAt", "value": "={{ $now.toISO() }}", "type": "string" },
+              {
+                "id": "b3",
+                "name": "youSent",
+                "value": "={{ $json.body ?? {} }}",
+                "type": "object"
+              }
+            ]
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "0d96c435-f846-5b80-a4ee-489a7a113c4f",
+        "name": "Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [440, 0],
+        "typeVersion": 1.1,
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [[{ "node": "Build response", "type": "main", "index": 0 }]]
+      },
+      "Build response": {
+        "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}

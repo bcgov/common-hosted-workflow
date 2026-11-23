@@ -1,0 +1,146 @@
+{
+  "id": 1001,
+  "name": "Copy new Postgres orders into Google Sheets",
+  "description": "## What it does\n\nRuns every morning at 06:00, reads the orders that have not been exported yet from Postgres, appends them to a Google Sheet, and then marks each exported row with `exported_at`.\n\n## Setup\n\n1. Add a **Postgres** credential and point the queries at your own table.\n2. Add a **Google Sheets** credential, select your spreadsheet in the **Document** control, and select the **Orders** sheet in the **Sheet** control.\n3. Adjust the schedule if 06:00 is not the right time for you, then activate the workflow.\n\n## Notes\n\nThe final Postgres node only marks a row after the sheet append succeeds. If the append succeeds but the update fails, a later run can still duplicate that row; use a transaction or an outbox pattern for a production integration.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 1,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    { "id": 1, "name": "Starter" },
+    { "id": 2, "name": "Data & Storage" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 10011,
+      "name": "n8n-nodes-base.scheduleTrigger",
+      "displayName": "Schedule Trigger",
+      "icon": "fa:clock",
+      "iconData": { "type": "icon", "icon": "clock" },
+      "defaults": { "name": "Schedule Trigger", "color": "#1f8ceb" },
+      "typeVersion": 1.2,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10012,
+      "name": "n8n-nodes-base.postgres",
+      "displayName": "Postgres",
+      "icon": "fa:database",
+      "iconData": { "type": "icon", "icon": "database" },
+      "defaults": { "name": "Postgres", "color": "#336791" },
+      "typeVersion": 2.4,
+      "nodeCategories": [{ "id": 2, "name": "Data & Storage" }]
+    },
+    {
+      "id": 10013,
+      "name": "n8n-nodes-base.set",
+      "displayName": "Edit Fields",
+      "icon": "fa:pen",
+      "iconData": { "type": "icon", "icon": "pen" },
+      "defaults": { "name": "Edit Fields", "color": "#0000FF" },
+      "typeVersion": 3.4,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10014,
+      "name": "n8n-nodes-base.googleSheets",
+      "displayName": "Google Sheets",
+      "icon": "fa:table",
+      "iconData": { "type": "icon", "icon": "table" },
+      "defaults": { "name": "Google Sheets", "color": "#0F9D58" },
+      "typeVersion": 4.4,
+      "nodeCategories": [{ "id": 2, "name": "Data & Storage" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "c2cff78f-ab69-5209-8f1f-b2795251d116",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [0, 0],
+        "typeVersion": 1.2,
+        "parameters": {
+          "rule": {
+            "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 6, "triggerAtMinute": 0 }]
+          }
+        }
+      },
+      {
+        "id": "d9a908da-46f8-55e6-8f88-922c9d85ba63",
+        "name": "Get unsynced orders",
+        "type": "n8n-nodes-base.postgres",
+        "position": [220, 0],
+        "typeVersion": 2.4,
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT id, customer, total, created_at FROM orders WHERE exported_at IS NULL ORDER BY created_at"
+        }
+      },
+      {
+        "id": "201a7559-631a-5df1-ab72-1a9a0adf89c4",
+        "name": "Map to sheet rows",
+        "type": "n8n-nodes-base.set",
+        "position": [440, 0],
+        "typeVersion": 3.4,
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              { "id": "a1", "name": "order_id", "value": "={{ $json.id }}", "type": "number" },
+              { "id": "a2", "name": "customer", "value": "={{ $json.customer }}", "type": "string" },
+              { "id": "a3", "name": "total", "value": "={{ $json.total }}", "type": "number" },
+              { "id": "a4", "name": "created_at", "value": "={{ $json.created_at }}", "type": "string" }
+            ]
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "8543f01e-4cb5-5738-831e-222d075c060b",
+        "name": "Append to sheet",
+        "type": "n8n-nodes-base.googleSheets",
+        "position": [660, 0],
+        "typeVersion": 4.4,
+        "parameters": {
+          "operation": "append",
+          "documentId": { "__rl": true, "mode": "id", "value": "YOUR_SPREADSHEET_ID" },
+          "sheetName": { "__rl": true, "mode": "name", "value": "Orders" },
+          "columns": { "mappingMode": "autoMapInputData" },
+          "options": {}
+        }
+      },
+      {
+        "id": "b6f3f2e1-2d7d-5f6c-8b2a-100100000005",
+        "name": "Mark orders as exported",
+        "type": "n8n-nodes-base.postgres",
+        "position": [880, 0],
+        "typeVersion": 2.4,
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "=UPDATE orders SET exported_at = NOW() WHERE id = {{ $('Map to sheet rows').item.json.order_id }} AND exported_at IS NULL"
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [[{ "node": "Get unsynced orders", "type": "main", "index": 0 }]]
+      },
+      "Get unsynced orders": {
+        "main": [[{ "node": "Map to sheet rows", "type": "main", "index": 0 }]]
+      },
+      "Map to sheet rows": {
+        "main": [[{ "node": "Append to sheet", "type": "main", "index": 0 }]]
+      },
+      "Append to sheet": {
+        "main": [[{ "node": "Mark orders as exported", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}

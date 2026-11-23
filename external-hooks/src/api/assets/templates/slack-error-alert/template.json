@@ -1,0 +1,125 @@
+{
+  "id": 1003,
+  "name": "Post a Slack alert when any workflow fails",
+  "description": "## What it does\n\nListens for failed executions with the **Error Trigger** and posts the workflow name, execution id and error message to Slack.\n\n## Setup\n\n1. Add a **Slack** credential.\n2. Replace `#alerts` with the channel you want to use.\n3. Activate this workflow — an Error Trigger workflow only fires once it is active.\n4. In every workflow you want to monitor, open **Settings → Error workflow** and select this workflow (or configure an instance-wide default). Activation alone does not subscribe other workflows.\n\n## Notes\n\nThe Error Trigger runs once per failed execution. If several workflows fail at the same time you get one message per failure; add a Merge node if you would rather batch them.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 3,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    { "id": 3, "name": "Communication" },
+    { "id": 5, "name": "Monitoring" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 10031,
+      "name": "n8n-nodes-base.errorTrigger",
+      "displayName": "Error Trigger",
+      "icon": "fa:bug",
+      "iconData": { "type": "icon", "icon": "triangle-alert" },
+      "defaults": { "name": "Error Trigger", "color": "#FF0000" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10032,
+      "name": "n8n-nodes-base.set",
+      "displayName": "Edit Fields",
+      "icon": "fa:pen",
+      "iconData": { "type": "icon", "icon": "pen" },
+      "defaults": { "name": "Edit Fields", "color": "#0000FF" },
+      "typeVersion": 3.4,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 10033,
+      "name": "n8n-nodes-base.slack",
+      "displayName": "Slack",
+      "icon": "fa:comment",
+      "iconData": { "type": "icon", "icon": "message-square" },
+      "defaults": { "name": "Slack", "color": "#4A154B" },
+      "typeVersion": 2.3,
+      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "35500e7d-2a79-5774-a87e-4ca57b78d78e",
+        "name": "Error Trigger",
+        "type": "n8n-nodes-base.errorTrigger",
+        "position": [0, 0],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "1d701cd1-e105-5083-990a-4247d23616f6",
+        "name": "Format alert",
+        "type": "n8n-nodes-base.set",
+        "position": [220, 0],
+        "typeVersion": 3.4,
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "c1",
+                "name": "workflow",
+                "value": "={{ $json.workflow.name }}",
+                "type": "string"
+              },
+              {
+                "id": "c2",
+                "name": "executionId",
+                "value": "={{ $json.execution.id }}",
+                "type": "string"
+              },
+              {
+                "id": "c3",
+                "name": "error",
+                "value": "={{ $json.execution.error.message }}",
+                "type": "string"
+              },
+              {
+                "id": "c4",
+                "name": "url",
+                "value": "={{ $json.execution.url }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "8ee1f857-7c91-58f2-a1cd-2713e9b72691",
+        "name": "Notify Slack",
+        "type": "n8n-nodes-base.slack",
+        "position": [440, 0],
+        "typeVersion": 2.3,
+        "parameters": {
+          "resource": "message",
+          "operation": "post",
+          "select": "channel",
+          "channelId": { "__rl": true, "value": "#alerts", "mode": "name" },
+          "text": "=:rotating_light: *{{ $json.workflow }}* failed (execution {{ $json.executionId }})\n{{ $json.error }}\n{{ $json.url }}",
+          "otherOptions": {}
+        }
+      }
+    ],
+    "connections": {
+      "Error Trigger": {
+        "main": [[{ "node": "Format alert", "type": "main", "index": 0 }]]
+      },
+      "Format alert": {
+        "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}
