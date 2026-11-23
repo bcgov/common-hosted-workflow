@@ -212,6 +212,24 @@ async function processItem(
   };
 }
 
+/**
+ * Handles an error thrown while processing one input item. With "Continue On Fail" it returns an
+ * error item for the first output; otherwise it rethrows, wrapping upstream HTTP errors in
+ * NodeApiError so n8n shows the API response.
+ */
+function toErrorItemOrThrow(ctx: IExecuteFunctions, error: unknown, itemIndex: number): INodeExecutionData {
+  if (ctx.continueOnFail()) {
+    return { json: { error: (error as Error).message }, pairedItem: { item: itemIndex } };
+  }
+  if (error instanceof NodeOperationError) {
+    throw error;
+  }
+  if ((error as Error & { response?: unknown }).response) {
+    throw new NodeApiError(ctx.getNode(), error as unknown as JsonObject);
+  }
+  throw error;
+}
+
 export class CHEFSSubmissionExtractor implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'CHEFS Submission Extractor',
@@ -375,20 +393,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
         const { items: executionData, kind } = await processItem(this, i, credentials);
         (route ? outputFor[kind] : returnData).push(...executionData);
       } catch (error) {
-        if (this.continueOnFail()) {
-          returnData.push({
-            json: { error: (error as Error).message },
-            pairedItem: { item: i },
-          });
-          continue;
-        }
-        if (error instanceof NodeOperationError) {
-          throw error;
-        }
-        if ((error as Error & { response?: unknown }).response) {
-          throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
-        }
-        throw error;
+        returnData.push(toErrorItemOrThrow(this, error, i));
       }
     }
 
