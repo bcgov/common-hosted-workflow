@@ -106,6 +106,62 @@ describe('computePermissions', () => {
     });
   });
 
+  describe('CSTAR ui:actor portal access', () => {
+    const uiActorTenantRoles = [{ roles: ['ui:actor'] }];
+
+    it('grants only WIL to an unprovisioned identity holding ui:actor', () => {
+      const permissions = computePermissions(null, makeFeatureFlagService(), uiActorTenantRoles);
+
+      expect(permissions).toEqual({
+        isAdmin: false,
+        canViewWorkflows: false,
+        canRequestAccess: false,
+        canReviewAccessRequests: false,
+        canShareWorkflows: false,
+        canUnshareWorkflows: false,
+        canManageWil: true,
+        canManageProject: false,
+      });
+    });
+
+    it('grants WIL to a role-less n8n user holding ui:actor in any tenant', () => {
+      const permissions = computePermissions({ disabled: false, role: null }, makeFeatureFlagService(), [
+        { roles: ['project:other'] },
+        { roles: ['ui:actor'] },
+      ]);
+
+      expect(permissions.canManageWil).toBe(true);
+      expect(permissions.canRequestAccess).toBe(false);
+      expect(permissions.canViewWorkflows).toBe(false);
+      expect(permissions.canManageProject).toBe(false);
+    });
+
+    it('keeps a disabled n8n user blocked even with ui:actor', () => {
+      const permissions = computePermissions(
+        { disabled: true, role: memberRole },
+        makeFeatureFlagService(),
+        uiActorTenantRoles,
+      );
+
+      expect(permissions.canManageWil).toBe(false);
+      expect(permissions.canRequestAccess).toBe(true);
+    });
+
+    it('does not treat other CSTAR roles as portal access', () => {
+      const permissions = computePermissions(null, makeFeatureFlagService(), [{ roles: ['project:viewer-ish'] }]);
+
+      expect(permissions.canManageWil).toBe(false);
+      expect(permissions.canRequestAccess).toBe(true);
+    });
+
+    it('falls back to access request for ui:actor users when WIL is disabled', () => {
+      const permissions = computePermissions(null, makeFeatureFlagService([]), uiActorTenantRoles);
+
+      expect(permissions.canManageWil).toBe(false);
+      expect(permissions.canRequestAccess).toBe(true);
+    });
+  });
+
   it('respects feature flags for eligible users', () => {
     const permissions = computePermissions({ disabled: false, role: memberRole }, makeFeatureFlagService([]));
 

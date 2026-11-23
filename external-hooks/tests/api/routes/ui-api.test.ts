@@ -807,6 +807,83 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
     });
   });
 
+  describe('unprovisioned identity holding CSTAR ui:actor (portal-only)', () => {
+    beforeEach(() => {
+      mockTenantService.getTenantRolesForSession.mockResolvedValue({
+        roles: [{ tenantId: 'tenant-1', tenantName: 'Tenant One', roles: ['ui:actor'] }],
+      });
+    });
+
+    it('receives WIL access without access-request or any n8n capability', async () => {
+      const uiApi = makeUnprovisionedContextService();
+      const req = createMockRequest({ get: vi.fn(() => undefined) as any });
+      const res = createMockResponse();
+
+      await runProtectedRoute({ uiApi }, 'get', '/whoami', req as any, res as any);
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          n8nUser: null,
+          permissions: {
+            isAdmin: false,
+            canViewWorkflows: false,
+            canRequestAccess: false,
+            canReviewAccessRequests: false,
+            canShareWorkflows: false,
+            canUnshareWorkflows: false,
+            canManageWil: true,
+            canManageProject: false,
+          },
+        }),
+      );
+    });
+
+    it('can reach the WIL router', async () => {
+      const uiApi = makeUnprovisionedContextService();
+      const listTenantsForUser = vi.fn().mockResolvedValue([]);
+
+      const response = await dispatchUiRequest(
+        { uiApi, tenant: { ...mockTenantService, listTenantsForUser } },
+        'get',
+        '/wil/tenants',
+      );
+
+      expect(response.status).toBe(200);
+      expect(listTenantsForUser).toHaveBeenCalledWith(expect.objectContaining({ n8nUserId: undefined }));
+    });
+
+    it('cannot list workflows', async () => {
+      const uiApi = makeUnprovisionedContextService();
+      const req = createMockRequest({ get: vi.fn(() => undefined) as any });
+      const res = createMockResponse();
+
+      await runProtectedRoute({ uiApi }, 'get', '/workflows', req as any, res as any);
+
+      makeDeniedExpectations(res);
+    });
+
+    it('cannot create an access request', async () => {
+      const accessRequestService = { createAccessRequest: vi.fn() };
+      const uiApi = makeUnprovisionedContextService();
+      const req = createMockRequest({
+        body: { justification: 'Need access to manage workflows.' },
+        get: vi.fn(() => undefined) as any,
+      });
+      const res = createMockResponse();
+
+      await runProtectedRoute(
+        { uiApi, accessRequest: accessRequestService },
+        'post',
+        '/access-requests',
+        req as any,
+        res as any,
+      );
+
+      makeDeniedExpectations(res);
+      expect(accessRequestService.createAccessRequest).not.toHaveBeenCalled();
+    });
+  });
+
   describe('disabled admin with a stale database role', () => {
     it('receives only access-request capabilities and a disabled n8n user representation', async () => {
       const uiApi = makeDisabledAdminContextService();

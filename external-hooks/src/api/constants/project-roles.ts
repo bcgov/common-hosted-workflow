@@ -23,3 +23,9 @@ export type ManagedProjectRole = (typeof MANAGED_PROJECT_ROLES)[number];
 export function isManagedProjectRole(name: string): name is ManagedProjectRole {
   return (MANAGED_PROJECT_ROLES as readonly string[]).includes(name);
 }
+
+/**
+ * CSTAR shared service role that grants Workflow User Portal (WIL) access on its
+ * own, without an n8n identity. It is not an n8n project role and is never synced.
+ */
+export const CSTAR_ROLE_UI_ACTOR = 'ui:actor' as const;

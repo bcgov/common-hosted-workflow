@@ -184,7 +184,7 @@ async function resolveUiRequestContext(
     session: {
       ...session,
       n8nUser: resolvedN8nUser,
-      permissions: computePermissions(resolvedN8nUser, services.featureFlag),
+      permissions: computePermissions(resolvedN8nUser, services.featureFlag, tenantRolesResult.roles),
       tenantRoles: tenantRolesResult.roles,
       tenantGroups: tenantGroupsResult.groups,
       // Internal use only — excluded from buildSessionSummary/buildWhoamiResponse public types
