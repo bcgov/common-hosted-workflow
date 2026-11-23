@@ -43,12 +43,12 @@ sequenceDiagram
 
 What the platform endpoint does with each call:
 
-| CHEFS call                                                                             | What happens                                                                                                          |
-| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Body has no `formId` or `submissionId` (CHEFS form **publish** / **unpublish** events) | Rejected with `400` by request validation. No workflow runs. This is expected and harmless.                           |
-| Any other `subscriptionEvent` than `eventSubmission`                                   | Acknowledged with `200` and **ignored**. No workflow runs.                                                            |
-| `eventSubmission`, and a **CHEFS Resubmit Wait** registered this form + submission     | Forwarded to that execution's resume URL. The registration is deleted once n8n accepts it.                            |
-| `eventSubmission`, nothing registered                                                  | Forwarded to `https://<n8n>/webhook/<webhookPath>`, which starts a new execution of the workflow at its Webhook node. |
+| CHEFS call                                                                             | What happens                                                                                                                               |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Body has no `formId` or `submissionId` (CHEFS form **publish** / **unpublish** events) | Rejected with `400` by request validation. No workflow runs. This is expected and harmless.                                                |
+| Any other `subscriptionEvent` than `eventSubmission`                                   | Acknowledged with `200` and **ignored**. No workflow runs.                                                                                 |
+| `eventSubmission`, and a **CHEFS Resubmit Wait** registered this form + submission     | Forwarded to that execution's resume URL. The registration is deleted once n8n accepts it.                                                 |
+| `eventSubmission`, nothing registered                                                  | Forwarded to `https://workflow.digital.gov.bc.ca/webhook/<webhookPath>`, which starts a new execution of the workflow at its Webhook node. |
 
 The endpoint does **not** check the key itself. It passes every header (including `x-n8n-chef-key`) through, and the **Header Auth** credential on the Webhook / CHEFS Resubmit Wait node rejects calls with a wrong or missing key. If n8n rejects the call, CHEFS gets the same status code back.
 
@@ -138,28 +138,38 @@ The extractor's **On Draft / Deleted Submission** option (every Field Mapping Mo
 2. Go to **Manage Form → Form Settings → Edit**, tick **Allow event subscription**, and save.
 3. Open the new **Event Subscription** panel and fill it in:
 
-| CHEFS field    | Value                                                        |
-| -------------- | ------------------------------------------------------------ |
-| Endpoint URL   | `https://<workflow-host>/rest/custom/v1/chefs/<webhookPath>` |
-| Key            | The Header Auth **Name**, for example `x-n8n-chef-key`       |
-| Endpoint Token | The Header Auth **Value**                                    |
+| CHEFS field    | Value                                                  |
+| -------------- | ------------------------------------------------------ |
+| Endpoint URL   | One of the two URLs below                              |
+| Key            | The Header Auth **Name**, for example `x-n8n-chef-key` |
+| Endpoint Token | The Header Auth **Value**                              |
 
 ![CHEFS Event Subscription settings for the Trip Plan form](./img/a10.png)
 
-Use the host of your environment:
+### Which Endpoint URL?
 
-| Environment | Endpoint URL example                                                             |
+| Endpoint URL                                                                          | Use it when                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://workflow.digital.gov.bc.ca/rest/custom/v1/chefs/<webhookPath>` (recommended) | Always works. **Required** if the workflow uses **CHEFS Resubmit Wait** to wait for a resubmission.                                                                             |
+| `https://workflow.digital.gov.bc.ca/webhook/<webhookPath>` (direct n8n webhook)       | The workflow does not use CHEFS Resubmit Wait. Every submission **and every resubmission** starts the workflow from the beginning, so the workflow must tell them apart itself. |
+
+- **Platform endpoint** (`/rest/custom/v1/chefs/…`): receives every CHEFS event. A fresh submission is forwarded to your Webhook node at `/webhook/<webhookPath>`. A resubmission that a **CHEFS Resubmit Wait** registered for is sent to that waiting execution instead. Form publish/unpublish events are dropped before they reach n8n. Your Header Auth key is passed through and checked by the Webhook node as usual.
+- **Direct n8n webhook** (`/webhook/…`): CHEFS calls your Webhook node directly, and its Header Auth checks the key. Every event starts a **new** execution from the Webhook node, and a CHEFS Resubmit Wait is never resumed. That means:
+  - **Resubmissions start the workflow again from the beginning**, with the same `submissionId` as the original submission. If the workflow must treat them differently (for example, skip creating a new record and update the existing one), it has to detect them itself. A simple way: store each `submissionId` in an n8n **Data Table** when it first arrives, and at the start of the workflow look it up; if it is already there, it is a resubmission. The **Common Hosted Form Service (CHEFS)** node's **Get Submission Statuses** can also help: a submission that has been through **REVISING** has been resubmitted.
+  - **Form publish and unpublish events arrive too**, and start executions with no `submissionId`. Add an **If** node on `{{ $json.body.subscriptionEvent }}` equal to `eventSubmission` before the extractor.
+
+Both deliver the same payload, so the Webhook node and the rest of the workflow are the same. You can switch between them by changing only the Endpoint URL in CHEFS, for example when you add a CHEFS Resubmit Wait step.
+
+The URLs above use the production host. For other environments, keep the path and change the host:
+
+| Environment | Platform endpoint example                                                        |
 | ----------- | -------------------------------------------------------------------------------- |
+| Production  | `https://workflow.digital.gov.bc.ca/rest/custom/v1/chefs/trip-plan`              |
 | Dev         | `https://dev-workflow.apps.gold.devops.gov.bc.ca/rest/custom/v1/chefs/trip-plan` |
-| Test / Prod | Same path on the test / prod workflow host                                       |
-
-:::tip
-Point CHEFS at `/rest/custom/v1/chefs/<path>`, **not** directly at `/webhook/<path>`. The direct webhook URL works for fresh submissions, but resubmissions would then start a second execution instead of resuming the waiting one.
-:::
 
 ## Step 4 — Activate and test
 
-1. **Activate** (publish) the workflow. The forwarder always calls the production URL `/webhook/<path>`, so a workflow that is only open in the editor is not called. To debug in the editor, open the Webhook node, click **Listen for test event**, and temporarily set the CHEFS Endpoint URL to the n8n **test** webhook URL.
+1. **Activate** (publish) the workflow. Both Endpoint URLs reach the production webhook `/webhook/<path>`, so a workflow that is only open in the editor is not called. To debug in the editor, open the Webhook node, click **Listen for test event**, and temporarily set the CHEFS Endpoint URL to the n8n **test** webhook URL.
 2. Submit the CHEFS form.
 3. Check **Executions** in n8n. You should see one run that started at the Webhook node.
 

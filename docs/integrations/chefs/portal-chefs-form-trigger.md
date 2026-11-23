@@ -95,6 +95,8 @@ Tenant managers do this under **Workflow Interaction → Triggers → Create Tri
 | Allowed Actors                                     | The role names, group names or user emails allowed to use the trigger (not needed for **All**)                                                   |
 | Send Form Data to Workflow (Skip CHEFS Submission) | Off: the form is stored in CHEFS and the workflow receives the submission ID. On: nothing is stored in CHEFS; the workflow receives the answers. |
 
+In a **personal project** tenant, **Allowed Actors Type** is fixed to **User** and **Allowed Actors** to your own email, so only you can run the trigger. See [Do I need a CSTAR tenant?](./README.md#do-i-need-a-cstar-tenant).
+
 ![Create Trigger form with a CHEFS Form trigger, credential details, allowed actors, skip toggle and workflow](./img/c3.png)
 
 Click **Save Trigger**. The trigger appears in the list, where managers can **Run**, **Edit** or **Delete** it:
