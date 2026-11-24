@@ -43,7 +43,7 @@ import { createReadOnlyMiddleware } from '../middlewares';
 import { buildWilRouter } from './wil';
 import { buildAdminProjectRouter } from './admin-projects';
 import { buildProjectsRouter } from './projects';
-import { resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
+import { isBceidIdentity, resolveCstarSsoUserId } from '../helpers/cstar-sso-user-id';
 import { PERIOD_TIMEZONE } from '../helpers/period';
 
 type UiApiMutableRequest = Request & {
@@ -184,7 +184,12 @@ async function resolveUiRequestContext(
     session: {
       ...session,
       n8nUser: resolvedN8nUser,
-      permissions: computePermissions(resolvedN8nUser, services.featureFlag, tenantRolesResult.roles),
+      permissions: computePermissions(
+        resolvedN8nUser,
+        services.featureFlag,
+        tenantRolesResult.roles,
+        isBceidIdentity(session.claims),
+      ),
       tenantRoles: tenantRolesResult.roles,
       tenantGroups: tenantGroupsResult.groups,
       // Internal use only — excluded from buildSessionSummary/buildWhoamiResponse public types

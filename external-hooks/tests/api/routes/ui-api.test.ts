@@ -814,7 +814,7 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
       });
     });
 
-    it('receives WIL access without access-request or any n8n capability', async () => {
+    it('receives WIL and access-request capabilities but no n8n capability', async () => {
       const uiApi = makeUnprovisionedContextService();
       const req = createMockRequest({ get: vi.fn(() => undefined) as any });
       const res = createMockResponse();
@@ -827,7 +827,7 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
           permissions: {
             isAdmin: false,
             canViewWorkflows: false,
-            canRequestAccess: false,
+            canRequestAccess: true,
             canReviewAccessRequests: false,
             canShareWorkflows: false,
             canUnshareWorkflows: false,
@@ -862,8 +862,20 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
       makeDeniedExpectations(res);
     });
 
-    it('cannot create an access request', async () => {
-      const accessRequestService = { createAccessRequest: vi.fn() };
+    it('can create an access request to get n8n access and a personal project', async () => {
+      const accessRequestService = {
+        createAccessRequest: vi.fn().mockResolvedValue({
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          requesterEmail: 'person@example.com',
+          justification: 'Need access to manage workflows.',
+          status: 'pending',
+          reviewerEmail: null,
+          reviewerN8nUserId: null,
+          denyReason: null,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        }),
+      };
       const uiApi = makeUnprovisionedContextService();
       const req = createMockRequest({
         body: { justification: 'Need access to manage workflows.' },
@@ -879,8 +891,58 @@ describe('OIDC-02: ineligible and disabled user boundary', () => {
         res as any,
       );
 
-      makeDeniedExpectations(res);
-      expect(accessRequestService.createAccessRequest).not.toHaveBeenCalled();
+      expect(accessRequestService.createAccessRequest).toHaveBeenCalledWith({
+        requesterEmail: 'person@example.com',
+        justification: 'Need access to manage workflows.',
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    describe('signed in with BCeID', () => {
+      beforeEach(() => {
+        getUiSessionMock.mockResolvedValue({
+          subject: 'sub-1',
+          email: 'person@example.com',
+          issuer: 'https://issuer.example.com',
+          audience: ['app'],
+          claims: { bceid_user_guid: 'bceid-guid-1' },
+        });
+      });
+
+      it('keeps WIL but loses the access-request capability', async () => {
+        const uiApi = makeUnprovisionedContextService();
+        const req = createMockRequest({ get: vi.fn(() => undefined) as any });
+        const res = createMockResponse();
+
+        await runProtectedRoute({ uiApi }, 'get', '/whoami', req as any, res as any);
+
+        expect(res.json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            permissions: expect.objectContaining({ canRequestAccess: false, canManageWil: true }),
+          }),
+        );
+      });
+
+      it('cannot create an access request', async () => {
+        const accessRequestService = { createAccessRequest: vi.fn() };
+        const uiApi = makeUnprovisionedContextService();
+        const req = createMockRequest({
+          body: { justification: 'Need access to manage workflows.' },
+          get: vi.fn(() => undefined) as any,
+        });
+        const res = createMockResponse();
+
+        await runProtectedRoute(
+          { uiApi, accessRequest: accessRequestService },
+          'post',
+          '/access-requests',
+          req as any,
+          res as any,
+        );
+
+        expect(accessRequestService.createAccessRequest).not.toHaveBeenCalled();
+        makeDeniedExpectations(res);
+      });
     });
   });
 

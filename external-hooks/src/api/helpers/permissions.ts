@@ -29,10 +29,15 @@ export type Permissions = {
 // `tenantRoles` (CSTAR) only widens portal-side WIL access: a user holding `ui:actor`
 // in any tenant may use Workflow Interaction even without an n8n identity. A disabled
 // n8n user stays blocked regardless of CSTAR roles.
+//
+// `isBceidLogin` removes the access-request capability: approval provisions the user
+// through an Azure IDIR lookup, so a BCeID request could never be approved. BCeID
+// users get n8n access only through CSTAR `project:editor`/`project:viewer`.
 export function computePermissions(
   n8nUser: { disabled: boolean; role: { slug: string } | null } | null,
   featureFlagService: FeatureFlagService,
   tenantRoles: readonly TenantRoleNames[] | null = null,
+  isBceidLogin = false,
 ): Permissions {
   const isDisabled = n8nUser?.disabled ?? false;
   const hasNoRole = n8nUser?.role == null;
@@ -50,11 +55,11 @@ export function computePermissions(
   return {
     isAdmin,
     canViewWorkflows: canShareWorkflows,
-    // Access-request creation/status is the only default capability for
-    // disabled or ineligible (missing/role-less) identities. Portal actors
-    // (`ui:actor` in CSTAR) already have portal access; n8n access for them is
-    // granted through CSTAR project roles, not the access-request flow.
-    canRequestAccess: (isDisabled || hasNoRole) && !isPortalActor,
+    // Access-request creation/status is the default capability for disabled or
+    // ineligible (missing/role-less) identities. Portal actors (`ui:actor` in
+    // CSTAR) keep it so they can later request n8n access and a personal project.
+    // BCeID logins never get it (see above).
+    canRequestAccess: (isDisabled || hasNoRole) && !isBceidLogin,
     canReviewAccessRequests: isAdmin,
     canShareWorkflows,
     canUnshareWorkflows: isAdmin,

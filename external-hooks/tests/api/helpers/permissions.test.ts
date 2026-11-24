@@ -109,19 +109,32 @@ describe('computePermissions', () => {
   describe('CSTAR ui:actor portal access', () => {
     const uiActorTenantRoles = [{ roles: ['ui:actor'] }];
 
-    it('grants only WIL to an unprovisioned identity holding ui:actor', () => {
+    it('grants WIL and keeps access request for an unprovisioned identity holding ui:actor', () => {
       const permissions = computePermissions(null, makeFeatureFlagService(), uiActorTenantRoles);
 
       expect(permissions).toEqual({
         isAdmin: false,
         canViewWorkflows: false,
-        canRequestAccess: false,
+        canRequestAccess: true,
         canReviewAccessRequests: false,
         canShareWorkflows: false,
         canUnshareWorkflows: false,
         canManageWil: true,
         canManageProject: false,
       });
+    });
+
+    it('drops access request for a BCeID login but keeps WIL for ui:actor', () => {
+      const permissions = computePermissions(null, makeFeatureFlagService(), uiActorTenantRoles, true);
+
+      expect(permissions.canRequestAccess).toBe(false);
+      expect(permissions.canManageWil).toBe(true);
+    });
+
+    it('leaves a BCeID login with no tenant role with no capabilities', () => {
+      const permissions = computePermissions(null, makeFeatureFlagService(), [], true);
+
+      expect(Object.values(permissions).every((value) => value === false)).toBe(true);
     });
 
     it('grants WIL to a role-less n8n user holding ui:actor in any tenant', () => {
@@ -131,7 +144,7 @@ describe('computePermissions', () => {
       ]);
 
       expect(permissions.canManageWil).toBe(true);
-      expect(permissions.canRequestAccess).toBe(false);
+      expect(permissions.canRequestAccess).toBe(true);
       expect(permissions.canViewWorkflows).toBe(false);
       expect(permissions.canManageProject).toBe(false);
     });
