@@ -1655,6 +1655,9 @@ describe('ProjectRateLimitService · admin run-request review', () => {
   }
 
   beforeEach(() => {
+    // Keep the relative past/current/future week fixtures deterministic.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-16T12:00:00Z'));
     n8nRepos = createMockN8nRepositories();
     (n8nRepos.projectRelation.findProjectRole as ReturnType<typeof vi.fn>).mockResolvedValue('project:editor');
     n8nRepos.user.findOne.mockResolvedValue({
@@ -1704,6 +1707,7 @@ describe('ProjectRateLimitService · admin run-request review', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 

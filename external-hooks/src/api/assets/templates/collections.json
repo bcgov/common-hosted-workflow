@@ -1,0 +1,16 @@
+{
+  "collections": [
+    {
+      "id": 1,
+      "name": "Starter pack",
+      "description": "Three templates to get a fresh instance moving: an inbound webhook, a scheduled database export, and an error alert. Each one works without any custom nodes.",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "totalViews": 0,
+      "rank": 0,
+      "workflowIds": [1002, 1001, 1003],
+      "categories": [{ "id": 1, "name": "Starter" }],
+      "nodes": [],
+      "image": []
+    }
+  ]
+}
