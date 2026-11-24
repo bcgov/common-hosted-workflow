@@ -14,6 +14,45 @@ import { validateFieldPaths, extractFields } from './shared/fieldExtractor';
 import { chefsApiRequest } from './shared/chefsApiRequest';
 
 /**
+ * How draft and deleted submissions are handled. Stored in the `draftDeletedHandling` parameter.
+ * A missing value means PROCESS, so workflows saved before this option existed behave as before.
+ */
+export const DRAFT_DELETED_HANDLING = {
+  /** Treat drafts and deleted submissions like any other submission (the default). */
+  PROCESS: 'process',
+  /** Output nothing for them, so the run stops at this node without an error. */
+  STOP: 'stop',
+  /** Send them to extra "Draft" and "Deleted" outputs. */
+  ROUTE: 'route',
+} as const;
+
+/** Which output a processed submission belongs to. A deleted draft counts as deleted. */
+export type SubmissionKind = 'submission' | 'draft' | 'deleted';
+
+/**
+ * Builds the node's outputs from its parameters. n8n evaluates this in the editor and at run
+ * time (it is serialized into the `outputs` expression), so it must stay self-contained.
+ * A missing value means the default, "process", which has a single output.
+ */
+export const configuredOutputs = (parameters: { draftDeletedHandling?: string }) => {
+  const handling = parameters.draftDeletedHandling ?? 'process';
+  if (handling === 'route') {
+    return [
+      { type: 'main', displayName: 'Submission' },
+      { type: 'main', displayName: 'Draft' },
+      { type: 'main', displayName: 'Deleted' },
+    ];
+  }
+  return [{ type: 'main' }];
+};
+
+/** Result of processing one input item: the output items, and what kind of submission it is. */
+interface ProcessedItem {
+  items: INodeExecutionData[];
+  kind: SubmissionKind;
+}
+
+/**
  * Parses field mappings from either the UI key-value collection or JSON input.
  *
  * @param ctx - The execution context
@@ -110,7 +149,7 @@ async function processItem(
   ctx: IExecuteFunctions,
   itemIndex: number,
   credentials: ChefsFormCredentials,
-): Promise<INodeExecutionData[]> {
+): Promise<ProcessedItem> {
   const submissionId = (ctx.getNodeParameter('submissionId', itemIndex) as string).trim();
   if (!submissionId) {
     throw new NodeOperationError(ctx.getNode(), 'Submission ID is required and cannot be empty', { itemIndex });
@@ -121,11 +160,24 @@ async function processItem(
   const response = await chefsApiRequest(ctx, 'GET', `/submissions/${submissionId}`, credentials);
   const inner = validateResponseStructure(ctx, response, itemIndex);
 
+  // A draft is, for example, a submission the submitter has recalled to edit; a deleted submission
+  // was deleted in CHEFS. With "stop", no items are returned for either, so downstream nodes do not
+  // run and the execution still succeeds. With "route" and "process" they are extracted like any
+  // other submission; the caller picks the output.
+  const kind: SubmissionKind = inner.deleted === true ? 'deleted' : inner.draft === true ? 'draft' : 'submission';
+  const handling = ctx.getNodeParameter('draftDeletedHandling', itemIndex, DRAFT_DELETED_HANDLING.PROCESS) as string;
+  if (kind !== 'submission' && handling === DRAFT_DELETED_HANDLING.STOP) {
+    return { items: [], kind };
+  }
+
   // When "Get Full Submission Data" is selected, output the entire submission object as-is.
   if (mode === 'fullSubmission') {
-    return ctx.helpers.constructExecutionMetaData(ctx.helpers.returnJsonArray(inner as unknown as IDataObject), {
-      itemData: { item: itemIndex },
-    });
+    return {
+      items: ctx.helpers.constructExecutionMetaData(ctx.helpers.returnJsonArray(inner as unknown as IDataObject), {
+        itemData: { item: itemIndex },
+      }),
+      kind,
+    };
   }
 
   const missingPathBehavior = ctx.getNodeParameter('missingPathBehavior', itemIndex) as string;
@@ -152,9 +204,30 @@ async function processItem(
     extracted['_updatedAt'] = inner.updatedAt;
   }
 
-  return ctx.helpers.constructExecutionMetaData(ctx.helpers.returnJsonArray(extracted as IDataObject), {
-    itemData: { item: itemIndex },
-  });
+  return {
+    items: ctx.helpers.constructExecutionMetaData(ctx.helpers.returnJsonArray(extracted as IDataObject), {
+      itemData: { item: itemIndex },
+    }),
+    kind,
+  };
+}
+
+/**
+ * Handles an error thrown while processing one input item. With "Continue On Fail" it returns an
+ * error item for the first output; otherwise it rethrows, wrapping upstream HTTP errors in
+ * NodeApiError so n8n shows the API response.
+ */
+function toErrorItemOrThrow(ctx: IExecuteFunctions, error: unknown, itemIndex: number): INodeExecutionData {
+  if (ctx.continueOnFail()) {
+    return { json: { error: (error as Error).message }, pairedItem: { item: itemIndex } };
+  }
+  if (error instanceof NodeOperationError) {
+    throw error;
+  }
+  if ((error as Error & { response?: unknown }).response) {
+    throw new NodeApiError(ctx.getNode(), error as unknown as JsonObject);
+  }
+  throw error;
 }
 
 export class CHEFSSubmissionExtractor implements INodeType {
@@ -171,7 +244,7 @@ export class CHEFSSubmissionExtractor implements INodeType {
     },
     usableAsTool: true,
     inputs: [NodeConnectionTypes.Main],
-    outputs: [NodeConnectionTypes.Main],
+    outputs: `={{(${configuredOutputs})($parameter)}}`,
     credentials: [
       {
         name: 'chefsFormAuth',
@@ -198,6 +271,34 @@ export class CHEFSSubmissionExtractor implements INodeType {
         ],
         default: 'keyValue',
         description: 'Choose how to define field mappings',
+      },
+      {
+        displayName: 'On Draft / Deleted Submission',
+        name: 'draftDeletedHandling',
+        type: 'options',
+        noDataExpression: true,
+        options: [
+          {
+            name: 'Process Normally',
+            value: DRAFT_DELETED_HANDLING.PROCESS,
+            description: 'Treat drafts and deleted submissions like any other submission',
+          },
+          {
+            name: 'Stop (Output Nothing)',
+            value: DRAFT_DELETED_HANDLING.STOP,
+            description:
+              'Output nothing for drafts and deleted submissions, so the workflow stops at this node without an error',
+          },
+          {
+            name: 'Send to Draft / Deleted Output',
+            value: DRAFT_DELETED_HANDLING.ROUTE,
+            description:
+              'Adds "Draft" and "Deleted" outputs; those submissions go there so the workflow can handle them',
+          },
+        ],
+        default: DRAFT_DELETED_HANDLING.PROCESS,
+        description:
+          'What to do when the submission is a draft (for example one the submitter has recalled to edit) or has been deleted in CHEFS. A deleted draft counts as deleted.',
       },
       {
         displayName: 'Missing Path Behavior',
@@ -268,6 +369,18 @@ export class CHEFSSubmissionExtractor implements INodeType {
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
+    const draftData: INodeExecutionData[] = [];
+    const deletedData: INodeExecutionData[] = [];
+    const outputFor: Record<SubmissionKind, INodeExecutionData[]> = {
+      submission: returnData,
+      draft: draftData,
+      deleted: deletedData,
+    };
+
+    // `draftDeletedHandling` has no expressions, so one value applies to the whole node and matches
+    // the outputs built by `configuredOutputs`.
+    const route =
+      this.getNodeParameter('draftDeletedHandling', 0, DRAFT_DELETED_HANDLING.PROCESS) === DRAFT_DELETED_HANDLING.ROUTE;
 
     const credentials = (await this.getCredentials('chefsFormAuth')) as unknown as ChefsFormCredentials;
 
@@ -277,26 +390,13 @@ export class CHEFSSubmissionExtractor implements INodeType {
 
     for (let i = 0; i < items.length; i++) {
       try {
-        const executionData = await processItem(this, i, credentials);
-        returnData.push(...executionData);
+        const { items: executionData, kind } = await processItem(this, i, credentials);
+        (route ? outputFor[kind] : returnData).push(...executionData);
       } catch (error) {
-        if (this.continueOnFail()) {
-          returnData.push({
-            json: { error: (error as Error).message },
-            pairedItem: { item: i },
-          });
-          continue;
-        }
-        if (error instanceof NodeOperationError) {
-          throw error;
-        }
-        if ((error as Error & { response?: unknown }).response) {
-          throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
-        }
-        throw error;
+        returnData.push(toErrorItemOrThrow(this, error, i));
       }
     }
 
-    return [returnData];
+    return route ? [returnData, draftData, deletedData] : [returnData];
   }
 }

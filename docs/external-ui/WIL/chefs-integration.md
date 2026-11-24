@@ -2,6 +2,8 @@
 
 This document covers how the external-ui embeds and interacts with CHEFS (Common Hosted Enterprise Forms Service) forms via the `<chefs-form-viewer>` web component.
 
+For how workflow designers use CHEFS with n8n (Event Subscription, Show Form actions, portal triggers), see the [CHEFS + n8n integration guide](../../integrations/chefs/README.md). This page covers the portal internals.
+
 ## Overview
 
 CHEFS forms are rendered using a web component (`<chefs-form-viewer>`) distributed as a script from the CHEFS application. The external-ui wraps this web component in a React component (`ChefsFormViewer`) that handles script loading, attribute binding, event listening, and lifecycle cleanup.

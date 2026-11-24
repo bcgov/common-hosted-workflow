@@ -61,13 +61,13 @@ That reduces ambiguity between:
 
 ## Practical examples
 
-| CSTAR roles in one tenant          | Result                        |
-| ---------------------------------- | ----------------------------- |
-| `project:viewer`                   | user becomes `project:viewer` |
-| `project:editor`                   | user becomes `project:editor` |
-| `project:viewer`, `project:editor` | user becomes `project:editor` |
-| `ui:actor` only                    | no managed `n8n` project role |
-| no roles                           | no managed `n8n` project role |
+| CSTAR roles in one tenant          | Result                                                                |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `project:viewer`                   | user becomes `project:viewer`                                         |
+| `project:editor`                   | user becomes `project:editor`                                         |
+| `project:viewer`, `project:editor` | user becomes `project:editor`                                         |
+| `ui:actor` only                    | no managed `n8n` project role; Workflow User Portal (WIL) access only |
+| no roles                           | no managed `n8n` project role                                         |
 
 ## Related docs
 

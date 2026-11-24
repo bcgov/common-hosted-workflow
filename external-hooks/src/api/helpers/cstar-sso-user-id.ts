@@ -17,3 +17,11 @@ export function resolveCstarSsoUserId(
   }
   return subject || email || '';
 }
+
+/**
+ * True when the session was signed in with a BCeID identity (CSS issues
+ * `bceid_user_guid` for BCeID Basic/Business logins).
+ */
+export function isBceidIdentity(claims: Record<string, unknown>): boolean {
+  return typeof claims.bceid_user_guid === 'string' && !!claims.bceid_user_guid;
+}

@@ -14,6 +14,7 @@ Requests use the fixed base URL `https://submit.digital.gov.bc.ca/app/api/v1`. F
 
 ## Guides
 
+- [CHEFS + n8n integration guide (choosing a pattern)](../../integrations/chefs/README.md)
 - [Node operations and input matrix](./node-operations.md)
 - [Credentials and the two authentication layers](./credentials.md)
 - [Release notes and migration](./release-notes.md)

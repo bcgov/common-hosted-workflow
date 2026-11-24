@@ -139,6 +139,81 @@ describe('Session-driven navigation/gating', () => {
     });
   });
 
+  describe('Home landing after sign-in', () => {
+    function setUnprovisionedSession(canManageWil: boolean, canRequestAccess = true) {
+      sessionState.session = {
+        user: { subject: 'sub-1', email: 'user@example.com' },
+        oidc: null,
+        n8nUser: null,
+        permissions: {
+          isAdmin: false,
+          canViewWorkflows: false,
+          canRequestAccess,
+          canReviewAccessRequests: false,
+          canShareWorkflows: false,
+          canUnshareWorkflows: false,
+          canManageWil,
+          canManageProject: false,
+        },
+      };
+    }
+
+    it('redirects to the access-request page when that is the only capability', () => {
+      setUnprovisionedSession(false);
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByText('Request Access')).toBeInTheDocument();
+    });
+
+    it('keeps a ui:actor portal user on home with Workflow Interaction and Access Request options', () => {
+      setUnprovisionedSession(true);
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.queryByText('Request Access')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Workflow User Portal' })).toBeInTheDocument();
+      expect(screen.getAllByText('Workflow Interaction').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Access Request').length).toBeGreaterThan(0);
+    });
+
+    it('tells a signed-in user with no capabilities (e.g. BCeID, no tenant) to join a tenant', () => {
+      setUnprovisionedSession(false, false);
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByRole('heading', { name: 'Join a tenant to get started' })).toBeInTheDocument();
+      expect(screen.queryByText('Access Request')).not.toBeInTheDocument();
+      expect(screen.queryByText('Request Access')).not.toBeInTheDocument();
+    });
+
+    it('does not show the join-a-tenant message to a BCeID ui:actor user', () => {
+      setUnprovisionedSession(true, false);
+
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getAllByText('Workflow Interaction').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Access Request')).not.toBeInTheDocument();
+      expect(screen.queryByText('Join a tenant to get started')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Navigation links', () => {
     it('shows Access Request link when canRequestAccess is true', () => {
       sessionState.session = {
@@ -531,6 +606,8 @@ describe('Session-driven navigation/gating', () => {
           canReviewAccessRequests: false,
           canShareWorkflows: false,
           canUnshareWorkflows: false,
+          // Keeps the user on Home (a ui:actor portal user) so the link stays inactive.
+          canManageWil: true,
         },
       };
 
