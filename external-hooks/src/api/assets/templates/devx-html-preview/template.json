@@ -1,0 +1,67 @@
+{
+  "id": 2002,
+  "name": "DevX Connector: send sanitized HTML (Preview)",
+  "description": "Demonstrates the DevX Message Connector HTML type. The node sanitizes unsupported markup before creating the Teams message. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview calls the preview endpoint without posting to Teams; switch Mode to Send when ready.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 11,
+  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "categories": [
+    { "id": 3, "name": "Communication" },
+    { "id": 6, "name": "DevX Message Connector" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 200201,
+      "name": "n8n-nodes-base.manualTrigger",
+      "displayName": "Manual Trigger",
+      "icon": "fa:play",
+      "iconData": { "type": "icon", "icon": "play" },
+      "defaults": { "name": "Manual Trigger", "color": "#909399" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 200202,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:code",
+      "iconData": { "type": "icon", "icon": "code" },
+      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "typeVersion": 0.1,
+      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000002002",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "position": [0, 0],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002102",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [240, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "html",
+          "payload": "<div><h2>Deployment completed</h2><p>The production release is now live.</p><ul><li>Version 1.2.3</li><li>All checks passed</li></ul></div>",
+          "mode": "preview",
+          "mentions": {}
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}

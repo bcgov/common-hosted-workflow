@@ -1,0 +1,73 @@
+{
+  "id": 2008,
+  "name": "DevX Connector: Backup Container template (Preview)",
+  "description": "Demonstrates Template mode with Source Backup Container. The WARN status is normalized to the db_backup template's warn status. Supported statuses are info, warn, and error. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 17,
+  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "categories": [
+    { "id": 3, "name": "Communication" },
+    { "id": 6, "name": "DevX Message Connector" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 200801,
+      "name": "n8n-nodes-base.manualTrigger",
+      "displayName": "Manual Trigger",
+      "icon": "fa:play",
+      "iconData": { "type": "icon", "icon": "play" },
+      "defaults": { "name": "Manual Trigger", "color": "#909399" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 200802,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:database",
+      "iconData": { "type": "icon", "icon": "database" },
+      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "typeVersion": 0.1,
+      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000002008",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "position": [0, 0],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002108",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [240, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "template",
+          "source": "backup-container",
+          "payload": {
+            "projectFriendlyName": "Common Hosted Workflow",
+            "projectName": "common-hosted-workflow",
+            "statusCode": "WARN",
+            "message": "Backup finished with warnings"
+          },
+          "mode": "preview",
+          "mentions": {}
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}

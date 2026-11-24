@@ -11,6 +11,18 @@
       "categories": [{ "id": 1, "name": "Starter" }],
       "nodes": [],
       "image": []
+    },
+    {
+      "id": 2,
+      "name": "DevX Message Connector scenarios",
+      "description": "Eleven manual-run examples covering Text, HTML, Adaptive Card, Generic, Rocket.Chat, GitHub pull requests and workflow runs, Backup Container, Sysdig, StatusCake, and Uptime.com. Every example uses Preview mode, which calls the configured DevX preview endpoint without posting to Teams.",
+      "createdAt": "2026-01-12T00:00:00.000Z",
+      "totalViews": 0,
+      "rank": 1,
+      "workflowIds": [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011],
+      "categories": [{ "id": 6, "name": "DevX Message Connector" }],
+      "nodes": [],
+      "image": []
     }
   ]
 }

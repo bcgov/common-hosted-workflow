@@ -1,0 +1,80 @@
+{
+  "id": 2007,
+  "name": "DevX Connector: GitHub workflow run (Preview)",
+  "description": "Demonstrates Template mode with Source GitHub for a workflow_run webhook payload. The connector extracts the conclusion, workflow name, repository, branch, actor, URL, commit SHA, and commit message. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview does not post to Teams; switch Mode to Send after reviewing the result.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 16,
+  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "categories": [
+    { "id": 3, "name": "Communication" },
+    { "id": 6, "name": "DevX Message Connector" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 200701,
+      "name": "n8n-nodes-base.manualTrigger",
+      "displayName": "Manual Trigger",
+      "icon": "fa:play",
+      "iconData": { "type": "icon", "icon": "play" },
+      "defaults": { "name": "Manual Trigger", "color": "#909399" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 200702,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:code-branch",
+      "iconData": { "type": "icon", "icon": "git-branch" },
+      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "typeVersion": 0.1,
+      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000002007",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "position": [0, 0],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002107",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [240, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "template",
+          "source": "github",
+          "payload": {
+            "action": "completed",
+            "repository": { "full_name": "bcgov/common-hosted-workflow" },
+            "workflow_run": {
+              "conclusion": "success",
+              "name": "CI",
+              "head_branch": "main",
+              "html_url": "https://github.com/bcgov/common-hosted-workflow/actions/runs/123",
+              "head_sha": "abcdef1234567890",
+              "head_commit": { "message": "Run all checks" },
+              "triggering_actor": { "login": "ci-bot" }
+            }
+          },
+          "mode": "preview",
+          "mentions": {}
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}

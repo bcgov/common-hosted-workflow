@@ -86,6 +86,38 @@ describe('loadTemplateLibrary', () => {
     expect(postgres?.workflow.connections['Append to sheet']).toBeDefined();
   });
 
+  it('loads every DevX Message Connector scenario into its dedicated collection', () => {
+    const library = loadTemplateLibrary(ASSETS_DIR);
+    const scenarios = [
+      [2001, 'text', undefined],
+      [2002, 'html', undefined],
+      [2003, 'card', undefined],
+      [2004, 'template', 'generic'],
+      [2005, 'template', 'rocket-chat'],
+      [2006, 'template', 'github'],
+      [2007, 'template', 'github'],
+      [2008, 'template', 'backup-container'],
+      [2009, 'template', 'sysdig'],
+      [2010, 'template', 'status-cake'],
+      [2011, 'template', 'uptime-com'],
+    ] as const;
+
+    for (const [id, type, source] of scenarios) {
+      const template = library.templatesById.get(id);
+      const connector = template?.workflow.nodes.find((node) => node.type === 'CUSTOM.devXMessageConnector');
+
+      expect(connector, `template ${id}`).toBeDefined();
+      expect(connector?.typeVersion).toBe(0.1);
+      expect(connector?.parameters).toMatchObject({ type, mode: 'preview' });
+      expect(connector?.parameters.source).toBe(source);
+      expect(connector?.credentials).toBeUndefined();
+      expect((template?.workflow as Record<string, unknown> | undefined)?.pinData).toBeUndefined();
+    }
+
+    expect(library.collectionsById.get(2)?.workflowIds).toEqual(scenarios.map(([id]) => id));
+    expect(library.collectionsById.get(2)?.nodes.length).toBeGreaterThan(0);
+  });
+
   it('applies defaults and strips credentials from graph nodes', () => {
     const dir = makeTempDir();
     writeTemplate(dir, 'with-credentials', {

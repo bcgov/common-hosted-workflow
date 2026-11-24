@@ -63,6 +63,24 @@ Malformed files are logged and skipped rather than preventing n8n from
 starting. When duplicate template or collection IDs are found, the first entry
 in deterministic file order wins and later entries are logged and skipped.
 
+## DevX Message Connector examples
+
+Templates `2001` through `2011` cover every DevX Message Connector type and
+source/subtype: Text, HTML, Adaptive Card, Generic, Rocket.Chat, GitHub
+`pull_request`, GitHub `workflow_run`, Backup Container, Sysdig, StatusCake, and
+Uptime.com. Collection `2` groups all eleven examples.
+
+Each graph uses **Manual Trigger → DevX Message Connector** with a constant,
+realistic payload and **Mode: Preview**. The exported community-node type is
+case-sensitive: `CUSTOM.devXMessageConnector`, with `typeVersion: 0.1`.
+
+Preview avoids posting to Teams, but it is not an offline transformation mode.
+It still requires a `devXConnector` credential containing the full Teams channel
+link, plus `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`, and calls
+`<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview`. Change **Mode** to **Send**
+only after reviewing the preview response. The sample payloads are also executed
+against the real connector in `community-nodes/tests/DevXMessageConnector/templates.test.ts`.
+
 ## Reload and validate
 
 The image already contains these assets. Docker Compose also bind-mounts this
