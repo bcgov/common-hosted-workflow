@@ -12,8 +12,14 @@
     "verified": true
   },
   "categories": [
-    { "id": 1, "name": "Starter" },
-    { "id": 2, "name": "Data & Storage" }
+    {
+      "id": 1,
+      "name": "Starter"
+    },
+    {
+      "id": 2,
+      "name": "Data & Storage"
+    }
   ],
   "image": [],
   "nodes": [
@@ -22,44 +28,90 @@
       "name": "n8n-nodes-base.scheduleTrigger",
       "displayName": "Schedule Trigger",
       "icon": "fa:clock",
-      "iconData": { "type": "icon", "icon": "clock" },
-      "defaults": { "name": "Schedule Trigger", "color": "#1f8ceb" },
+      "iconData": {
+        "type": "icon",
+        "icon": "clock"
+      },
+      "defaults": {
+        "name": "Schedule Trigger",
+        "color": "#1f8ceb"
+      },
       "typeVersion": 1.2,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 10012,
       "name": "n8n-nodes-base.postgres",
       "displayName": "Postgres",
       "icon": "fa:database",
-      "iconData": { "type": "icon", "icon": "database" },
-      "defaults": { "name": "Postgres", "color": "#336791" },
+      "iconData": {
+        "type": "icon",
+        "icon": "database"
+      },
+      "defaults": {
+        "name": "Postgres",
+        "color": "#336791"
+      },
       "typeVersion": 2.4,
-      "nodeCategories": [{ "id": 2, "name": "Data & Storage" }]
+      "nodeCategories": [
+        {
+          "id": 2,
+          "name": "Data & Storage"
+        }
+      ]
     },
     {
       "id": 10013,
       "name": "n8n-nodes-base.set",
       "displayName": "Edit Fields",
       "icon": "fa:pen",
-      "iconData": { "type": "icon", "icon": "pen" },
-      "defaults": { "name": "Edit Fields", "color": "#0000FF" },
+      "iconData": {
+        "type": "icon",
+        "icon": "pen"
+      },
+      "defaults": {
+        "name": "Edit Fields",
+        "color": "#0000FF"
+      },
       "typeVersion": 3.4,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 10014,
       "name": "n8n-nodes-base.googleSheets",
       "displayName": "Google Sheets",
       "icon": "fa:table",
-      "iconData": { "type": "icon", "icon": "table" },
-      "defaults": { "name": "Google Sheets", "color": "#0F9D58" },
+      "iconData": {
+        "type": "icon",
+        "icon": "table"
+      },
+      "defaults": {
+        "name": "Google Sheets",
+        "color": "#0F9D58"
+      },
       "typeVersion": 4.4,
-      "nodeCategories": [{ "id": 2, "name": "Data & Storage" }]
+      "nodeCategories": [
+        {
+          "id": 2,
+          "name": "Data & Storage"
+        }
+      ]
     }
   ],
   "workflow": {
-    "settings": { "executionOrder": "v1" },
+    "settings": {
+      "executionOrder": "v1"
+    },
     "nodes": [
       {
         "id": "c2cff78f-ab69-5209-8f1f-b2795251d116",
@@ -69,7 +121,14 @@
         "typeVersion": 1.2,
         "parameters": {
           "rule": {
-            "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 6, "triggerAtMinute": 0 }]
+            "interval": [
+              {
+                "field": "days",
+                "daysInterval": 1,
+                "triggerAtHour": 6,
+                "triggerAtMinute": 0
+              }
+            ]
           }
         }
       },
@@ -93,10 +152,30 @@
         "parameters": {
           "assignments": {
             "assignments": [
-              { "id": "a1", "name": "order_id", "value": "={{ $json.id }}", "type": "number" },
-              { "id": "a2", "name": "customer", "value": "={{ $json.customer }}", "type": "string" },
-              { "id": "a3", "name": "total", "value": "={{ $json.total }}", "type": "number" },
-              { "id": "a4", "name": "created_at", "value": "={{ $json.created_at }}", "type": "string" }
+              {
+                "id": "a1",
+                "name": "order_id",
+                "value": "={{ $json.id }}",
+                "type": "number"
+              },
+              {
+                "id": "a2",
+                "name": "customer",
+                "value": "={{ $json.customer }}",
+                "type": "string"
+              },
+              {
+                "id": "a3",
+                "name": "total",
+                "value": "={{ $json.total }}",
+                "type": "number"
+              },
+              {
+                "id": "a4",
+                "name": "created_at",
+                "value": "={{ $json.created_at }}",
+                "type": "string"
+              }
             ]
           },
           "options": {}
@@ -110,9 +189,19 @@
         "typeVersion": 4.4,
         "parameters": {
           "operation": "append",
-          "documentId": { "__rl": true, "mode": "id", "value": "YOUR_SPREADSHEET_ID" },
-          "sheetName": { "__rl": true, "mode": "name", "value": "Orders" },
-          "columns": { "mappingMode": "autoMapInputData" },
+          "documentId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "YOUR_SPREADSHEET_ID"
+          },
+          "sheetName": {
+            "__rl": true,
+            "mode": "name",
+            "value": "Orders"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData"
+          },
           "options": {}
         }
       },
@@ -130,16 +219,48 @@
     ],
     "connections": {
       "Schedule Trigger": {
-        "main": [[{ "node": "Get unsynced orders", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Get unsynced orders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       },
       "Get unsynced orders": {
-        "main": [[{ "node": "Map to sheet rows", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Map to sheet rows",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       },
       "Map to sheet rows": {
-        "main": [[{ "node": "Append to sheet", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Append to sheet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       },
       "Append to sheet": {
-        "main": [[{ "node": "Mark orders as exported", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Mark orders as exported",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   }

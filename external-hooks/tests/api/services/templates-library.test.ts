@@ -60,6 +60,19 @@ describe('loadTemplateLibrary', () => {
     );
   });
 
+  it('uses the same description sections for every shipped template', () => {
+    const library = loadTemplateLibrary(ASSETS_DIR);
+
+    for (const template of library.templates) {
+      const headings = [...template.description.matchAll(/^## .+$/gm)].map((match) => match[0]);
+      expect(headings, `template ${template.id}`).toEqual(['## What it does', '## Setup', '## Notes']);
+
+      const bodies = template.description.split(/^## (?:What it does|Setup|Notes)\n\n/m).slice(1);
+      expect(bodies, `template ${template.id} section bodies`).toHaveLength(3);
+      for (const body of bodies) expect(body.trim().length, `template ${template.id}`).toBeGreaterThan(0);
+    }
+  });
+
   it('keeps the shipped node parameters compatible with their advertised behavior', () => {
     const library = loadTemplateLibrary(ASSETS_DIR);
 
@@ -133,6 +146,141 @@ describe('loadTemplateLibrary', () => {
 
     expect(library.collectionsById.get(2)?.workflowIds).toEqual(scenarios.map(([id]) => id));
     expect(library.collectionsById.get(2)?.nodes.length).toBeGreaterThan(0);
+  });
+
+  it('ships the documented CHEFS review and resubmission workflow without credentials', () => {
+    const library = loadTemplateLibrary(ASSETS_DIR);
+    const template = library.templatesById.get(3001);
+
+    expect(template).toBeDefined();
+    expect(template?.categories).toEqual(
+      expect.arrayContaining([
+        { id: 7, name: 'CHEFS' },
+        { id: 8, name: 'Human in the Loop' },
+      ]),
+    );
+    expect(template?.workflow.nodes).toHaveLength(11);
+    expect(template?.workflow.nodes.every((node) => node.credentials === undefined)).toBe(true);
+    expect((template?.workflow as Record<string, unknown> | undefined)?.pinData).toBeUndefined();
+
+    const webhook = template?.workflow.nodes.find((node) => node.name === 'CHEFS Event');
+    expect(webhook).toMatchObject({
+      type: 'n8n-nodes-base.webhook',
+      typeVersion: 2.1,
+      parameters: { httpMethod: 'POST', path: 'trip-plan', authentication: 'headerAuth' },
+    });
+
+    const reviewer = template?.workflow.nodes.find((node) => node.name === 'Reviewer Decision');
+    expect(reviewer).toMatchObject({
+      type: 'CUSTOM.workflowInteractionLayer',
+      parameters: { resource: 'action', operation: 'createAndWait', actionType: 'getapproval' },
+    });
+
+    const resubmitWait = template?.workflow.nodes.find((node) => node.name === 'CHEFS Resubmit Wait');
+    expect(resubmitWait).toMatchObject({
+      type: 'CUSTOM.chefsResubmitWait',
+      typeVersion: 1.1,
+      parameters: { incomingAuthentication: 'headerAuth' },
+    });
+    expect(template?.workflow.connections['Re-extract Submission']).toEqual({
+      main: [[{ node: 'Build Review Context', type: 'main', index: 0 }]],
+    });
+
+    expect(library.collectionsById.get(3)?.workflowIds).toEqual([3001, 3002]);
+    expect(library.collectionsById.get(3)?.nodes.length).toBeGreaterThan(0);
+  });
+
+  it('ships the documented multi-actor approval graph with explicit callback settings', () => {
+    const library = loadTemplateLibrary(ASSETS_DIR);
+    const template = library.templatesById.get(3002);
+
+    expect(template).toBeDefined();
+    expect(template?.workflow.nodes).toHaveLength(6);
+    expect(template?.workflow.nodes.every((node) => node.credentials === undefined)).toBe(true);
+
+    const webhook = template?.workflow.nodes.find((node) => node.name === 'Webhook Trigger');
+    expect(webhook?.parameters).toMatchObject({ httpMethod: 'POST', path: 'approval-trigger' });
+
+    const actions = template?.workflow.nodes.filter((node) => node.type === 'CUSTOM.workflowInteractionLayer');
+    expect(actions).toHaveLength(2);
+    expect(actions?.map((node) => node.parameters)).toEqual([
+      expect.objectContaining({
+        operation: 'create',
+        actorType: 'user',
+        actionType: 'showform',
+        callbackMethod: 'POST',
+        callbackUrl: "={{ $execution.resumeUrl + '&actor=alice' }}",
+      }),
+      expect.objectContaining({
+        operation: 'create',
+        actorType: 'user',
+        actionType: 'showform',
+        callbackMethod: 'POST',
+        callbackUrl: "={{ $execution.resumeUrl + '&actor=bob' }}",
+      }),
+    ]);
+
+    const wait = template?.workflow.nodes.find((node) => node.type === 'CUSTOM.multiWebhookWait');
+    expect(wait?.parameters).toMatchObject({ operation: 'wait', useStaticExpectedCalls: false });
+    expect(JSON.parse(String(wait?.parameters.expectedCallsDynamic))).toEqual([
+      { queryParam: 'actor', queryValue: 'alice' },
+      { queryParam: 'actor', queryValue: 'bob' },
+    ]);
+    expect(template?.workflow.connections['Multi Webhook Wait Node']).toBeDefined();
+  });
+
+  it('ships every documented Adaptive Card notification workflow in Preview mode', () => {
+    const library = loadTemplateLibrary(ASSETS_DIR);
+    const scenarios = [
+      [4001, 'devx/deployment-status'],
+      [4002, 'devx/dns-routing-change'],
+      [4003, 'devx/grafana-alert'],
+      [4004, 'devx/sysdig-alert-card'],
+      [4005, 'devx/github-secret-scanning-alert'],
+    ] as const;
+
+    for (const [id, webhookPath] of scenarios) {
+      const template = library.templatesById.get(id);
+      const webhook = template?.workflow.nodes.find((node) => node.type === 'n8n-nodes-base.webhook');
+      const code = template?.workflow.nodes.find((node) => node.type === 'n8n-nodes-base.code');
+      const connector = template?.workflow.nodes.find((node) => node.type === 'CUSTOM.devXMessageConnector');
+
+      expect(template, `template ${id}`).toBeDefined();
+      expect(template?.workflow.nodes).toHaveLength(3);
+      expect(template?.workflow.nodes.every((node) => node.credentials === undefined)).toBe(true);
+      expect((template?.workflow as Record<string, unknown> | undefined)?.pinData).toBeUndefined();
+      expect(webhook?.parameters).toMatchObject({
+        httpMethod: 'POST',
+        path: webhookPath,
+        responseMode: 'onReceived',
+      });
+      expect(code?.parameters.mode).toBe('runOnceForAllItems');
+      expect(code?.parameters.jsCode).toEqual(expect.any(String));
+      expect(connector?.parameters).toMatchObject({
+        type: 'card',
+        payload: '={{ $json.cardJson }}',
+        mode: 'preview',
+      });
+      expect(template?.workflow.connections.Webhook).toBeDefined();
+      expect(template?.workflow.connections['Build Adaptive Card']).toBeDefined();
+    }
+
+    expect(library.templatesById.get(4004)?.workflow.nodes[0].parameters.authentication).toBe('headerAuth');
+    expect(library.templatesById.get(4005)?.workflow.nodes[0].parameters.authentication).toBe('headerAuth');
+    expect(library.templatesById.get(4005)?.workflow.settings).toMatchObject({
+      saveDataErrorExecution: 'none',
+      saveDataSuccessExecution: 'none',
+      saveDataManualExecutions: false,
+      saveExecutionProgress: false,
+    });
+    expect(library.collectionsById.get(4)?.workflowIds).toEqual(scenarios.map(([id]) => id));
+
+    const webhookPaths = library.templates.flatMap((template) =>
+      template.workflow.nodes
+        .filter((node) => node.type === 'n8n-nodes-base.webhook')
+        .map((node) => node.parameters.path),
+    );
+    expect(new Set(webhookPaths).size).toBe(webhookPaths.length);
   });
 
   it('applies defaults and strips credentials from graph nodes', () => {

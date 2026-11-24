@@ -1,14 +1,25 @@
 {
   "id": 2002,
   "name": "DevX Connector: send sanitized HTML (Preview)",
-  "description": "Demonstrates the DevX Message Connector HTML type. The node sanitizes unsupported markup before creating the Teams message. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview calls the preview endpoint without posting to Teams; switch Mode to Send when ready.",
+  "description": "## What it does\n\nDemonstrates the **HTML** type using **Manual Trigger → DevX Message Connector**. The connector sanitizes unsupported markup before creating the Teams message.\n\n## Setup\n\n1. Add a **DevX Message Connector** credential containing the full Teams channel link and configure `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`.\n2. Run the workflow manually and inspect the Preview response.\n3. Change **Mode** to **Send** only after reviewing the sanitized result.\n\n## Notes\n\nPreview calls `<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview` without posting to Teams; it is not an offline transformation mode. No credentials or pinned execution data are included.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 11,
-  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
   "categories": [
-    { "id": 3, "name": "Communication" },
-    { "id": 6, "name": "DevX Message Connector" }
+    {
+      "id": 3,
+      "name": "Communication"
+    },
+    {
+      "id": 6,
+      "name": "DevX Message Connector"
+    }
   ],
   "image": [],
   "nodes": [
@@ -17,24 +28,48 @@
       "name": "n8n-nodes-base.manualTrigger",
       "displayName": "Manual Trigger",
       "icon": "fa:play",
-      "iconData": { "type": "icon", "icon": "play" },
-      "defaults": { "name": "Manual Trigger", "color": "#909399" },
+      "iconData": {
+        "type": "icon",
+        "icon": "play"
+      },
+      "defaults": {
+        "name": "Manual Trigger",
+        "color": "#909399"
+      },
       "typeVersion": 1,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 200202,
       "name": "CUSTOM.devXMessageConnector",
       "displayName": "DevX Message Connector",
       "icon": "fa:code",
-      "iconData": { "type": "icon", "icon": "code" },
-      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "iconData": {
+        "type": "icon",
+        "icon": "code"
+      },
+      "defaults": {
+        "name": "DevX Message Connector",
+        "color": "#7B61FF"
+      },
       "typeVersion": 0.1,
-      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
     }
   ],
   "workflow": {
-    "settings": { "executionOrder": "v1" },
+    "settings": {
+      "executionOrder": "v1"
+    },
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002002",
@@ -60,7 +95,15 @@
     ],
     "connections": {
       "Manual Trigger": {
-        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "DevX Message Connector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   }

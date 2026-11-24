@@ -94,6 +94,8 @@ The webhook body is a flat JSON object:
 
 ## n8n workflow setup
 
+The built-in template library includes this graph as **Deployment status to Teams Adaptive Card (Preview)** (template `4001`, in **Operational Teams notifications**). It uses the script below without modification and starts in Preview mode.
+
 1. **Webhook node** — listens for the POST. Its output nests the payload under `body` (`{ headers, params, query, body }`).
 2. **Code node** — mode **Run Once for All Items**, paste the script below.
 3. **DevX Message Connector** — **Type: Adaptive Card**, **Payload: `{{ $json.cardJson }}`**, **Mode: Send**.

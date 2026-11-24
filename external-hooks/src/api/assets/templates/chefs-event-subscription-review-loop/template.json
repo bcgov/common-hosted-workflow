@@ -1,0 +1,510 @@
+{
+  "id": 3001,
+  "name": "CHEFS submission review and resubmission",
+  "description": "## What it does\n\nReceives a CHEFS Event Subscription webhook, fetches the full submission, and asks a reviewer to approve it or request changes through the Workflow Interaction Layer. Approval sends a confirmation email. A change request emails the submitter a recall link, waits for resubmission, fetches the updated data, and returns it to the reviewer in the same execution.\n\n## Setup\n\n1. Select the same **Header Auth** credential on **CHEFS Event** and **CHEFS Resubmit Wait**, with Name `x-n8n-chef-key` and a long random Value.\n2. Select a **CHEFS Form Authentication** credential on both extractor nodes.\n3. Select a **Workflow Interaction Layer API** credential on **Reviewer Decision** and an **SMTP** credential on both email nodes.\n4. In **Build Review Context**, replace `submission.data.fullName` and `submission.data.email` with the form's field API names.\n5. Set the reviewer group, role, or user on **Reviewer Decision**.\n6. In CHEFS, enable Event Subscription and Recall Submission. Set Endpoint URL to `/rest/custom/v1/chefs/trip-plan` on this n8n host, Key to `x-n8n-chef-key`, and Endpoint Token to the Header Auth value.\n7. Activate the workflow before submitting the form.\n\n## Notes\n\nThe Webhook path is `trip-plan`; change it in both the Webhook node and CHEFS Endpoint URL if it is already in use. Use the platform `/rest/custom/v1/chefs/...` endpoint rather than the direct n8n webhook so resubmissions can resume the waiting execution. No credentials or pinned execution data are included.",
+  "createdAt": "2026-11-24T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 21,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    {
+      "id": 7,
+      "name": "CHEFS"
+    },
+    {
+      "id": 8,
+      "name": "Human in the Loop"
+    }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 300101,
+      "name": "n8n-nodes-base.stickyNote",
+      "displayName": "Sticky Note",
+      "icon": "fa:sticky-note",
+      "iconData": {
+        "type": "icon",
+        "icon": "sticky-note"
+      },
+      "defaults": {
+        "name": "Sticky Note",
+        "color": "#FFD233"
+      },
+      "typeVersion": 1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 300102,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 2.1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 300103,
+      "name": "CUSTOM.chefsSubmissionExtractor",
+      "displayName": "CHEFS Submission Extractor",
+      "icon": "fa:file-alt",
+      "iconData": {
+        "type": "icon",
+        "icon": "file-search"
+      },
+      "defaults": {
+        "name": "CHEFS Submission Extractor",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 1,
+      "nodeCategories": [
+        {
+          "id": 7,
+          "name": "CHEFS"
+        }
+      ]
+    },
+    {
+      "id": 300104,
+      "name": "n8n-nodes-base.set",
+      "displayName": "Set",
+      "icon": "fa:pen",
+      "iconData": {
+        "type": "icon",
+        "icon": "pencil"
+      },
+      "defaults": {
+        "name": "Set",
+        "color": "#0000FF"
+      },
+      "typeVersion": 3.4,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 300105,
+      "name": "CUSTOM.workflowInteractionLayer",
+      "displayName": "Workflow Interaction Layer",
+      "icon": "fa:comments",
+      "iconData": {
+        "type": "icon",
+        "icon": "message-square"
+      },
+      "defaults": {
+        "name": "Workflow Interaction Layer",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 1,
+      "nodeCategories": [
+        {
+          "id": 8,
+          "name": "Human in the Loop"
+        }
+      ]
+    },
+    {
+      "id": 300106,
+      "name": "n8n-nodes-base.if",
+      "displayName": "If",
+      "icon": "fa:filter",
+      "iconData": {
+        "type": "icon",
+        "icon": "filter"
+      },
+      "defaults": {
+        "name": "If",
+        "color": "#408000"
+      },
+      "typeVersion": 2.2,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 300107,
+      "name": "n8n-nodes-base.emailSend",
+      "displayName": "Send Email",
+      "icon": "fa:envelope",
+      "iconData": {
+        "type": "icon",
+        "icon": "mail"
+      },
+      "defaults": {
+        "name": "Send Email",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 2.1,
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
+    },
+    {
+      "id": 300108,
+      "name": "CUSTOM.chefsResubmitWait",
+      "displayName": "CHEFS Resubmit Wait",
+      "icon": "fa:clock",
+      "iconData": {
+        "type": "icon",
+        "icon": "clock"
+      },
+      "defaults": {
+        "name": "CHEFS Resubmit Wait",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 1.1,
+      "nodeCategories": [
+        {
+          "id": 7,
+          "name": "CHEFS"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "parameters": {
+          "content": "## CHEFS Event Subscription sample\n\n**CHEFS -> Manage Form -> Event Subscription**\n- Endpoint URL: `https://workflow.digital.gov.bc.ca/rest/custom/v1/chefs/trip-plan`\n- Key: `x-n8n-chef-key`\n- Endpoint Token: the secret stored in your Header Auth credential\n\nThe last path segment (`trip-plan`) must equal the **Path** of the Webhook node.\n\n**Before activating**\n1. Select a *Header Auth* credential (Name `x-n8n-chef-key`, Value = Endpoint Token) on **CHEFS Event** and **CHEFS Resubmit Wait**.\n2. Select a *CHEFS Form Authentication* credential on both extractor nodes.\n3. Select a *Workflow Interaction Layer API* credential on **Reviewer Decision**.\n4. Select an SMTP credential on the two email nodes and replace the field names under `submission.data.*` with your form's field API names.",
+          "height": 520,
+          "width": 460,
+          "color": 4
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0001",
+        "name": "Sticky Note - Setup",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [-520, -260]
+      },
+      {
+        "parameters": {
+          "content": "## Resubmission loop\n\n**CHEFS Resubmit Wait** registers `(formId, submissionId) -> resumeUrl` with external-hooks and pauses.\n\nThe submitter opens the view link, clicks **Recall Submission**, edits and submits. CHEFS sends `eventSubmission` for the **same** submissionId to `/rest/custom/v1/chefs/trip-plan`; external-hooks finds the registration and forwards the call to this execution's resume URL instead of starting a new execution.\n\nCHEFS only sends the event on **Submit**, never on a draft save, so **Re-extract Submission** reads the resubmitted (non-draft) data.",
+          "height": 400,
+          "width": 460,
+          "color": 6
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0002",
+        "name": "Sticky Note - Resubmission",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [1440, 380]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "trip-plan",
+          "authentication": "headerAuth",
+          "options": {}
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0010",
+        "name": "CHEFS Event",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [0, 0],
+        "webhookId": "5d0c1d6e-1f43-4c3e-9a6b-0c7e2d1a0010"
+      },
+      {
+        "parameters": {
+          "submissionId": "={{ $json.body.submissionId }}",
+          "fieldMappingMode": "fullSubmission"
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0011",
+        "name": "Extract Submission",
+        "type": "CUSTOM.chefsSubmissionExtractor",
+        "typeVersion": 1,
+        "position": [220, 0]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "a0000000-0000-4000-8000-000000000001",
+                "name": "formId",
+                "value": "={{ $('CHEFS Event').first().json.body.formId }}",
+                "type": "string"
+              },
+              {
+                "id": "a0000000-0000-4000-8000-000000000002",
+                "name": "submissionId",
+                "value": "={{ $json.id }}",
+                "type": "string"
+              },
+              {
+                "id": "a0000000-0000-4000-8000-000000000003",
+                "name": "confirmationId",
+                "value": "={{ $json.confirmationId }}",
+                "type": "string"
+              },
+              {
+                "id": "a0000000-0000-4000-8000-000000000004",
+                "name": "applicantName",
+                "value": "={{ $json.submission.data.fullName }}",
+                "type": "string"
+              },
+              {
+                "id": "a0000000-0000-4000-8000-000000000005",
+                "name": "submitterEmail",
+                "value": "={{ $json.submission.data.email }}",
+                "type": "string"
+              },
+              {
+                "id": "a0000000-0000-4000-8000-000000000006",
+                "name": "viewUrl",
+                "value": "=https://submit.digital.gov.bc.ca/app/user/view?s={{ $json.id }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0014",
+        "name": "Build Review Context",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [440, 0]
+      },
+      {
+        "parameters": {
+          "resource": "action",
+          "operation": "createAndWait",
+          "actorId": "Reviewer",
+          "actorType": "group",
+          "actionType": "getapproval",
+          "actionTitle": "=Review trip plan {{ $json.confirmationId }}",
+          "approvalHtml": "=<h3>Trip plan {{ $json.confirmationId }}</h3>\n<p><strong>Applicant:</strong> {{ $json.applicantName }}</p>\n<p>Open the submission in CHEFS to review the details, then choose an outcome.</p>",
+          "approvalOptions": {
+            "option": [
+              {
+                "label": "Approve"
+              },
+              {
+                "label": "Request Changes"
+              }
+            ]
+          }
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0015",
+        "name": "Reviewer Decision",
+        "type": "CUSTOM.workflowInteractionLayer",
+        "typeVersion": 1,
+        "position": [660, 0],
+        "webhookId": "5d0c1d6e-1f43-4c3e-9a6b-0c7e2d1a0015"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c1a1d7a0-0000-4000-8000-000000000002",
+                "leftValue": "={{ $json.option }}",
+                "rightValue": "Approve",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0016",
+        "name": "Approved?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [1100, 40]
+      },
+      {
+        "parameters": {
+          "fromEmail": "DoNotReply@gov.bc.ca",
+          "toEmail": "={{ $('Build Review Context').last().json.submitterEmail }}",
+          "subject": "=Your trip plan {{ $('Build Review Context').last().json.confirmationId }} was approved",
+          "html": "=<p>Hello {{ $('Build Review Context').last().json.applicantName }},</p>\n<p>Your trip plan <strong>{{ $('Build Review Context').last().json.confirmationId }}</strong> has been approved.</p>",
+          "options": {}
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0017",
+        "name": "Email: Approved",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [1320, -80]
+      },
+      {
+        "parameters": {
+          "fromEmail": "DoNotReply@gov.bc.ca",
+          "toEmail": "={{ $('Build Review Context').last().json.submitterEmail }}",
+          "subject": "=Changes requested for trip plan {{ $('Build Review Context').last().json.confirmationId }}",
+          "html": "=<p>Hello {{ $('Build Review Context').last().json.applicantName }},</p>\n<p>The reviewer has asked for changes to your trip plan <strong>{{ $('Build Review Context').last().json.confirmationId }}</strong>.</p>\n<ol>\n  <li>Open your submission: <a href=\"{{ $('Build Review Context').last().json.viewUrl }}\">{{ $('Build Review Context').last().json.viewUrl }}</a></li>\n  <li>Click <strong>Recall Submission</strong>.</li>\n  <li>Make your changes and click <strong>Submit</strong>.</li>\n</ol>",
+          "options": {}
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0018",
+        "name": "Email: Request Changes",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [1320, 160]
+      },
+      {
+        "parameters": {
+          "formId": "={{ $('Build Review Context').last().json.formId }}",
+          "submissionId": "={{ $('Build Review Context').last().json.submissionId }}",
+          "incomingAuthentication": "headerAuth",
+          "options": {}
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0019",
+        "name": "CHEFS Resubmit Wait",
+        "type": "CUSTOM.chefsResubmitWait",
+        "typeVersion": 1.1,
+        "position": [1540, 160],
+        "webhookId": "5d0c1d6e-1f43-4c3e-9a6b-0c7e2d1a0019"
+      },
+      {
+        "parameters": {
+          "submissionId": "={{ $json.body.submissionId }}",
+          "fieldMappingMode": "fullSubmission"
+        },
+        "id": "0b0f3f2e-6a8b-4d55-9a51-6f0f6c0a0020",
+        "name": "Re-extract Submission",
+        "type": "CUSTOM.chefsSubmissionExtractor",
+        "typeVersion": 1,
+        "position": [1760, 160]
+      }
+    ],
+    "connections": {
+      "CHEFS Event": {
+        "main": [
+          [
+            {
+              "node": "Extract Submission",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Submission": {
+        "main": [
+          [
+            {
+              "node": "Build Review Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Review Context": {
+        "main": [
+          [
+            {
+              "node": "Reviewer Decision",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reviewer Decision": {
+        "main": [
+          [
+            {
+              "node": "Approved?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Approved?": {
+        "main": [
+          [
+            {
+              "node": "Email: Approved",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Email: Request Changes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Email: Request Changes": {
+        "main": [
+          [
+            {
+              "node": "CHEFS Resubmit Wait",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CHEFS Resubmit Wait": {
+        "main": [
+          [
+            {
+              "node": "Re-extract Submission",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Re-extract Submission": {
+        "main": [
+          [
+            {
+              "node": "Build Review Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

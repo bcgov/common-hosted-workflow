@@ -1,0 +1,159 @@
+{
+  "id": 4004,
+  "name": "Sysdig alert to custom Teams Adaptive Card (Preview)",
+  "description": "## What it does\n\nReceives an authenticated Sysdig Monitor webhook and builds a custom Adaptive Card with alert status, scope, metrics, conditions, and trusted Sysdig links using **Webhook → Code → DevX Message Connector**.\n\n## Setup\n\n1. Add a **DevX Message Connector** credential containing the full Teams channel link and configure `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`.\n2. Attach a **Header Auth** credential to the Webhook using header name `Authorization` and a dedicated shared secret. POST a sample to `/webhook-test/devx/sysdig-alert-card` with that header and inspect the Preview response.\n3. Activate the workflow and configure the Sysdig channel with `/webhook/devx/sysdig-alert-card` and the exact same Authorization value. Change **Mode** to **Send** only after reviewing the card.\n\n## Notes\n\nThis uses the custom Code-node formatter, not the connector's simpler **Template → Sysdig** mode in template `2009`. Preview calls `<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview` without posting to Teams; it is not an offline transformation mode. The Webhook responds immediately, so acceptance does not confirm Teams delivery. The Code node is the exact script from the [source runbook](https://bcgov.github.io/common-hosted-workflow/operations/sysdig-alert-notifications). No credentials or pinned execution data are included.",
+  "createdAt": "2026-11-24T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 26,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    {
+      "id": 5,
+      "name": "Monitoring"
+    },
+    {
+      "id": 6,
+      "name": "DevX Message Connector"
+    }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 400401,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 2.1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 400402,
+      "name": "n8n-nodes-base.code",
+      "displayName": "Code",
+      "icon": "fa:code",
+      "iconData": {
+        "type": "icon",
+        "icon": "code"
+      },
+      "defaults": {
+        "name": "Code",
+        "color": "#0004F5"
+      },
+      "typeVersion": 2,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 400403,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:id-card",
+      "iconData": {
+        "type": "icon",
+        "icon": "id-card"
+      },
+      "defaults": {
+        "name": "DevX Message Connector",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 0.1,
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000004004",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [0, 0],
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000004004",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/sysdig-alert-card",
+          "responseMode": "onReceived",
+          "authentication": "headerAuth",
+          "options": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000005004",
+        "name": "Build Adaptive Card",
+        "type": "n8n-nodes-base.code",
+        "position": [240, 0],
+        "typeVersion": 2,
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "// Format an authenticated Sysdig Monitor Webhook delivery for DevX Message Connector.\nconst SYSDIG_ORIGIN = 'https://app.sysdigcloud.com'; // Exact HTTPS origin, without a trailing slash.\nconst MAX_ROWS = 4; // Maximum segments per card and metric rows per segment.\nconst KUBE_LABELS = [\n  ['Cluster', 'kube_cluster_name'],\n  ['Namespace', 'kube_namespace_name', 'namespace'],\n  ['Workload', 'kube_workload_name'],\n  ['Pod', 'kube_pod_name'],\n  ['PVC', 'persistentvolumeclaim'],\n];\n\nconst asArray = (value) => (Array.isArray(value) ? value : []);\nconst isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\n\nconst payloadOf = (json) => {\n  let p = json?.body ?? json;\n  if (typeof p === 'string') {\n    try {\n      p = JSON.parse(p);\n    } catch {\n      throw new Error('Invalid JSON in Sysdig webhook.');\n    }\n  }\n  if (!isObject(p) || !isObject(p.alert) || typeof p.alert.name !== 'string' || !p.alert.name.trim()) {\n    throw new Error('Expected a Sysdig webhook object with alert.name.');\n  }\n  return p;\n};\n\n// Bound card text and escape Markdown rather than rendering arbitrary formatting.\nconst text = (value, limit = 160) => {\n  if (Number.isFinite(value)) value = String(value);\n  if (typeof value !== 'string') return '';\n  const clean = value.replace(/\\s+/g, ' ').trim();\n  return (clean.length > limit ? `${clean.slice(0, limit - 1)}…` : clean).replace(/([\\\\`*_\\[\\]()<>~])/g, '\\\\$1');\n};\n\nconst formatTime = (value) => {\n  const micros = typeof value === 'string' && /^\\d+$/.test(value) ? Number(value) : value;\n  if (!Number.isSafeInteger(micros) || micros <= 0) return '';\n  return new Date(Math.floor(micros / 1000)).toISOString().slice(0, 19).replace('T', ' ') + ' UTC';\n};\n\nconst statusOf = (state, warning) => {\n  if (state === 'OK') return { title: '✅ Resolved', style: 'good' };\n  if (state === 'ACTIVE' && warning) return { title: '🟡 Triggered — Warning', style: 'warning' };\n  if (state === 'ACTIVE') return { title: '🔴 Triggered', style: 'attention' };\n  return { title: 'ℹ️ Sysdig notification', style: 'emphasis' };\n};\n\n// Standard Sysdig segments use `key = 'value' and ...`. Also accept comma-separated,\n// double-quoted label assignments. This is a fallback for missing structured labels.\nconst segmentLabels = (entity) => {\n  if (typeof entity !== 'string') return {};\n  const pairs = entity.matchAll(\n    /(?:^|[{,]|\\s+and\\s+)\\s*(kube_(?:cluster|namespace|workload|pod)_name|namespace|persistentvolumeclaim)\\s*=\\s*(?:'([^']*)'|\"([^\"]*)\")/g,\n  );\n  return Object.fromEntries(Array.from(pairs, ([, key, single, double]) => [key, single ?? double]));\n};\n\nconst isSysdigLink = (url) => typeof url === 'string' && url.startsWith(`${SYSDIG_ORIGIN}/`) && !/[\\s\\\\]/.test(url);\n\nreturn $input.all().map((item, index) => {\n  const p = payloadOf(item.json);\n  const alert = p.alert;\n  const state = typeof p.state === 'string' ? p.state.trim().toUpperCase() : '';\n  const warning = typeof alert.threshold === 'string' && alert.threshold.trim().toUpperCase() === 'WARNING';\n  const status = statusOf(state, warning);\n  const recovered = asArray(p.endEntities);\n  const showRecovery = state === 'OK' && recovered.length > 0;\n  const entities = showRecovery ? recovered : asArray(p.entities);\n\n  const facts = [\n    { title: 'Severity', value: text(alert.severityLabel) },\n    { title: 'Threshold', value: text(alert.thresholdLabel) || text(alert.threshold) },\n    { title: 'Timestamp', value: formatTime(p.timestamp) },\n  ].filter(({ value }) => value);\n  const description = text(alert.description, 360);\n  const condition = (warning ? text(p.warningCondition, 360) : '') || text(p.condition, 360);\n\n  const sections = (entities.length ? entities.slice(0, MAX_ROWS) : [{}]).flatMap((entity) => {\n    const labels = segmentLabels(entity?.entity);\n    const rows = KUBE_LABELS.map(([title, ...keys]) => ({\n      title,\n      value:\n        keys.map((key) => text(p.labels?.[key])).find(Boolean) || keys.map((key) => text(labels[key])).find(Boolean),\n    })).filter(({ value }) => value);\n\n    // On recovery without endEntities, keep the original segment labels but not the old values.\n    const metrics = state !== 'OK' || showRecovery ? asArray(entity?.metricValues) : [];\n    for (const metric of metrics.slice(0, MAX_ROWS)) {\n      const value = text(metric?.value, 80);\n      if (!value) continue;\n      const name = text(metric.metric, 120);\n      const percentMetric = typeof metric.metric === 'string' && metric.metric.endsWith('_percent');\n      const unit = Number.isFinite(metric.value) && percentMetric ? '%' : '';\n      rows.push({ title: 'Metric', value: `${name ? `${name}: ` : ''}${value}${unit}` });\n    }\n    if (metrics.length > MAX_ROWS) rows.push({ title: 'More metrics', value: `${metrics.length - MAX_ROWS} omitted` });\n    return rows.length ? [{ type: 'FactSet', separator: true, facts: rows }] : [];\n  });\n\n  const actions = [\n    { type: 'Action.OpenUrl', title: 'Open Sysdig event', url: p.event?.url },\n    { type: 'Action.OpenUrl', title: 'Open alert rule', url: alert.editUrl },\n  ].filter(({ url }) => isSysdigLink(url));\n\n  const card = {\n    type: 'AdaptiveCard',\n    $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',\n    version: '1.4',\n    msteams: { width: 'Full' },\n    body: [\n      {\n        type: 'Container',\n        style: status.style,\n        items: [\n          {\n            type: 'TextBlock',\n            text: `${status.title} — ${text(alert.name)}`,\n            weight: 'Bolder',\n            size: 'Medium',\n            wrap: true,\n          },\n        ],\n      },\n      ...(description ? [{ type: 'TextBlock', text: description, wrap: true }] : []),\n      ...(facts.length ? [{ type: 'FactSet', facts }] : []),\n      ...sections,\n      ...(condition ? [{ type: 'TextBlock', text: `Condition: ${condition}`, size: 'Small', wrap: true }] : []),\n      ...(entities.length > MAX_ROWS\n        ? [{ type: 'TextBlock', text: `Showing the first ${MAX_ROWS} alert segments.`, isSubtle: true, wrap: true }]\n        : []),\n    ],\n    ...(actions.length ? { actions } : {}),\n  };\n\n  return { json: { card, cardJson: JSON.stringify(card) }, pairedItem: { item: index } };\n});"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006004",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [480, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "card",
+          "payload": "={{ $json.cardJson }}",
+          "mode": "preview"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Build Adaptive Card",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Adaptive Card": {
+        "main": [
+          [
+            {
+              "node": "DevX Message Connector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

@@ -1,14 +1,25 @@
 {
   "id": 2005,
   "name": "DevX Connector: Rocket.Chat template (Preview)",
-  "description": "Demonstrates Template mode with Source Rocket.Chat using an incoming webhook. POST Rocket.Chat message JSON to /webhook/devx/rocket-chat; the connector converts its text and attachments into sanitized HTML. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and point Rocket.Chat at the production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "description": "## What it does\n\nDemonstrates **Template** mode with **Source: Rocket.Chat** using **Webhook → DevX Message Connector**. The connector converts Rocket.Chat text and attachments into sanitized HTML.\n\n## Setup\n\n1. Add a **DevX Message Connector** credential containing the full Teams channel link and configure `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`.\n2. While editing, POST Rocket.Chat message JSON to `/webhook-test/devx/rocket-chat` and inspect the Preview response.\n3. Activate the workflow and configure Rocket.Chat to POST to `/webhook/devx/rocket-chat`. Change **Mode** to **Send** only after reviewing the output.\n\n## Notes\n\nPreview calls `<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview` without posting to Teams; it is not an offline transformation mode. The Webhook passes `{{ $json.body }}` to the connector and responds after the last node finishes. No credentials or pinned execution data are included.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 14,
-  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
   "categories": [
-    { "id": 3, "name": "Communication" },
-    { "id": 6, "name": "DevX Message Connector" }
+    {
+      "id": 3,
+      "name": "Communication"
+    },
+    {
+      "id": 6,
+      "name": "DevX Message Connector"
+    }
   ],
   "image": [],
   "nodes": [
@@ -17,24 +28,48 @@
       "name": "n8n-nodes-base.webhook",
       "displayName": "Webhook",
       "icon": "fa:globe",
-      "iconData": { "type": "icon", "icon": "globe" },
-      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
       "typeVersion": 2.1,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 200502,
       "name": "CUSTOM.devXMessageConnector",
       "displayName": "DevX Message Connector",
       "icon": "fa:comments",
-      "iconData": { "type": "icon", "icon": "message-square" },
-      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "iconData": {
+        "type": "icon",
+        "icon": "message-square"
+      },
+      "defaults": {
+        "name": "DevX Message Connector",
+        "color": "#7B61FF"
+      },
       "typeVersion": 0.1,
-      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
     }
   ],
   "workflow": {
-    "settings": { "executionOrder": "v1" },
+    "settings": {
+      "executionOrder": "v1"
+    },
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002005",
@@ -67,7 +102,15 @@
     ],
     "connections": {
       "Webhook": {
-        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "DevX Message Connector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   }
