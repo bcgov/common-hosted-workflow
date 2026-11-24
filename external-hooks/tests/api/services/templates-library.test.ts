@@ -86,6 +86,55 @@ describe('loadTemplateLibrary', () => {
     expect(postgres?.workflow.connections['Append to sheet']).toBeDefined();
   });
 
+  it('loads every DevX Message Connector scenario into its dedicated collection', () => {
+    const library = loadTemplateLibrary(ASSETS_DIR);
+    const scenarios = [
+      [2001, 'text', undefined, undefined],
+      [2002, 'html', undefined, undefined],
+      [2003, 'card', undefined, undefined],
+      [2004, 'template', 'generic', undefined],
+      [2005, 'template', 'rocket-chat', 'devx/rocket-chat'],
+      [2006, 'template', 'github', 'devx/github-pull-request'],
+      [2007, 'template', 'github', 'devx/github-workflow-run'],
+      [2008, 'template', 'backup-container', 'devx/backup-container'],
+      [2009, 'template', 'sysdig', 'devx/sysdig'],
+      [2010, 'template', 'status-cake', 'devx/status-cake'],
+      [2011, 'template', 'uptime-com', 'devx/uptime-com'],
+    ] as const;
+
+    for (const [id, type, source, webhookPath] of scenarios) {
+      const template = library.templatesById.get(id);
+      const connector = template?.workflow.nodes.find((node) => node.type === 'CUSTOM.devXMessageConnector');
+      const triggerName = webhookPath ? 'Webhook' : 'Manual Trigger';
+      const trigger = template?.workflow.nodes.find((node) => node.name === triggerName);
+
+      expect(connector, `template ${id}`).toBeDefined();
+      expect(connector?.typeVersion).toBe(0.1);
+      expect(connector?.parameters).toMatchObject({ type, mode: 'preview' });
+      expect(connector?.parameters.source).toBe(source);
+      expect(connector?.credentials).toBeUndefined();
+      expect(trigger, `template ${id} trigger`).toBeDefined();
+      expect(template?.workflow.connections[triggerName]).toBeDefined();
+
+      if (webhookPath) {
+        expect(trigger).toMatchObject({ type: 'n8n-nodes-base.webhook', typeVersion: 2.1 });
+        expect(trigger?.parameters).toMatchObject({
+          httpMethod: 'POST',
+          path: webhookPath,
+          responseMode: 'lastNode',
+        });
+        expect(connector?.parameters.payload).toBe('={{ $json.body }}');
+      } else {
+        expect(trigger).toMatchObject({ type: 'n8n-nodes-base.manualTrigger', typeVersion: 1 });
+      }
+
+      expect((template?.workflow as Record<string, unknown> | undefined)?.pinData).toBeUndefined();
+    }
+
+    expect(library.collectionsById.get(2)?.workflowIds).toEqual(scenarios.map(([id]) => id));
+    expect(library.collectionsById.get(2)?.nodes.length).toBeGreaterThan(0);
+  });
+
   it('applies defaults and strips credentials from graph nodes', () => {
     const dir = makeTempDir();
     writeTemplate(dir, 'with-credentials', {

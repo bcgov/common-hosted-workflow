@@ -1,0 +1,67 @@
+{
+  "id": 2001,
+  "name": "DevX Connector: send plain text (Preview)",
+  "description": "Demonstrates the DevX Message Connector Text type with a constant message. Add a DevX Message Connector credential containing a full Teams channel link and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Run manually to call the preview endpoint without posting to Teams; switch Mode to Send after reviewing the result.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 10,
+  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "categories": [
+    { "id": 3, "name": "Communication" },
+    { "id": 6, "name": "DevX Message Connector" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 200101,
+      "name": "n8n-nodes-base.manualTrigger",
+      "displayName": "Manual Trigger",
+      "icon": "fa:play",
+      "iconData": { "type": "icon", "icon": "play" },
+      "defaults": { "name": "Manual Trigger", "color": "#909399" },
+      "typeVersion": 1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 200102,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:comments",
+      "iconData": { "type": "icon", "icon": "message-square" },
+      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "typeVersion": 0.1,
+      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000002001",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "position": [0, 0],
+        "typeVersion": 1,
+        "parameters": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002101",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [240, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "text",
+          "payload": "Deployment completed successfully.",
+          "mode": "preview",
+          "mentions": {}
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}

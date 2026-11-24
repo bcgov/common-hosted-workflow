@@ -63,6 +63,31 @@ Malformed files are logged and skipped rather than preventing n8n from
 starting. When duplicate template or collection IDs are found, the first entry
 in deterministic file order wins and later entries are logged and skipped.
 
+## DevX Message Connector examples
+
+Templates `2001` through `2011` cover every DevX Message Connector type and
+source/subtype: Text, HTML, Adaptive Card, Generic, Rocket.Chat, GitHub
+`pull_request`, GitHub `workflow_run`, Backup Container, Sysdig, StatusCake, and
+Uptime.com. Collection `2` groups all eleven examples.
+
+Templates `2001` through `2004` use **Manual Trigger → DevX Message Connector**
+with constant example content. The source-specific templates `2005` through
+`2011` use **Webhook → DevX Message Connector**. Their webhooks accept `POST` at
+unique paths under `devx/`, respond when the last node finishes, and map the
+connector payload with `={{ $json.body }}`. Use the test URL while editing;
+activate the imported workflow before configuring the source with its production
+`/webhook/devx/...` URL. The exported community-node type is case-sensitive:
+`CUSTOM.devXMessageConnector`, with `typeVersion: 0.1`.
+
+Every example uses **Mode: Preview**. Preview avoids posting to Teams, but it is
+not an offline transformation mode. It still requires a `devXConnector`
+credential containing the full Teams channel link, plus
+`DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`, and calls
+`<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview`. Change **Mode** to **Send**
+only after reviewing the preview response. The constant examples and realistic
+webhook request bodies are also executed against the real connector in
+`community-nodes/tests/DevXMessageConnector/templates.test.ts`.
+
 ## Reload and validate
 
 The image already contains these assets. Docker Compose also bind-mounts this

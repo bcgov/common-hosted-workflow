@@ -25,8 +25,11 @@ repos:
   hooks:
   - id: detect-secrets
     args: [--baseline, .secrets.baseline]
+    # Workflow templates carry realistic example payloads (webhook URLs, tokens)
+    # and must remain importable; they never contain real credentials.
     exclude: |
       (?x)^(
+          external-hooks/(src|dist)/api/assets/templates/ |
           docker-compose/n8n/demo-data/ |
           docker-compose/sdg-mock-app/src/app/api/v1/mock-data\.json$ |
           docker-compose/observability/seaweedfs/s3\.json$ |

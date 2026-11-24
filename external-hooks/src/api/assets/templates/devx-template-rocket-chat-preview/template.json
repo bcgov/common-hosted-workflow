@@ -1,0 +1,74 @@
+{
+  "id": 2005,
+  "name": "DevX Connector: Rocket.Chat template (Preview)",
+  "description": "Demonstrates Template mode with Source Rocket.Chat using an incoming webhook. POST Rocket.Chat message JSON to /webhook/devx/rocket-chat; the connector converts its text and attachments into sanitized HTML. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and point Rocket.Chat at the production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "createdAt": "2026-01-12T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 14,
+  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "categories": [
+    { "id": 3, "name": "Communication" },
+    { "id": 6, "name": "DevX Message Connector" }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 200501,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": { "type": "icon", "icon": "globe" },
+      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "typeVersion": 2.1,
+      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+    },
+    {
+      "id": 200502,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:comments",
+      "iconData": { "type": "icon", "icon": "message-square" },
+      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "typeVersion": 0.1,
+      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+    }
+  ],
+  "workflow": {
+    "settings": { "executionOrder": "v1" },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000002005",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [0, 0],
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000002005",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/rocket-chat",
+          "responseMode": "lastNode",
+          "options": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002105",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [240, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "template",
+          "source": "rocket-chat",
+          "payload": "={{ $json.body }}",
+          "mode": "preview",
+          "mentions": {}
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+      }
+    }
+  }
+}
