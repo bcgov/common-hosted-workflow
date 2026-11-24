@@ -1,7 +1,7 @@
 {
   "id": 2008,
   "name": "DevX Connector: Backup Container template (Preview)",
-  "description": "Demonstrates Template mode with Source Backup Container. The WARN status is normalized to the db_backup template's warn status. Supported statuses are info, warn, and error. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "description": "Demonstrates Template mode with Source Backup Container using an incoming webhook. POST Backup Container notifications to /webhook/devx/backup-container; the connector maps the project, status, and message into the db_backup template and normalizes WARN to warn. Supported statuses are info, warn, and error. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and use its production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 17,
@@ -14,12 +14,12 @@
   "nodes": [
     {
       "id": 200801,
-      "name": "n8n-nodes-base.manualTrigger",
-      "displayName": "Manual Trigger",
-      "icon": "fa:play",
-      "iconData": { "type": "icon", "icon": "play" },
-      "defaults": { "name": "Manual Trigger", "color": "#909399" },
-      "typeVersion": 1,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": { "type": "icon", "icon": "globe" },
+      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "typeVersion": 2.1,
       "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
     },
     {
@@ -38,11 +38,17 @@
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002008",
-        "name": "Manual Trigger",
-        "type": "n8n-nodes-base.manualTrigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
         "position": [0, 0],
-        "typeVersion": 1,
-        "parameters": {}
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000002008",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/backup-container",
+          "responseMode": "lastNode",
+          "options": {}
+        }
       },
       {
         "id": "00000000-0000-4000-8000-000000002108",
@@ -53,19 +59,14 @@
         "parameters": {
           "type": "template",
           "source": "backup-container",
-          "payload": {
-            "projectFriendlyName": "Common Hosted Workflow",
-            "projectName": "common-hosted-workflow",
-            "statusCode": "WARN",
-            "message": "Backup finished with warnings"
-          },
+          "payload": "={{ $json.body }}",
           "mode": "preview",
           "mentions": {}
         }
       }
     ],
     "connections": {
-      "Manual Trigger": {
+      "Webhook": {
         "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
       }
     }

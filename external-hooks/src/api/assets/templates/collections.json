@@ -15,7 +15,7 @@
     {
       "id": 2,
       "name": "DevX Message Connector scenarios",
-      "description": "Eleven manual-run examples covering Text, HTML, Adaptive Card, Generic, Rocket.Chat, GitHub pull requests and workflow runs, Backup Container, Sysdig, StatusCake, and Uptime.com. Every example uses Preview mode, which calls the configured DevX preview endpoint without posting to Teams.",
+      "description": "Eleven examples covering Text, HTML, Adaptive Card, Generic, Rocket.Chat, GitHub pull requests and workflow runs, Backup Container, Sysdig, StatusCake, and Uptime.com. Text, HTML, Adaptive Card, and Generic start manually; the seven known source formats start with source-specific POST webhooks. Every example uses Preview mode, which calls the configured DevX preview endpoint without posting to Teams.",
       "createdAt": "2026-01-12T00:00:00.000Z",
       "totalViews": 0,
       "rank": 1,

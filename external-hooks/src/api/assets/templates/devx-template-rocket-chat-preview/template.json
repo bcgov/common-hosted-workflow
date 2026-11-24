@@ -1,7 +1,7 @@
 {
   "id": 2005,
   "name": "DevX Connector: Rocket.Chat template (Preview)",
-  "description": "Demonstrates Template mode with Source Rocket.Chat. The sample contains a message and an attachment with a link, color, and fields; the connector converts them into sanitized HTML. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "description": "Demonstrates Template mode with Source Rocket.Chat using an incoming webhook. POST Rocket.Chat message JSON to /webhook/devx/rocket-chat; the connector converts its text and attachments into sanitized HTML. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and point Rocket.Chat at the production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 14,
@@ -14,12 +14,12 @@
   "nodes": [
     {
       "id": 200501,
-      "name": "n8n-nodes-base.manualTrigger",
-      "displayName": "Manual Trigger",
-      "icon": "fa:play",
-      "iconData": { "type": "icon", "icon": "play" },
-      "defaults": { "name": "Manual Trigger", "color": "#909399" },
-      "typeVersion": 1,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": { "type": "icon", "icon": "globe" },
+      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "typeVersion": 2.1,
       "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
     },
     {
@@ -38,11 +38,17 @@
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002005",
-        "name": "Manual Trigger",
-        "type": "n8n-nodes-base.manualTrigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
         "position": [0, 0],
-        "typeVersion": 1,
-        "parameters": {}
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000002005",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/rocket-chat",
+          "responseMode": "lastNode",
+          "options": {}
+        }
       },
       {
         "id": "00000000-0000-4000-8000-000000002105",
@@ -53,25 +59,14 @@
         "parameters": {
           "type": "template",
           "source": "rocket-chat",
-          "payload": {
-            "text": "Deployment completed",
-            "attachments": [
-              {
-                "title": "my-app",
-                "title_link": "https://example.com/deployments/123",
-                "text": "Version 1.2.3 is now live",
-                "color": "#36a64f",
-                "fields": [{ "title": "Environment", "value": "prod", "short": true }]
-              }
-            ]
-          },
+          "payload": "={{ $json.body }}",
           "mode": "preview",
           "mentions": {}
         }
       }
     ],
     "connections": {
-      "Manual Trigger": {
+      "Webhook": {
         "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
       }
     }

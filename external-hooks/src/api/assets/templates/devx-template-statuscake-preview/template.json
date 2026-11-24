@@ -1,7 +1,7 @@
 {
   "id": 2010,
   "name": "DevX Connector: StatusCake template (Preview)",
-  "description": "Demonstrates Template mode with Source Status Cake. The sample maps an UP check into the statuscake template, including URL, status code, IP, tags, check rate, test ID, and method. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "description": "Demonstrates Template mode with Source Status Cake using an incoming webhook. POST StatusCake check notifications to /webhook/devx/status-cake; the connector maps URL, status, status code, IP, tags, check rate, test ID, and method into the statuscake template. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and point StatusCake at the production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 19,
@@ -14,12 +14,12 @@
   "nodes": [
     {
       "id": 201001,
-      "name": "n8n-nodes-base.manualTrigger",
-      "displayName": "Manual Trigger",
-      "icon": "fa:play",
-      "iconData": { "type": "icon", "icon": "play" },
-      "defaults": { "name": "Manual Trigger", "color": "#909399" },
-      "typeVersion": 1,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": { "type": "icon", "icon": "globe" },
+      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "typeVersion": 2.1,
       "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
     },
     {
@@ -38,11 +38,17 @@
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002010",
-        "name": "Manual Trigger",
-        "type": "n8n-nodes-base.manualTrigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
         "position": [0, 0],
-        "typeVersion": 1,
-        "parameters": {}
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000002010",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/status-cake",
+          "responseMode": "lastNode",
+          "options": {}
+        }
       },
       {
         "id": "00000000-0000-4000-8000-000000002110",
@@ -53,24 +59,14 @@
         "parameters": {
           "type": "template",
           "source": "status-cake",
-          "payload": {
-            "Status": "UP",
-            "URL": "https://example.com/health",
-            "StatusCode": 200,
-            "IP": "127.0.0.1",
-            "Tags": "prod,web",
-            "Name": "Example website health check",
-            "Checkrate": 300,
-            "TestID": 42,
-            "Method": "GET"
-          },
+          "payload": "={{ $json.body }}",
           "mode": "preview",
           "mentions": {}
         }
       }
     ],
     "connections": {
-      "Manual Trigger": {
+      "Webhook": {
         "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
       }
     }

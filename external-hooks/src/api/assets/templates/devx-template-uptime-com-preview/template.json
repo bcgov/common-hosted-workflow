@@ -1,7 +1,7 @@
 {
   "id": 2011,
   "name": "DevX Connector: Uptime.com template (Preview)",
-  "description": "Demonstrates Template mode with Source Uptime.com. The sample maps a down alert, service name, timestamp, and alert-details URL into the uptime template. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY, then run manually. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "description": "Demonstrates Template mode with Source Uptime.com using an incoming webhook. POST Uptime.com alerts to /webhook/devx/uptime-com; the connector maps the up/down state, service name, timestamp, and alert-details URL into the uptime template. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and point Uptime.com at the production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 20,
@@ -14,12 +14,12 @@
   "nodes": [
     {
       "id": 201101,
-      "name": "n8n-nodes-base.manualTrigger",
-      "displayName": "Manual Trigger",
-      "icon": "fa:play",
-      "iconData": { "type": "icon", "icon": "play" },
-      "defaults": { "name": "Manual Trigger", "color": "#909399" },
-      "typeVersion": 1,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": { "type": "icon", "icon": "globe" },
+      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "typeVersion": 2.1,
       "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
     },
     {
@@ -38,11 +38,17 @@
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002011",
-        "name": "Manual Trigger",
-        "type": "n8n-nodes-base.manualTrigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
         "position": [0, 0],
-        "typeVersion": 1,
-        "parameters": {}
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000002011",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/uptime-com",
+          "responseMode": "lastNode",
+          "options": {}
+        }
       },
       {
         "id": "00000000-0000-4000-8000-000000002111",
@@ -53,23 +59,14 @@
         "parameters": {
           "type": "template",
           "source": "uptime-com",
-          "payload": {
-            "data": {
-              "alert": {
-                "is_up": false,
-                "created_at": "2024-02-03T04:05:06.789Z"
-              },
-              "service": { "display_name": "Workflow API" },
-              "links": { "alert_details": "https://uptime.com/alerts/123" }
-            }
-          },
+          "payload": "={{ $json.body }}",
           "mode": "preview",
           "mentions": {}
         }
       }
     ],
     "connections": {
-      "Manual Trigger": {
+      "Webhook": {
         "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
       }
     }
