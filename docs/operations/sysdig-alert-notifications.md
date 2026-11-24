@@ -12,6 +12,8 @@ Sysdig Monitor → Webhook notification channel → n8n Webhook (POST)
 
 ## n8n workflow setup
 
+The built-in template library includes this graph as **Sysdig alert to custom Teams Adaptive Card (Preview)** (template `4004`, in **Operational Teams notifications**). It uses the script below without modification and starts in Preview mode. This is distinct from template `2009`, which demonstrates the connector's simpler **Template → Sysdig** mode.
+
 1. **Webhook** — set **HTTP Method** to **POST**, leave **Raw Body** off, and set **Authentication**
    to **Header Auth**. In the credential, set the header name to `Authorization` and the value to
    a dedicated shared secret (for example, `Bearer <shared-secret>`), not the Sysdig API token.

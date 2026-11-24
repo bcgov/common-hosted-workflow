@@ -100,7 +100,7 @@ describe('templates router', () => {
 
     expect(status).toBe(200);
     expect(body.totalWorkflows).toBe(library.templates.length);
-    expect(body.workflows).toHaveLength(library.templates.length);
+    expect(body.workflows).toHaveLength(Math.min(20, library.templates.length));
     expect(body.filters).toEqual([]);
 
     // List items are summaries: no workflow graph, no description.

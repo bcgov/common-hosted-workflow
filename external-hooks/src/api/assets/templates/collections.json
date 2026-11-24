@@ -23,6 +23,36 @@
       "categories": [{ "id": 6, "name": "DevX Message Connector" }],
       "nodes": [],
       "image": []
+    },
+    {
+      "id": 3,
+      "name": "CHEFS and approval patterns",
+      "description": "Two complete human-in-the-loop examples: a CHEFS Event Subscription review and same-execution resubmission loop, and a multi-actor CHEFS form approval coordinated by Multi Webhook Wait.",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "totalViews": 0,
+      "rank": 2,
+      "workflowIds": [3001, 3002],
+      "categories": [
+        { "id": 7, "name": "CHEFS" },
+        { "id": 8, "name": "Human in the Loop" }
+      ],
+      "nodes": [],
+      "image": []
+    },
+    {
+      "id": 4,
+      "name": "Operational Teams notifications",
+      "description": "Five documented webhook-to-Adaptive-Card workflows for deployment status, DNS routing changes, Grafana alerts, custom Sysdig alerts, and GitHub secret scanning alerts. Every example starts in DevX Preview mode.",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "totalViews": 0,
+      "rank": 3,
+      "workflowIds": [4001, 4002, 4003, 4004, 4005],
+      "categories": [
+        { "id": 5, "name": "Monitoring" },
+        { "id": 6, "name": "DevX Message Connector" }
+      ],
+      "nodes": [],
+      "image": []
     }
   ]
 }

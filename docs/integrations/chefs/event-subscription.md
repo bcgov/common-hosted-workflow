@@ -220,7 +220,7 @@ _From a real workflow: Form ID and Submission ID come from an earlier Set node. 
 
 ## Sample workflow
 
-[**Download the sample workflow JSON**](./samples/chefs-event-subscription-review-loop.json) and import it with **Workflows → Import from File**.
+[**Download the sample workflow JSON**](./samples/chefs-event-subscription-review-loop.json) and import it with **Workflows → Import from File**. The same graph is also available in the built-in template library as **CHEFS submission review and resubmission** (template `3001`, in the **CHEFS workflow patterns** collection); the library version omits all credential references and pinned data.
 
 ```mermaid
 flowchart LR

@@ -335,7 +335,7 @@ After the wait node resumes, access individual actor responses in downstream nod
 
 ### Sample Workflow JSON
 
-Below is a complete working workflow demonstrating the pattern with two WIL actions and a Multi Webhook Wait node:
+Below is a complete working workflow demonstrating the pattern with two WIL actions and a Multi Webhook Wait node. The built-in template library publishes it as **Multi-actor CHEFS form approval** (template `3002`, in **CHEFS and approval patterns**), with credential references removed and the Action / Create, User actor type, and POST callback settings made explicit:
 
 ```json
 {

@@ -1,0 +1,162 @@
+{
+  "id": 4001,
+  "name": "Deployment status to Teams Adaptive Card (Preview)",
+  "description": "## What it does\n\nReceives the deployment callback sent by the repository GitHub Actions deploy workflow and renders its job, environment, image, namespace, Helm release, and run link as an Adaptive Card using **Webhook → Code → DevX Message Connector**.\n\n## Setup\n\n1. Add a **DevX Message Connector** credential containing the full Teams channel link and configure `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`.\n2. While editing, POST a deployment payload to `/webhook-test/devx/deployment-status` and inspect the Preview response.\n3. Activate the workflow and point `DEPLOY_WEBHOOK_URL` or `REPO_DEPLOY_WEBHOOK_URL` at `/webhook/devx/deployment-status`. Change **Mode** to **Send** only after reviewing the card.\n\n## Notes\n\nPreview calls `<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview` without posting to Teams; it is not an offline transformation mode. The Webhook responds immediately, so acceptance does not confirm Teams delivery. The Code node is the exact script from the [source runbook](https://bcgov.github.io/common-hosted-workflow/ci-cd/cd/deployment-status-notifications), which documents success, failure, and cancellation fields. No credentials or pinned execution data are included.",
+  "createdAt": "2026-11-24T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 23,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    {
+      "id": 4,
+      "name": "Development"
+    },
+    {
+      "id": 5,
+      "name": "Monitoring"
+    },
+    {
+      "id": 6,
+      "name": "DevX Message Connector"
+    }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 400101,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 2.1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 400102,
+      "name": "n8n-nodes-base.code",
+      "displayName": "Code",
+      "icon": "fa:code",
+      "iconData": {
+        "type": "icon",
+        "icon": "code"
+      },
+      "defaults": {
+        "name": "Code",
+        "color": "#0004F5"
+      },
+      "typeVersion": 2,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 400103,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:id-card",
+      "iconData": {
+        "type": "icon",
+        "icon": "id-card"
+      },
+      "defaults": {
+        "name": "DevX Message Connector",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 0.1,
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000004001",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [0, 0],
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000004001",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/deployment-status",
+          "responseMode": "onReceived",
+          "options": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000005001",
+        "name": "Build Adaptive Card",
+        "type": "n8n-nodes-base.code",
+        "position": [240, 0],
+        "typeVersion": 2,
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "// Turn the deployment status webhook payload into an MS Teams Adaptive Card\n// for the DevX Message Connector (\"Type: Adaptive Card\").\n// Adds to each item: card (object) and cardJson (string for the Payload field).\n\n// Helm emits Go time format (\"2026-11-05 09:30:12.123456 +0000 UTC\"); make it readable.\nconst formatTime = (value) => {\n  if (!value) return 'unknown';\n  const raw = String(value);\n  const go = raw.match(/^(\\d{4}-\\d{2}-\\d{2}) (\\d{2}:\\d{2}:\\d{2})(?:\\.\\d+)? ([+-]\\d{4}) UTC$/);\n  if (go) return go[1] + ' ' + go[2] + ' UTC';\n  const parsed = new Date(raw);\n  return Number.isNaN(parsed.getTime()) ? raw : parsed.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';\n};\n\nconst STATES = {\n  success: { emoji: '✅', label: 'Deploy succeeded', style: 'good', color: 'Good' },\n  failure: { emoji: '❌', label: 'Deploy failed', style: 'attention', color: 'Attention' },\n  cancelled: { emoji: '🚫', label: 'Deploy cancelled', style: 'warning', color: 'Warning' },\n};\nconst DEFAULT_STATE = { emoji: '❔', label: 'Unknown status', style: 'emphasis', color: 'Default' };\n\n// n8n's Webhook node wraps the request as { headers, params, query, body } —\n// dig the actual payload out of `body` (object or JSON string) when present.\nconst payloadOf = (json) => {\n  let p = json || {};\n  if (p.body !== undefined) {\n    if (typeof p.body === 'string') {\n      try {\n        p = JSON.parse(p.body);\n      } catch {\n        p = {};\n      }\n    } else {\n      p = p.body;\n    }\n  }\n  return p && typeof p === 'object' ? p : {};\n};\n\nreturn $input.all().map((item) => {\n  const p = payloadOf(item.json);\n  const helm = p.helm || {};\n  const rev = helm.last_revision || {};\n\n  const state = STATES[p.status] || { ...DEFAULT_STATE, label: `Unknown status (${p.status ?? 'n/a'})` };\n\n  let hint = '';\n  if (p.status === 'failure') {\n    if (p.deploy_outcome === 'skipped') {\n      hint = 'Job failed before the deploy step — Helm status shows the last good release.';\n    } else if (helm.status === 'deployed') {\n      hint = 'Chart applied, but workloads are not healthy — check rollout/pods in the run logs.';\n    } else if (['failed', 'pending-upgrade'].includes(helm.status)) {\n      hint = 'The Helm upgrade did not complete on the cluster.';\n    }\n  }\n\n  const facts = [];\n  if (p.workflow || p.event) {\n    facts.push({ title: 'Workflow', value: [p.workflow, p.event && `(${p.event})`].filter(Boolean).join(' ') });\n  }\n  if (p.status || p.deploy_outcome) {\n    facts.push({\n      title: 'Result',\n      value: [p.status, p.deploy_outcome && `deploy step: ${p.deploy_outcome}`].filter(Boolean).join(' · '),\n    });\n  }\n  if (p.image_tag) facts.push({ title: 'Image tag', value: String(p.image_tag) });\n  if (p.namespace) facts.push({ title: 'Namespace', value: String(p.namespace) });\n  facts.push({\n    title: 'Helm release',\n    value: [\n      'chwf',\n      helm.status || 'unknown',\n      rev.revision !== undefined && `rev ${rev.revision}`,\n      rev.chart,\n      rev.app_version && `app v${rev.app_version}`,\n    ]\n      .filter(Boolean)\n      .join(' · '),\n  });\n  if (helm.last_deployed) facts.push({ title: 'Last deployed', value: formatTime(helm.last_deployed) });\n  if (p.timestamp) facts.push({ title: 'Payload time', value: formatTime(p.timestamp) });\n\n  const headerItems = [\n    {\n      type: 'TextBlock',\n      text: `${state.emoji} ${state.label} — ${p.environment ?? 'unknown env'}`,\n      weight: 'Bolder',\n      size: 'Medium',\n      wrap: true,\n    },\n  ];\n  const subtitle = [p.workflow, p.cluster && `cluster ${p.cluster}`].filter(Boolean).join(' · ');\n  if (subtitle) {\n    headerItems.push({ type: 'TextBlock', text: subtitle, isSubtle: true, size: 'Small', wrap: true });\n  }\n\n  const card = {\n    type: 'AdaptiveCard',\n    $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',\n    version: '1.4',\n    msteams: { width: 'Full' },\n    body: [\n      { type: 'Container', style: state.style, items: headerItems },\n      ...(facts.length ? [{ type: 'FactSet', facts }] : []),\n      ...(hint ? [{ type: 'TextBlock', text: `⚠️ ${hint}`, color: state.color, wrap: true }] : []),\n    ],\n  };\n  if (p.run_url) {\n    card.actions = [{ type: 'Action.OpenUrl', title: 'View workflow run', url: String(p.run_url) }];\n  }\n\n  return {\n    json: {\n      ...item.json, // preserve webhook fields (headers/body/...)\n      card,\n      cardJson: JSON.stringify(card),\n    },\n  };\n});"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006001",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [480, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "card",
+          "payload": "={{ $json.cardJson }}",
+          "mode": "preview"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Build Adaptive Card",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Adaptive Card": {
+        "main": [
+          [
+            {
+              "node": "DevX Message Connector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

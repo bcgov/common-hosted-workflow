@@ -119,6 +119,8 @@ Alertmanager-compatible) — the same envelope for every rule. A firing example
 
 ## n8n workflow setup
 
+The built-in template library includes this graph as **Grafana alert to Teams Adaptive Card (Preview)** (template `4003`, in **Operational Teams notifications**). It uses the script below without modification and starts in Preview mode.
+
 1. **Webhook node** — method **POST**. Use the **Production** URL in the secret (the test URL
    is fine for manual tries from Grafana's contact-point _Send test notification_ button). Its
    output nests the payload under `body` (`{ headers, params, query, body }`).

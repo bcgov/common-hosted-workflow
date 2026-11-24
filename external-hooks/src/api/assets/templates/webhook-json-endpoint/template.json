@@ -1,7 +1,7 @@
 {
   "id": 1002,
   "name": "JSON endpoint with a Webhook and Respond to Webhook",
-  "description": "## What it does\n\nExposes `POST /webhook/hello` and answers with JSON built in the workflow. No external service, no credentials — a good first template to prove that webhooks and responses work.\n\n## Try it\n\n```bash\ncurl -X POST http://localhost:5678/webhook/hello \\\n  -H 'content-type: application/json' \\\n  -d '{\"name\":\"Ada\"}'\n```\n\n## Notes\n\n`responseMode` is set to **Respond to Webhook node**, so the HTTP response is only sent when the workflow reaches the last node. Switch it to *Immediately* if you want the webhook to answer before the rest of the workflow runs. Activate the imported workflow before calling the production `/webhook/hello` URL; the test URL is available while editing.",
+  "description": "## What it does\n\nExposes `POST /webhook/hello` and answers with JSON built in the workflow. No external service or credentials are required, making this a good first template for testing webhooks and responses.\n\n## Setup\n\n1. Import and activate the workflow.\n2. Send a request to the production endpoint:\n\n```bash\ncurl -X POST http://localhost:5678/webhook/hello \\\n  -H 'content-type: application/json' \\\n  -d '{\"name\":\"Ada\"}'\n```\n\n## Notes\n\n`responseMode` is set to **Respond to Webhook node**, so the HTTP response is sent only when the workflow reaches the last node. Switch it to **Immediately** if the webhook should answer before the rest of the workflow runs. Use the test URL while editing instead of activating the workflow.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 2,
@@ -12,8 +12,14 @@
     "verified": true
   },
   "categories": [
-    { "id": 1, "name": "Starter" },
-    { "id": 4, "name": "Development" }
+    {
+      "id": 1,
+      "name": "Starter"
+    },
+    {
+      "id": 4,
+      "name": "Development"
+    }
   ],
   "image": [],
   "nodes": [
@@ -22,34 +28,69 @@
       "name": "n8n-nodes-base.webhook",
       "displayName": "Webhook",
       "icon": "fa:globe",
-      "iconData": { "type": "icon", "icon": "globe" },
-      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
       "typeVersion": 2,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 10022,
       "name": "n8n-nodes-base.set",
       "displayName": "Edit Fields",
       "icon": "fa:pen",
-      "iconData": { "type": "icon", "icon": "pen" },
-      "defaults": { "name": "Edit Fields", "color": "#0000FF" },
+      "iconData": {
+        "type": "icon",
+        "icon": "pen"
+      },
+      "defaults": {
+        "name": "Edit Fields",
+        "color": "#0000FF"
+      },
       "typeVersion": 3.4,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 10023,
       "name": "n8n-nodes-base.respondToWebhook",
       "displayName": "Respond to Webhook",
       "icon": "fa:reply",
-      "iconData": { "type": "icon", "icon": "reply" },
-      "defaults": { "name": "Respond to Webhook", "color": "#1f8ceb" },
+      "iconData": {
+        "type": "icon",
+        "icon": "reply"
+      },
+      "defaults": {
+        "name": "Respond to Webhook",
+        "color": "#1f8ceb"
+      },
       "typeVersion": 1.1,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     }
   ],
   "workflow": {
-    "settings": { "executionOrder": "v1" },
+    "settings": {
+      "executionOrder": "v1"
+    },
     "nodes": [
       {
         "id": "d45f36d2-2f90-5884-a0cf-7b7dfac8f510",
@@ -80,7 +121,12 @@
                 "value": "Hello from the template library",
                 "type": "string"
               },
-              { "id": "b2", "name": "receivedAt", "value": "={{ $now.toISO() }}", "type": "string" },
+              {
+                "id": "b2",
+                "name": "receivedAt",
+                "value": "={{ $now.toISO() }}",
+                "type": "string"
+              },
               {
                 "id": "b3",
                 "name": "youSent",
@@ -107,10 +153,26 @@
     ],
     "connections": {
       "Webhook": {
-        "main": [[{ "node": "Build response", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Build response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       },
       "Build response": {
-        "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   }

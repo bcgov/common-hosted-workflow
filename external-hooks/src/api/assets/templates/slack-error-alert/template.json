@@ -12,8 +12,14 @@
     "verified": true
   },
   "categories": [
-    { "id": 3, "name": "Communication" },
-    { "id": 5, "name": "Monitoring" }
+    {
+      "id": 3,
+      "name": "Communication"
+    },
+    {
+      "id": 5,
+      "name": "Monitoring"
+    }
   ],
   "image": [],
   "nodes": [
@@ -22,34 +28,69 @@
       "name": "n8n-nodes-base.errorTrigger",
       "displayName": "Error Trigger",
       "icon": "fa:bug",
-      "iconData": { "type": "icon", "icon": "triangle-alert" },
-      "defaults": { "name": "Error Trigger", "color": "#FF0000" },
+      "iconData": {
+        "type": "icon",
+        "icon": "triangle-alert"
+      },
+      "defaults": {
+        "name": "Error Trigger",
+        "color": "#FF0000"
+      },
       "typeVersion": 1,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 10032,
       "name": "n8n-nodes-base.set",
       "displayName": "Edit Fields",
       "icon": "fa:pen",
-      "iconData": { "type": "icon", "icon": "pen" },
-      "defaults": { "name": "Edit Fields", "color": "#0000FF" },
+      "iconData": {
+        "type": "icon",
+        "icon": "pen"
+      },
+      "defaults": {
+        "name": "Edit Fields",
+        "color": "#0000FF"
+      },
       "typeVersion": 3.4,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 10033,
       "name": "n8n-nodes-base.slack",
       "displayName": "Slack",
       "icon": "fa:comment",
-      "iconData": { "type": "icon", "icon": "message-square" },
-      "defaults": { "name": "Slack", "color": "#4A154B" },
+      "iconData": {
+        "type": "icon",
+        "icon": "message-square"
+      },
+      "defaults": {
+        "name": "Slack",
+        "color": "#4A154B"
+      },
       "typeVersion": 2.3,
-      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
     }
   ],
   "workflow": {
-    "settings": { "executionOrder": "v1" },
+    "settings": {
+      "executionOrder": "v1"
+    },
     "nodes": [
       {
         "id": "35500e7d-2a79-5774-a87e-4ca57b78d78e",
@@ -107,7 +148,11 @@
           "resource": "message",
           "operation": "post",
           "select": "channel",
-          "channelId": { "__rl": true, "value": "#alerts", "mode": "name" },
+          "channelId": {
+            "__rl": true,
+            "value": "#alerts",
+            "mode": "name"
+          },
           "text": "=:rotating_light: *{{ $json.workflow }}* failed (execution {{ $json.executionId }})\n{{ $json.error }}\n{{ $json.url }}",
           "otherOptions": {}
         }
@@ -115,10 +160,26 @@
     ],
     "connections": {
       "Error Trigger": {
-        "main": [[{ "node": "Format alert", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Format alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       },
       "Format alert": {
-        "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "Notify Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   }

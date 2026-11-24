@@ -1,0 +1,163 @@
+{
+  "id": 4005,
+  "name": "GitHub secret scanning alert to Teams Adaptive Card (Preview)",
+  "description": "## What it does\n\nReceives an already-authenticated GitHub `secret_scanning_alert` delivery and renders only allowlisted alert metadata as an Adaptive Card using **Webhook → Code → DevX Message Connector**. The formatter excludes the secret value, comments, provider metadata, and original request body.\n\n## Setup\n\n1. Add a **DevX Message Connector** credential containing the full Teams channel link and configure `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`.\n2. Use a trusted receiver to validate `X-Hub-Signature-256` against the original request bytes before forwarding to this workflow. Attach **Header Auth** for authenticated forwarding and preserve the GitHub event and delivery headers.\n3. While editing, POST a redacted sample to `/webhook-test/devx/github-secret-scanning-alert` and inspect the Preview response. Activate the workflow before using `/webhook/devx/github-secret-scanning-alert`, and change **Mode** to **Send** only after reviewing the card.\n\n## Notes\n\nThe Code node is not a signature verifier. Execution-data saving is disabled; restrict workflow and Teams-channel access and review platform audit/error logging before enabling real deliveries. Preview calls `<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview` without posting to Teams; it is not an offline transformation mode. The Webhook responds immediately, so acceptance does not confirm Teams delivery. The Code node is the exact script from the [source runbook](https://bcgov.github.io/common-hosted-workflow/operations/github-secret-scanning-alert-notifications). No credentials or pinned execution data are included.",
+  "createdAt": "2026-11-24T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 27,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    {
+      "id": 5,
+      "name": "Monitoring"
+    },
+    {
+      "id": 6,
+      "name": "DevX Message Connector"
+    }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 400501,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 2.1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 400502,
+      "name": "n8n-nodes-base.code",
+      "displayName": "Code",
+      "icon": "fa:code",
+      "iconData": {
+        "type": "icon",
+        "icon": "code"
+      },
+      "defaults": {
+        "name": "Code",
+        "color": "#0004F5"
+      },
+      "typeVersion": 2,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 400503,
+      "name": "CUSTOM.devXMessageConnector",
+      "displayName": "DevX Message Connector",
+      "icon": "fa:id-card",
+      "iconData": {
+        "type": "icon",
+        "icon": "id-card"
+      },
+      "defaults": {
+        "name": "DevX Message Connector",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 0.1,
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "settings": {
+      "executionOrder": "v1",
+      "saveDataErrorExecution": "none",
+      "saveDataSuccessExecution": "none",
+      "saveDataManualExecutions": false,
+      "saveExecutionProgress": false
+    },
+    "nodes": [
+      {
+        "id": "00000000-0000-4000-8000-000000004005",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [0, 0],
+        "typeVersion": 2.1,
+        "webhookId": "10000000-0000-4000-8000-000000004005",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "devx/github-secret-scanning-alert",
+          "responseMode": "onReceived",
+          "authentication": "headerAuth",
+          "options": {}
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000005005",
+        "name": "Build Adaptive Card",
+        "type": "n8n-nodes-base.code",
+        "position": [240, 0],
+        "typeVersion": 2,
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "// Format an already-authenticated GitHub secret_scanning_alert delivery.\n// Never copy alert.secret, comments, provider metadata, or the original body.\n// Signature verification must happen before this formatter.\n\n// For GitHub Enterprise Server, replace this with your trusted HTTPS base URL.\nconst GITHUB_BASE_URL = 'https://github.com';\n\nconst isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\n\nconst payloadOf = (json) => {\n  let p = isObject(json) && json.body !== undefined ? json.body : json;\n  if (typeof p === 'string') {\n    try {\n      p = JSON.parse(p);\n    } catch {\n      throw new Error('Invalid JSON for secret_scanning_alert.');\n    }\n  }\n  if (!isObject(p)) throw new Error('Expected a secret_scanning_alert JSON object.');\n  return p;\n};\n\nconst headerOf = (json, name) => {\n  const headers = isObject(json) && isObject(json.headers) ? json.headers : {};\n  const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());\n  return key && typeof headers[key] === 'string' ? headers[key] : '';\n};\n\n// Bound text length and escape Markdown; never stringify whole input objects.\nconst cardText = (value, fallback = 'unknown') => {\n  const text =\n    typeof value === 'string'\n      ? value\n          .trim()\n          .replace(/[\\r\\n\\t]+/g, ' ')\n          .slice(0, 200)\n      : '';\n  return text ? text.replace(/\\\\/g, '\\\\\\\\').replace(/([`*_\\[\\]()<>])/g, '\\\\$1') : fallback;\n};\n\nconst formatTime = (value) => {\n  if (typeof value !== 'string' || !value) return 'unknown';\n  const parsed = new Date(value);\n  return Number.isNaN(parsed.getTime()) ? 'unknown' : parsed.toISOString().slice(0, 19).replace('T', ' ') + ' UTC';\n};\n\nconst STATES = {\n  created: { emoji: '🔴', label: 'Secret detected', style: 'attention' },\n  publicly_leaked: { emoji: '🔴', label: 'Secret publicly leaked', style: 'attention' },\n  reopened: { emoji: '🔴', label: 'Secret alert reopened', style: 'attention' },\n  resolved: { emoji: '✅', label: 'Secret alert resolved', style: 'good' },\n  assigned: { emoji: 'ℹ️', label: 'Secret alert assigned', style: 'emphasis' },\n  unassigned: { emoji: '🟡', label: 'Secret alert unassigned', style: 'warning' },\n  metadata_created: { emoji: 'ℹ️', label: 'Secret alert metadata added', style: 'emphasis' },\n  metadata_removed: { emoji: 'ℹ️', label: 'Secret alert metadata removed', style: 'emphasis' },\n};\n\nconst RESOLUTIONS = {\n  revoked: 'Revoked',\n  false_positive: 'False positive',\n  used_in_tests: 'Used in tests',\n  wont_fix: \"Won't fix\",\n  pattern_edited: 'Pattern edited',\n  pattern_deleted: 'Pattern deleted',\n};\n\nconst stateOf = (action, alertState, validity) => {\n  if (action === 'resolved' || alertState === 'resolved') return STATES.resolved;\n  if (action === 'validated') {\n    return validity === 'active'\n      ? { emoji: '🔴', label: 'Active secret confirmed', style: 'attention' }\n      : {\n          emoji: '🟡',\n          label: validity === 'inactive' ? 'Secret reported inactive' : 'Secret validity updated',\n          style: 'warning',\n        };\n  }\n  return Object.hasOwn(STATES, action)\n    ? STATES[action]\n    : { emoji: '❔', label: 'Secret alert updated', style: 'emphasis' };\n};\n\nreturn $input.all().flatMap((item, index) => {\n  const event = headerOf(item.json, 'x-github-event');\n  if (event && event !== 'secret_scanning_alert') return []; // includes setup ping\n\n  const p = payloadOf(item.json);\n  const a = isObject(p.alert) ? p.alert : {};\n  const repository = isObject(p.repository) ? p.repository : {};\n  const repoName = repository.full_name;\n  const action = p.action;\n  if (\n    !Number.isSafeInteger(a.number) ||\n    a.number < 1 ||\n    typeof repoName !== 'string' ||\n    !/^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+$/.test(repoName) ||\n    typeof action !== 'string' ||\n    !/^[a-z_]{1,64}$/.test(action)\n  ) {\n    throw new Error('Invalid secret_scanning_alert: expected action, alert number, and repository.');\n  }\n\n  const alertState = ['open', 'resolved'].includes(a.state) ? a.state : 'unknown';\n  const validity = ['active', 'inactive', 'unknown'].includes(a.validity) ? a.validity : 'unknown';\n  const resolution = typeof a.resolution === 'string' && Object.hasOwn(RESOLUTIONS, a.resolution) ? a.resolution : null;\n  const state = stateOf(action, alertState, validity);\n  const closed = action === 'resolved' || alertState === 'resolved';\n  const secretType = cardText(a.secret_type_display_name || a.secret_type, 'Unknown secret type');\n  const deliveryId = headerOf(item.json, 'x-github-delivery');\n\n  const facts = [\n    { title: 'Action', value: cardText(action) },\n    { title: 'State', value: alertState },\n    { title: 'Validity', value: validity },\n  ];\n  if (typeof a.publicly_leaked === 'boolean' || action === 'publicly_leaked') {\n    facts.push({ title: 'Publicly leaked', value: a.publicly_leaked || action === 'publicly_leaked' ? 'Yes' : 'No' });\n  }\n  if (typeof a.multi_repo === 'boolean')\n    facts.push({ title: 'Multiple repositories', value: a.multi_repo ? 'Yes' : 'No' });\n  if (typeof a.push_protection_bypassed === 'boolean') {\n    facts.push({ title: 'Push protection bypassed', value: a.push_protection_bypassed ? 'Yes' : 'No' });\n  }\n  if (a.push_protection_bypassed === true) {\n    if (a.push_protection_bypassed_by?.login)\n      facts.push({ title: 'Bypassed by', value: cardText(a.push_protection_bypassed_by.login) });\n    if (a.push_protection_bypassed_at)\n      facts.push({ title: 'Bypassed at', value: formatTime(a.push_protection_bypassed_at) });\n  }\n  const assignee = action === 'assigned' || action === 'unassigned' ? p.assignee : a.assigned_to;\n  if (assignee?.login)\n    facts.push({ title: action === 'unassigned' ? 'Assignee removed' : 'Assignee', value: cardText(assignee.login) });\n  if (p.sender?.login) facts.push({ title: 'Triggered by', value: cardText(p.sender.login) });\n  if (a.created_at) facts.push({ title: 'Created', value: formatTime(a.created_at) });\n  if (a.updated_at) facts.push({ title: 'Updated', value: formatTime(a.updated_at) });\n  if (closed) {\n    facts.push({ title: 'Resolution', value: resolution ? RESOLUTIONS[resolution] : 'Not supplied' });\n    if (a.resolved_by?.login) facts.push({ title: 'Resolved by', value: cardText(a.resolved_by.login) });\n    if (a.resolved_at) facts.push({ title: 'Resolved', value: formatTime(a.resolved_at) });\n  }\n\n  const hint = closed\n    ? 'GitHub marked this alert resolved. Check the closure reason; closing an alert does not prove the credential was revoked.'\n    : action === 'validated' && validity === 'inactive'\n      ? 'GitHub reports this credential inactive. The alert is not necessarily resolved; review it and record the appropriate closure reason.'\n      : 'Review this alert in GitHub. Revoke or rotate exposed credentials and investigate their use; removing the committed value alone does not make a credential safe.';\n\n  // Construct links on a trusted host, rather than forwarding arbitrary payload URLs.\n  const repoUrl = `${GITHUB_BASE_URL}/${repoName}`;\n  const card = {\n    type: 'AdaptiveCard',\n    $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',\n    version: '1.4',\n    msteams: { width: 'Full' },\n    body: [\n      {\n        type: 'Container',\n        style: state.style,\n        items: [\n          {\n            type: 'TextBlock',\n            text: `${state.emoji} ${state.label} — ${secretType}`,\n            weight: 'Bolder',\n            size: 'Medium',\n            wrap: true,\n          },\n          {\n            type: 'TextBlock',\n            text: `${cardText(repoName)} · alert #${a.number}`,\n            isSubtle: true,\n            size: 'Small',\n            wrap: true,\n          },\n        ],\n      },\n      { type: 'FactSet', facts },\n      { type: 'TextBlock', text: hint, wrap: true },\n      {\n        type: 'TextBlock',\n        text: 'Secret value, comments, and sensitive metadata intentionally omitted.',\n        isSubtle: true,\n        size: 'Small',\n        wrap: true,\n      },\n    ],\n    actions: [\n      { type: 'Action.OpenUrl', title: 'Open secret alert', url: `${repoUrl}/security/secret-scanning/${a.number}` },\n      { type: 'Action.OpenUrl', title: 'Open repository', url: repoUrl },\n    ],\n  };\n\n  return [\n    {\n      json: {\n        event: 'secret_scanning_alert',\n        action,\n        deliveryId,\n        alertKey: `${repoName}:${a.number}`,\n        repository: repoName,\n        alertNumber: a.number,\n        state: alertState,\n        validity,\n        resolution,\n        card,\n        cardJson: JSON.stringify(card),\n      },\n      pairedItem: { item: index },\n    },\n  ];\n});"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006005",
+        "name": "DevX Message Connector",
+        "type": "CUSTOM.devXMessageConnector",
+        "position": [480, 0],
+        "typeVersion": 0.1,
+        "parameters": {
+          "type": "card",
+          "payload": "={{ $json.cardJson }}",
+          "mode": "preview"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Build Adaptive Card",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Adaptive Card": {
+        "main": [
+          [
+            {
+              "node": "DevX Message Connector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

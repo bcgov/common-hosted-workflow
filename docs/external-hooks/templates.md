@@ -34,6 +34,31 @@ by category **ID**, so IDs must be stable and consistent across files.
 `rank` controls the default curation order (lower values first, then template
 ID). Search results can also be sorted by `views`, `createdAt`, or `name`.
 
+## Description convention
+
+Every template description uses these three H2 sections in this order, with
+non-empty content in each section:
+
+```markdown
+## What it does
+
+Summarize the trigger, main nodes, and useful outcome.
+
+## Setup
+
+List credential, environment, field-mapping, testing, and activation steps.
+
+## Notes
+
+Document Preview behavior, response semantics, limitations, safety precautions,
+and links to detailed runbooks.
+```
+
+Use **Setup** rather than alternate headings such as **Try it** or **Before
+activating**. Keep actionable instructions in Setup and behavioral warnings or
+implementation details in Notes. The shipped-inventory tests enforce the three
+headings and their order.
+
 ## Public-data rules
 
 The template endpoints are unauthenticated because the browser fetches them
@@ -87,6 +112,59 @@ credential containing the full Teams channel link, plus
 only after reviewing the preview response. The constant examples and realistic
 webhook request bodies are also executed against the real connector in
 `community-nodes/tests/DevXMessageConnector/templates.test.ts`.
+
+## CHEFS and approval examples
+
+Collection `3` contains two human-in-the-loop examples:
+
+- Template `3001` publishes the complete sample from
+  `docs/integrations/chefs/samples/chefs-event-subscription-review-loop.json`.
+  It receives a CHEFS Event Subscription webhook, obtains a reviewer decision
+  through the Workflow Interaction Layer, emails the result, and loops through
+  CHEFS Resubmit Wait when changes are requested. Follow
+  [Pattern A — CHEFS Event Subscription](../integrations/chefs/event-subscription.md)
+  to attach Header Auth, CHEFS Form Authentication, Workflow Interaction Layer
+  API, and SMTP credentials; replace the example form field mappings; and
+  configure the CHEFS Event Subscription endpoint.
+- Template `3002` publishes the Multi Webhook Wait sample from
+  `docs/community-nodes/multi-webhook-wait/README.md`. Two WIL Show Form actions
+  use actor-specific callback URLs before Multi Webhook Wait fans the responses
+  back into one execution. The template makes the sample's Action / Create,
+  User actor type, and POST callback settings explicit. Each WIL action needs
+  WIL API and CHEFS Form Authentication credentials, and the wait node requires
+  `N8N_BASE_URL` and `INTERNAL_AUTH_TOKEN` in the runtime.
+
+The published graphs deliberately omit credential references and `pinData`.
+
+## Operational notification examples
+
+Collection `4` contains five **Webhook → Code → DevX Message Connector**
+examples. Their Code nodes are copied from the linked runbooks, their webhooks
+use unique POST paths and respond immediately, and every connector starts in
+**Preview** mode:
+
+| ID   | Example                     | Webhook path                        | Source                                                                                                    |
+| ---- | --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 4001 | Deployment status card      | `devx/deployment-status`            | [Deployment Status Notifications](../ci-cd/cd/deployment-status-notifications.md)                         |
+| 4002 | DNS routing change card     | `devx/dns-routing-change`           | [DNS Probe](../platform/dns-probe.md)                                                                     |
+| 4003 | Grafana alert card          | `devx/grafana-alert`                | [Grafana Alert Notifications](../operations/grafana-alert-notifications.md)                               |
+| 4004 | Custom Sysdig alert card    | `devx/sysdig-alert-card`            | [Sysdig Alert Notifications](../operations/sysdig-alert-notifications.md)                                 |
+| 4005 | GitHub secret scanning card | `devx/github-secret-scanning-alert` | [GitHub Secret Scanning Alert Notifications](../operations/github-secret-scanning-alert-notifications.md) |
+
+Template `4004` is the custom Code-node Adaptive Card flow, distinct from
+template `2009`'s simpler **Template → Sysdig** transformation. Sysdig and
+GitHub secret scanning use Header Auth; attach the credential after import.
+
+Template `4005` must receive deliveries from a trusted receiver that validates
+GitHub's signature against the original request bytes. Its formatter is not a
+signature verifier. The template disables execution-data saving and its Code
+node allowlists output metadata so `alert.secret`, comments, provider metadata,
+and the original body do not flow to the connector. Follow the source runbook's
+remaining access-control and logging precautions before using real deliveries.
+
+The formatter tests execute each documented sample payload against the real
+DevX connector in Preview mode and verify the Code-node scripts remain
+identical to the source runbooks.
 
 ## Reload and validate
 

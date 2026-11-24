@@ -1,14 +1,25 @@
 {
   "id": 2010,
   "name": "DevX Connector: StatusCake template (Preview)",
-  "description": "Demonstrates Template mode with Source Status Cake using an incoming webhook. POST StatusCake check notifications to /webhook/devx/status-cake; the connector maps URL, status, status code, IP, tags, check rate, test ID, and method into the statuscake template. Add a DevX Message Connector credential and configure DEVX_CONNECTOR_API_URL and DEVX_CONNECTOR_API_KEY. Use the Webhook test URL while editing, or activate the workflow and point StatusCake at the production URL. Preview does not post to Teams; switch Mode to Send after reviewing the output.",
+  "description": "## What it does\n\nDemonstrates **Template** mode with **Source: StatusCake** using **Webhook → DevX Message Connector**. The connector maps URL, status, status code, IP, tags, check rate, test ID, and method into the `statuscake` template.\n\n## Setup\n\n1. Add a **DevX Message Connector** credential containing the full Teams channel link and configure `DEVX_CONNECTOR_API_URL` and `DEVX_CONNECTOR_API_KEY`.\n2. While editing, POST a StatusCake check notification to `/webhook-test/devx/status-cake` and inspect the Preview response.\n3. Activate the workflow and configure StatusCake to POST to `/webhook/devx/status-cake`. Change **Mode** to **Send** only after reviewing the output.\n\n## Notes\n\nPreview calls `<DEVX_CONNECTOR_API_URL>/api/v1/messages/preview` without posting to Teams; it is not an offline transformation mode. The Webhook passes `{{ $json.body }}` to the connector and responds after the last node finishes. No credentials or pinned execution data are included.",
   "createdAt": "2026-01-12T00:00:00.000Z",
   "totalViews": 0,
   "rank": 19,
-  "user": { "username": "platform-team", "name": "Platform Team", "avatar": "", "verified": true },
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
   "categories": [
-    { "id": 3, "name": "Communication" },
-    { "id": 6, "name": "DevX Message Connector" }
+    {
+      "id": 3,
+      "name": "Communication"
+    },
+    {
+      "id": 6,
+      "name": "DevX Message Connector"
+    }
   ],
   "image": [],
   "nodes": [
@@ -17,24 +28,48 @@
       "name": "n8n-nodes-base.webhook",
       "displayName": "Webhook",
       "icon": "fa:globe",
-      "iconData": { "type": "icon", "icon": "globe" },
-      "defaults": { "name": "Webhook", "color": "#1f8ceb" },
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
       "typeVersion": 2.1,
-      "nodeCategories": [{ "id": 9, "name": "Core Nodes" }]
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
     },
     {
       "id": 201002,
       "name": "CUSTOM.devXMessageConnector",
       "displayName": "DevX Message Connector",
       "icon": "fa:signal",
-      "iconData": { "type": "icon", "icon": "activity" },
-      "defaults": { "name": "DevX Message Connector", "color": "#7B61FF" },
+      "iconData": {
+        "type": "icon",
+        "icon": "activity"
+      },
+      "defaults": {
+        "name": "DevX Message Connector",
+        "color": "#7B61FF"
+      },
       "typeVersion": 0.1,
-      "nodeCategories": [{ "id": 3, "name": "Communication" }]
+      "nodeCategories": [
+        {
+          "id": 3,
+          "name": "Communication"
+        }
+      ]
     }
   ],
   "workflow": {
-    "settings": { "executionOrder": "v1" },
+    "settings": {
+      "executionOrder": "v1"
+    },
     "nodes": [
       {
         "id": "00000000-0000-4000-8000-000000002010",
@@ -67,7 +102,15 @@
     ],
     "connections": {
       "Webhook": {
-        "main": [[{ "node": "DevX Message Connector", "type": "main", "index": 0 }]]
+        "main": [
+          [
+            {
+              "node": "DevX Message Connector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     }
   }

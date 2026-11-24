@@ -71,6 +71,8 @@ This payload is a single flat object — unlike [Grafana's webhook schema](../op
 
 ## n8n workflow setup
 
+The built-in template library includes this graph as **DNS routing change to Teams Adaptive Card (Preview)** (template `4002`, in **Operational Teams notifications**). It uses the script below without modification and starts in Preview mode.
+
 1. **Webhook node** — method **POST**. Use the **Production** URL in the secret (the test URL
    is handy for manual tries — the probe only fires on a real routing change).
 2. **Code node** — mode **Run Once for All Items**, paste the script below.

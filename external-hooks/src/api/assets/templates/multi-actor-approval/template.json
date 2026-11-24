@@ -1,0 +1,278 @@
+{
+  "id": 3002,
+  "name": "Multi-actor CHEFS form approval",
+  "description": "## What it does\n\nStarts two Workflow Interaction Layer **Show Form** actions, merges their branches, and pauses at **Multi Webhook Wait Node** until callbacks identified by `actor=alice` and `actor=bob` have both arrived. **Process Results** is a NoOp placeholder for downstream result handling.\n\n## Setup\n\n1. Replace the example actor email addresses on both WIL nodes.\n2. Select a **Workflow Interaction Layer API** credential and a **CHEFS Form Authentication** credential on each WIL action; Show Form requires both.\n3. Ensure the runtime has `N8N_BASE_URL` and `INTERNAL_AUTH_TOKEN` for Multi Webhook Wait registration.\n4. While editing, POST to `/webhook-test/approval-trigger`, or activate the workflow and POST to `/webhook/approval-trigger`.\n\n## Notes\n\nThe callback expressions are `$execution.resumeUrl + '&actor=alice'` and `$execution.resumeUrl + '&actor=bob'`. The WIL nodes explicitly use Action / Create, User actor type, and POST callbacks. The wait resumes only after all expected callbacks arrive; see the [Multi Webhook Wait documentation](https://bcgov.github.io/common-hosted-workflow/community-nodes/multi-webhook-wait) for results and timeout cleanup. No credentials or pinned execution data are included.",
+  "createdAt": "2026-11-24T00:00:00.000Z",
+  "totalViews": 0,
+  "rank": 22,
+  "user": {
+    "username": "platform-team",
+    "name": "Platform Team",
+    "avatar": "",
+    "verified": true
+  },
+  "categories": [
+    {
+      "id": 7,
+      "name": "CHEFS"
+    },
+    {
+      "id": 8,
+      "name": "Human in the Loop"
+    }
+  ],
+  "image": [],
+  "nodes": [
+    {
+      "id": 300201,
+      "name": "n8n-nodes-base.webhook",
+      "displayName": "Webhook",
+      "icon": "fa:globe",
+      "iconData": {
+        "type": "icon",
+        "icon": "globe"
+      },
+      "defaults": {
+        "name": "Webhook",
+        "color": "#1f8ceb"
+      },
+      "typeVersion": 2.1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 300202,
+      "name": "CUSTOM.workflowInteractionLayer",
+      "displayName": "Workflow Interaction Layer",
+      "icon": "fa:comments",
+      "iconData": {
+        "type": "icon",
+        "icon": "message-square"
+      },
+      "defaults": {
+        "name": "Workflow Interaction Layer",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 1,
+      "nodeCategories": [
+        {
+          "id": 8,
+          "name": "Human in the Loop"
+        }
+      ]
+    },
+    {
+      "id": 300203,
+      "name": "n8n-nodes-base.merge",
+      "displayName": "Merge",
+      "icon": "fa:code-branch",
+      "iconData": {
+        "type": "icon",
+        "icon": "code-branch"
+      },
+      "defaults": {
+        "name": "Merge",
+        "color": "#408000"
+      },
+      "typeVersion": 3.2,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    },
+    {
+      "id": 300204,
+      "name": "CUSTOM.multiWebhookWait",
+      "displayName": "Multi Webhook Wait Node",
+      "icon": "fa:clock",
+      "iconData": {
+        "type": "icon",
+        "icon": "clock"
+      },
+      "defaults": {
+        "name": "Multi Webhook Wait Node",
+        "color": "#7B61FF"
+      },
+      "typeVersion": 1,
+      "nodeCategories": [
+        {
+          "id": 8,
+          "name": "Human in the Loop"
+        }
+      ]
+    },
+    {
+      "id": 300205,
+      "name": "n8n-nodes-base.noOp",
+      "displayName": "No Operation, do nothing",
+      "icon": "fa:check",
+      "iconData": {
+        "type": "icon",
+        "icon": "check"
+      },
+      "defaults": {
+        "name": "No Operation, do nothing",
+        "color": "#909399"
+      },
+      "typeVersion": 1,
+      "nodeCategories": [
+        {
+          "id": 9,
+          "name": "Core Nodes"
+        }
+      ]
+    }
+  ],
+  "workflow": {
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "responseMode": "onReceived",
+          "path": "approval-trigger",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [-768, -304],
+        "name": "Webhook Trigger",
+        "id": "00000000-0000-4000-8000-000000003003",
+        "webhookId": "10000000-0000-4000-8000-000000003002"
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "actorType": "user",
+          "callbackMethod": "POST",
+          "resource": "action",
+          "actorId": "alice@example.com",
+          "actionType": "showform",
+          "actionTitle": "Please Review and Approve",
+          "callbackUrl": "={{ $execution.resumeUrl + '&actor=alice' }}"
+        },
+        "type": "CUSTOM.workflowInteractionLayer",
+        "typeVersion": 1,
+        "position": [-96, -416],
+        "name": "Create Action for Alice",
+        "id": "00000000-0000-4000-8000-000000003004"
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "actorType": "user",
+          "callbackMethod": "POST",
+          "resource": "action",
+          "actorId": "bob@example.com",
+          "actionType": "showform",
+          "actionTitle": "Please Review and Approve",
+          "callbackUrl": "={{ $execution.resumeUrl + '&actor=bob' }}"
+        },
+        "type": "CUSTOM.workflowInteractionLayer",
+        "typeVersion": 1,
+        "position": [-96, -208],
+        "name": "Create Action for Bob",
+        "id": "00000000-0000-4000-8000-000000003005"
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [144, -304],
+        "name": "Merge",
+        "id": "00000000-0000-4000-8000-000000003006"
+      },
+      {
+        "parameters": {
+          "operation": "wait",
+          "useStaticExpectedCalls": false,
+          "expectedCallsDynamic": "[\n  {\"queryParam\": \"actor\", \"queryValue\": \"alice\"},\n  {\"queryParam\": \"actor\", \"queryValue\": \"bob\"}\n]"
+        },
+        "type": "CUSTOM.multiWebhookWait",
+        "typeVersion": 1,
+        "position": [336, -304],
+        "name": "Multi Webhook Wait Node",
+        "id": "00000000-0000-4000-8000-000000003007",
+        "webhookId": "10000000-0000-4000-8000-000000003102"
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [576, -304],
+        "name": "Process Results",
+        "id": "00000000-0000-4000-8000-000000003008"
+      }
+    ],
+    "connections": {
+      "Webhook Trigger": {
+        "main": [
+          [
+            {
+              "node": "Create Action for Alice",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Create Action for Bob",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Action for Alice": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Action for Bob": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Merge": {
+        "main": [
+          [
+            {
+              "node": "Multi Webhook Wait Node",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Multi Webhook Wait Node": {
+        "main": [
+          [
+            {
+              "node": "Process Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

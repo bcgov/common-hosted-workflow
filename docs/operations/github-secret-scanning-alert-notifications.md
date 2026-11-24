@@ -194,6 +194,8 @@ both are handled.
 
 ## n8n workflow setup
 
+The built-in template library includes this graph as **GitHub secret scanning alert to Teams Adaptive Card (Preview)** (template `4005`, in **Operational Teams notifications**). It uses the script below without modification, disables execution-data saving, and starts in Preview mode. The template still requires the trusted signature-validating receiver and other precautions above.
+
 1. **Webhook node** — method **POST**, receiving authenticated forwarding from the
    signature-validating receiver. Use its **Production** URL for live traffic and a parsed
    JSON body for the formatter below. Preserve `X-GitHub-Event` and `X-GitHub-Delivery` when
