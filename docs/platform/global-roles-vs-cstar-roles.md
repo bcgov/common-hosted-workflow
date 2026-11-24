@@ -81,6 +81,7 @@ Examples:
 - `project:editor` does not make a user `global:admin`
 - `global:member` does not guarantee access to any tenant team project
 - `ui:actor` can matter for WIL matching without changing `n8n` project membership
+- `ui:actor` on its own grants Workflow User Portal (WIL) access but never `n8n` access; see `docs/platform/access-request.md#portal-only-access-with-uiactor`
 
 ## Related docs
 

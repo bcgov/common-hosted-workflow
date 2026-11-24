@@ -661,7 +661,9 @@ export class OidcLoginCoordinator {
         kind: 'access-request',
         uiHandle: handle,
         uiToken: token,
-        redirectUrl: appendSessionToReturnTo(buildUiAppUrl('/access-request'), handle),
+        // Land on the portal home: it redirects to /access-request only when that is the
+        // user's sole capability, so `ui:actor` portal users are not forced onto that page.
+        redirectUrl: appendSessionToReturnTo(buildUiAppUrl('/'), handle),
       };
     } catch (error) {
       logError(this.deps.logger, error, { context: `OIDC callback - prepare UI exchange (${userKind})` });

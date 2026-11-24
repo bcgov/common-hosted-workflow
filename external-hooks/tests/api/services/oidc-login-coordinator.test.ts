@@ -203,7 +203,7 @@ describe('OidcLoginCoordinator', () => {
 
     expect(outcome.kind).toBe('access-request');
     if (outcome.kind === 'access-request') {
-      expect(outcome.redirectUrl).toMatch(/\/ui\/access-request\?session=/);
+      expect(outcome.redirectUrl).toMatch(/\/ui\/\?session=/);
     }
     expect(deps.userRepository.createUserWithProject).not.toHaveBeenCalled();
     expect(deps.createAuthTokenFn).not.toHaveBeenCalled();

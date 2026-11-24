@@ -9,3 +9,4 @@ node_modules
 /.cocoindex_code
 docs/tasks
 *.tsbuildinfo
+CLAUDE.md

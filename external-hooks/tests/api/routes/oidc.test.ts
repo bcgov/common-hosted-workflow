@@ -543,7 +543,7 @@ describe('oidc router', () => {
     expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
     expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
     expect(setUiSessionExchangeMock).toHaveBeenCalledWith(expect.any(String), 'access-token-1', 60_000);
-    expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+    expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/\?session=/));
   });
 
   // stale and cross-identity n8n sessions must be terminated on access-request
@@ -580,7 +580,7 @@ describe('oidc router', () => {
       expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
       expect(params.authService.clearCookie).toHaveBeenCalledTimes(1);
       expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
-      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/\?session=/));
       // Subsequent n8n cookie auth with prior (non-existent) token is denied — login falls through to OIDC
       params.authService.resolveJwt = vi.fn(async () => {
         throw new Error('no token');
@@ -636,7 +636,7 @@ describe('oidc router', () => {
       expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
       expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
       // Cookie mutation: browser would drop n8n-auth — Set-Cookie clear via authService
-      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/\?session=/));
       // Subsequent protected n8n behavior: disabled user must be rejected at integration seam
       // Simulate n8n authService.resolveJwt now seeing disabled user — should be treated as unauthorized.
       // Our assertion is that the only way to retain access would be the stale cookie, which was cleared.
@@ -689,7 +689,7 @@ describe('oidc router', () => {
       expect(params.n8nRepositories.user.createUserWithProject).not.toHaveBeenCalled();
       expect(params.authService.clearCookie).toHaveBeenCalledWith(res);
       expect(res.cookie).not.toHaveBeenCalledWith('n8n-auth', expect.anything(), expect.anything());
-      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/access-request\?session=/));
+      expect(res.redirect).toHaveBeenCalledWith(expect.stringMatching(/^\/ui\/\?session=/));
       // Integration seam: prior cookie for A must not grant n8n access after B's access-request;
       // simulate second request presenting the stale A token — authService would previously have returned A,
       // but after clear the browser would not send it. We assert clear prevents replay.
