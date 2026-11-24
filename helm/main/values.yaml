@@ -146,6 +146,9 @@ n8n:
     N8N_OTEL_ENABLED: "false"
     N8N_LOG_FORMAT: "json"
     N8N_LOG_STREAMING_MANAGED_BY_ENV: "false"
+    # Cap old space below the 2 GiB container limit, leaving headroom for other
+    # V8 heap spaces and native/non-heap memory.
+    NODE_OPTIONS: "--max-old-space-size=1536"
 
   extraEnv:
     DB_POSTGRESDB_DATABASE:
@@ -215,10 +218,10 @@ n8n:
     resources:
       requests:
         cpu: 300m
-        memory: 576Mi
+        memory: 768Mi
       limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 2Gi
 
   worker:
     enabled: true
@@ -228,10 +231,10 @@ n8n:
     resources:
       requests:
         cpu: 300m
-        memory: 576Mi
+        memory: 768Mi
       limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 2Gi
 
   webhook:
     enabled: false
@@ -244,10 +247,10 @@ n8n:
     resources:
       requests:
         cpu: 300m
-        memory: 576Mi
+        memory: 768Mi
       limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 2Gi
 
   runner:
     enabled: false
@@ -261,6 +264,7 @@ n8n:
       N8N_RUNNERS_MAX_CONCURRENCY: "20"
       N8N_RUNNERS_TASK_TIMEOUT: "300"
       N8N_BLOCK_FS_WRITE_ACCESS: "true"
+      NODE_OPTIONS: "--max-old-space-size=1536"
 
     resources:
       requests:
@@ -268,7 +272,7 @@ n8n:
         memory: 768Mi
       limits:
         cpu: 500m
-        memory: 1Gi
+        memory: 2Gi
 
   # Nodes disabled in all environments.
   baseExcludedNodes:
