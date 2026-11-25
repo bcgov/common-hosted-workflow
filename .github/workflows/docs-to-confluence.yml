@@ -31,7 +31,7 @@ jobs:
       uses: ./.github/actions/setup-npm
 
     - name: Sync Docs to Confluence
-      uses: egose/actions/confluence@71efad841d4b7bb6a479984abacf7111ebd44a16
+      uses: egose/actions/confluence@0e43440beeb97fe9057856ef1de9e970d0b67b77
       with:
         folder: docs
         username: ${{ secrets.CONFLUENCE_USERNAME }}
@@ -40,3 +40,5 @@ jobs:
         space-key: ${{ vars.CONFLUENCE_SPACE_KEY }}
         parent-page-id: ${{ vars.CONFLUENCE_PARENT_PAGE_ID }}
         page-title-strategy: sentence-case-path
+        disambiguate-folder-titles: 'true'
+        overwrite-parent-page: 'true'
