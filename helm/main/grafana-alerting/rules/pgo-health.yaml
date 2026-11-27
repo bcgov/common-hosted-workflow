@@ -1,0 +1,353 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: PGO Health Alerts
+    folder: n8n
+    interval: 1m
+    rules:
+
+      # Guard rule for the whole group. A missing series also indicates that
+      # Alloy discovery, scraping, or remote write is unavailable.
+      - uid: pgo-metrics-unavailable
+        title: "PGO Metrics Unavailable"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'min by (pod) (up{job="pgo"})'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        isPaused: false
+        annotations:
+          dashboard_url: d/pgo-health/pgo-health
+          summary: "The Crunchy PostgreSQL exporter is no longer being scraped."
+          description: "PGO metrics are unavailable. Check the exporter sidecar, Alloy pod discovery/RBAC, and the Alloy→Mimir pipeline; other PGO alerts are unreliable while this fires."
+        labels:
+          category: availability
+          environment: __NAMESPACE__
+          service: pgo
+          severity: critical
+          team: platform
+
+      # pg_up reports whether postgres_exporter can connect to PostgreSQL even
+      # when the exporter HTTP endpoint itself remains scrapeable.
+      - uid: pgo-database-unavailable
+        title: "PostgreSQL Database Unavailable"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'min by (pod) (pg_up{job="pgo"})'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        isPaused: false
+        annotations:
+          dashboard_url: d/pgo-health/pgo-health
+          summary: "The PGO exporter cannot connect to PostgreSQL."
+          description: "PostgreSQL is unavailable through the exporter on {{ $labels.pod }}. Check database health and the ccp_monitoring connection."
+        labels:
+          category: availability
+          environment: __NAMESPACE__
+          service: pgo
+          severity: critical
+          team: platform
+
+      # Total connections include active and idle sessions, both of which count
+      # against max_connections.
+      - uid: pgo-connections-high
+        title: "PostgreSQL Connections Sustained High"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max by (pod) (100 * ccp_connection_stats_total{job="pgo"} / clamp_min(ccp_connection_stats_max_connections{job="pgo"}, 1))'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [85]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        isPaused: false
+        annotations:
+          dashboard_url: d/pgo-health/pgo-health
+          summary: "PostgreSQL connections exceed 85% of max_connections."
+          description: "Connections on {{ $labels.pod }} are at {{ $values.A.Value | printf \"%.1f\" }}% of max_connections for 10+ minutes. Check for connection leaks or insufficient pooling."
+        labels:
+          category: capacity
+          environment: __NAMESPACE__
+          service: pgo
+          severity: warning
+          team: platform
+
+      # This series is exported by the primary for each connected replica.
+      - uid: pgo-replication-lag-high
+        title: "PostgreSQL Replication Lag High"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max by (pod, replica) (ccp_replication_lag_size_bytes{job="pgo"} / 1048576)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [64]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        isPaused: false
+        annotations:
+          dashboard_url: d/pgo-health/pgo-health
+          summary: "PostgreSQL replica lag exceeds 64 MiB."
+          description: "Replica {{ $labels.replica }} reported by {{ $labels.pod }} is {{ $values.A.Value | printf \"%.1f\" }} MiB behind for 10+ minutes. Check replica and network health before a failover."
+        labels:
+          category: performance
+          environment: __NAMESPACE__
+          service: pgo
+          severity: warning
+          team: platform
+
+      - uid: pgo-backup-failed
+        title: "PostgreSQL Backup Failed"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max by (pod, repo, backup_type) (ccp_backrest_last_info_backup_error{job="pgo"})'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        isPaused: false
+        annotations:
+          dashboard_url: d/pgo-health/pgo-health
+          summary: "pgBackRest reports a failed PostgreSQL backup."
+          description: "The latest {{ $labels.backup_type }} backup in repo {{ $labels.repo }} failed. Check pgBackRest logs and repository connectivity."
+        labels:
+          category: availability
+          environment: __NAMESPACE__
+          service: pgo
+          severity: warning
+          team: platform
+
+      # Repo 1 is the chart's local repository. The 96-hour threshold tolerates
+      # environments whose schedules intentionally pause over the weekend.
+      - uid: pgo-backup-stale
+        title: "PostgreSQL Local Backup Stale"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 'max by (pod, repo) (ccp_backrest_last_incr_backup_time_since_completion_seconds{job="pgo", repo="1"} / 3600)'
+              hide: false
+              instant: true
+              queryType: instant
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    params: [96]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              hide: false
+              refId: B
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        isPaused: false
+        annotations:
+          dashboard_url: d/pgo-health/pgo-health
+          summary: "The latest local incremental PostgreSQL backup is over 96 hours old."
+          description: "The latest incremental backup in repo {{ $labels.repo }} is {{ $values.A.Value | printf \"%.1f\" }} hours old. Check the pgBackRest schedule and recent backup jobs."
+        labels:
+          category: availability
+          environment: __NAMESPACE__
+          service: pgo
+          severity: warning
+          team: platform

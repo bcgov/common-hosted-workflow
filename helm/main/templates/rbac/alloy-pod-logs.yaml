@@ -1,4 +1,4 @@
-{{- if and .Values.alloy.enabled .Values.systemLogs.enabled }}
+{{- if .Values.alloy.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
