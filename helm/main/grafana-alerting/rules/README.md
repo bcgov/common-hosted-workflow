@@ -33,13 +33,14 @@ Add one file per service (e.g. `alloy.yaml`, `loki.yaml`).
 | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `workflow_failures` | `workflow`       | Template range over `$values` to list per-workflow failure counts. Email template renders these under a "Failed workflows" section.                           |
 | `error_messages`    | `infrastructure` | Template range over `$values` to list top error messages from a secondary Loki query (refId G). Email template renders these under a "Recent errors" section. |
+| `dashboard_url`     | Other categories | Relative dashboard path used by the generic email review link, for example `d/pgo-health/pgo-health`.                                                         |
 
 ## Required labels
 
 | Label         | Allowed values                                                      | Notes                                                                                                      |
 | ------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `environment` | _(injected)_                                                        | **Do not set manually.** Use `__NAMESPACE__` — Helm replaces it with the release namespace at deploy time. |
-| `service`     | `n8n` `alloy` `loki` `tempo` `mimir` `prometheus`                   | Which service this alert monitors.                                                                         |
+| `service`     | `n8n` `pgo` `alloy` `loki` `tempo` `mimir` `prometheus`             | Which service this alert monitors.                                                                         |
 | `team`        | `platform` `workflows`                                              | Routes the notification. Must exactly match a receiver in `notification-policies.yaml`.                    |
 | `severity`    | `critical` `warning`                                                | `critical` = immediate action. `warning` = investigate soon.                                               |
 | `category`    | `infrastructure` `workflow` `capacity` `performance` `availability` | Controls email template branching.                                                                         |

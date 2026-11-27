@@ -512,7 +512,7 @@ alloy:
   rbac:
     create: false
   serviceAccount:
-    create: false          # created by templates/rbac/alloy-pod-logs.yaml when systemLogs.enabled
+    create: false          # created by templates/rbac/alloy-pod-logs.yaml when Alloy is enabled
     name: chwf-alloy
   controller:
     type: deployment
@@ -840,8 +840,8 @@ logStreaming:
 
 # n8n system log collection — collects stdout/stderr from n8n pods via the Kubernetes API.
 #
-# Requires alloy.enabled. RBAC (ServiceAccount, Role, RoleBinding) is created by
-# templates/rbac/alloy-pod-logs.yaml when this is enabled.
+# Requires alloy.enabled. The shared pod-discovery RBAC (ServiceAccount, Role,
+# RoleBinding) is created by templates/rbac/alloy-pod-logs.yaml with Alloy.
 #
 # Logs are labelled job="n8n-system-logs" to distinguish them from log streaming events.
 

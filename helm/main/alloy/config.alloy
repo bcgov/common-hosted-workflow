@@ -13,6 +13,98 @@ prometheus.scrape "n8n" {
   forward_to      = [prometheus.remote_write.mimir.receiver]
 }
 
+// Discover Crunchy PostgreSQL exporter sidecars in Alloy's own namespace.
+// The dedicated exporter label avoids hardcoding generated pod names or addresses.
+discovery.kubernetes "pgo_pods" {
+  role = "pod"
+
+  namespaces {
+    own_namespace = true
+  }
+
+  selectors {
+    role  = "pod"
+    label = "postgres-operator.crunchydata.com/crunchy-postgres-exporter=true"
+  }
+}
+
+// Keep only the exporter's declared port and retain bounded Kubernetes metadata
+// so dashboards and alerts can distinguish HA pods and primary/replica roles.
+discovery.relabel "pgo_exporter" {
+  targets = discovery.kubernetes.pgo_pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    regex         = "exporter"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_number"]
+    regex         = "9187"
+    action        = "keep"
+  }
+
+  rule {
+    target_label = "__metrics_path__"
+    replacement  = "/metrics"
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "pgo"
+  }
+
+  rule {
+    target_label = "app"
+    replacement  = "pgo"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_postgres_operator_crunchydata_com_cluster"]
+    target_label  = "postgres_cluster"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_postgres_operator_crunchydata_com_instance_set"]
+    target_label  = "postgres_instance_set"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_postgres_operator_crunchydata_com_role"]
+    target_label  = "postgres_role"
+  }
+}
+
+// Keep pgMonitor and database/scrape health series while excluding exporter
+// runtime, Go process, and duplicate postgres_exporter default metrics.
+prometheus.relabel "pgo" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "ccp_.+|pg_up|pg_exporter_last_scrape_error|up"
+    action        = "keep"
+  }
+
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.scrape "pgo" {
+  targets         = discovery.relabel.pgo_exporter.output
+  scrape_interval = "30s"
+  scrape_timeout  = "20s"
+  forward_to      = [prometheus.relabel.pgo.receiver]
+}
+
 // Receive OTLP traces from n8n (N8N_OTEL_ENABLED=true) and forward to Tempo
 otelcol.receiver.otlp "n8n" {
   http {
@@ -129,11 +221,9 @@ loki.process "n8n_events" {
   forward_to = [loki.write.streaming.receiver]
 }
 
-// Discover pods in Alloy's own namespace via the Kubernetes API.
-// Requires systemLogs.enabled=true in Helm values, which creates the required
-// RBAC resources in templates/rbac/alloy-pod-logs.yaml.
-// If RBAC is missing, the Kubernetes discovery/logging components will report
-// permission errors; other independent pipelines can continue running.
+// Discover n8n pods in Alloy's own namespace for system-log collection.
+// templates/rbac/alloy-pod-logs.yaml grants the shared pod-discovery RBAC used
+// by this component and the PGO exporter discovery above.
 discovery.kubernetes "n8n_pods" {
   role = "pod"
 

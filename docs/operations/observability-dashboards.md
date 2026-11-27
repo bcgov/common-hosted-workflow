@@ -1,15 +1,16 @@
-# n8n Observability Dashboards
+# Observability Dashboards
 
-Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They are provisioned automatically — no manual import is needed.
+Grafana provides dashboards for monitoring n8n and its Crunchy PostgreSQL database in Common Hosted Workflow. They are provisioned automatically — no manual import is needed.
 
-| Dashboard             | Audience                     | Scope                                         |
-| --------------------- | ---------------------------- | --------------------------------------------- |
-| **n8n User Overview** | Workflow authors             | How are my workflows performing?              |
-| **n8n Executions**    | Workflow authors, team leads | Are my workflows running and how fast?        |
-| **n8n Health**        | Platform / ops team          | Is the n8n process itself healthy?            |
-| **n8n Traces**        | Workflow authors, platform   | What happened inside a single run?            |
-| **n8n Logs**          | Platform / ops team          | What failed, who changed what, audit trail?   |
-| **n8n System Logs**   | Platform / ops team          | What did the n8n pods print to stdout/stderr? |
+| Dashboard             | Audience                     | Scope                                             |
+| --------------------- | ---------------------------- | ------------------------------------------------- |
+| **n8n User Overview** | Workflow authors             | How are my workflows performing?                  |
+| **n8n Executions**    | Workflow authors, team leads | Are my workflows running and how fast?            |
+| **n8n Health**        | Platform / ops team          | Is the n8n process itself healthy?                |
+| **PGO Health**        | Platform / ops team          | Are PostgreSQL, replication, and backups healthy? |
+| **n8n Traces**        | Workflow authors, platform   | What happened inside a single run?                |
+| **n8n Logs**          | Platform / ops team          | What failed, who changed what, audit trail?       |
+| **n8n System Logs**   | Platform / ops team          | What did the n8n pods print to stdout/stderr?     |
 
 ---
 
@@ -19,7 +20,7 @@ Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They a
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Grafana (UI)                              │
 │   n8n Executions  │   n8n Traces     │ n8n Logs                 │
-│   n8n Health      │                  │                          │
+│   n8n Health      │   PGO Health     │                          │
 └──────┬──────────────────┬──────────────────┬────────────────────┘
        │ PromQL           │ TraceQL          │ LogQL
        ▼                  ▼                  ▼
@@ -36,7 +37,7 @@ Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They a
     scrapes /metrics        receives OTLP + syslog
          (pull)                   (push)
               │                       │
-           n8n pod                 n8n pod
+           n8n + PGO pods          n8n pod
 ```
 
 ---
@@ -48,7 +49,7 @@ Grafana provides dashboards for monitoring n8n in Common Hosted Workflow. They a
 | Local sandbox | `http://localhost:3000`                 | SSO via Keycloak |
 | Dev / prod    | Grafana route configured in Helm values | SSO via Keycloak |
 
-**n8n User Overview** is in the **n8n** folder in Grafana's left sidebar. All other dashboards (**n8n Executions**, **n8n Health**, **n8n Traces**, **n8n Logs**, **n8n System Logs**) are in the **n8n-admin** folder.
+**n8n User Overview** is in the **n8n** folder in Grafana's left sidebar. All other dashboards (**n8n Executions**, **n8n Health**, **PGO Health**, **n8n Traces**, **n8n Logs**, **n8n System Logs**) are in the **n8n-admin** folder.
 
 ---
 
@@ -195,6 +196,40 @@ n8n caches workflow definitions and credentials in memory to avoid repeated data
 | **Cache Hits & Misses Over Time** | Hit and miss rates per second — a sustained rise in misses without a matching rise in hits indicates cache pressure                 |
 
 ---
+
+## PGO Health
+
+Monitors the Crunchy PostgreSQL cluster through its pgMonitor exporter sidecars. Use it to check database availability, connection pressure, replication, backup freshness, transaction wraparound, and cache behavior.
+
+> **Availability:** This dashboard requires Alloy and pgMonitor in OpenShift. It shows no PGO data in the local docker-compose sandbox, which does not run the Crunchy exporter or Kubernetes discovery.
+
+### Filter
+
+**PostgreSQL pod** — selects one or more exporter pods. The default **All** includes every HA member. Database-size panels use the maximum across selected exporters to avoid counting the same database twice.
+
+### Health KPIs
+
+| Panel                            | What it shows                                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Healthy Exporters**            | Number of PGO exporter targets Alloy is scraping successfully                                |
+| **Database Available**           | Minimum `pg_up` value across selected pods — zero means the exporter cannot query PostgreSQL |
+| **Connection Utilization**       | Highest active-plus-idle connection usage against `max_connections`                          |
+| **Replication Lag**              | Largest WAL byte lag reported by a primary for a connected replica                           |
+| **Local Incremental Backup Age** | Time since the latest successful incremental backup in local repo 1                          |
+| **Application Database Size**    | Combined size of non-`postgres` databases without double-counting HA exporters               |
+
+### Charts
+
+| Panel                                | What it shows                                                                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Connections Over Time**            | Active and idle sessions per exporter, with the connection ceiling                                  |
+| **Replication Lag Over Time**        | WAL lag per primary/replica relationship; no series is expected without a connected replica         |
+| **Database Size Over Time**          | Size per database, deduplicated across selected HA exporters                                        |
+| **Incremental Backup Age Over Time** | Backup age per pgBackRest repository                                                                |
+| **Transaction Wraparound Progress**  | Progress towards emergency autovacuum and transaction ID exhaustion risk                            |
+| **Buffer Cache Hit Ratio**           | Buffer hits relative to hits plus reads; sustained low values can indicate memory or query pressure |
+
+Alloy discovers pods labelled `postgres-operator.crunchydata.com/crunchy-postgres-exporter=true` and scrapes port `9187` every 30 seconds. It forwards `ccp_*`, `pg_up`, exporter-health, and scrape-health series to Mimir while dropping exporter runtime and duplicate default metrics to control cardinality. This pipeline does not require Prometheus annotations and does not send these metrics to Sysdig Cloud.
 
 ---
 
@@ -401,10 +436,10 @@ Git and provisioned by Helm; they are locked against editing in the Grafana UI.
 
 Every alert rule includes a `team` label. Grafana routes notifications using that label:
 
-| Team label  | Recipient contact point | Webhook | Alert scope                            |
-| ----------- | ----------------------- | ------- | -------------------------------------- |
-| `platform`  | `n8n-ops-email`         | Yes     | n8n platform and infrastructure health |
-| `workflows` | `n8n-workflows-email`   | No      | Workflow execution failures            |
+| Team label  | Recipient contact point | Webhook | Alert scope                                |
+| ----------- | ----------------------- | ------- | ------------------------------------------ |
+| `platform`  | `n8n-ops-email`         | Yes     | n8n and PGO platform/infrastructure health |
+| `workflows` | `n8n-workflows-email`   | No      | Workflow execution failures                |
 
 The recipient addresses and the webhook callback URL are supplied to Grafana through the
 deployment secret (`GRAFANA_ALERT_EMAIL_TO`, `GRAFANA_ALERT_EMAIL_WORKFLOWS`, and
@@ -462,6 +497,21 @@ runs in queue mode; in single-process mode they stay silent. The warning thresho
 100, FDs 500, 0.9 cores, 1 s lag) are starting points — tune them against production data
 before trusting the warning-level pages.
 
+### PGO health alerts
+
+The following rules query Crunchy pgMonitor metrics from Mimir and route to the `platform` team by email and webhook callback. Notifications link to the **PGO Health** dashboard.
+
+| Alert                                     | Condition                                                                      | Evaluation                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |
+| **PGO Metrics Unavailable**               | An exporter scrape fails, or all PGO scrape series disappear.                  | Sustained for two minutes     |
+| **PostgreSQL Database Unavailable**       | The exporter cannot query PostgreSQL (`pg_up` is zero).                        | Sustained for two minutes     |
+| **PostgreSQL Connections Sustained High** | Total connections exceed 85% of `max_connections`.                             | Sustained for ten minutes     |
+| **PostgreSQL Replication Lag High**       | A replica is more than 64 MiB behind its primary.                              | Sustained for ten minutes     |
+| **PostgreSQL Backup Failed**              | pgBackRest reports an error for the latest backup of any type or repository.   | Sustained for one minute      |
+| **PostgreSQL Local Backup Stale**         | The latest successful incremental backup in local repo 1 is over 96 hours old. | Sustained for fifteen minutes |
+
+`PGO Metrics Unavailable` is the guard rule for the group. The 96-hour backup-age threshold accommodates environments with weekday-only schedules. Replication and backup series are only present when the corresponding replica or backup information exists, so those rules use `noDataState: OK` rather than treating an absent optional series as a failure.
+
 ### Workflow alerts
 
 | Alert                         | Condition                                                                                                                                     | Evaluation                                          |
@@ -484,6 +534,7 @@ rule label in sync: an unmatched team label falls back to Grafana's default rece
 
 ```
 n8n /metrics           →  Alloy (scrapes every 30 s)        →  Mimir                       →  Grafana (datasource "Mimir")
+PGO exporter :9187     →  Alloy (Kubernetes pod discovery)  →  Mimir                       →  Grafana (datasource "Mimir")
 n8n OTLP               →  Alloy (OTLP receiver :4318)       →  Tempo                       →  Grafana (datasource "Tempo")
 n8n log streaming      →  Alloy (syslog TCP :5514)          →  Loki  tenant: streaming     →  Grafana (datasource "Loki")
 n8n pod stdout/stderr  →  Alloy (loki.source.kubernetes)    →  Loki  tenant: system-logs   →  Grafana (datasource "Loki System Logs")
