@@ -23,7 +23,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 'min by (pod) (up{job="pgo"})'
+              expr: 'min by (postgres_cluster, pod) (up{job="pgo"})'
               hide: false
               instant: true
               queryType: instant
@@ -81,7 +81,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 'min by (pod) (pg_up{job="pgo"})'
+              expr: 'min by (postgres_cluster, pod) (pg_up{job="pgo"})'
               hide: false
               instant: true
               queryType: instant
@@ -139,7 +139,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 'max by (pod) (100 * ccp_connection_stats_total{job="pgo"} / clamp_min(ccp_connection_stats_max_connections{job="pgo"}, 1))'
+              expr: 'max by (postgres_cluster, pod) (100 * ccp_connection_stats_total{job="pgo"} / clamp_min(ccp_connection_stats_max_connections{job="pgo"}, 1))'
               hide: false
               instant: true
               queryType: instant
@@ -196,7 +196,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 'max by (pod, replica) (ccp_replication_lag_size_bytes{job="pgo"} / 1048576)'
+              expr: 'max by (postgres_cluster, pod, replica) (ccp_replication_lag_size_bytes{job="pgo"} / 1048576)'
               hide: false
               instant: true
               queryType: instant
@@ -252,7 +252,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 'max by (pod, repo, backup_type) (ccp_backrest_last_info_backup_error{job="pgo"})'
+              expr: 'max by (postgres_cluster, pod, repo, backup_type) (ccp_backrest_last_info_backup_error{job="pgo"})'
               hide: false
               instant: true
               queryType: instant
@@ -310,7 +310,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 'max by (pod, repo) (ccp_backrest_last_incr_backup_time_since_completion_seconds{job="pgo", repo="1"} / 3600)'
+              expr: 'max by (postgres_cluster, pod, repo) (ccp_backrest_last_incr_backup_time_since_completion_seconds{job="pgo", repo="1"} / 3600)'
               hide: false
               instant: true
               queryType: instant

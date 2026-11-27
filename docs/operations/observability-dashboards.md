@@ -499,7 +499,11 @@ before trusting the warning-level pages.
 
 ### PGO health alerts
 
-The following rules query Crunchy pgMonitor metrics from Mimir and route to the `platform` team by email and webhook callback. Notifications link to the **PGO Health** dashboard.
+The following rules query Crunchy pgMonitor metrics from Mimir and notify the `platform` team
+by email and the same n8n webhook used by n8n health alerts. Alert instances retain the
+PostgreSQL cluster and pod labels when present, and notifications link to the **PGO Health**
+dashboard. See [Grafana Alert Notifications → PGO alert payloads](grafana-alert-notifications.md#pgo-alert-payloads)
+for the payload example and workflow Code node.
 
 | Alert                                     | Condition                                                                      | Evaluation                    |
 | ----------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |

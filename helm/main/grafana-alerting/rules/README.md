@@ -27,13 +27,13 @@ Add one file per service (e.g. `alloy.yaml`, `loki.yaml`).
 | `summary`     | One sentence, plain text, no template vars. Shown in Grafana alert list.                          |
 | `description` | Full sentence with metric value. Template vars allowed: `{{ $values.B.Value \| printf "%.0f" }}`. |
 
-## Optional annotations (email-only)
+## Optional annotations
 
 | Annotation          | Category         | Notes                                                                                                                                                         |
 | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `workflow_failures` | `workflow`       | Template range over `$values` to list per-workflow failure counts. Email template renders these under a "Failed workflows" section.                           |
 | `error_messages`    | `infrastructure` | Template range over `$values` to list top error messages from a secondary Loki query (refId G). Email template renders these under a "Recent errors" section. |
-| `dashboard_url`     | Other categories | Relative dashboard path used by the generic email review link, for example `d/pgo-health/pgo-health`.                                                         |
+| `dashboard_url`     | Other categories | Relative dashboard path used by the generic email review link and the n8n card's **Open dashboard** button, for example `d/pgo-health/pgo-health`.            |
 
 ## Required labels
 
