@@ -13,9 +13,9 @@ policies:
     group_interval: 5m
     repeat_interval: 4h
     routes:
-      # team=platform alerts (all System Log + Health alerts) fan out to BOTH
-      # the ops email and the webhook contact point: `continue: true` keeps
-      # evaluating sibling routes after this one matches.
+      # team=platform alerts (n8n System Log + Health and PGO Health alerts)
+      # fan out to BOTH the ops email and the webhook contact point:
+      # `continue: true` keeps evaluating sibling routes after this one matches.
       - receiver: n8n-ops-email
         object_matchers:
           - [team, =, platform]

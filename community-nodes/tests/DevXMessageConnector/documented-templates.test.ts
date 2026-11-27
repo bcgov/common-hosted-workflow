@@ -7,6 +7,7 @@ import { executeNode, getSentContent, setupDevXConnectorEnv } from './helpers';
 
 const PROJECT_ROOT = path.resolve(process.cwd(), '..');
 const TEMPLATES_ROOT = path.join(PROJECT_ROOT, 'external-hooks/src/api/assets/templates');
+const GRAFANA_RUNBOOK = 'docs/operations/grafana-alert-notifications.md';
 
 type WorkflowNode = {
   name: string;
@@ -88,7 +89,7 @@ const scenarios: Scenario[] = [
   {
     id: 4003,
     slug: 'grafana-alert-adaptive-card',
-    document: 'docs/operations/grafana-alert-notifications.md',
+    document: GRAFANA_RUNBOOK,
     webhookPath: 'devx/grafana-alert',
     sampleBody: {
       receiver: 'n8n-webhook',
@@ -247,6 +248,44 @@ describe('documented Adaptive Card workflow templates', () => {
       expect(serializedOutput).not.toContain('SENSITIVE_TEST_MARKER');
       expect(JSON.stringify(getSentContent(requestOptions))).not.toContain('SENSITIVE_TEST_MARKER');
     }
+  });
+
+  it('renders the documented PGO warning with cluster details and a dashboard link', () => {
+    const markdown = readFileSync(path.join(PROJECT_ROOT, GRAFANA_RUNBOOK), 'utf8');
+    const example = markdown.match(/### PGO alert payloads[\s\S]*?```json\n([\s\S]*?)\n```/);
+    if (!example) throw new Error('PGO alert payload example not found');
+    const [output] = runFormatter(documentedScript(GRAFANA_RUNBOOK), { body: JSON.parse(example[1]) });
+
+    expect(output.json.card).toMatchObject({
+      body: [
+        {
+          style: 'warning',
+          items: [
+            { text: '🟡 Firing — Warning — PostgreSQL Connections Sustained High' },
+            { text: 'c89a45-prod · pgo · platform' },
+          ],
+        },
+        {
+          items: expect.arrayContaining([
+            {
+              type: 'FactSet',
+              facts: expect.arrayContaining([
+                { title: 'PostgreSQL cluster', value: 'n8n-postgres' },
+                { title: 'Pod', value: 'n8n-postgres-instance1-8f4z' },
+                { title: 'Value', value: '91.3' },
+              ]),
+            },
+          ]),
+        },
+      ],
+      actions: expect.arrayContaining([
+        {
+          type: 'Action.OpenUrl',
+          title: 'Open dashboard',
+          url: 'https://grafana-workflow.apps.gold.devops.gov.bc.ca/d/pgo-health/pgo-health',
+        },
+      ]),
+    });
   });
 
   it('uses a unique path for every documented notification webhook', () => {

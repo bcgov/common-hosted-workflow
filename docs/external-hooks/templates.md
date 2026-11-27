@@ -147,7 +147,7 @@ use unique POST paths and respond immediately, and every connector starts in
 | ---- | --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | 4001 | Deployment status card      | `devx/deployment-status`            | [Deployment Status Notifications](../ci-cd/cd/deployment-status-notifications.md)                         |
 | 4002 | DNS routing change card     | `devx/dns-routing-change`           | [DNS Probe](../platform/dns-probe.md)                                                                     |
-| 4003 | Grafana alert card          | `devx/grafana-alert`                | [Grafana Alert Notifications](../operations/grafana-alert-notifications.md)                               |
+| 4003 | n8n/PGO Grafana alert card  | `devx/grafana-alert`                | [Grafana Alert Notifications](../operations/grafana-alert-notifications.md)                               |
 | 4004 | Custom Sysdig alert card    | `devx/sysdig-alert-card`            | [Sysdig Alert Notifications](../operations/sysdig-alert-notifications.md)                                 |
 | 4005 | GitHub secret scanning card | `devx/github-secret-scanning-alert` | [GitHub Secret Scanning Alert Notifications](../operations/github-secret-scanning-alert-notifications.md) |
 

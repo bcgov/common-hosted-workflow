@@ -28,8 +28,8 @@ contactPoints:
   # Webhook receiver — POSTs Grafana's standard alert JSON (receiver, status,
   # alerts[] with labels/annotations/values, title, message) to a callback URL,
   # e.g. an n8n webhook node or the external-hooks API. Routed from
-  # notification-policies.yaml for every alert matching team=platform (all
-  # System Log and Health alerts), alongside the ops email.
+  # notification-policies.yaml for every alert matching team=platform (n8n
+  # System Log and Health alerts plus PGO Health alerts), alongside the ops email.
   - orgId: 1
     name: n8n-webhook
     receivers:
