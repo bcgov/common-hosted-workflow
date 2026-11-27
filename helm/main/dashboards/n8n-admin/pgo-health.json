@@ -249,7 +249,11 @@
         "defaults": {
           "unit": "bytes",
           "min": 0,
-          "color": { "mode": "text" }
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
         },
         "overrides": []
       },
