@@ -70,7 +70,7 @@
     "n8n-core": "^2.16.1",
     "n8n-nodes-base": "^2.15.1",
     "n8n-workflow": "^2.16.0",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "typescript-eslint": "^8.67.0",
     "vitest": "^5.0.0"
   },
