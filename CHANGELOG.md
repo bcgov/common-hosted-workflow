@@ -1,3 +1,21 @@
+## [0.14.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.13.0...v0.14.0) (2026-11-27)
+
+### Features
+
+* **6545:** accept source-specific webhook events in DevX templates ([4162ac8](https://github.com/bcgov/common-hosted-workflow/commit/4162ac853fa01ccc179ab1dee5f6c63264805234))
+* **6545:** add a static workflow template library ([89de1f5](https://github.com/bcgov/common-hosted-workflow/commit/89de1f5f0d47eff9584f9dabe825c4866aad30b1))
+* **6545:** add Crunchy PostgreSQL health monitoring ([d87fece](https://github.com/bcgov/common-hosted-workflow/commit/d87fecece1114d95185458e299b03b7a44a54487))
+* **6545:** add DevX Message Connector preview templates ([9202e88](https://github.com/bcgov/common-hosted-workflow/commit/9202e8898dbfaf6f0d395b47421abf095977cc1e))
+* **6545:** publish documented workflow templates ([e937635](https://github.com/bcgov/common-hosted-workflow/commit/e9376350ef6c29043b9d6b1bb25be1c0aca9a56c))
+* **6545:** route PGO alerts to Grafana webhook cards ([8c6f652](https://github.com/bcgov/common-hosted-workflow/commit/8c6f6523b78ffcb46e15f047b200e3949b565ebb))
+* **CCP-6332:** add chef documentation and handle draft or deleted submissions ([#625](https://github.com/bcgov/common-hosted-workflow/issues/625)) ([b3f8446](https://github.com/bcgov/common-hosted-workflow/commit/b3f84460de019e8db876c006910aef591e0839d1))
+
+### Bug Fixes
+
+* **6545:** use threshold-based coloring for PGO health dashboard values ([8ca982b](https://github.com/bcgov/common-hosted-workflow/commit/8ca982b9fef0b48542ba589047daf078066a9611))
+* **CCP-6549:** allow a user with uiactor role to access the WIL User portal ([#626](https://github.com/bcgov/common-hosted-workflow/issues/626)) ([b5a471c](https://github.com/bcgov/common-hosted-workflow/commit/b5a471c18a8244d741db184847c8d252532d91a9))
+* **n8n:** increase default memory allocation and Node.js heap size ([7e93371](https://github.com/bcgov/common-hosted-workflow/commit/7e9337159d3ae8446af8fe19e7042851da0d2c8b))
+
 ## [0.13.0](https://github.com/bcgov/common-hosted-workflow/compare/v0.12.0...v0.13.0) (2026-11-20)
 
 ### Features
